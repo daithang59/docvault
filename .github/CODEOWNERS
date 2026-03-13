@@ -1,0 +1,29 @@
+# CODEOWNERS — DocVault
+# Each line is a file pattern followed by one or more owners.
+# Order matters: the last matching pattern takes precedence.
+# GitHub docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default: team lead reviews everything not otherwise matched
+*                             @daithang59
+
+# Infrastructure & CI/CD
+infra/                        @daithang59
+.github/                      @daithang59
+
+# Services — assign to backend owners
+services/gateway/             @daithang59
+services/metadata-service/    @daithang59
+services/document-service/    @daithang59
+services/workflow-service/    @daithang59
+services/audit-service/       @daithang59
+services/notification-service/ @daithang59
+
+# Shared libraries
+libs/                         @daithang59
+
+# Frontend
+apps/web/                     @daithang59
+
+# Docs
+docs/                         @daithang59
+README.md                     @daithang59
