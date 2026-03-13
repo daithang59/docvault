@@ -1,0 +1,8 @@
+{
+  "realm": "docvault",
+  "enabled": true,
+  "displayName": "DocVault Realm",
+  "clients": [],
+  "roles": { "realm": [] },
+  "users": []
+}
