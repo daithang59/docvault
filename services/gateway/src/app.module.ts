@@ -9,4 +9,3 @@ import { MetadataProxyController } from './metadata.proxy.controller';
   controllers: [AppController, MetadataProxyController],
 })
 export class AppModule {}
-

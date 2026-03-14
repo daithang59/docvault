@@ -1,0 +1,23 @@
+
+> docvault@ lint C:\NT114\docvault
+> turbo run lint
+
+â€¢ turbo 2.8.16
+â€¢ Packages in scope: gateway, metadata-service
+â€¢ Running lint in 2 packages
+â€¢ Remote caching disabled
+gateway:lint: cache miss, executing 032ed9ecdf139ec3
+metadata-service:lint: cache miss, executing 7a7e7ec50d6caf92
+gateway:lint: 
+gateway:lint: > gateway@0.0.1 lint C:\NT114\docvault\services\gateway
+gateway:lint: > eslint "{src,apps,libs,test}/**/*.ts" --fix
+gateway:lint: 
+metadata-service:lint: 
+metadata-service:lint: > metadata-service@0.0.1 lint C:\NT114\docvault\services\metadata-service
+metadata-service:lint: > eslint "{src,apps,libs,test}/**/*.ts" --fix
+metadata-service:lint: 
+
+ Tasks:    2 successful, 2 total
+Cached:    0 cached, 2 total
+  Time:    5.746s 
+
