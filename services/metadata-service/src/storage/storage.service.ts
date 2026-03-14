@@ -1,5 +1,10 @@
-import { Injectable } from '@nestjs/common';
-import { PutObjectCommand, S3Client } from '@aws-sdk/client-s3';
+import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  GetObjectCommand,
+  PutObjectCommand,
+  S3Client,
+} from '@aws-sdk/client-s3';
+import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 
 @Injectable()
@@ -42,4 +47,36 @@ export class StorageService {
       etag: result.ETag,
     };
   }
+
+  async createDownloadUrl(params: {
+    objectKey?: string | null;
+    filename?: string | null;
+    expiresInSeconds?: number;
+  }): Promise<string> {
+    if (!params.objectKey) {
+      throw new NotFoundException('Object key not found');
+    }
+
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: params.objectKey,
+      ResponseContentDisposition: params.filename
+        ? `attachment; filename="${encodeURIComponent(params.filename)}"`
+        : undefined,
+    });
+
+    return getSignedUrl(this.client, command, {
+      expiresIn: params.expiresInSeconds ?? 300,
+    });
+  }
+
+  async getObjectStream(objectKey: string) {
+    return this.client.send(
+      new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+      }),
+    );
+  }
 }
+
