@@ -1,18 +1,20 @@
 # Metadata Service
 
-`metadata-service` la service metadata hien co trong DocVault. O trang thai hien tai, day la mot API demo co xac thuc va phan quyen theo role, nhung logic du lieu van dang chay bang in-memory thay vi Postgres.
+`metadata-service` la service metadata hien co trong DocVault. O trang thai hien tai, service nay da co xac thuc, phan quyen theo role, tach module cho documents va su dung Prisma/Postgres de luu metadata co ban.
 
 ## Da co gi trong implementation
 
 - NestJS application voi Swagger tai `/docs`
 - JWT verification bang Keycloak JWKS
 - `RolesGuard` + `Roles` decorator
-- Cac route demo cho metadata:
+- `PrismaModule` + `PrismaService`
+- `DocumentsModule` + `DocumentsService`
+- Cac route cho metadata:
   - `GET /health`
   - `GET /me`
   - `GET /documents`
   - `POST /documents`
-  - `GET /documents/audit-view`
+- Prisma schema, migration va `prisma.config.ts`
 - Prisma schema va `prisma.config.ts` de dinh nghia huong ket noi Postgres ve sau
 
 ## Hanh vi API hien tai
@@ -23,28 +25,33 @@
 | `GET` | `/me` | Xem thong tin user tu token | Bat ky user da dang nhap |
 | `GET` | `/documents` | Lay danh sach document demo | `viewer`, `editor`, `approver`, `co`, `admin` |
 | `POST` | `/documents` | Tao document demo | `editor`, `admin` |
-| `GET` | `/documents/audit-view` | View danh cho compliance/audit | `co`, `admin` |
 
 ## Du lieu hien tai
 
-Danh sach document mau dang duoc khai bao truc tiep trong controller va chi ton tai trong bo nho cua process:
+Document da duoc doc/ghi qua Prisma tu bang `document_metadata`:
 
-- Khong ghi vao Postgres
-- Khoi dong lai service se mat du lieu moi tao
-- Chua co layer repository/service rieng
+- `findAll()` sap xep theo `createdAt desc`
+- `create()` luu `title`, `description`, `filename`, `contentType`, `ownerId`
+- `ownerId` lay tu `username` trong token, fallback sang `sub`
+
+Service da co layer rieng:
+
+- controller trong `src/documents/documents.controller.ts`
+- service trong `src/documents/documents.service.ts`
+- DTO trong `src/documents/dto/create-document.dto.ts`
 
 ## Prisma va database
 
 Folder `prisma/` da dinh nghia model `DocumentMetadata`, enum `DocumentStatus` va `prisma.config.ts`.
 
-Dieu nay cho thay huong thiet ke da duoc dat nen:
+Dieu nay cho thay huong thiet ke da duoc dat nen va da duoc noi vao runtime o muc co ban:
 
-- metadata luu o Postgres
+- metadata dang luu o Postgres
 - document co `objectKey` de lien ket ve object storage
 - co versioning co ban
 - co lifecycle status
 
-Nhung o runtime hien tai controller chua goi Prisma Client.
+Ngoai schema, folder `prisma/migrations/` da co migration tao bang `document_metadata`.
 
 ## Bien moi truong
 
@@ -68,6 +75,7 @@ Luu y:
 Tu root repo:
 
 ```bash
+pnpm --filter metadata-service exec prisma migrate deploy
 pnpm --filter metadata-service start:dev
 ```
 
@@ -86,14 +94,15 @@ http://localhost:3001/docs
 ## Cac file quan trong
 
 - `src/app.controller.ts`: chua tat ca route hien tai
+- `src/documents/`: module/controller/service cho metadata document
+- `src/prisma/`: module/service ket noi Prisma
 - `src/auth/`: JWT strategy, role decorator, role guard
 - `prisma/schema.prisma`: model du lieu cho giai doan tiep theo
 - `prisma.config.ts`: cau hinh Prisma theo `DATABASE_URL`
 
 ## Gioi han hien tai
 
-- Chua co Postgres integration that su
-- Chua co DTO/validation/service layer
+- Chua co validation decorator tren DTO
 - Chua co endpoint update/delete/get by id
 - Chua co ACL, upload version, workflow status update
 - Chua co audit event publishing

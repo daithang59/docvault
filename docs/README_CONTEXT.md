@@ -1,5 +1,7 @@
 # README_CONTEXT.md — DocVault (Part 1: Web Microservices MVP)
 
+> Luu y: day la tai lieu context/ke hoach ban dau. De xem implementation hien tai cua repo, uu tien doc `docs/PROJECT_STATUS.md`.
+
 > Scope hiện tại: **chỉ phần 1 — xây dựng web microservices** (chưa DevSecOps).  
 > Mục tiêu: có **E2E demo flow** chạy local bằng Docker Compose.
 
