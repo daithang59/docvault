@@ -12,9 +12,9 @@ Thu muc nay chua schema Prisma cua metadata-service.
 ## Trang thai hien tai
 
 - Da co schema
-- Chua co migration trong `prisma/migrations`
-- Runtime chua goi Prisma Client
+- Da co migration trong `prisma/migrations`
+- Runtime da goi Prisma Client qua `PrismaService`
 
 ## Vai tro
 
-Day la nen tang de chuyen metadata-service tu demo in-memory sang persistence that su voi Postgres.
+Day la noi dinh nghia schema va migration cho persistence that su cua metadata-service voi Postgres.

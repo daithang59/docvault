@@ -7,14 +7,18 @@ Thu muc nay chua source code runtime cua metadata-service.
 - `main.ts`
   - Bootstrap NestJS va Swagger
 - `app.module.ts`
-  - Dang ky `AuthModule`
+  - Dang ky `AuthModule`, `PrismaModule`, `DocumentsModule`
 - `app.controller.ts`
-  - Chua toan bo route metadata demo hien co
+  - Chua route `health` va `me`
 - `app.service.ts`
   - File scaffold, hien khong duoc su dung
+- `documents/`
+  - Chua module/controller/service cho metadata document
+- `prisma/`
+  - Chua Prisma module/service
 - `auth/`
   - JWT strategy va RBAC helper
 
 ## Ghi chu
 
-Service nay hien chua tach service/repository layer. Phan lon nghiep vu dang nam trong controller de phuc vu muc demo nhanh.
+Service nay da tach auth, documents va prisma thanh module rieng. Tuy nhien nghiep vu van moi o muc list/create co ban, chua co CRUD day du va validation chat che.
