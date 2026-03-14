@@ -2,8 +2,10 @@ import {
   Body,
   Controller,
   Get,
+  Param,
   Post,
   Req,
+  Res,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -11,9 +13,15 @@ import {
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
+import { Response } from 'express';
 // eslint-disable-next-line @typescript-eslint/no-require-imports
 const FormData = require('form-data') as typeof import('form-data');
 
@@ -29,12 +37,9 @@ export class MetadataProxyController {
   async list(@Req() req: any) {
     const response = await firstValueFrom(
       this.http.get('http://localhost:3001/documents', {
-        headers: {
-          authorization: req.headers.authorization,
-        },
+        headers: { authorization: req.headers.authorization },
       }),
     );
-
     return response.data;
   }
 
@@ -44,12 +49,9 @@ export class MetadataProxyController {
   async create(@Req() req: any, @Body() body: any) {
     const response = await firstValueFrom(
       this.http.post('http://localhost:3001/documents', body, {
-        headers: {
-          authorization: req.headers.authorization,
-        },
+        headers: { authorization: req.headers.authorization },
       }),
     );
-
     return response.data;
   }
 
@@ -85,8 +87,46 @@ export class MetadataProxyController {
         maxBodyLength: Infinity,
       }),
     );
-
     return response.data;
   }
-}
 
+  @Get('documents/:id/download-url')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Proxy → metadata-service GET /documents/:id/download-url' })
+  async getDownloadUrl(@Param('id') id: string, @Req() req: any) {
+    const response = await firstValueFrom(
+      this.http.get(`http://localhost:3001/documents/${id}/download-url`, {
+        headers: { authorization: req.headers.authorization },
+      }),
+    );
+    return response.data;
+  }
+
+  @Get('documents/:id/download')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Proxy → metadata-service GET /documents/:id/download (stream)' })
+  async download(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const response = await firstValueFrom(
+      this.http.get(`http://localhost:3001/documents/${id}/download`, {
+        headers: { authorization: req.headers.authorization },
+        responseType: 'stream',
+      }),
+    );
+
+    if (response.headers['content-type']) {
+      res.setHeader('Content-Type', response.headers['content-type'] as string);
+    }
+    if (response.headers['content-disposition']) {
+      res.setHeader(
+        'Content-Disposition',
+        response.headers['content-disposition'] as string,
+      );
+    }
+
+    (response.data as NodeJS.ReadableStream).pipe(res);
+  }
+}

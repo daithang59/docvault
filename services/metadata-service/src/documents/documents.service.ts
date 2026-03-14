@@ -1,4 +1,9 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../storage/storage.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
@@ -15,6 +20,10 @@ export class DocumentsService {
     return this.prisma.documentMetadata.findMany({
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  findOne(id: string) {
+    return this.prisma.documentMetadata.findUnique({ where: { id } });
   }
 
   create(dto: CreateDocumentDto, user: { sub: string; username?: string }) {
@@ -59,5 +68,53 @@ export class DocumentsService {
       },
     });
   }
-}
 
+  /** CO gets audit/compliance view only — cannot download blobs */
+  private canDownload(
+    doc: { ownerId: string },
+    user: { username?: string; sub: string; roles?: string[] },
+  ): boolean {
+    const roles = user.roles ?? [];
+    const isOwner = doc.ownerId === (user.username ?? user.sub);
+    const isPrivileged = roles.some((r) =>
+      ['admin', 'approver', 'editor', 'viewer'].includes(r),
+    );
+    const isComplianceOnly = roles.includes('co');
+    return (isOwner || isPrivileged) && !isComplianceOnly;
+  }
+
+  async getDownloadUrl(
+    id: string,
+    user: { username?: string; sub: string; roles?: string[] },
+  ) {
+    const doc = await this.findOne(id);
+    if (!doc) throw new NotFoundException('Document not found');
+    if (!this.canDownload(doc, user)) {
+      throw new ForbiddenException('You are not allowed to download this file');
+    }
+
+    const url = await this.storage.createDownloadUrl({
+      objectKey: doc.objectKey,
+      filename: doc.filename,
+      expiresInSeconds: 300,
+    });
+
+    return { id: doc.id, filename: doc.filename, expiresInSeconds: 300, url };
+  }
+
+  async getDownloadStream(
+    id: string,
+    user: { username?: string; sub: string; roles?: string[] },
+  ) {
+    const doc = await this.findOne(id);
+    if (!doc) throw new NotFoundException('Document not found');
+    if (!this.canDownload(doc, user)) {
+      throw new ForbiddenException('You are not allowed to download this file');
+    }
+
+    return {
+      doc,
+      object: await this.storage.getObjectStream(doc.objectKey!),
+    };
+  }
+}
