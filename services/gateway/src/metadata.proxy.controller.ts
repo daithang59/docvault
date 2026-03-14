@@ -1,8 +1,21 @@
-import { Controller, Get, Post, Req, Body, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Req,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
 import { HttpService } from '@nestjs/axios';
 import { firstValueFrom } from 'rxjs';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiOperation, ApiTags, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+// eslint-disable-next-line @typescript-eslint/no-require-imports
+const FormData = require('form-data') as typeof import('form-data');
 
 @ApiTags('metadata-proxy')
 @ApiBearerAuth()
@@ -39,4 +52,41 @@ export class MetadataProxyController {
 
     return response.data;
   }
+
+  @Post('documents/upload')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Proxy → metadata-service POST /documents/upload (multipart)' })
+  @ApiConsumes('multipart/form-data')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 20 * 1024 * 1024 },
+    }),
+  )
+  async upload(
+    @Req() req: any,
+    @UploadedFile() file: Express.Multer.File,
+    @Body() body: any,
+  ) {
+    const form = new FormData();
+    form.append('title', body.title ?? '');
+    if (body.description) form.append('description', body.description);
+    form.append('file', file.buffer, {
+      filename: file.originalname,
+      contentType: file.mimetype,
+    });
+
+    const response = await firstValueFrom(
+      this.http.post('http://localhost:3001/documents/upload', form, {
+        headers: {
+          ...form.getHeaders(),
+          authorization: req.headers.authorization,
+        },
+        maxBodyLength: Infinity,
+      }),
+    );
+
+    return response.data;
+  }
 }
+

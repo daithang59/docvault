@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { StorageService } from '../storage/storage.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
+import { UploadDocumentDto } from './dto/upload-document.dto';
 
 @Injectable()
 export class DocumentsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   findAll() {
     return this.prisma.documentMetadata.findMany({
@@ -23,4 +28,36 @@ export class DocumentsService {
       },
     });
   }
+
+  async uploadDocument(
+    dto: UploadDocumentDto,
+    file: Express.Multer.File | undefined,
+    user: { sub: string; username?: string },
+  ) {
+    if (!file) throw new BadRequestException('File is required');
+
+    const objectKey = this.storage.buildObjectKey(file.originalname);
+
+    const uploaded = await this.storage.upload({
+      objectKey,
+      body: file.buffer,
+      contentType: file.mimetype,
+      metadata: { owner: user.username ?? user.sub },
+    });
+
+    return this.prisma.documentMetadata.create({
+      data: {
+        title: dto.title,
+        description: dto.description,
+        ownerId: user.username ?? user.sub,
+        filename: file.originalname,
+        contentType: file.mimetype,
+        sizeBytes: file.size,
+        bucket: uploaded.bucket,
+        objectKey: uploaded.objectKey,
+        etag: uploaded.etag?.replaceAll('"', '') ?? null,
+      },
+    });
+  }
 }
+
