@@ -6,6 +6,7 @@ datasource db {
   provider = "postgresql"
 }
 
+
 enum DocumentStatus {
   DRAFT
   PENDING_APPROVAL
@@ -21,7 +22,10 @@ model DocumentMetadata {
   ownerId     String
   filename    String?
   contentType String?
+  sizeBytes   Int?
+  bucket      String?
   objectKey   String?        @unique
+  etag        String?
   status      DocumentStatus @default(DRAFT)
   version     Int            @default(1)
   createdAt   DateTime       @default(now())
