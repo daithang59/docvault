@@ -103,8 +103,8 @@ export class DocumentsController {
       );
     }
 
-    // AWS SDK v3 returns a web ReadableStream; convert to Node.js Readable for StreamableFile
-    return new StreamableFile(Readable.fromWeb(object.Body as ReadableStream));
+    // AWS SDK v3 returns a Node.js Readable stream in Node environment by default
+    return new StreamableFile(object.Body as any);
   }
 
   // ──────────── Workflow routes ────────────
