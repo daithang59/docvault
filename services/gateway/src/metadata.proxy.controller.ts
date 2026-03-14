@@ -35,7 +35,11 @@ export class MetadataProxyController {
 
   private handleAxiosError(err: any): never {
     if (err.response) {
-      throw new HttpException(err.response.data, err.response.status);
+      let data = err.response.data;
+      if (data && typeof data.pipe === 'function') {
+        data = { message: 'Downstream proxy error (stream)' };
+      }
+      throw new HttpException(data, err.response.status);
     }
     throw new HttpException('Gateway Error', 500);
   }
