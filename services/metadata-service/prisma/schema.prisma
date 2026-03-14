@@ -6,13 +6,23 @@ datasource db {
   provider = "postgresql"
 }
 
-
 enum DocumentStatus {
   DRAFT
   PENDING_APPROVAL
   APPROVED
   REJECTED
   ARCHIVED
+}
+
+enum AuditAction {
+  DOCUMENT_CREATED
+  DOCUMENT_UPLOADED
+  DOCUMENT_SUBMITTED
+  DOCUMENT_APPROVED
+  DOCUMENT_REJECTED
+  DOCUMENT_ARCHIVED
+  DOCUMENT_DOWNLOAD_URL_ISSUED
+  DOCUMENT_DOWNLOADED
 }
 
 model DocumentMetadata {
@@ -22,16 +32,38 @@ model DocumentMetadata {
   ownerId     String
   filename    String?
   contentType String?
-  sizeBytes   Int?
-  bucket      String?
-  objectKey   String?        @unique
-  etag        String?
   status      DocumentStatus @default(DRAFT)
   version     Int            @default(1)
+  sizeBytes   Int?
+  bucket      String?
+  objectKey   String?
+  etag        String?
   createdAt   DateTime       @default(now())
   updatedAt   DateTime       @updatedAt
+
+  auditLogs   AuditLog[]
 
   @@index([ownerId])
   @@index([status])
   @@map("document_metadata")
+}
+
+model AuditLog {
+  id         String          @id @default(uuid())
+  documentId String?
+  actorId    String
+  actorRole  String?
+  action     AuditAction
+  fromStatus DocumentStatus?
+  toStatus   DocumentStatus?
+  detail     String?
+  createdAt  DateTime        @default(now())
+
+  document   DocumentMetadata? @relation(fields: [documentId], references: [id], onDelete: SetNull)
+
+  @@index([documentId])
+  @@index([actorId])
+  @@index([action])
+  @@index([createdAt])
+  @@map("audit_log")
 }

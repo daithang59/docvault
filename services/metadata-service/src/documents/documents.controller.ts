@@ -3,6 +3,7 @@ import {
   Controller,
   Get,
   Param,
+  Patch,
   Post,
   Req,
   Res,
@@ -26,6 +27,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UploadDocumentDto } from './dto/upload-document.dto';
+import { RejectDocumentDto } from './dto/reject-document.dto';
 import { Readable } from 'stream';
 
 @ApiTags('documents')
@@ -103,5 +105,51 @@ export class DocumentsController {
 
     // AWS SDK v3 returns a web ReadableStream; convert to Node.js Readable for StreamableFile
     return new StreamableFile(Readable.fromWeb(object.Body as ReadableStream));
+  }
+
+  // ──────────── Workflow routes ────────────
+
+  @Get(':id/audit')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('co', 'admin', 'approver', 'editor', 'viewer')
+  @ApiOperation({ summary: 'Get audit trail for a document' })
+  audit(@Param('id') id: string) {
+    return this.documentsService.listAudit(id);
+  }
+
+  @Patch(':id/submit')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Submit document for approval (owner editor/admin only)' })
+  submit(@Param('id') id: string, @Req() req: any) {
+    return this.documentsService.submitForApproval(id, req.user);
+  }
+
+  @Patch(':id/approve')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('approver', 'admin')
+  @ApiOperation({ summary: 'Approve a PENDING_APPROVAL document' })
+  approve(@Param('id') id: string, @Req() req: any) {
+    return this.documentsService.approve(id, req.user);
+  }
+
+  @Patch(':id/reject')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('approver', 'admin')
+  @ApiOperation({ summary: 'Reject a PENDING_APPROVAL document' })
+  reject(
+    @Param('id') id: string,
+    @Req() req: any,
+    @Body() body: RejectDocumentDto,
+  ) {
+    return this.documentsService.reject(id, req.user, body.reason);
+  }
+
+  @Patch(':id/archive')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'Archive an APPROVED or REJECTED document (admin only)' })
+  archive(@Param('id') id: string, @Req() req: any) {
+    return this.documentsService.archive(id, req.user);
   }
 }
