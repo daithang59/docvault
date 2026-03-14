@@ -14,4 +14,4 @@ Cap nhat test de cover:
 - `GET /health`
 - `GET /documents` theo role
 - `POST /documents` voi `editor/admin` va role khong hop le
-- `GET /documents/audit-view` voi `co/admin`
+- `GET /me` voi token hop le/khong hop le
