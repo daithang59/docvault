@@ -1,220 +1,236 @@
-# Trang Thai Thuc Te Cua Du An DocVault
+# PROJECT_STATUS.md — DocVault (Cập nhật theo codebase thực tế)
 
-Cap nhat theo codebase hien co trong repo tai thoi diem hien tai.
+> Tài liệu này phản ánh **trạng thái implementation thực tế** của repo.  
+> Cập nhật lần cuối: 2026-03-14.  
+> Để đọc kế hoạch/roadmap ban đầu, xem [`docs/README_CONTEXT.md`](./README_CONTEXT.md).
 
-## 1. Muc tieu cua repo
+---
 
-DocVault huong toi mot he thong quan ly tai lieu theo mo hinh microservices, co xac thuc bang Keycloak va phan quyen theo role. Tuy nhien implementation hien tai moi o giai doan khoi tao backend va ha tang local, chua dat den day du flow document-vault trong tai lieu dinh huong ban dau.
+## 1. Mục tiêu repo
 
-## 2. Nhung gi da duoc implementation
+DocVault là hệ thống quản lý tài liệu theo mô hình **microservices**, xác thực bằng **Keycloak**, lưu blob qua **MinIO**, metadata qua **PostgreSQL + Prisma**. Phân quyền theo role (`viewer`, `editor`, `approver`, `co`, `admin`).
 
-### 2.1. Monorepo va tooling
+---
 
-- Repo dung `pnpm` workspace de quan ly package.
-- `turbo.json` da khai bao task `build`, `lint`, `test`.
-- Root `package.json` da co script cho `dev`, `build`, `lint`, `test`, `format`.
-- Hien tai chi co 2 package thuc su nam trong workspace:
-  - `services/gateway`
-  - `services/metadata-service`
+## 2. Những gì đã được implement
 
-### 2.2. Infrastructure local
+### 2.1. Monorepo & Tooling
 
-Thu muc `infra/` da co stack local cho:
+- Monorepo dùng **pnpm workspaces** + **Turborepo** (`turbo.json`).
+- Root scripts: `dev`, `build`, `lint`, `test`, `format`.
+- Hai package đang hoạt động trong workspace:
+  - `services/gateway` (port **3000**)
+  - `services/metadata-service` (port **3001**)
 
-- Postgres 16
-- MongoDB 7
-- MinIO + bucket init script
-- Keycloak 26 voi realm import san
+### 2.2. Infrastructure local (`infra/`)
 
-`docker-compose.dev.yml` hien moi khoi dong dependency infrastructure, chua khoi dong service cua ung dung.
+Stack khởi động qua `infra/docker-compose.dev.yml`:
 
-### 2.3. Keycloak va IAM
+| Service     | Image             | Port  | Ghi chú                        |
+|-------------|-------------------|-------|--------------------------------|
+| PostgreSQL  | postgres:16       | 5432  | DB cho metadata-service        |
+| MongoDB     | mongo:7           | 27017 | Dự phòng cho audit-service     |
+| MinIO       | minio/minio       | 9000/9001 | Object storage + console  |
+| Keycloak    | keycloak:26       | 8080  | IAM, realm import sẵn          |
 
-File `infra/keycloak/realm-docvault.json` da seed:
+> Compose hiện chỉ khởi động **dependency infrastructure**, không khởi động service ứng dụng.
+
+### 2.3. Keycloak & IAM (`infra/keycloak/realm-docvault.json`)
 
 - Realm: `docvault`
-- Client confidential: `docvault-gateway`
-- Direct access grants: bat
-- Roles:
-  - `viewer`
-  - `editor`
-  - `approver`
-  - `co`
-  - `admin`
-- Users demo:
-  - `viewer1`
-  - `editor1`
-  - `approver1`
-  - `co1`
-  - `admin1`
+- Client confidential: `docvault-gateway` (direct access grants: bật)
+- Client secret (dev): `dev-gateway-secret`
+- Roles: `viewer`, `editor`, `approver`, `co`, `admin`
+- Demo users (password `Passw0rd!`): `viewer1`, `editor1`, `approver1`, `co1`, `admin1`
 
-Tat ca user tren deu co password `Passw0rd!`.
+> **Lưu ý:** Role compliance officer trong code được đặt tên là `co`, không phải `compliance_officer` như trong tài liệu kế hoạch ban đầu.
 
-### 2.4. Gateway service
+### 2.4. Gateway Service (`services/gateway`, port 3000)
 
-`services/gateway` da co cac phan sau:
+**Tech:** NestJS + Swagger (`/docs`) + `@nestjs/axios` + `multer`
 
-- Bootstrap NestJS + Swagger tai `/docs`
-- JWT verification qua Keycloak JWKS
-- Route `GET /health`
-- Route `GET /me` de tra thong tin user da duoc resolve tu access token
-- Route `GET /admin-only` de demo role-based authorization cho `admin`
-- Metadata proxy controller:
-  - `GET /metadata/documents` -> forward toi metadata-service
-  - `POST /metadata/documents` -> forward toi metadata-service
+#### Endpoints:
 
-Gateway hien da lam dung 2 vai tro chinh:
+| Method | Path | Auth | RBAC | Mô tả |
+|--------|------|------|------|-------|
+| GET | `/health` | ❌ | - | Healthcheck |
+| GET | `/me` | JWT | any | Thông tin user từ token |
+| GET | `/admin-only` | JWT | `admin` | Demo RBAC |
+| GET | `/metadata/documents` | JWT | any | Proxy → metadata-service |
+| POST | `/metadata/documents` | JWT | any | Proxy → metadata-service |
+| POST | `/metadata/documents/upload` | JWT | any | Proxy multipart → metadata-service |
+| GET | `/metadata/documents/:id/download-url` | JWT | any | Proxy → metadata-service |
+| GET | `/metadata/documents/:id/download` | JWT | any | Proxy stream → metadata-service |
 
-1. Xac thuc access token tu Keycloak
-2. Chuyen tiep request metadata kem header `Authorization`
+#### Cách hoạt động proxy upload:
+Gateway nhận multipart/form-data, rebuild thành `FormData` rồi forward cùng `Authorization` header đến metadata-service.
 
-Han che hien tai:
+#### Hạn chế hiện tại:
+- URL metadata-service **hardcode** `http://localhost:3001` (chưa dùng env var).
+- Chưa có logging, rate limit, error mapping trung tâm.
+- RBAC ở gateway chỉ check `any authenticated` cho proxy routes — RBAC thực thi ở metadata-service.
 
-- URL metadata-service dang hardcode thanh `http://localhost:3001`
-- `KEYCLOAK_AUDIENCE` co trong file `.env.example` nhung chua duoc enforce trong strategy
-- Chua co logging, validation, error mapping, rate limit
+### 2.5. Metadata Service (`services/metadata-service`, port 3001)
 
-### 2.5. Metadata service
+**Tech:** NestJS + Swagger (`/docs`) + Prisma + AWS SDK v3 + Multer
 
-`services/metadata-service` da co:
+#### Modules:
+- `AppModule` → imports `DocumentsModule`, `PrismaModule`, `StorageModule`
+- `DocumentsModule` → `DocumentsController` + `DocumentsService` + `StorageService` + `PrismaService`
+- `PrismaModule` → `PrismaService` (singleton, graceful shutdown)
+- `StorageModule` → `StorageService` (MinIO via AWS SDK v3 S3 compatible)
 
-- Bootstrap NestJS + Swagger tai `/docs`
-- JWT verification qua Keycloak JWKS
-- Role guard bang `RolesGuard`
-- `PrismaModule` va `PrismaService`
-- `DocumentsModule` tach rieng controller/service/dto
-- Cac endpoint:
-  - `GET /health`
-  - `GET /me`
-  - `GET /documents`
-  - `POST /documents`
+#### Endpoints:
 
-Logic hien tai:
+| Method | Path | RBAC | Mô tả |
+|--------|------|------|-------|
+| GET | `/health` | ❌ | Healthcheck |
+| GET | `/me` | any | Thông tin user từ token |
+| GET | `/documents` | `viewer/editor/approver/co/admin` | Danh sách tất cả documents |
+| POST | `/documents` | `editor/admin` | Tạo metadata record (không kèm file) |
+| POST | `/documents/upload` | `editor/admin` | Upload file → MinIO + tạo metadata |
+| GET | `/documents/:id/download-url` | `viewer/editor/approver/co/admin` | Trả presigned URL (5 phút) — CO bị block |
+| GET | `/documents/:id/download` | `viewer/editor/approver/co/admin` | Stream file trực tiếp — CO bị block |
 
-- `GET /documents` doc du lieu tu bang `document_metadata` qua Prisma
-- `POST /documents` tao ban ghi moi trong Postgres
-- `GET /documents` cho phep cac role `viewer`, `editor`, `approver`, `co`, `admin`
-- `POST /documents` chi cho `editor` va `admin`
-- `ownerId` duoc gan tu `req.user.username` neu co, neu khong se fallback sang `sub`
-- Co `CreateDocumentDto` cho payload tao metadata
-- Da co migration khoi tao bang `document_metadata`
+#### Logic download authorization (`canDownload`):
+```typescript
+// CO bị block download ngay cả khi có role khác
+const isComplianceOnly = roles.includes('co');
+return (isOwner || isPrivileged) && !isComplianceOnly;
+```
 
-Han che hien tai:
+Các role được phép download: `admin`, `approver`, `editor`, `viewer` (hoặc là `ownerId`).  
+Role `co` **luôn bị từ chối** (HTTP 403), kể cả khi là owner của document.
 
-- Chua co validation decorator tren DTO
-- Chua co endpoint get-by-id, update, delete
-- Chua co ACL, upload workflow, audit event, download authorization
-- Chua co query/filter/pagination
+#### `StorageService` (MinIO via `@aws-sdk/client-s3`):
+- `buildObjectKey(filename)` → `documents/YYYY-MM-DD/uuid-filename`
+- `upload()` → `PutObjectCommand` lên MinIO
+- `createDownloadUrl()` → `getSignedUrl` (presigned, mặc định 300 giây)
+- `getObjectStream()` → `GetObjectCommand`, stream trực tiếp qua `StreamableFile`
 
-### 2.6. Prisma schema va migration
+#### Cấu hình env metadata-service (`.env.example`):
+```env
+PORT=3001
+KEYCLOAK_BASE_URL=http://localhost:8080
+KEYCLOAK_REALM=docvault
+KEYCLOAK_AUDIENCE=docvault-gateway
+DATABASE_URL=postgresql://docvault:docvaultpw@localhost:5432/docvault_metadata?schema=public
+S3_ENDPOINT=http://localhost:9000
+S3_REGION=us-east-1
+S3_ACCESS_KEY=minioadmin
+S3_SECRET_KEY=minioadminpw
+S3_BUCKET=docvault
+S3_FORCE_PATH_STYLE=true
+```
 
-`services/metadata-service/prisma/schema.prisma` da dinh nghia model `DocumentMetadata` voi:
+### 2.6. Prisma Schema & Migrations
 
-- `id`
-- `title`
-- `description`
-- `ownerId`
-- `filename`
-- `contentType`
-- `objectKey`
-- `status`
-- `version`
-- `createdAt`
-- `updatedAt`
+**File:** `services/metadata-service/prisma/schema.prisma`
 
-Enum `DocumentStatus` hien gom:
+Model `DocumentMetadata` (table: `document_metadata`):
 
-- `DRAFT`
-- `PENDING_APPROVAL`
-- `APPROVED`
-- `REJECTED`
-- `ARCHIVED`
+| Field | Type | Ghi chú |
+|-------|------|---------|
+| `id` | String (UUID) | PK |
+| `title` | String | Bắt buộc |
+| `description` | String? | |
+| `ownerId` | String | `username ?? sub` từ JWT |
+| `filename` | String? | Tên file gốc |
+| `contentType` | String? | MIME type |
+| `sizeBytes` | Int? | File size bytes |
+| `bucket` | String? | MinIO bucket name |
+| `objectKey` | String? (unique) | `documents/date/uuid-file` |
+| `etag` | String? | ETag từ MinIO |
+| `status` | `DocumentStatus` | Mặc định `DRAFT` |
+| `version` | Int | Mặc định `1` |
+| `createdAt` | DateTime | |
+| `updatedAt` | DateTime | |
 
-Ngoai schema, service da co:
+Enum `DocumentStatus`: `DRAFT`, `PENDING_APPROVAL`, `APPROVED`, `REJECTED`, `ARCHIVED`
 
-- `prisma.config.ts`
-- `src/prisma/prisma.module.ts`
-- `src/prisma/prisma.service.ts`
-- migration `20260314091050_init_document_metadata`
+Indexes: `ownerId`, `status`
 
-Dieu nay cho thay metadata-service da di qua muc demo in-memory va da co persistence co ban bang Postgres + Prisma.
+**Migrations hiện có:**
+1. `20260314091050_init_document_metadata` — tạo bảng và enum cơ bản
+2. `20260314152014_add_storage_fields` — thêm `bucket`, `etag`, `sizeBytes`
 
-### 2.7. Contracts va tai lieu API
+### 2.7. DTOs
 
-- `libs/contracts/openapi/gateway.yaml` da co OpenAPI toi thieu cho route `/health`
-- Thu muc `libs/contracts/events/` da duoc tao nhung chua co event schema
-- `docs/README_CONTEXT.md` dang mo ta context va roadmap ban dau, khong phan anh day du implementation hien tai
+- `CreateDocumentDto` — `title`, `description?`, `filename?`, `contentType?`
+- `UploadDocumentDto` — `title`, `description?` (file nhận qua `FileInterceptor`)
 
-## 3. Nhung folder da duoc tao nhung chua co implementation
+> Chưa có validation decorators (`@IsString`, `@IsNotEmpty`, v.v.) trên DTO.
 
-### 3.1. Frontend
+### 2.8. RBAC matrix (trạng thái thực tế)
 
-- `apps/web/` moi co `.gitkeep`
-- Chua co Next.js app, route, UI hay logic login
+| Endpoint | viewer | editor | approver | co | admin |
+|----------|--------|--------|----------|----|-------|
+| `GET /documents` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `POST /documents` | ❌ | ✅ | ❌ | ❌ | ✅ |
+| `POST /documents/upload` | ❌ | ✅ | ❌ | ❌ | ✅ |
+| `GET /documents/:id/download-url` | ✅ | ✅ | ✅ | **403** | ✅ |
+| `GET /documents/:id/download` | ✅ | ✅ | ✅ | **403** | ✅ |
+| `GET /admin-only` (gateway) | ❌ | ❌ | ❌ | ❌ | ✅ |
 
-### 3.2. Cac service placeholder
+### 2.9. Contracts & Tài liệu API
 
-Da co folder nhung chua co source code:
+- `libs/contracts/openapi/gateway.yaml` — OpenAPI tối thiểu, chỉ có route `/health`
+- `libs/contracts/events/` — đã tạo folder, chưa có event schema
+- Swagger UI tự sinh tại runtime qua NestJS decorators
 
-- `services/document-service`
-- `services/workflow-service`
-- `services/audit-service`
-- `services/notification-service`
+---
 
-Nhung folder nay hien dong vai tro danh dau boundary cho kien truc du kien, khong phai implementation da hoan thanh.
+## 3. Các thành phần chưa implement
 
-### 3.3. Shared libs placeholder
+### 3.1. Frontend (`apps/web/`)
+- Chỉ có `.gitkeep`. Chưa có Next.js app, route, UI, OIDC login.
 
-- `libs/auth` chua co ma dung chung
-- `libs/contracts/events` chua co file schema
+### 3.2. Service placeholder (folder tồn tại, chưa có source code)
+- `services/document-service` — upload/download MinIO (nay đã tích hợp vào metadata-service)
+- `services/workflow-service` — state machine Draft → Pending → Approved
+- `services/audit-service` — ingest + query audit events
+- `services/notification-service` — notify submit/approve
 
-## 4. Hanh vi phan quyen hien co
+### 3.3. Shared libs chưa có code
+- `libs/auth/` — chưa có JWT helpers/role constants dùng chung
+- `libs/contracts/events/` — chưa có event schema
 
-Role dang duoc dung trong code la:
+### 3.4. Chức năng còn thiếu trong metadata-service
+- Chưa có `GET /documents/:id` (get-by-id)
+- Chưa có update, delete document
+- Chưa có validation decorators trên DTO
+- Chưa có query/filter/pagination cho `GET /documents`
+- Chưa có workflow endpoint (`/submit`, `/approve`, `/reject`)
+- Chưa có ACL per-document
+- Chưa có audit event emit
 
-- `viewer`
-- `editor`
-- `approver`
-- `co`
-- `admin`
+---
 
-RBAC hien tai da enforce duoc o 2 noi:
+## 4. Cách chạy hệ thống
 
-- Gateway:
-  - `GET /admin-only` chi `admin`
-- Metadata service:
-  - `GET /documents`: `viewer|editor|approver|co|admin`
-  - `POST /documents`: `editor|admin`
-
-Luu y quan trong:
-
-- Trong code hien tai role compliance officer duoc dat ten la `co`, khong phai `compliance_officer`
-- Chua co logic "CO xem audit duoc nhung download bi 403" o runtime vi document-service, audit-service va luong download chua duoc implement
-
-## 5. Cach chay va quan sat he thong
-
-### 5.1. Khoi dong dependency
+### 4.1. Khởi động dependency (Docker)
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
-### 5.2. Chay service
+### 4.2. Chạy services
 
 ```bash
+# Metadata service (port 3001)
 pnpm --filter metadata-service exec prisma migrate deploy
-pnpm --filter metadata-service start:dev
+pnpm --filter metadata-service dev
+
+# Gateway (port 3000)
 pnpm --filter gateway start:dev
 ```
 
-### 5.3. Xem Swagger
+### 4.3. Swagger UI
 
-- Gateway: `http://localhost:3000/docs`
-- Metadata service: `http://localhost:3001/docs`
+- Gateway: http://localhost:3000/docs
+- Metadata service: http://localhost:3001/docs
 
-### 5.4. Lay access token tu Keycloak
-
-Vi client `docvault-gateway` dang bat direct access grants, co the lay token bang `curl`:
+### 4.4. Lấy access token từ Keycloak
 
 ```bash
 curl -X POST "http://localhost:8080/realms/docvault/protocol/openid-connect/token" \
@@ -226,38 +242,57 @@ curl -X POST "http://localhost:8080/realms/docvault/protocol/openid-connect/toke
   -d "password=Passw0rd!"
 ```
 
-Sau do goi gateway:
+### 4.5. Ví dụ gọi upload (qua gateway)
 
 ```bash
-curl http://localhost:3000/me -H "Authorization: Bearer <access_token>"
+curl -X POST http://localhost:3000/metadata/documents/upload \
+  -H "Authorization: Bearer <access_token>" \
+  -F "title=My Document" \
+  -F "file=@/path/to/file.pdf"
 ```
 
-## 6. Khoang cach giua roadmap va implementation
+### 4.6. Ví dụ lấy presigned download URL
 
-Tai lieu cu trong repo mo ta mot MVP day du hon hien trang. Neu doi chieu voi codebase hien tai thi:
+```bash
+curl http://localhost:3000/metadata/documents/<id>/download-url \
+  -H "Authorization: Bearer <access_token>"
+# Response: { id, filename, expiresInSeconds: 300, url: "https://..." }
+```
 
-- Da co skeleton auth/RBAC va infra
-- Da co metadata persistence co ban bang Prisma/Postgres
-- Chua co flow upload file
-- Chua co workflow Draft -> Pending -> Published
-- Chua co audit service
-- Chua co notification service
-- Chua co frontend
-- Chua co compose full stack cho toan bo ung dung
+---
 
-Noi cach khac, repo dang o giai doan "foundation + demo auth/metadata", chua phai "E2E document vault MVP hoan chinh".
+## 5. Khoảng cách giữa roadmap và implementation hiện tại
 
-## 7. Huong uu tien tiep theo neu tiep tuc phat trien
+| Hạng mục | Roadmap | Trạng thái |
+|----------|---------|------------|
+| IAM / Keycloak | ✅ | ✅ Done |
+| Gateway auth + routing | ✅ | ✅ Done (URL hardcode) |
+| Metadata CRUD | ✅ | ⚠️ Partial (thiếu get-by-id, update, delete) |
+| Upload file → MinIO | ✅ | ✅ Done |
+| Download presigned URL | ✅ | ✅ Done |
+| Download stream | ✅ | ✅ Done |
+| CO download block (403) | ✅ | ✅ Done |
+| Workflow (submit/approve) | ✅ | ❌ Chưa có |
+| Audit service | ✅ | ❌ Chưa có |
+| Notification service | optional | ❌ Chưa có |
+| Frontend (Next.js) | ✅ | ❌ Chưa có |
+| Full-stack Docker Compose | ✅ | ❌ Chưa có |
 
-1. Bo sung get-by-id, update, delete va validation cho `metadata-service`.
-2. Rut hardcode metadata URL khoi gateway va dua vao env.
-3. Viet `document-service` de xu ly upload/download qua MinIO.
-4. Bo sung workflow service va trang thai `Draft -> Pending -> Approved/Rejected`.
-5. Bo sung audit service de thuc hien use case `co` xem audit.
-6. Cap nhat test e2e theo route thuc te thay vi scaffold mac dinh cua Nest.
+---
 
-## 8. Tai lieu lien quan
+## 6. Ưu tiên tiếp theo
 
-- `README.md`: tong quan nhanh cua repo
-- `docs/README.md`: muc luc tai lieu
-- `docs/README_CONTEXT.md`: context va roadmap ban dau
+1. **Validation DTO** — thêm `class-validator` decorators vào `CreateDocumentDto`, `UploadDocumentDto`.
+2. **`GET /documents/:id`** — get-by-id endpoint trong metadata-service.
+3. **Env var cho gateway** — đưa `METADATA_SERVICE_URL` ra env thay vì hardcode.
+4. **Workflow service** — state machine `Draft → Pending → Approved/Rejected`.
+5. **Audit service** — ingest events (upload, submit, approve, download allow/deny).
+6. **Frontend** — scaffold Next.js với OIDC login + document list + upload form.
+
+---
+
+## 7. Tài liệu liên quan
+
+- [`README.md`](../README.md) — tổng quan nhanh repo
+- [`docs/README.md`](./README.md) — mục lục tài liệu
+- [`docs/README_CONTEXT.md`](./README_CONTEXT.md) — context và roadmap ban đầu (kế hoạch)
