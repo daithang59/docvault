@@ -1,0 +1,37 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+
+enum DocumentStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  REJECTED
+  ARCHIVED
+}
+
+model DocumentMetadata {
+  id          String         @id @default(uuid())
+  title       String
+  description String?
+  ownerId     String
+  filename    String?
+  contentType String?
+  sizeBytes   Int?
+  bucket      String?
+  objectKey   String?        @unique
+  etag        String?
+  status      DocumentStatus @default(DRAFT)
+  version     Int            @default(1)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+
+  @@index([ownerId])
+  @@index([status])
+  @@map("document_metadata")
+}

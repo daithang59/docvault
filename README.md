@@ -1,147 +1,128 @@
-# DocVault — Web Microservices MVP
+# DocVault
 
-> **Scope:** Part 1 — Web Microservices (no DevSecOps yet).  
-> **Goal:** A fully runnable E2E demo via `docker compose up`.
+DocVault la mot monorepo cho MVP he thong luu tru tai lieu theo huong microservices. Trang thai hien tai cua repo la mot skeleton backend da co xac thuc JWT bang Keycloak, route protection theo role, metadata service da ket noi Prisma/Postgres o muc co ban, va bo ha tang local de phuc vu viec phat trien.
 
----
+Tai lieu nay mo ta dung implementation hien co trong repo. Cac thanh phan nhu frontend, document-service, workflow-service, audit-service va notification-service moi duoc tao folder, chua co ma nguon van hanh.
 
-## Overview
+## Da lam duoc gi
 
-DocVault is a document-vault platform built with a microservices architecture. It enforces **role-based access control (RBAC)** at the API level — not just in the UI — so that sensitive operations (e.g., download) are properly denied even when the frontend is bypassed.
+- Thiet lap monorepo bang `pnpm` workspace + `turbo`.
+- Tao `gateway` va `metadata-service` bang NestJS.
+- Tich hop xac thuc JWT voi Keycloak qua JWKS (`passport-jwt` + `jwks-rsa`).
+- Tao RBAC co ban bang `Roles` decorator va `RolesGuard`.
+- Gateway da proxy 2 API metadata:
+  - `GET /metadata/documents`
+  - `POST /metadata/documents`
+- Metadata service da co API co ban cho document metadata:
+  - `GET /health`
+  - `GET /me`
+  - `GET /documents`
+  - `POST /documents`
+- Bo sung Prisma schema, Prisma module/service va migration cho `metadata-service`.
+- Tao stack local trong `infra/` cho Postgres, MongoDB, MinIO, MinIO init va Keycloak realm seed.
+- Seed san realm `docvault`, client `docvault-gateway` va cac user demo trong Keycloak.
+- Tao OpenAPI contract toi thieu cho gateway trong `libs/contracts/openapi/gateway.yaml`.
 
-### MVP E2E Flow
+## Chua lam xong
 
-```
-Editor   ──create doc + upload──► [Draft]
-                                     │ submit
-                                   [Pending]
-Approver ────────────────approve──► [Published]
-Viewer   ─────────────────────────► download ✅
-CO       ──────────audit logs OK──► download ❌ (403 from backend)
-```
+- `apps/web` chua co frontend, hien chi co `.gitkeep`.
+- `document-service`, `workflow-service`, `audit-service`, `notification-service` chua co source code.
+- `metadata-service` moi co list/create metadata co ban, chua co CRUD day du, ACL, workflow hay upload.
+- `docker-compose.dev.yml` hien chi khoi dong dependency infrastructure, chua khoi dong gateway, metadata-service hoac frontend.
+- Root script `pnpm dev` chua kha dung vi cac package chua dinh nghia task `dev`, hien tai can chay tung service bang `start:dev`.
 
-The **"CO sees audit but is denied download"** scenario is the cornerstone demo requirement and is enforced at the **backend/gateway level**, not only hidden in the UI.
+## Cau truc repo
 
----
-
-## Repo Structure
-
-```
+```text
 docvault/
   apps/
-    web/                        # Next.js 14 + TypeScript frontend
-  services/
-    gateway/                    # JWT verify + routing + RBAC guard
-    metadata-service/           # Source of truth: metadata, ACL, status (Postgres)
-    document-service/           # Blob upload/download via MinIO
-    workflow-service/           # State machine: Draft → Pending → Published
-    audit-service/              # Append-only audit events + query (MongoDB)
-    notification-service/       # REST notify on submit/approve (optional MVP)
-  libs/
-    contracts/                  # OpenAPI YAMLs + event schemas + generated types
-    auth/                       # JWT helpers + role constants
-  infra/
-    docker-compose.dev.yml      # Full local dev stack
-    keycloak/                   # Realm export, clients, roles, seed users
-    db/                         # Postgres init/migration scripts
-    minio/                      # Bucket + policy setup
+    web/                       # Placeholder cho frontend
   docs/
-    README_CONTEXT.md           # Project context, architecture, API contracts
+    PROJECT_STATUS.md          # Tai lieu tong hop implementation hien tai
+    README_CONTEXT.md          # Context/roadmap ban dau
+  infra/
+    db/                        # Bootstrap SQL cho Postgres
+    keycloak/                  # Realm export + user/role/client seed
+    minio/                     # Script khoi tao bucket MinIO
+    docker-compose.dev.yml     # Stack local cho dependency infrastructure
+  libs/
+    auth/                      # Placeholder cho thu vien auth dung chung
+    contracts/                 # OpenAPI va event contract
+  services/
+    gateway/                   # API gateway, auth, proxy metadata
+    metadata-service/          # Metadata service demo + Prisma schema
+    document-service/          # Placeholder
+    workflow-service/          # Placeholder
+    audit-service/             # Placeholder
+    notification-service/      # Placeholder
 ```
 
----
+## Cach chay hien tai
 
-## Local Dev
-
-> **Prerequisites:** Docker Desktop running.
+### 1. Cai dependency
 
 ```bash
-# Start entire stack (Keycloak + Postgres + MinIO + MongoDB + all services + FE)
-docker compose -f infra/docker-compose.dev.yml up
-
-# First-time seed (Keycloak realm + users, MinIO bucket)
-# (instructions TBD when infra scripts are ready)
+pnpm install
 ```
 
-### Definition of Done for local dev
-- [ ] `docker compose up` runs without errors
-- [ ] Login via Keycloak and receive a valid JWT
-- [ ] Upload a file through Document Service → stored in MinIO
-- [ ] Submit / Approve / Publish flow updates status correctly
-- [ ] Viewer download succeeds; CO download returns **403**
+### 2. Khoi dong infrastructure
 
----
-
-## Demo Accounts
-
-| Username  | Role                | Password   |
-|-----------|---------------------|------------|
-| `viewer1` | `viewer`            | `demo1234` |
-| `editor1` | `editor`            | `demo1234` |
-| `approver1` | `approver`        | `demo1234` |
-| `co1`     | `compliance_officer`| `demo1234` |
-
-> All accounts belong to Keycloak realm **`docvault`**.
-
----
-
-## Services & Ports
-
-| Service              | Port   | Notes                        |
-|----------------------|--------|------------------------------|
-| Gateway              | `8080` | All FE traffic routes here   |
-| Metadata Service     | `8081` | Postgres-backed              |
-| Document Service     | `8082` | MinIO-backed                 |
-| Workflow Service     | `8083` | Stateless, calls Metadata    |
-| Audit Service        | `8084` | MongoDB-backed               |
-| Notification Service | `8085` | Optional MVP                 |
-| Keycloak             | `9090` | Realm: `docvault`            |
-| Postgres             | `5432` |                              |
-| MinIO                | `9000` | Console: `9001`              |
-| MongoDB              | `27017`| Audit storage                |
-| Frontend (Next.js)   | `3000` |                              |
-
----
-
-## RBAC Matrix
-
-| Feature               | Viewer | Editor | Approver | Compliance Officer |
-|-----------------------|:------:|:------:|:--------:|:------------------:|
-| View published docs   | ✅     | ✅     | ✅       | ✅                 |
-| **Download file**     | ✅     | ✅     | ✅       | ❌ **(always 403)**|
-| Upload doc/version    | ❌     | ✅     | ✅ (opt) | ❌                 |
-| Submit workflow       | ❌     | ✅     | ✅ (opt) | ❌                 |
-| Approve / Reject      | ❌     | ❌     | ✅       | ❌                 |
-| View audit logs       | ❌     | ❌     | ❌       | ✅                 |
-
-> **⚠️ Enforcement is at the backend/gateway level.** Frontend only hides/shows UI elements.
-
----
-
-## E2E Demo Script (Key Scenario)
-
-```
-1. editor1   → POST /documents            (create Draft)
-2. editor1   → POST /documents/:id/upload (upload file)
-3. editor1   → POST /workflow/:id/submit  (Draft → Pending)
-4. approver1 → POST /workflow/:id/approve (Pending → Published)
-5. viewer1   → GET  /documents/:id/download  → 200 OK ✅
-6. co1       → GET  /audit/query             → 200 OK (audit logs) ✅
-7. co1       → GET  /documents/:id/download  → 403 Forbidden ❌ ← KEY DEMO
+```bash
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
-> Step 7 must be **denied by the backend**, not merely hidden in the UI.
+Mac dinh se co:
 
----
+- Keycloak: `http://localhost:8080`
+- Postgres: `localhost:5432`
+- MongoDB: `localhost:27017`
+- MinIO API: `http://localhost:9000`
+- MinIO Console: `http://localhost:9001`
 
-## Contributing
+### 3. Tao file env cho service
 
-- All changes must go through a **Pull Request** to `main`.
-- At least **1 approval** required before merge.
-- Follow the service ownership defined in [CODEOWNERS](.github/CODEOWNERS).
-- See the [PR template](.github/pull_request_template.md) for checklist.
+Sao chep:
 
----
+- `services/gateway/.env.example` thanh `services/gateway/.env`
+- `services/metadata-service/.env.example` thanh `services/metadata-service/.env`
+
+### 4. Chay service
+
+Ap migration cho metadata-service:
+
+```bash
+pnpm --filter metadata-service exec prisma migrate deploy
+```
+
+Sau do chay service:
+
+```bash
+pnpm --filter metadata-service start:dev
+pnpm --filter gateway start:dev
+```
+
+Sau khi chay:
+
+- Gateway Swagger: `http://localhost:3000/docs`
+- Metadata Swagger: `http://localhost:3001/docs`
+
+## Tai khoan demo Keycloak
+
+Tat ca user nam trong realm `docvault` va dung password `Passw0rd!`.
+
+| Username | Role |
+|----------|------|
+| `viewer1` | `viewer` |
+| `editor1` | `editor` |
+| `approver1` | `approver` |
+| `co1` | `co` |
+| `admin1` | `admin` |
+
+## Tai lieu bo sung
+
+- Xem tong hop implementation: [docs/PROJECT_STATUS.md](docs/PROJECT_STATUS.md)
+- Xem chi muc tai lieu: [docs/README.md](docs/README.md)
+- Xem context va roadmap ban dau: [docs/README_CONTEXT.md](docs/README_CONTEXT.md)
 
 ## License
 
