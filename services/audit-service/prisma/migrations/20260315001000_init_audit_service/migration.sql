@@ -1,3 +1,5 @@
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
 CREATE TABLE IF NOT EXISTS "audit_events" (
   "eventId" uuid PRIMARY KEY DEFAULT uuid_generate_v4(),
   "timestamp" timestamptz NOT NULL DEFAULT now(),
