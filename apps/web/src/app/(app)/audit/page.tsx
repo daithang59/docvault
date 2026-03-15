@@ -9,7 +9,6 @@ import { AuditTable } from '@/components/audit/audit-table';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { AuditQueryFilters } from '@/types/audit';
-import { Search } from 'lucide-react';
 
 export default function AuditPage() {
   const { session } = useAuth();

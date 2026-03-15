@@ -23,13 +23,11 @@ import {
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
-import { ProtectedAction } from '@/components/common/protected-action';
 import {
-  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Settings
+  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
-import { useRouter } from 'next/navigation';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
@@ -41,7 +39,6 @@ interface DocumentActionPanelProps {
 
 export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPanelProps) {
   const { session } = useAuth();
-  const router = useRouter();
 
   const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | null>(null);
   const [rejectReason, setRejectReason] = useState('');

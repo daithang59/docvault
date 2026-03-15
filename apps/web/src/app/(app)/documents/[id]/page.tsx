@@ -10,7 +10,7 @@ import { DocumentVersionsCard } from '@/components/documents/document-versions-c
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
 import { DocumentActionPanel } from '@/components/documents/document-action-panel';
-import { LoadingState, CardSkeleton } from '@/components/common/loading-state';
+import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { canDownloadDocument, canManageAcl } from '@/lib/auth/guards';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
@@ -30,7 +30,7 @@ export default function DocumentDetailPage({ params }: Props) {
   const { data: doc, isLoading, isError, refetch } = useDocumentDetail(id);
   const { data: history = [] } = useWorkflowHistory(id);
   const { data: acl = [] } = useAcl(id);
-  const { download, isDownloading } = useDownloadDocument({ onError: (msg) => toast.error(msg) });
+  const { download } = useDownloadDocument({ onError: (msg) => toast.error(msg) });
 
   if (isLoading) return <LoadingState label="Loading document..." />;
   if (isError || !doc) return <ErrorState message="Failed to load document." onRetry={refetch} />;

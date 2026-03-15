@@ -68,7 +68,7 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
                         <span>{formatDateTime(entry.createdAt)}</span>
                       </div>
                       {entry.reason && (
-                        <p className="text-xs text-[#64748B] mt-1 italic">"{entry.reason}"</p>
+                        <p className="text-xs text-[#64748B] mt-1 italic">&ldquo;{entry.reason}&rdquo;</p>
                       )}
                     </div>
                   </div>

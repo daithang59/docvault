@@ -1,9 +1,7 @@
 'use client';
 
-import { useState } from 'react';
-import { AuditQueryFilters } from '@/types/audit';
-import { AuditResult } from '@/types/audit';
-import { Search, X } from 'lucide-react';
+import { AuditQueryFilters, AuditResult } from '@/types/audit';
+import { X } from 'lucide-react';
 
 interface AuditFiltersProps {
   filters: AuditQueryFilters;

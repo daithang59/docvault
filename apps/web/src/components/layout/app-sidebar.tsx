@@ -9,16 +9,19 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
 import { UserRole } from '@/types/auth';
 
-export function AppSidebar() {
-  const pathname = usePathname();
-  const { session } = useAuth();
-  const [mobileOpen, setMobileOpen] = useState(false);
-
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    session?.roles.some((r) => (item.roles as UserRole[]).includes(r))
-  );
-
-  const SidebarContent = () => (
+// Extracted outside the render function to avoid re-creation on each render
+function SidebarNav({
+  pathname,
+  session,
+  visibleItems,
+  onLinkClick,
+}: {
+  pathname: string;
+  session: { username: string; roles: string[] } | null;
+  visibleItems: typeof NAV_ITEMS;
+  onLinkClick: () => void;
+}) {
+  return (
     <div className="flex flex-col h-full">
       {/* Logo */}
       <div className="flex items-center gap-3 px-6 py-5 border-b border-[#1E293B]">
@@ -46,7 +49,7 @@ export function AppSidebar() {
             <Link
               key={item.href}
               href={item.href}
-              onClick={() => setMobileOpen(false)}
+              onClick={onLinkClick}
               className={cn(
                 'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all',
                 isActive
@@ -84,12 +87,27 @@ export function AppSidebar() {
       )}
     </div>
   );
+}
+
+export function AppSidebar() {
+  const pathname = usePathname();
+  const { session } = useAuth();
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  const visibleItems = NAV_ITEMS.filter((item) =>
+    session?.roles.some((r) => (item.roles as UserRole[]).includes(r))
+  );
 
   return (
     <>
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex flex-col w-60 bg-[#0F172A] h-screen sticky top-0 shrink-0">
-        <SidebarContent />
+        <SidebarNav
+          pathname={pathname}
+          session={session}
+          visibleItems={visibleItems}
+          onLinkClick={() => setMobileOpen(false)}
+        />
       </aside>
 
       {/* Mobile toggle */}
@@ -114,7 +132,12 @@ export function AppSidebar() {
             >
               <X className="h-5 w-5" />
             </button>
-            <SidebarContent />
+            <SidebarNav
+              pathname={pathname}
+              session={session}
+              visibleItems={visibleItems}
+              onLinkClick={() => setMobileOpen(false)}
+            />
           </aside>
         </div>
       )}
