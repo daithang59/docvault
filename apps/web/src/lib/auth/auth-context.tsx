@@ -3,7 +3,6 @@
 import React, {
   createContext,
   useContext,
-  useEffect,
   useState,
   useCallback,
 } from 'react';
@@ -13,17 +12,13 @@ import { hasRole, hasAnyRole } from './guards';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [loading, setLoading] = useState(true);
+// Initialize session from storage lazily to avoid setState-in-effect pattern
+function initSession(): Session | null {
+  return loadSession();
+}
 
-  useEffect(() => {
-    const stored = loadSession();
-    if (stored) {
-      setSession(stored);
-    }
-    setLoading(false);
-  }, []);
+export function AuthProvider({ children }: { children: React.ReactNode }) {
+  const [session, setSession] = useState<Session | null>(initSession);
 
   const login = useCallback((newSession: Session) => {
     saveSession(newSession);
@@ -48,8 +43,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     isComplianceOfficer: hasRole(session, 'compliance_officer'),
     isAdmin: hasRole(session, 'admin'),
   };
-
-  if (loading) return null;
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
 }

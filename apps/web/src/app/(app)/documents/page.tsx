@@ -1,15 +1,13 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useRouter } from 'next/navigation';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
-import { useAuth } from '@/lib/auth/auth-context';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters, DocumentFiltersState } from '@/components/documents/document-filters';
 import { EmptyState } from '@/components/common/empty-state';
-import { LoadingState, TableSkeleton } from '@/components/common/loading-state';
+import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { ProtectedAction } from '@/components/common/protected-action';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -30,8 +28,6 @@ const DEFAULT_FILTERS: DocumentFiltersState = {
 };
 
 export default function DocumentsPage() {
-  const router = useRouter();
-  const { session } = useAuth();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_FILTERS);
@@ -43,7 +39,7 @@ export default function DocumentsPage() {
   const approve = useApproveDocument(targetDoc?.id ?? '');
   const reject = useRejectDocument(targetDoc?.id ?? '');
   const archive = useArchiveDocument(targetDoc?.id ?? '');
-  const { download, isDownloading } = useDownloadDocument({
+  const { download } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
 
@@ -59,8 +55,8 @@ export default function DocumentsPage() {
     if (filters.status) result = result.filter((d) => d.status === filters.status);
     if (filters.classification) result = result.filter((d) => d.classification === filters.classification);
     result.sort((a, b) => {
-      let valA: string | number = a[filters.sort as keyof DocumentListItem] as string ?? '';
-      let valB: string | number = b[filters.sort as keyof DocumentListItem] as string ?? '';
+      const valA: string | number = a[filters.sort as keyof DocumentListItem] as string ?? '';
+      const valB: string | number = b[filters.sort as keyof DocumentListItem] as string ?? '';
       const cmp = String(valA).localeCompare(String(valB));
       return filters.sortDir === 'asc' ? cmp : -cmp;
     });

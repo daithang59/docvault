@@ -10,7 +10,6 @@ import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { DocumentListItem } from '@/types/document';
-import { CheckSquare } from 'lucide-react';
 
 export default function ApprovalsPage() {
   const { session } = useAuth();
