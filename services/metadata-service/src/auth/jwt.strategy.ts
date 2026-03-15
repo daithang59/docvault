@@ -19,10 +19,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     const baseUrl = process.env.KEYCLOAK_BASE_URL!;
     const realm = process.env.KEYCLOAK_REALM!;
     const issuer = `${baseUrl}/realms/${realm}`;
+    const audience = process.env.KEYCLOAK_AUDIENCE;
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
       issuer,
+      audience,
       algorithms: ['RS256'],
       ignoreExpiration: false,
       secretOrKeyProvider: jwksRsa.passportJwtSecret({
@@ -35,13 +37,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: KeycloakAccessToken) {
-    const realmRoles = payload.realm_access?.roles ?? [];
+    const roles = new Set(payload.realm_access?.roles ?? []);
+    if (roles.has('co')) {
+      roles.add('compliance_officer');
+    }
 
     return {
       sub: payload.sub,
       username: payload.preferred_username,
       email: payload.email,
-      roles: realmRoles,
+      roles: Array.from(roles),
       raw: payload,
     };
   }
