@@ -1,120 +1,124 @@
 import {
-  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { StorageService } from '../storage/storage.service';
+import { AuditClient } from '../audit/audit.client';
 import { CreateDocumentDto } from './dto/create-document.dto';
-import { UploadDocumentDto } from './dto/upload-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
+import {
+  RequestContext,
+  ServiceUser,
+  buildActorId,
+} from '../common/request-context';
 
 @Injectable()
 export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly storage: StorageService,
+    private readonly auditClient: AuditClient,
   ) {}
 
   findAll() {
-    return this.prisma.documentMetadata.findMany({
+    return this.prisma.document.findMany({
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  findOne(id: string) {
-    return this.prisma.documentMetadata.findUnique({ where: { id } });
-  }
-
-  create(dto: CreateDocumentDto, user: { sub: string; username?: string }) {
-    return this.prisma.documentMetadata.create({
-      data: {
-        title: dto.title,
-        description: dto.description,
-        filename: dto.filename,
-        contentType: dto.contentType,
-        ownerId: user.username ?? user.sub,
+  async findOneOrThrow(id: string) {
+    const document = await this.prisma.document.findUnique({
+      where: { id },
+      include: {
+        versions: { orderBy: { version: 'desc' } },
+        aclEntries: true,
       },
     });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    return document;
   }
 
-  async uploadDocument(
-    dto: UploadDocumentDto,
-    file: Express.Multer.File | undefined,
-    user: { sub: string; username?: string },
+  async create(
+    dto: CreateDocumentDto,
+    user: ServiceUser,
+    context: RequestContext,
   ) {
-    if (!file) throw new BadRequestException('File is required');
-
-    const objectKey = this.storage.buildObjectKey(file.originalname);
-
-    const uploaded = await this.storage.upload({
-      objectKey,
-      body: file.buffer,
-      contentType: file.mimetype,
-      metadata: { owner: user.username ?? user.sub },
-    });
-
-    return this.prisma.documentMetadata.create({
+    const created = await this.prisma.document.create({
       data: {
         title: dto.title,
         description: dto.description,
-        ownerId: user.username ?? user.sub,
-        filename: file.originalname,
-        contentType: file.mimetype,
-        sizeBytes: file.size,
-        bucket: uploaded.bucket,
-        objectKey: uploaded.objectKey,
-        etag: uploaded.etag?.replaceAll('"', '') ?? null,
+        classification: (dto.classification ?? 'INTERNAL') as any,
+        tags: this.sanitizeTags(dto.tags),
+        ownerId: buildActorId(user),
       },
     });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_CREATED',
+      resourceType: 'DOCUMENT',
+      resourceId: created.id,
+      result: 'SUCCESS',
+    });
+
+    return created;
   }
 
-  /** CO gets audit/compliance view only — cannot download blobs */
-  private canDownload(
-    doc: { ownerId: string },
-    user: { username?: string; sub: string; roles?: string[] },
-  ): boolean {
+  async update(
+    id: string,
+    dto: UpdateDocumentDto,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    this.assertCanManage(document.ownerId, user);
+
+    const data: Record<string, any> = {};
+    if (dto.title !== undefined) data.title = dto.title;
+    if (dto.description !== undefined) data.description = dto.description;
+    if (dto.classification !== undefined) data.classification = dto.classification;
+    if (dto.tags !== undefined) data.tags = this.sanitizeTags(dto.tags);
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_METADATA_UPDATED',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+    });
+
+    return updated;
+  }
+
+  /** Trim, deduplicate, remove empty strings */
+  private sanitizeTags(tags?: string[]): string[] {
+    if (!tags) return [];
+    return [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
+  }
+
+  private assertCanManage(ownerId: string, user: ServiceUser) {
+    const actorId = buildActorId(user);
     const roles = user.roles ?? [];
-    const isOwner = doc.ownerId === (user.username ?? user.sub);
-    const isPrivileged = roles.some((r) =>
-      ['admin', 'approver', 'editor', 'viewer'].includes(r),
-    );
-    const isComplianceOnly = roles.includes('co');
-    return (isOwner || isPrivileged) && !isComplianceOnly;
-  }
+    const isEditor = roles.includes('editor') || roles.includes('admin');
 
-  async getDownloadUrl(
-    id: string,
-    user: { username?: string; sub: string; roles?: string[] },
-  ) {
-    const doc = await this.findOne(id);
-    if (!doc) throw new NotFoundException('Document not found');
-    if (!this.canDownload(doc, user)) {
-      throw new ForbiddenException('You are not allowed to download this file');
+    if (!isEditor || (ownerId !== actorId && !roles.includes('admin'))) {
+      throw new ForbiddenException(
+        'Only the owner editor or admin can mutate metadata',
+      );
     }
-
-    const url = await this.storage.createDownloadUrl({
-      objectKey: doc.objectKey,
-      filename: doc.filename,
-      expiresInSeconds: 300,
-    });
-
-    return { id: doc.id, filename: doc.filename, expiresInSeconds: 300, url };
-  }
-
-  async getDownloadStream(
-    id: string,
-    user: { username?: string; sub: string; roles?: string[] },
-  ) {
-    const doc = await this.findOne(id);
-    if (!doc) throw new NotFoundException('Document not found');
-    if (!this.canDownload(doc, user)) {
-      throw new ForbiddenException('You are not allowed to download this file');
-    }
-
-    return {
-      doc,
-      object: await this.storage.getObjectStream(doc.objectKey!),
-    };
   }
 }
