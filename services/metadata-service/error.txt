@@ -1,0 +1,44 @@
+[dotenv@17.3.1] injecting env (11) from .env -- tip: â™ï¸  suppress all logs with { quiet: true }
+[32m[Nest] 30764  - [39m03/14/2026, 11:48:27 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[Nest] 30764  - 03/14/2026, 11:48:27 PM   ERROR [ExceptionHandler] `PrismaClient` needs to be constructed with a non-empty, valid `PrismaClientOptions`:
+
+```
+new PrismaClient({
+  ...
+})
+```
+
+or
+
+```
+constructor() {
+  super({ ... });
+}
+```
+          
+PrismaClientInitializationError: `PrismaClient` needs to be constructed with a non-empty, valid `PrismaClientOptions`:
+
+```
+new PrismaClient({
+  ...
+})
+```
+
+or
+
+```
+constructor() {
+  super({ ... });
+}
+```
+          
+    at new t (C:\NT114\docvault\node_modules\.pnpm\@prisma+client@7.5.0_prisma@7.5.0_@types+react@19.2.14_react-dom@19.2.4_react@19.2.4__react@1_5pqc6sd3qmq3ggpb4qoifrci6i\node_modules\@prisma\client\runtime\client.js:70:1527)
+    at new PrismaService (C:\NT114\docvault\services\metadata-service\dist\prisma\prisma.service.js:12:21)
+    at Injector.instantiateClass (C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\injector.js:373:19)
+    at callback (C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\injector.js:65:45)
+    at process.processTicksAndRejections (node:internal/process/task_queues:105:5)
+    at async Injector.resolveConstructorParams (C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\injector.js:145:24)
+    at async Injector.loadInstance (C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\injector.js:70:13)
+    at async Injector.loadProvider (C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\injector.js:98:9)
+    at async C:\NT114\docvault\node_modules\.pnpm\@nestjs+core@10.4.22_@nestjs+common@10.4.22_reflect-metadata@0.2.2_rxjs@7.8.2__@nestjs+platfo_7kfmsha4ldy5jexczco62bentu\node_modules\@nestjs\core\injector\instance-loader.js:56:13
+    at async Promise.all (index 3)
