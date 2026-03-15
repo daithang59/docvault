@@ -4,6 +4,45 @@ DocVault is a NestJS monorepo that now runs the MVP as actual microservices inst
 
 ## Architecture
 
+```mermaid
+graph TD
+    %% Actors
+    Viewer[Viewer]
+    Editor[Editor]
+    Approver[Approver]
+    CO[Compliance Officer]
+
+    %% Gateway
+    Gateway[API Gateway<br/>Auth & Routing]
+
+    %% Services
+    subgraph Microservices
+        Meta[Metadata Service<br/>PostgreSQL]
+        Doc[Document Service<br/>MinIO]
+        WF[Workflow Service]
+        Audit[Audit Service<br/>PostgreSQL]
+    end
+
+    %% Connections
+    Viewer -->|JWT| Gateway
+    Editor -->|JWT| Gateway
+    Approver -->|JWT| Gateway
+    CO -->|JWT| Gateway
+
+    Gateway -->|/api/metadata| Meta
+    Gateway -->|/api/documents| Doc
+    Gateway -->|/api/workflow| WF
+    Gateway -->|/api/audit| Audit
+
+    Doc -.->|Sync Metadata/Versions| Meta
+    WF -.->|Update Status| Meta
+    
+    Gateway -.->|Log Request| Audit
+    Meta -.->|Log Changes| Audit
+    Doc -.->|Log Upload/Download| Audit
+    WF -.->|Log Transitions| Audit
+```
+
 ### Service boundaries
 
 - `services/gateway`
@@ -13,8 +52,8 @@ DocVault is a NestJS monorepo that now runs the MVP as actual microservices inst
   - Propagates `X-Request-Id`, `X-User-Id`, `X-Roles`
   - Emits gateway audit wrapper events: `REQUEST_RECEIVED`, `REQUEST_OK`, `REQUEST_DENIED`
 - `services/metadata-service`
-  - Source-of-truth for metadata, ACL, status, current version pointer
-  - Owns download authorization policy
+  - Source-of-truth for metadata, ACL, tags, status, current version pointer
+  - Owns download authorization policy and records workflow history
   - Endpoints:
     - `POST /documents`
     - `GET /documents`
@@ -25,6 +64,7 @@ DocVault is a NestJS monorepo that now runs the MVP as actual microservices inst
     - `POST /documents/:docId/versions`
     - `POST /documents/:docId/status`
     - `POST /documents/:docId/download-authorize`
+    - `GET /documents/:docId/workflow-history`
 - `services/document-service`
   - Owns MinIO upload/download/presign, checksum, object key generation
   - Object key format: `doc/{docId}/v{n}/{filename}`
@@ -34,15 +74,16 @@ DocVault is a NestJS monorepo that now runs the MVP as actual microservices inst
     - `POST /documents/:docId/presign-download`
     - `GET /documents/:docId/versions/:version/stream`
 - `services/workflow-service`
-  - Owns workflow state machine and transition validation
+  - Owns workflow state machine and transition validation (`DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`)
   - Calls metadata-service to update status
   - Calls audit-service and notification-service
   - Endpoints:
     - `POST /workflow/:docId/submit`
     - `POST /workflow/:docId/approve`
     - `POST /workflow/:docId/reject`
+    - `POST /workflow/:docId/archive`
 - `services/audit-service`
-  - Append-only audit ingest and query
+  - Append-only audit ingest and query with **Tamper-evident Hash Chain** security
   - `GET /audit/query` is `compliance_officer` only
   - Endpoints:
     - `POST /audit/events`
@@ -69,9 +110,10 @@ DocVault is a NestJS monorepo that now runs the MVP as actual microservices inst
 
 ### Metadata DB (`docvault_metadata`)
 
-- `documents`
+- `documents` (includes tags, classification, publishedAt, archivedAt)
 - `document_versions`
-- `document_acl`
+- `document_acl` (supports USER, ROLE, GROUP)
+- `document_workflow_history`
 
 ### Audit DB (`docvault_audit`)
 
@@ -165,6 +207,70 @@ pnpm dev
 2. `co1` is denied by `POST /api/metadata/documents/:docId/download-authorize`
 3. `co1` is denied by `POST /api/documents/:docId/presign-download`
 4. `co1` is denied by `GET /api/documents/:docId/versions/:version/stream`
+
+## Use Cases (Business Flows)
+
+```mermaid
+usecaseDiagram
+    actor "Viewer" as V
+    actor "Editor" as E
+    actor "Approver" as A
+    actor "Compliance Officer" as CO
+
+    rectangle "DocVault System" {
+        usecase "Create Document & Metadata" as UC1
+        usecase "Upload Document File" as UC2
+        usecase "Assign ACL & Roles/Groups" as UC3
+        usecase "Submit Workflow (Draft -> Pending)" as UC4
+        usecase "Approve Document (Pending -> Published)" as UC5
+        usecase "Archive Document (Published -> Archived)" as UC6
+        usecase "Download Published File" as UC7
+        usecase "Query Audit Logs" as UC8
+    }
+
+    E --> UC1
+    E --> UC2
+    E --> UC3
+    E --> UC4
+
+    A --> UC5
+    A --> UC6
+    A --> UC3
+    
+    V --> UC7
+
+    CO --> UC8
+    
+    %% Implicit capabilities (Editor and Approver can often download/view too if ACL allows)
+    E -.-> UC7
+    A -.-> UC7
+```
+
+### 1. Document Creation & Upload (Editor)
+- An **Editor** creates a new document entry with metadata, assigning classification (e.g., `CONFIDENTIAL`) and tags (e.g., `finance`, `report`). The document starts in the `DRAFT` state.
+- The Editor uploads the physical file (PDF/Docx), which is streamed to MinIO. The Document Service registers the new version with the Metadata Service.
+
+### 2. Group & Role based Access Control
+- The document owner or an Admin can assign ACL permissions. Instead of just picking single users, they can assign permissions (`READ`, `WRITE`, `APPROVE`) to specific **GROUPs** (e.g., `finance-team`) or roles (`approver`).
+
+### 3. Document Approval Workflow
+- When the draft is ready, the Editor **Submits** the workflow. The state transitions from `DRAFT` to `PENDING`.
+- An **Approver** reviews the document and triggers **Approve**. The state transitions from `PENDING` to `PUBLISHED`, and `publishedAt` is recorded.
+- Every transition automatically generates an atomic record in the `document_workflow_history` table and an audit event.
+
+### 4. Secure File Download (Viewer)
+- A **Viewer** requests to download a document.
+- The Gateway routes the request to Document Service, which synchronously calls Metadata Service to evaluate the ACL policy.
+- If the document is `PUBLISHED` and the Viewer has `READ` permission (via user, role, or group), a short-lived MinIO presigned URL is returned.
+
+### 5. Document Archival
+- When a published document reaches the end of its lifecycle, an Admin or Approver triggers the **Archive** action.
+- The document transitions to `ARCHIVED`, locking it from further active workflows while retaining history.
+
+### 6. Compliance Audit Tracking (Compliance Officer)
+- Every significant action (create, upload, download, workflow state change) generates an audit event.
+- The Audit Service links events securely using a **Tamper-evident Hash Chain** (`SHA-256(prevHash + payload)`), making it impossible to silently alter history.
+- A **Compliance Officer** can query these logs securely. However, the system enforces a strict rule: Compliance Officers can *never* download the actual document blobs, ensuring separation of duties.
 
 ## Demo and checks
 
