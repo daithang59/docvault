@@ -11,6 +11,7 @@
       { "name": "editor" },
       { "name": "approver" },
       { "name": "co" },
+      { "name": "compliance_officer" },
       { "name": "admin" }
     ]
   },
@@ -112,7 +113,7 @@
       "email": "co1@docvault.local",
       "requiredActions": [],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
-      "realmRoles": ["co"]
+      "realmRoles": ["co", "compliance_officer"]
     },
     {
       "username": "admin1",

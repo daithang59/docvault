@@ -1,5 +1,6 @@
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
 }
 
 datasource db {
@@ -8,62 +9,111 @@ datasource db {
 
 enum DocumentStatus {
   DRAFT
-  PENDING_APPROVAL
-  APPROVED
-  REJECTED
+  PENDING
+  PUBLISHED
   ARCHIVED
 }
 
-enum AuditAction {
-  DOCUMENT_CREATED
-  DOCUMENT_UPLOADED
-  DOCUMENT_SUBMITTED
-  DOCUMENT_APPROVED
-  DOCUMENT_REJECTED
-  DOCUMENT_ARCHIVED
-  DOCUMENT_DOWNLOAD_URL_ISSUED
-  DOCUMENT_DOWNLOADED
+enum ClassificationLevel {
+  PUBLIC
+  INTERNAL
+  CONFIDENTIAL
+  SECRET
 }
 
-model DocumentMetadata {
-  id          String         @id @default(uuid())
-  title       String
-  description String?
-  ownerId     String
-  filename    String?
-  contentType String?
-  status      DocumentStatus @default(DRAFT)
-  version     Int            @default(1)
-  sizeBytes   Int?
-  bucket      String?
-  objectKey   String?
-  etag        String?
-  createdAt   DateTime       @default(now())
-  updatedAt   DateTime       @updatedAt
+enum AclSubjectType {
+  USER
+  ROLE
+  GROUP
+  ALL
+}
 
-  auditLogs   AuditLog[]
+enum DocumentPermission {
+  READ
+  DOWNLOAD
+  WRITE
+  APPROVE
+}
+
+enum AclEffect {
+  ALLOW
+  DENY
+}
+
+enum WorkflowAction {
+  SUBMIT
+  APPROVE
+  REJECT
+  ARCHIVE
+}
+
+model Document {
+  id              String            @id @default(uuid())
+  title           String
+  description     String?
+  ownerId         String
+  classification  ClassificationLevel @default(INTERNAL)
+  tags            String[]          @default([])
+  status          DocumentStatus    @default(DRAFT)
+  currentVersion  Int               @default(0)
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+  publishedAt     DateTime?
+  archivedAt      DateTime?
+  versions        DocumentVersion[]
+  aclEntries      DocumentAcl[]
+  workflowHistory DocumentWorkflowHistory[]
 
   @@index([ownerId])
   @@index([status])
-  @@map("document_metadata")
+  @@index([tags], type: Gin)
+  @@map("documents")
 }
 
-model AuditLog {
-  id         String          @id @default(uuid())
-  documentId String?
+model DocumentVersion {
+  id          String   @id @default(uuid())
+  docId       String
+  version     Int
+  objectKey   String
+  checksum    String
+  size        Int
+  filename    String
+  contentType String?
+  createdAt   DateTime @default(now())
+  createdBy   String
+  document    Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@unique([docId, version])
+  @@index([docId, createdAt])
+  @@map("document_versions")
+}
+
+model DocumentAcl {
+  id          String             @id @default(uuid())
+  docId       String
+  subjectType AclSubjectType
+  subjectId   String?
+  permission  DocumentPermission
+  effect      AclEffect
+  createdAt   DateTime           @default(now())
+  document    Document           @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, permission])
+  @@index([subjectType, subjectId])
+  @@map("document_acl")
+}
+
+model DocumentWorkflowHistory {
+  id         String         @id @default(uuid())
+  docId      String
+  fromStatus DocumentStatus
+  toStatus   DocumentStatus
+  action     WorkflowAction
   actorId    String
-  actorRole  String?
-  action     AuditAction
-  fromStatus DocumentStatus?
-  toStatus   DocumentStatus?
-  detail     String?
-  createdAt  DateTime        @default(now())
+  reason     String?
+  createdAt  DateTime       @default(now())
+  document   Document       @relation(fields: [docId], references: [id], onDelete: Cascade)
 
-  document   DocumentMetadata? @relation(fields: [documentId], references: [id], onDelete: SetNull)
-
-  @@index([documentId])
-  @@index([actorId])
-  @@index([action])
-  @@index([createdAt])
-  @@map("audit_log")
+  @@index([docId, createdAt])
+  @@map("document_workflow_history")
 }

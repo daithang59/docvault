@@ -1,0 +1,30 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model AuditEvent {
+  eventId      String   @id @default(uuid())
+  timestamp    DateTime @default(now())
+  actorId      String
+  actorRoles   String[]
+  action       String
+  resourceType String
+  resourceId   String?
+  result       String
+  reason       String?
+  ip           String?
+  traceId      String?
+  prevHash     String?
+  hash         String
+
+  @@index([actorId, timestamp])
+  @@index([action, timestamp])
+  @@index([resourceType, resourceId])
+  @@index([result, timestamp])
+  @@map("audit_events")
+}
