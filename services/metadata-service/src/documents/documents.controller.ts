@@ -2,154 +2,172 @@ import {
   Body,
   Controller,
   Get,
+  HttpCode,
   Param,
   Patch,
   Post,
   Req,
-  Res,
-  StreamableFile,
-  UploadedFile,
   UseGuards,
-  UseInterceptors,
 } from '@nestjs/common';
-import { FileInterceptor } from '@nestjs/platform-express';
-import { memoryStorage } from 'multer';
-import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import {
-  ApiBearerAuth,
-  ApiConsumes,
-  ApiOperation,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
-import { UploadDocumentDto } from './dto/upload-document.dto';
-import { RejectDocumentDto } from './dto/reject-document.dto';
-import { Readable } from 'stream';
+import { UpdateDocumentDto } from './dto/update-document.dto';
+import { AclService } from '../acl/acl.service';
+import { UpsertAclDto } from '../acl/dto/upsert-acl.dto';
+import { VersionsService } from '../versions/versions.service';
+import { CreateVersionDto } from '../versions/dto/create-version.dto';
+import { StatusService } from '../status/status.service';
+import { UpdateStatusDto } from '../status/dto/update-status.dto';
+import { PolicyService } from '../policy/policy.service';
+import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
+import { buildRequestContext } from '../common/request-context';
+import { PrismaService } from '../prisma/prisma.service';
 
 @ApiTags('documents')
 @ApiBearerAuth()
 @Controller('documents')
 export class DocumentsController {
-  constructor(private readonly documentsService: DocumentsService) {}
+  constructor(
+    private readonly documentsService: DocumentsService,
+    private readonly aclService: AclService,
+    private readonly versionsService: VersionsService,
+    private readonly statusService: StatusService,
+    private readonly policyService: PolicyService,
+    private readonly prisma: PrismaService,
+  ) {}
 
   @Get()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'co', 'admin')
-  @ApiOperation({ summary: 'List all documents (all authenticated roles)' })
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List document metadata records' })
   findAll() {
     return this.documentsService.findAll();
+  }
+
+  @Get(':docId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Get a document metadata record by id' })
+  findOne(@Param('docId') docId: string) {
+    return this.documentsService.findOneOrThrow(docId);
   }
 
   @Post()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Create a document record (editor/admin only)' })
+  @ApiOperation({ summary: 'Create a document metadata record' })
   create(@Body() body: CreateDocumentDto, @Req() req: any) {
-    return this.documentsService.create(body, req.user);
+    return this.documentsService.create(body, req.user, buildRequestContext(req));
   }
 
-  @Post('upload')
+  @Patch(':docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({
-    summary: 'Upload a document to MinIO and persist metadata (editor/admin only)',
-  })
-  @ApiConsumes('multipart/form-data')
-  @UseInterceptors(
-    FileInterceptor('file', {
-      storage: memoryStorage(),
-      limits: { fileSize: 20 * 1024 * 1024 },
-    }),
-  )
-  upload(
-    @UploadedFile() file: Express.Multer.File,
-    @Body() body: UploadDocumentDto,
+  @ApiOperation({ summary: 'Update metadata fields owned by metadata service' })
+  update(
+    @Param('docId') docId: string,
+    @Body() body: UpdateDocumentDto,
     @Req() req: any,
   ) {
-    return this.documentsService.uploadDocument(body, file, req.user);
-  }
-
-  @Get(':id/download-url')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'co', 'admin')
-  @ApiOperation({ summary: 'Get presigned download URL (300 s) — CO blocked' })
-  getDownloadUrl(@Param('id') id: string, @Req() req: any) {
-    return this.documentsService.getDownloadUrl(id, req.user);
-  }
-
-  @Get(':id/download')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'co', 'admin')
-  @ApiOperation({ summary: 'Stream file directly through service — CO blocked' })
-  async download(
-    @Param('id') id: string,
-    @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const { doc, object } = await this.documentsService.getDownloadStream(
-      id,
+    return this.documentsService.update(
+      docId,
+      body,
       req.user,
+      buildRequestContext(req),
     );
-
-    if (doc.contentType) res.setHeader('Content-Type', doc.contentType);
-    if (doc.filename) {
-      res.setHeader(
-        'Content-Disposition',
-        `attachment; filename="${encodeURIComponent(doc.filename)}"`,
-      );
-    }
-
-    // AWS SDK v3 returns a Node.js Readable stream in Node environment by default
-    return new StreamableFile(object.Body as any);
   }
 
-  // ──────────── Workflow routes ────────────
-
-  @Get(':id/audit')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('co', 'admin', 'approver', 'editor', 'viewer')
-  @ApiOperation({ summary: 'Get audit trail for a document' })
-  audit(@Param('id') id: string) {
-    return this.documentsService.listAudit(id);
-  }
-
-  @Patch(':id/submit')
+  @Post(':docId/acl')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Submit document for approval (owner editor/admin only)' })
-  submit(@Param('id') id: string, @Req() req: any) {
-    return this.documentsService.submitForApproval(id, req.user);
-  }
-
-  @Patch(':id/approve')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('approver', 'admin')
-  @ApiOperation({ summary: 'Approve a PENDING_APPROVAL document' })
-  approve(@Param('id') id: string, @Req() req: any) {
-    return this.documentsService.approve(id, req.user);
-  }
-
-  @Patch(':id/reject')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('approver', 'admin')
-  @ApiOperation({ summary: 'Reject a PENDING_APPROVAL document' })
-  reject(
-    @Param('id') id: string,
+  @ApiOperation({ summary: 'Add an ACL rule for a document' })
+  upsertAcl(
+    @Param('docId') docId: string,
+    @Body() body: UpsertAclDto,
     @Req() req: any,
-    @Body() body: RejectDocumentDto,
   ) {
-    return this.documentsService.reject(id, req.user, body.reason);
+    return this.aclService.upsert(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
-  @Patch(':id/archive')
+  @Get(':docId/acl')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  @ApiOperation({ summary: 'Archive an APPROVED or REJECTED document (admin only)' })
-  archive(@Param('id') id: string, @Req() req: any) {
-    return this.documentsService.archive(id, req.user);
+  @Roles('editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List ACL rules for a document' })
+  listAcl(@Param('docId') docId: string) {
+    return this.aclService.list(docId);
+  }
+
+  @Post(':docId/versions')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Register a new document version pointer' })
+  createVersion(
+    @Param('docId') docId: string,
+    @Body() body: CreateVersionDto,
+    @Req() req: any,
+  ) {
+    return this.versionsService.create(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Post(':docId/status')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'approver', 'admin')
+  @ApiOperation({ summary: 'Update document status via workflow action' })
+  updateStatus(
+    @Param('docId') docId: string,
+    @Body() body: UpdateStatusDto,
+    @Req() req: any,
+  ) {
+    return this.statusService.update(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Get(':docId/workflow-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List workflow history for a document' })
+  getWorkflowHistory(@Param('docId') docId: string) {
+    return this.prisma.documentWorkflowHistory.findMany({
+      where: { docId },
+      orderBy: { createdAt: 'desc' },
+    });
+  }
+
+  @Post(':docId/download-authorize')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Authorize a download using metadata status and ACL policy',
+  })
+  @HttpCode(200)
+  authorizeDownload(
+    @Param('docId') docId: string,
+    @Body() body: DownloadAuthorizeDto,
+    @Req() req: any,
+  ) {
+    return this.policyService.authorizeDownload(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 }

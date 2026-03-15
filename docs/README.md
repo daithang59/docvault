@@ -1,20 +1,14 @@
-# Tai Lieu Trong Thu Muc `docs`
+# Docs
 
-Thu muc nay chua cac tai lieu phan tich va mo ta du an.
-
-## File nen doc truoc
-
+- `README.md`
+  - Main architecture, local run, demo flow, migration notes
 - `PROJECT_STATUS.md`
-  - Tai lieu moi nhat mo ta dung implementation hien co trong repo.
-  - Nen doc file nay neu muon biet du an da lam duoc gi den luc nay.
-
-## File bo sung
-
+  - Short summary of the repo after the microservice refactor
+- `REFRACTOR_SUMMARY.md`
+  - Consolidated list of the refactor changes that were applied
+- `ERD.md`
+  - Current ERD and data ownership by bounded context
 - `README_CONTEXT.md`
-  - Tai lieu context va roadmap ban dau cua du an.
-  - Noi dung trong file nay nghieng ve muc tieu/ke hoach, khong hoan toan trung voi trang thai code hien tai.
+  - Original planning context and roadmap
 
-## Khi nao dung file nao
-
-- Muon biet "repo hien tai chay duoc gi": doc `PROJECT_STATUS.md`
-- Muon biet "du an du kien se di den dau": doc `README_CONTEXT.md`
+Read `../README.md` first if you want the latest runnable setup.

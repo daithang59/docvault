@@ -1,12 +1,122 @@
+import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
+import { randomUUID } from 'crypto';
 import * as dotenv from 'dotenv';
+import { HttpExceptionFilter } from './common/http-exception.filter';
 
 dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
+  const serviceName = 'gateway';
+
+  app.setGlobalPrefix('api');
+  app.useGlobalPipes(
+    new ValidationPipe({
+      whitelist: true,
+      transform: true,
+      forbidNonWhitelisted: true,
+    }),
+  );
+  app.useGlobalFilters(new HttpExceptionFilter());
+  app.use((req: any, res: any, next: () => void) => {
+    const traceId = req.headers['x-request-id'] || randomUUID();
+    const startedAt = Date.now();
+    req.traceId = traceId;
+    res.setHeader('x-request-id', traceId);
+    res.on('finish', async () => {
+      const actorId =
+        req.user?.username ??
+        req.user?.sub ??
+        req.headers['x-user-id'] ??
+        'anonymous';
+      const roles = (req.user?.roles ?? []) as string[];
+      const result =
+        res.statusCode >= 500
+          ? 'ERROR'
+          : res.statusCode >= 400
+            ? 'DENY'
+            : 'SUCCESS';
+
+      console.log(
+        JSON.stringify({
+          traceId,
+          service: serviceName,
+          route: req.originalUrl,
+          actorId,
+          action: `${req.method} ${req.originalUrl}`,
+          result,
+          latencyMs: Date.now() - startedAt,
+        }),
+      );
+
+      const auditServiceUrl = process.env.AUDIT_SERVICE_URL;
+      if (!auditServiceUrl) {
+        return;
+      }
+
+      const headers: Record<string, string> = {
+        'content-type': 'application/json',
+        'x-request-id': traceId,
+        'x-user-id': actorId,
+        'x-roles': roles.join(','),
+      };
+      if (req.headers.authorization) {
+        headers.authorization = req.headers.authorization;
+      }
+
+      const baseEvent = {
+        actorId,
+        actorRoles: roles,
+        resourceType: 'HTTP_ROUTE',
+        resourceId: req.originalUrl,
+        ip: req.ip,
+        traceId,
+      };
+
+      try {
+        await fetch(`${auditServiceUrl}/audit/events`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...baseEvent,
+            action: 'REQUEST_RECEIVED',
+            result: 'SUCCESS',
+            timestamp: new Date().toISOString(),
+          }),
+        });
+        if (res.statusCode < 400) {
+          await fetch(`${auditServiceUrl}/audit/events`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              ...baseEvent,
+              action: 'REQUEST_OK',
+              result: 'SUCCESS',
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        } else if (res.statusCode === 401 || res.statusCode === 403) {
+          await fetch(`${auditServiceUrl}/audit/events`, {
+            method: 'POST',
+            headers,
+            body: JSON.stringify({
+              ...baseEvent,
+              action: 'REQUEST_DENIED',
+              result: 'DENY',
+              reason: `HTTP ${res.statusCode}`,
+              timestamp: new Date().toISOString(),
+            }),
+          });
+        }
+      } catch {
+        // swallow audit wrapper failures to avoid blocking the gateway response
+      }
+    });
+    next();
+  });
 
   const config = new DocumentBuilder()
     .setTitle('DocVault Gateway')
