@@ -36,12 +36,26 @@ This file reflects the post-refactor state of the repo.
   - compliance officer download authorization fails
   - compliance officer direct download fails
 
+## ERD MVP Sync (Latest Updates)
+
+The codebase has been successfully synchronized with the updated MVP ERD:
+- **Metadata-Service**: 
+  - `Document` model now supports `tags` (with GIN indexing) and `ClassificationLevel` enum.
+  - New `document_workflow_history` table automatically records state transitions.
+  - ACL supports `GROUP` subject types.
+  - New endpoints: `GET /documents/:docId/workflow-history`
+- **Workflow-Service**: 
+  - Added transition guards validating states (`DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`).
+  - Added `archive` capability: `POST /workflow/:docId/archive`.
+- **Audit-Service**: 
+  - Improved data integrity by implementing a **Tamper-evident Hash Chain** log structure. `hash = SHA-256(prevHash + payload)`.
+
 ## Local ops summary
 
-- Infra: `docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d`
-- Metadata migration: `pnpm --filter metadata-service prisma:deploy`
-- Audit migration: `pnpm --filter audit-service prisma:deploy`
+- Infra: `docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d postgres` (Requires PostgreSQL database to be running for Prisma migrations)
+- Metadata migration: `cd services/metadata-service && npx prisma migrate dev --name sync_erd_mvp`
+- Audit migration: `cd services/audit-service && npx prisma migrate dev --name add_hash_chain`
 - Build: `pnpm build`
-- E2E script: `pnpm test:e2e`
+- Custom Node Test: `npx ts-node services/metadata-service/src/test-flow.ts`
 
-See the root [README](../README.md) for full architecture, sequence flows, demo, and migration notes.
+See the root [README](../README.md) for full architecture, use cases, sequence flows, demo, and migration notes.
