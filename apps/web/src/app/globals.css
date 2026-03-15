@@ -1,0 +1,56 @@
+@import "tailwindcss";
+
+@theme {
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  /* Brand */
+  --brand-950: #0B1220;
+  --brand-900: #111827;
+  --brand-800: #1E293B;
+  --brand-700: #334155;
+  --brand-600: #475569;
+  --brand-500: #2563EB;
+  --brand-400: #60A5FA;
+  --brand-300: #93C5FD;
+
+  /* Neutral */
+  --bg-app: #F8FAFC;
+  --bg-subtle: #F1F5F9;
+  --bg-card: #FFFFFF;
+  --bg-muted: #EEF2F7;
+  --border-soft: #E2E8F0;
+  --border-strong: #CBD5E1;
+  --text-strong: #0F172A;
+  --text-main: #1E293B;
+  --text-muted: #64748B;
+  --text-faint: #94A3B8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html {
+  font-family: var(--font-sans);
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 6px; height: 6px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+
+/* Focus */
+:focus-visible {
+  outline: 2px solid #2563EB;
+  outline-offset: 2px;
+}

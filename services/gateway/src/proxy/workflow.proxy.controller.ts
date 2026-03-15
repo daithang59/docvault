@@ -47,4 +47,16 @@ export class WorkflowProxyController {
     });
     return response.data;
   }
+
+  @Post(':docId/archive')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('approver', 'admin')
+  @ApiOperation({ summary: 'Proxy -> workflow-service POST /workflow/:docId/archive' })
+  async archive(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.WORKFLOW_SERVICE_URL}/workflow/${docId}/archive`,
+    });
+    return response.data;
+  }
 }
