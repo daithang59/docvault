@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import { AclEntry, AddAclEntryDto, SubjectType, Permission, Effect } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
-import { Plus, Shield, AlertCircle } from 'lucide-react';
+import { Plus, Shield } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { useAddAclEntry } from '@/lib/hooks/use-acl';
 import { cn } from '@/lib/utils/cn';

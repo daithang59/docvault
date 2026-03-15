@@ -13,21 +13,18 @@ import { FileText, FilePlus, CheckSquare, Shield, ArrowRight, TrendingUp } from 
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
 import { formatDateTime } from '@/lib/utils/date';
-import { DocumentStatus } from '@/types/document';
 import { UserRole } from '@/types/auth';
 import { truncateEnd } from '@/lib/utils/format';
 
-const STATUS_COUNTS: DocumentStatus[] = ['DRAFT', 'PENDING', 'PUBLISHED', 'ARCHIVED'];
-
 export default function DashboardPage() {
-  const { session, isAdmin, isEditor, isApprover, isComplianceOfficer } = useAuth();
+  const { session } = useAuth();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const stats = useMemo(() => {
     if (!docs) return { total: 0, DRAFT: 0, PENDING: 0, PUBLISHED: 0, ARCHIVED: 0 };
     return docs.reduce(
-      (acc, d) => { acc.total++; acc[d.status]++; return acc; },
-      { total: 0, DRAFT: 0, PENDING: 0, PUBLISHED: 0, ARCHIVED: 0 } as Record<string, number>
+      (acc: Record<string, number>, d) => { acc.total++; acc[d.status]++; return acc; },
+      { total: 0, DRAFT: 0, PENDING: 0, PUBLISHED: 0, ARCHIVED: 0 }
     );
   }, [docs]);
 

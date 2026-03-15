@@ -17,7 +17,6 @@ import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
-import { cn } from '@/lib/utils/cn';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
