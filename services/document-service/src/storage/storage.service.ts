@@ -1,11 +1,10 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
 import {
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
-import { randomUUID } from 'crypto';
+import { Injectable, NotFoundException } from '@nestjs/common';
 
 @Injectable()
 export class StorageService {
@@ -20,9 +19,9 @@ export class StorageService {
     },
   });
 
-  buildObjectKey(filename: string): string {
-    const safe = filename.replace(/\s+/g, '-');
-    return `documents/${new Date().toISOString().slice(0, 10)}/${randomUUID()}-${safe}`;
+  buildObjectKey(docId: string, version: number, filename: string) {
+    const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
+    return `doc/${docId}/v${version}/${safeFilename}`;
   }
 
   async upload(params: {
@@ -30,8 +29,8 @@ export class StorageService {
     body: Buffer;
     contentType?: string;
     metadata?: Record<string, string>;
-  }): Promise<{ bucket: string; objectKey: string; etag: string | undefined }> {
-    const result = await this.client.send(
+  }) {
+    await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
         Key: params.objectKey,
@@ -44,33 +43,32 @@ export class StorageService {
     return {
       bucket: this.bucket,
       objectKey: params.objectKey,
-      etag: result.ETag,
     };
   }
 
   async createDownloadUrl(params: {
-    objectKey?: string | null;
-    filename?: string | null;
-    expiresInSeconds?: number;
-  }): Promise<string> {
-    if (!params.objectKey) {
-      throw new NotFoundException('Object key not found');
-    }
-
+    objectKey: string;
+    filename: string;
+    expiresInSeconds: number;
+  }) {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: params.objectKey,
-      ResponseContentDisposition: params.filename
-        ? `attachment; filename="${encodeURIComponent(params.filename)}"`
-        : undefined,
+      ResponseContentDisposition: `attachment; filename="${encodeURIComponent(
+        params.filename,
+      )}"`,
     });
 
     return getSignedUrl(this.client, command, {
-      expiresIn: params.expiresInSeconds ?? 300,
+      expiresIn: params.expiresInSeconds,
     });
   }
 
   async getObjectStream(objectKey: string) {
+    if (!objectKey) {
+      throw new NotFoundException('Object key not found');
+    }
+
     return this.client.send(
       new GetObjectCommand({
         Bucket: this.bucket,
@@ -79,4 +77,3 @@ export class StorageService {
     );
   }
 }
-

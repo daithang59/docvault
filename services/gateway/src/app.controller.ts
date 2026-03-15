@@ -1,25 +1,21 @@
-import { Controller, Get, UseGuards, Req } from '@nestjs/common';
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { Roles } from './auth/roles.decorator';
-import { RolesGuard } from './auth/roles.guard';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 
+@ApiTags('app')
 @Controller()
 export class AppController {
   @Get('health')
+  @ApiOperation({ summary: 'Health check' })
   health() {
     return { status: 'ok', service: 'gateway' };
   }
 
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
+  @ApiBearerAuth()
+  @ApiOperation({ summary: 'Return current user info from token' })
   me(@Req() req: any) {
     return req.user;
-  }
-
-  @Get('admin-only')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
-  adminOnly() {
-    return { ok: true, scope: 'admin' };
   }
 }
