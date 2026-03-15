@@ -211,22 +211,24 @@ pnpm dev
 ## Use Cases (Business Flows)
 
 ```mermaid
-usecaseDiagram
-    actor "Viewer" as V
-    actor "Editor" as E
-    actor "Approver" as A
-    actor "Compliance Officer" as CO
+flowchart LR
+    %% Actors
+    V((Viewer))
+    E((Editor))
+    A((Approver))
+    CO((Compliance Officer))
 
-    rectangle "DocVault System" {
-        usecase "Create Document & Metadata" as UC1
-        usecase "Upload Document File" as UC2
-        usecase "Assign ACL & Roles/Groups" as UC3
-        usecase "Submit Workflow (Draft -> Pending)" as UC4
-        usecase "Approve Document (Pending -> Published)" as UC5
-        usecase "Archive Document (Published -> Archived)" as UC6
-        usecase "Download Published File" as UC7
-        usecase "Query Audit Logs" as UC8
-    }
+    subgraph "DocVault System"
+        direction TB
+        UC1([Create Document & Metadata])
+        UC2([Upload Document File])
+        UC3([Assign ACL & Roles/Groups])
+        UC4([Submit Workflow: Draft -> Pending])
+        UC5([Approve Document: Pending -> Published])
+        UC6([Archive Document: Published -> Archived])
+        UC7([Download Published File])
+        UC8([Query Audit Logs])
+    end
 
     E --> UC1
     E --> UC2
