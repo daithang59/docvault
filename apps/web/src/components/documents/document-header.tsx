@@ -45,7 +45,7 @@ export function DocumentHeader({ doc }: DocumentHeaderProps) {
 
       {/* Metadata grid */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[#F1F5F9]">
-        <MetaItem label="Owner" icon={User} value={doc.ownerId} mono />
+        <MetaItem label="Owner" icon={User} value={doc.ownerDisplay ?? `${doc.ownerId.slice(0, 8)}…`} mono={!doc.ownerDisplay} />
         <MetaItem label="Created" icon={Calendar} value={formatDateTime(doc.createdAt)} />
         <MetaItem label="Updated" icon={Calendar} value={formatDateTime(doc.updatedAt)} />
         {doc.publishedAt && (

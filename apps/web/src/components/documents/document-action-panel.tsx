@@ -31,7 +31,7 @@ import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
-import { getErrorMessage } from '@/lib/api/errors';
+import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 
 interface DocumentActionPanelProps {
   doc: DocumentDetail;
@@ -61,7 +61,13 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       toast.success(TOAST_MESSAGES.SUBMITTED);
       onActionComplete?.();
     } catch (e) {
-      toast.error(getErrorMessage(e));
+      const err = parseApiError(e);
+      const msg = err.statusCode === 409
+        ? TOAST_MESSAGES.CONFLICT_SUBMIT
+        : err.statusCode === 403
+          ? TOAST_MESSAGES.FORBIDDEN_ACTION
+          : getErrorMessage(e);
+      toast.error(msg);
     }
   }
 
@@ -71,7 +77,13 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       toast.success(TOAST_MESSAGES.APPROVED);
       onActionComplete?.();
     } catch (e) {
-      toast.error(getErrorMessage(e));
+      const err = parseApiError(e);
+      const msg = err.statusCode === 409
+        ? TOAST_MESSAGES.CONFLICT_APPROVE
+        : err.statusCode === 403
+          ? TOAST_MESSAGES.FORBIDDEN_ACTION
+          : getErrorMessage(e);
+      toast.error(msg);
     }
   }
 
@@ -82,7 +94,13 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       setRejectReason('');
       onActionComplete?.();
     } catch (e) {
-      toast.error(getErrorMessage(e));
+      const err = parseApiError(e);
+      const msg = err.statusCode === 409
+        ? TOAST_MESSAGES.CONFLICT_REJECT
+        : err.statusCode === 403
+          ? TOAST_MESSAGES.FORBIDDEN_ACTION
+          : getErrorMessage(e);
+      toast.error(msg);
     }
   }
 
@@ -92,9 +110,14 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       toast.success(TOAST_MESSAGES.ARCHIVED);
       onActionComplete?.();
     } catch (e) {
-      const msg = e instanceof ApiError
-        ? (e.statusCode === 404 ? TOAST_MESSAGES.ARCHIVE_UNAVAILABLE : e.message)
-        : TOAST_MESSAGES.ARCHIVE_UNAVAILABLE;
+      const err = parseApiError(e);
+      const msg = err.statusCode === 409
+        ? TOAST_MESSAGES.CONFLICT_ARCHIVE
+        : err.statusCode === 403
+          ? TOAST_MESSAGES.FORBIDDEN_ACTION
+          : err.statusCode === 404
+            ? TOAST_MESSAGES.ARCHIVE_UNAVAILABLE
+            : getErrorMessage(e);
       toast.error(msg);
     }
   }
