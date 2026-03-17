@@ -1,5 +1,6 @@
 import type { UserRole } from '@/types/enums';
 import type { Session } from '@/types/auth';
+import { extractRoles as extractRolesFromPayload } from './token';
 
 export const ALL_ROLES: UserRole[] = [
   'viewer',
@@ -23,15 +24,5 @@ export function hasAnyRole(session: Session | null, roles: UserRole[]): boolean 
 
 /** Extract roles from Keycloak JWT realm_access claim */
 export function extractRolesFromJwt(payload: Record<string, unknown>): UserRole[] {
-  const realmAccess = payload['realm_access'] as { roles?: string[] } | undefined;
-  const realmRoles: UserRole[] = (realmAccess?.roles ?? []).filter((r): r is UserRole =>
-    (ALL_ROLES as string[]).includes(r),
-  );
-  // Also check resource_access or top-level roles claim
-  const topRoles = Array.isArray(payload['roles'])
-    ? (payload['roles'] as string[]).filter((r): r is UserRole =>
-        (ALL_ROLES as string[]).includes(r),
-      )
-    : [];
-  return Array.from(new Set([...realmRoles, ...topRoles]));
+  return extractRolesFromPayload(payload);
 }

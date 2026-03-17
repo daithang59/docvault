@@ -8,7 +8,7 @@ export const CLASSIFICATION_OPTIONS = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'SE
 export const createDocumentSchema = z.object({
   title: zNonEmptyString.max(255, 'Title must be at most 255 characters'),
   description: zOptionalString,
-  classificationLevel: z.enum(CLASSIFICATION_OPTIONS).refine((v) => v !== undefined, {
+  classification: z.enum(CLASSIFICATION_OPTIONS).refine((v) => v !== undefined, {
     message: 'Classification level is required',
   }),
   tags: z.array(z.string().trim().min(1)).default([]),
@@ -27,7 +27,7 @@ export type UpdateDocumentFormValues = z.infer<typeof updateDocumentSchema>;
 // ── Workflow comment schema ───────────────────────────────────────────────────
 
 export const workflowCommentSchema = z.object({
-  comment: zOptionalString,
+  reason: zOptionalString,
 });
 
 export type WorkflowCommentFormValues = z.infer<typeof workflowCommentSchema>;
@@ -35,10 +35,13 @@ export type WorkflowCommentFormValues = z.infer<typeof workflowCommentSchema>;
 // ── ACL entry form schema ─────────────────────────────────────────────────────
 
 export const addAclEntrySchema = z.object({
-  subjectType: z.enum(['USER', 'ROLE', 'GROUP']),
-  subjectId: zNonEmptyString,
-  permission: z.enum(['READ', 'WRITE', 'DELETE', 'APPROVE', 'AUDIT', 'SHARE']),
+  subjectType: z.enum(['USER', 'ROLE', 'GROUP', 'ALL']),
+  subjectId: zOptionalString,
+  permission: z.enum(['READ', 'DOWNLOAD', 'WRITE', 'APPROVE']),
   effect: z.enum(['ALLOW', 'DENY']),
+}).refine((value) => value.subjectType === 'ALL' || Boolean(value.subjectId?.trim()), {
+  message: 'Subject ID is required unless subject type is ALL',
+  path: ['subjectId'],
 });
 
 export type AddAclEntryFormValues = z.infer<typeof addAclEntrySchema>;

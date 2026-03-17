@@ -71,7 +71,7 @@ export function useApproveDocument(docId: string) {
 export function useRejectDocument(docId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (reason?: string) => rejectDocument(docId, reason ? { comment: reason } : undefined),
+    mutationFn: (reason?: string) => rejectDocument(docId, reason ? { reason } : undefined),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
       qc.invalidateQueries({ queryKey: queryKeys.documents });

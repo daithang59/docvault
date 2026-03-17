@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState } from 'react';
 import { authorizeDownload, presignDownload } from '@/features/documents/documents.api';
-import { ApiError } from '@/lib/api/errors';
+import { getErrorMessage } from '@/lib/api/errors';
 import { triggerBrowserDownload } from '@/lib/utils/download';
 
 interface UseDownloadDocumentOptions {
@@ -12,30 +12,19 @@ interface UseDownloadDocumentOptions {
 export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
   const [isDownloading, setIsDownloading] = useState(false);
 
-  const download = useCallback(
-    async (docId: string) => {
-      setIsDownloading(true);
-      try {
-        // Step 1: Authorize download — get a short-lived download token
-        const { downloadToken } = await authorizeDownload(docId);
+  async function download(docId: string) {
+    setIsDownloading(true);
+    try {
+      const authorization = await authorizeDownload(docId);
+      const { url, filename } = await presignDownload(docId, authorization.version);
 
-        // Step 2: Exchange token for presigned URL
-        const { url, filename } = await presignDownload(docId, downloadToken);
-
-        // Step 3: Trigger browser download
-        triggerBrowserDownload(url, filename || `document-${docId}`);
-      } catch (err) {
-        const message =
-          err instanceof ApiError
-            ? err.message
-            : 'Failed to download document.';
-        options?.onError?.(message);
-      } finally {
-        setIsDownloading(false);
-      }
-    },
-    [options],
-  );
+      triggerBrowserDownload(url, filename || authorization.filename || `document-${docId}`);
+    } catch (err) {
+      options?.onError?.(getErrorMessage(err));
+    } finally {
+      setIsDownloading(false);
+    }
+  }
 
   return { download, isDownloading };
 }

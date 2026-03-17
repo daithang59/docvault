@@ -15,7 +15,8 @@ interface DocumentContext {
 
 // ── Document list / creation ──────────────────────────────────────────────────
 
-export function canViewDocuments(_session: Session | null): boolean {
+export function canViewDocuments(session: Session | null): boolean {
+  void session;
   return true; // All authenticated users
 }
 
@@ -44,7 +45,8 @@ export function canSubmitDocument(
 ): boolean {
   if (!session) return false;
   if (doc.status !== 'DRAFT') return false;
-  return hasAnyRole(session, ['editor', 'admin']);
+  if (hasRole(session, 'admin')) return true;
+  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
 }
 
 export function canApproveDocument(
@@ -70,8 +72,9 @@ export function canArchiveDocument(
   doc: DocumentContext,
 ): boolean {
   if (!session) return false;
-  if (!['PUBLISHED', 'PENDING'].includes(doc.status)) return false;
-  return hasAnyRole(session, ['approver', 'admin']);
+  if (doc.status !== 'PUBLISHED') return false;
+  if (hasRole(session, 'admin')) return true;
+  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
 }
 
 // ── Download / ACL / Audit ────────────────────────────────────────────────────
@@ -95,8 +98,12 @@ export function canManageAcl(
   return false;
 }
 
+export function canReadAcl(session: Session | null): boolean {
+  return hasAnyRole(session, ['editor', 'approver', 'compliance_officer', 'admin']);
+}
+
 export function canViewAudit(session: Session | null): boolean {
-  return hasAnyRole(session, ['compliance_officer', 'admin']);
+  return hasRole(session, 'compliance_officer');
 }
 
 export function canViewApprovals(session: Session | null): boolean {

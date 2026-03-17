@@ -85,6 +85,8 @@ export function useUploadDocumentFile(id: string) {
     mutationFn: (file: File) => uploadDocumentFile(id, file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
       toast.success('File uploaded successfully');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -97,6 +99,7 @@ export function useAddAclEntry(id: string) {
     mutationFn: (dto: AddAclEntryDto) => addAclEntry(id, dto),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: documentsKeys.acl(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
       toast.success('ACL entry added');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
@@ -106,9 +109,9 @@ export function useAddAclEntry(id: string) {
 export function useDownloadDocument() {
   return useMutation({
     mutationFn: async ({ id, filename }: { id: string; filename?: string }) => {
-      const { downloadToken } = await authorizeDownload(id);
-      const { url, filename: serverFilename } = await presignDownload(id, downloadToken);
-      triggerBrowserDownload(url, filename ?? serverFilename ?? `document-${id}`);
+      const authorization = await authorizeDownload(id);
+      const { url, filename: serverFilename } = await presignDownload(id, authorization.version);
+      triggerBrowserDownload(url, filename ?? serverFilename ?? authorization.filename ?? `document-${id}`);
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

@@ -9,12 +9,13 @@ import { AuditTable } from '@/components/audit/audit-table';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import type { AuditQueryFilters } from '@/features/audit/audit.types';
+import { canViewAudit } from '@/lib/auth/guards';
 
 export default function AuditPage() {
   const { session } = useAuth();
-  const [filters, setFilters] = useState<AuditQueryFilters>({ limit: 100 });
+  const [filters, setFilters] = useState<AuditQueryFilters>({});
 
-  const hasAccess = session?.user.roles.some((r) => ['compliance_officer', 'admin'].includes(r));
+  const hasAccess = canViewAudit(session);
 
   const { data: logs, isLoading, isError, refetch } = useAuditQuery(filters);
 

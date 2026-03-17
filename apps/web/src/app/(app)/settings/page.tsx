@@ -1,5 +1,4 @@
 import { PageShell } from '@/components/layout/page-shell';
-import { SectionHeader } from '@/components/common/section-header';
 import { User, Shield, Globe, Info } from 'lucide-react';
 
 export default function SettingsPage() {
@@ -18,7 +17,7 @@ export default function SettingsPage() {
           <div className="px-5 py-4 space-y-3 text-sm text-slate-600">
             <p>Session information is shown below. Token details are managed by Keycloak.</p>
             <p className="text-xs text-slate-400">
-              User info is read from the access token stored in session storage.
+              User info is derived from the stored access token and current session payload.
             </p>
           </div>
         </div>

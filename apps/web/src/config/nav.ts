@@ -29,7 +29,7 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Audit',
     href: '/audit',
     icon: 'ClipboardList',
-    roles: ['compliance_officer', 'admin'],
+    roles: ['compliance_officer'],
   },
   {
     label: 'Settings',
