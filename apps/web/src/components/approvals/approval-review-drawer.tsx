@@ -12,7 +12,7 @@ import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
-import { ApiError } from '@/types/api';
+import { getErrorMessage } from '@/lib/api/errors';
 
 interface ApprovalReviewDrawerProps {
   doc: DocumentListItem | null;
@@ -34,7 +34,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
       toast.success(TOAST_MESSAGES.APPROVED);
       onClose();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to approve.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -46,7 +46,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
       setRejectReason('');
       onClose();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to reject.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -73,7 +73,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           <div>
             <div className="flex flex-wrap gap-2 mb-2">
               <StatusBadge status={doc.status} />
-              <ClassificationBadge classification={doc.classification} />
+              <ClassificationBadge classification={(doc.classificationLevel ?? doc.classification) as import('@/types/enums').ClassificationLevel} />
             </div>
             <h3 className="text-lg font-semibold text-[#0F172A] mb-1">{doc.title}</h3>
             {doc.description && (

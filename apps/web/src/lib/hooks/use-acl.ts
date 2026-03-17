@@ -17,6 +17,7 @@ export function useAddAclEntry(docId: string) {
     mutationFn: (data: AddAclEntryDto) => addAclEntry(docId, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: queryKeys.acl(docId) });
+      qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
     },
   });
 }

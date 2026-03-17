@@ -1,4 +1,4 @@
-import { Session } from '@/types/auth';
+import { Session } from '@/features/auth/auth.types';
 
 const STORAGE_KEY = 'docvault_session';
 

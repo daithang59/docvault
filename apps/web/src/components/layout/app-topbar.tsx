@@ -45,8 +45,8 @@ export function AppTopbar() {
       {/* Right: actions */}
       <div className="flex items-center gap-3">
         {/* Role badge */}
-        {session?.roles[0] && (
-          <RoleBadge role={session.roles[0] as UserRole} />
+        {session?.user.roles[0] && (
+          <RoleBadge role={session.user.roles[0] as UserRole} />
         )}
 
         {/* Notifications placeholder */}
@@ -62,10 +62,10 @@ export function AppTopbar() {
           >
             <div className="h-7 w-7 rounded-full bg-[#1E293B] flex items-center justify-center">
               <span className="text-xs font-semibold text-[#60A5FA] uppercase">
-                {session?.username?.slice(0, 2) ?? 'U'}
+                {session?.user.preferred_username?.slice(0, 2) ?? 'U'}
               </span>
             </div>
-            <span className="hidden md:block">{session?.username ?? 'User'}</span>
+            <span className="hidden md:block">{session?.user.preferred_username ?? 'User'}</span>
             <ChevronDown className="h-3.5 w-3.5 text-[#94A3B8]" />
           </button>
 
@@ -77,9 +77,9 @@ export function AppTopbar() {
               />
               <div className="absolute right-0 top-full mt-1 z-20 w-48 bg-white rounded-xl border border-[#E2E8F0] shadow-lg overflow-hidden">
                 <div className="px-4 py-3 border-b border-[#F1F5F9]">
-                  <p className="text-xs font-medium text-[#1E293B]">{session?.username}</p>
+                  <p className="text-xs font-medium text-[#1E293B]">{session?.user.preferred_username}</p>
                   <p className="text-xs text-[#94A3B8] mt-0.5">
-                    ID: {session?.userId?.slice(0, 8)}…
+                    ID: {session?.user.sub?.slice(0, 8)}…
                   </p>
                 </div>
                 <button

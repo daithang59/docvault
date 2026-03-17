@@ -22,14 +22,14 @@ export default function DashboardPage() {
 
   const stats = useMemo(() => {
     if (!docs) return { total: 0, DRAFT: 0, PENDING: 0, PUBLISHED: 0, ARCHIVED: 0 };
-    return docs.reduce(
+    return docs.data.reduce(
       (acc: Record<string, number>, d) => { acc.total++; acc[d.status]++; return acc; },
       { total: 0, DRAFT: 0, PENDING: 0, PUBLISHED: 0, ARCHIVED: 0 }
     );
   }, [docs]);
 
   const recentDocs = useMemo(
-    () => [...(docs ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5),
+    () => [...(docs?.data ?? [])].sort((a, b) => new Date(b.updatedAt).getTime() - new Date(a.updatedAt).getTime()).slice(0, 5),
     [docs]
   );
 
@@ -48,7 +48,7 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         subtitle="System overview and quick access to your documents."
-        badge={session?.roles[0] ? <RoleBadge role={session.roles[0] as UserRole} /> : null}
+        badge={session?.user.roles[0] ? <RoleBadge role={session.user.roles[0] as UserRole} /> : null}
       />
 
       {/* Stat cards */}
@@ -132,7 +132,7 @@ export default function DashboardPage() {
                   badge={stats.PENDING > 0 ? String(stats.PENDING) : undefined}
                 />
               </ProtectedAction>
-              <ProtectedAction roles={['compliance_officer', 'admin']}>
+              <ProtectedAction roles={['compliance_officer']}>
                 <QuickAction
                   href={ROUTES.AUDIT}
                   icon={Shield}
