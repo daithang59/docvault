@@ -10,6 +10,8 @@ export {
 
 export {
   canCreateDocument,
+  canViewDocuments,
+  canViewDocumentDetail,
   canEditDocument,
   canSubmitDocument,
   canApproveDocument,
