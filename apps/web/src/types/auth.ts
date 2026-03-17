@@ -1,27 +1,8 @@
-export type UserRole =
-  | 'viewer'
-  | 'editor'
-  | 'approver'
-  | 'compliance_officer'
-  | 'admin';
+/**
+ * Canonical auth types — aligned with features/auth/auth.types.ts.
+ * Legacy code should migrate to import directly from features/auth/auth.types.ts.
+ */
 
-export interface Session {
-  accessToken: string;
-  userId: string;
-  username: string;
-  roles: UserRole[];
-}
+export type { UserRole } from '@/types/enums';
+export type { UserInfo, Session, AuthContextValue } from '@/features/auth/auth.types';
 
-export interface AuthContextValue {
-  session: Session | null;
-  login: (session: Session) => void;
-  logout: () => void;
-  isAuthenticated: boolean;
-  hasRole: (role: UserRole) => boolean;
-  hasAnyRole: (roles: UserRole[]) => boolean;
-  isViewer: boolean;
-  isEditor: boolean;
-  isApprover: boolean;
-  isComplianceOfficer: boolean;
-  isAdmin: boolean;
-}

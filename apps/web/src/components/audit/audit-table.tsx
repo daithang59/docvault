@@ -49,7 +49,7 @@ export function AuditTable({ data }: AuditTableProps) {
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">
-                    {entry.actorRoles.map((r) => (
+                    {(entry.actorRoles ?? []).map((r) => (
                       <span key={r} className="text-[10px] px-1.5 py-0.5 bg-[#F1F5F9] text-[#64748B] rounded font-medium">
                         {r}
                       </span>
@@ -63,7 +63,7 @@ export function AuditTable({ data }: AuditTableProps) {
                   {entry.resourceType}
                 </td>
                 <td className="px-4 py-3 text-xs font-mono text-[#64748B]">
-                  <span title={entry.resourceId}>{truncateMiddle(entry.resourceId, 14)}</span>
+                  <span title={entry.resourceId ?? ''}>{truncateMiddle(entry.resourceId ?? '—', 14)}</span>
                 </td>
                 <td className="px-4 py-3 whitespace-nowrap">
                   <ResultBadge result={entry.result} />
@@ -94,11 +94,12 @@ function Th({ children }: { children: React.ReactNode }) {
   );
 }
 
-function ResultBadge({ result }: { result: 'SUCCESS' | 'DENY' }) {
+function ResultBadge({ result }: { result: string }) {
+  const isSuccess = result === 'SUCCESS';
   return (
     <span className={cn(
       'inline-flex items-center px-2 py-0.5 rounded text-[10px] font-semibold',
-      result === 'SUCCESS'
+      isSuccess
         ? 'bg-[#DCFCE7] text-[#166534]'
         : 'bg-[#FEF2F2] text-[#B91C1C]'
     )}>
