@@ -64,6 +64,8 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
             <option value="">All Results</option>
             <option value="SUCCESS">SUCCESS</option>
             <option value="DENY">DENY</option>
+            <option value="CONFLICT">CONFLICT</option>
+            <option value="ERROR">ERROR</option>
           </select>
         </div>
         <FilterInput

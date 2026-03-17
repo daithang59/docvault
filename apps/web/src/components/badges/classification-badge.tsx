@@ -18,11 +18,11 @@ const classificationLabels: Record<ClassificationLevel, string> = {
 };
 
 interface ClassificationBadgeProps {
-  classification: ClassificationLevel;
+  classification?: ClassificationLevel;
   className?: string;
 }
 
-export function ClassificationBadge({ classification, className }: ClassificationBadgeProps) {
+export function ClassificationBadge({ classification = 'PUBLIC', className }: ClassificationBadgeProps) {
   return (
     <span
       className={cn(

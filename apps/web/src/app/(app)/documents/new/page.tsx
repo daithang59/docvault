@@ -6,51 +6,53 @@ import { DocumentForm, DocumentFormValues } from '@/components/documents/documen
 import { UploadDropzone } from '@/components/documents/upload-dropzone';
 import { PageHeader } from '@/components/common/page-header';
 import { ProtectedAction } from '@/components/common/protected-action';
-import { useCreateDocument, useUploadDocument } from '@/lib/hooks/use-documents';
+import { useCreateDocument } from '@/lib/hooks/use-documents';
+import { uploadDocument } from '@/lib/api/documents';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
-import { ApiError } from '@/types/api';
+import { getErrorMessage } from '@/lib/api/errors';
 
 export default function NewDocumentPage() {
   const router = useRouter();
   const [file, setFile] = useState<File | null>(null);
-  const [createdDocId, setCreatedDocId] = useState<string | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
 
   const createDoc = useCreateDocument();
-  const uploadDoc = useUploadDocument(createdDocId ?? '');
 
   async function handleSubmit(values: DocumentFormValues) {
     try {
       const doc = await createDoc.mutateAsync({
         title: values.title,
         description: values.description || undefined,
-        classification: values.classification,
+        classification: values.classification as import('@/types/enums').ClassificationLevel,
         tags: values.tags,
       });
       toast.success(TOAST_MESSAGES.DOCUMENT_CREATED);
 
       if (file) {
-        setCreatedDocId(doc.id);
         try {
-          await uploadDoc.mutateAsync(file);
+          setIsUploading(true);
+          await uploadDocument(doc.id, file);
           toast.success(TOAST_MESSAGES.VERSION_UPLOADED);
         } catch (uploadErr) {
           toast.error(
             `Document created, but file upload failed: ${
-              uploadErr instanceof ApiError ? uploadErr.message : 'Upload error'
+              getErrorMessage(uploadErr) || 'Upload error'
             }`
           );
+        } finally {
+          setIsUploading(false);
         }
       }
 
       router.push(ROUTES.DOCUMENT_DETAIL(doc.id));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to create document.');
+      toast.error(getErrorMessage(e));
     }
   }
 
-  const isLoading = createDoc.isPending || uploadDoc.isPending;
+  const isLoading = createDoc.isPending || isUploading;
 
   return (
     <ProtectedAction

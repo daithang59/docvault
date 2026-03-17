@@ -13,7 +13,7 @@ import { canEditDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
-import { ApiError } from '@/types/api';
+import { getErrorMessage } from '@/lib/api/errors';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -49,13 +49,13 @@ export default function EditDocumentPage({ params }: Props) {
       await update.mutateAsync({
         title: values.title,
         description: values.description || undefined,
-        classification: values.classification,
+        classification: values.classification as import('@/types/enums').ClassificationLevel,
         tags: values.tags,
       });
       toast.success(TOAST_MESSAGES.DOCUMENT_UPDATED);
       router.push(ROUTES.DOCUMENT_DETAIL(id));
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to update document.');
+      toast.error(getErrorMessage(e));
     }
   }
 

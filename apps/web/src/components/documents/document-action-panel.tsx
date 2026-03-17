@@ -31,6 +31,7 @@ import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
+import { getErrorMessage } from '@/lib/api/errors';
 
 interface DocumentActionPanelProps {
   doc: DocumentDetail;
@@ -60,7 +61,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       toast.success(TOAST_MESSAGES.SUBMITTED);
       onActionComplete?.();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to submit document.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -70,7 +71,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       toast.success(TOAST_MESSAGES.APPROVED);
       onActionComplete?.();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to approve document.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -81,7 +82,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       setRejectReason('');
       onActionComplete?.();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Failed to reject document.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -107,7 +108,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
       setUploadFile(null);
       onActionComplete?.();
     } catch (e) {
-      toast.error(e instanceof ApiError ? e.message : 'Upload failed.');
+      toast.error(getErrorMessage(e));
     }
   }
 
@@ -226,7 +227,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
         )}
 
         {/* Manage ACL */}
-        {canManageAcl(session) && doc.status === 'DRAFT' && (
+        {canManageAcl(session, doc) && doc.status === 'DRAFT' && (
           <p className="text-xs text-[#94A3B8] text-center pt-1">ACL management available in the Access Control panel below.</p>
         )}
       </div>

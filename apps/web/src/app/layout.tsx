@@ -1,20 +1,22 @@
 import type { Metadata } from 'next';
 import { Inter } from 'next/font/google';
 import './globals.css';
-import { Providers } from '@/components/providers';
+import { AppProvider } from '@/providers/app-provider';
 
-const inter = Inter({ subsets: ['latin'] });
+const inter = Inter({ subsets: ['latin'], variable: '--font-inter' });
 
 export const metadata: Metadata = {
   title: 'DocVault — Secure Document Management',
-  description: 'Enterprise-grade secure document lifecycle management system with role-based access control.',
+  description:
+    'Enterprise-grade secure document lifecycle management system with role-based access control.',
+  keywords: ['document management', 'RBAC', 'enterprise', 'audit', 'workflow'],
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body className={inter.className}>
-        <Providers>{children}</Providers>
+    <html lang="en" suppressHydrationWarning>
+      <body className={`${inter.variable} font-sans antialiased`}>
+        <AppProvider>{children}</AppProvider>
       </body>
     </html>
   );

@@ -4,7 +4,12 @@ import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ROUTES } from '@/lib/constants/routes';
-import { parseJwt, extractRoles, extractUsername, extractUserId } from '@/lib/auth/jwt';
+import { getCurrentUser } from '@/features/auth/auth.api';
+import {
+  buildSessionFromAccessToken,
+  buildUserInfoFromCurrentUserDto,
+  parseJwt,
+} from '@/lib/auth/token';
 import { UserRole, Session } from '@/types/auth';
 import { Shield } from 'lucide-react';
 
@@ -26,45 +31,77 @@ export default function LoginPage() {
   const [jwtError, setJwtError] = useState('');
 
   function handleDemoLogin() {
+    const displayName = username.trim() || `demo_${selectedRole}`;
     const session: Session = {
       accessToken: `demo_token_${selectedRole}_${Date.now()}`,
-      userId: `demo-user-${selectedRole}`,
-      username: username.trim() || `demo_${selectedRole}`,
-      roles: [selectedRole],
+      user: {
+        sub: `demo-user-${selectedRole}`,
+        username: displayName,
+        preferred_username: displayName,
+        roles: [selectedRole],
+      },
     };
     login(session);
     router.push(ROUTES.DASHBOARD);
   }
 
-  function handleJwtLogin() {
+  async function handleJwtLogin() {
     setJwtError('');
     if (!jwtToken.trim()) {
       setJwtError('Please enter a JWT token.');
       return;
     }
-    const payload = parseJwt(jwtToken.trim());
-    if (!payload) {
-      setJwtError('Invalid JWT format. Falling back to demo role.');
-      const session: Session = {
-        accessToken: jwtToken.trim(),
-        userId: 'unknown',
-        username: username.trim() || 'user',
-        roles: [selectedRole],
-      };
-      login(session);
+    const token = jwtToken.trim();
+    const payload = parseJwt(token);
+
+    try {
+      const currentUser = await getCurrentUser(token);
+      login({
+        accessToken: token,
+        user: buildUserInfoFromCurrentUserDto(currentUser),
+      });
       router.push(ROUTES.DASHBOARD);
       return;
+    } catch {
+      const tokenSession = buildSessionFromAccessToken(token);
+
+      if (tokenSession) {
+        login({
+          ...tokenSession,
+          user: {
+            ...tokenSession.user,
+            username: username.trim() || tokenSession.user.username,
+            preferred_username:
+              username.trim() || tokenSession.user.preferred_username,
+            roles:
+              tokenSession.user.roles.length > 0
+                ? tokenSession.user.roles
+                : [selectedRole],
+          },
+        });
+        router.push(ROUTES.DASHBOARD);
+        return;
+      }
     }
-    const roles = extractRoles(payload) as UserRole[];
+
+    if (!payload) {
+      setJwtError('Invalid JWT format. Using selected fallback role.');
+    }
+
+    const displayName = username.trim() || 'user';
     const session: Session = {
-      accessToken: jwtToken.trim(),
-      userId: extractUserId(payload),
-      username: extractUsername(payload) || username.trim() || 'user',
-      roles: roles.length > 0 ? roles : [selectedRole],
+      accessToken: token,
+      user: {
+        sub: 'unknown',
+        username: displayName,
+        preferred_username: displayName,
+        roles: [selectedRole],
+      },
     };
     login(session);
     router.push(ROUTES.DASHBOARD);
   }
+
 
   return (
     <div className="min-h-screen bg-[#F8FAFC] flex">

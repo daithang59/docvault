@@ -38,7 +38,7 @@ export const TOAST_MESSAGES = {
   APPROVED: 'Document approved and published.',
   REJECTED: 'Document rejected.',
   ARCHIVED: 'Document archived.',
-  ARCHIVE_UNAVAILABLE: 'Archive endpoint is not available yet.',
+  ARCHIVE_UNAVAILABLE: 'Unable to archive this document.',
   DOWNLOAD_RESTRICTED: 'Only published documents can be downloaded.',
   ACL_UPDATED: 'Access control updated.',
 } as const;
