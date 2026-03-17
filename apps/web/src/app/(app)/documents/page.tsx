@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
+import { parseApiError } from '@/lib/api/errors';
 
 const DEFAULT_FILTERS: DocumentFiltersState = {
   search: '',
@@ -85,9 +86,21 @@ export default function DocumentsPage() {
         toast.success(TOAST_MESSAGES.ARCHIVED);
       }
     } catch (e) {
-      const msg = e instanceof ApiError
-        ? (type === 'archive' && e.statusCode === 404 ? TOAST_MESSAGES.ARCHIVE_UNAVAILABLE : e.message)
-        : 'Operation failed.';
+      const err = parseApiError(e);
+      let msg: string;
+      if (err.statusCode === 409) {
+        if (type === 'submit') msg = TOAST_MESSAGES.CONFLICT_SUBMIT;
+        else if (type === 'approve') msg = TOAST_MESSAGES.CONFLICT_APPROVE;
+        else if (type === 'reject') msg = TOAST_MESSAGES.CONFLICT_REJECT;
+        else if (type === 'archive') msg = TOAST_MESSAGES.CONFLICT_ARCHIVE;
+        else msg = err.message;
+      } else if (err.statusCode === 403) {
+        msg = TOAST_MESSAGES.FORBIDDEN_ACTION;
+      } else if (type === 'archive' && err.statusCode === 404) {
+        msg = TOAST_MESSAGES.ARCHIVE_UNAVAILABLE;
+      } else {
+        msg = e instanceof ApiError ? e.message : 'Operation failed.';
+      }
       toast.error(msg);
     } finally {
       setTargetDoc(null); setActionType(null); setRejectReason('');

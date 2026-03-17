@@ -22,10 +22,10 @@ import {
  *  ARCHIVE : PUBLISHED → ARCHIVED
  */
 const TRANSITION_MAP: Record<string, { from: string; to: string }> = {
-  SUBMIT:  { from: 'DRAFT',     to: 'PENDING'   },
-  APPROVE: { from: 'PENDING',   to: 'PUBLISHED' },
-  REJECT:  { from: 'PENDING',   to: 'DRAFT'     },
-  ARCHIVE: { from: 'PUBLISHED', to: 'ARCHIVED'  },
+  SUBMIT: { from: 'DRAFT', to: 'PENDING' },
+  APPROVE: { from: 'PENDING', to: 'PUBLISHED' },
+  REJECT: { from: 'PENDING', to: 'DRAFT' },
+  ARCHIVE: { from: 'PUBLISHED', to: 'ARCHIVED' },
 };
 
 @Injectable()
@@ -51,11 +51,7 @@ export class StatusService {
 
     // --- Role guard ---
     const roles = user.roles ?? [];
-    if (
-      !roles.some((role) =>
-        ['editor', 'approver', 'admin'].includes(role),
-      )
-    ) {
+    if (!roles.some((role) => ['editor', 'approver', 'admin'].includes(role))) {
       throw new ForbiddenException(
         'Only editor, approver, or admin can update status',
       );
@@ -64,22 +60,20 @@ export class StatusService {
     // --- Transition guard ---
     const transition = TRANSITION_MAP[dto.action];
     if (!transition) {
-      throw new BadRequestException(
-        `Unknown workflow action: ${dto.action}`,
-      );
+      throw new BadRequestException(`Unknown workflow action: ${dto.action}`);
     }
 
     if (document.status !== transition.from) {
       throw new ConflictException(
         `Cannot ${dto.action} a document in status ${document.status}. ` +
-        `Expected status: ${transition.from}`,
+          `Expected status: ${transition.from}`,
       );
     }
 
     if (dto.status !== transition.to) {
       throw new BadRequestException(
         `Action ${dto.action} must set status to ${transition.to}, ` +
-        `but got ${dto.status}`,
+          `but got ${dto.status}`,
       );
     }
 

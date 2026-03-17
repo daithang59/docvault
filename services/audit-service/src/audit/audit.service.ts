@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Prisma } from '@prisma/client';
+import { Prisma } from '../../generated/prisma';
 import { createHash } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
@@ -99,7 +99,10 @@ export class AuditService {
    * Compute SHA-256 hash from prevHash + canonical payload.
    * hash = SHA-256(prevHash + "|" + canonicalPayload)
    */
-  private computeHash(prevHash: string | null, canonicalPayload: string): string {
+  private computeHash(
+    prevHash: string | null,
+    canonicalPayload: string,
+  ): string {
     const input = `${prevHash ?? ''}|${canonicalPayload}`;
     return createHash('sha256').update(input, 'utf8').digest('hex');
   }

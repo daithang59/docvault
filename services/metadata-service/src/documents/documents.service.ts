@@ -86,7 +86,8 @@ export class DocumentsService {
     const data: Record<string, any> = {};
     if (dto.title !== undefined) data.title = dto.title;
     if (dto.description !== undefined) data.description = dto.description;
-    if (dto.classification !== undefined) data.classification = dto.classification;
+    if (dto.classification !== undefined)
+      data.classification = dto.classification;
     if (dto.tags !== undefined) data.tags = this.sanitizeTags(dto.tags);
 
     const updated = await this.prisma.document.update({

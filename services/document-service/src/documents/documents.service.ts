@@ -189,7 +189,12 @@ export class DocumentsService {
       action: 'DOCUMENT_DOWNLOAD_DENIED',
       resourceType: 'DOCUMENT',
       resourceId: docId,
-      result: status === 409 ? 'CONFLICT' : status && status >= 400 && status < 500 ? 'DENY' : 'ERROR',
+      result:
+        status === 409
+          ? 'CONFLICT'
+          : status && status >= 400 && status < 500
+            ? 'DENY'
+            : 'ERROR',
       reason:
         axiosError.response?.data?.message?.[0] ??
         axiosError.response?.data?.message ??
