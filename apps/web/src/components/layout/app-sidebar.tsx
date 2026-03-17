@@ -17,7 +17,7 @@ function SidebarNav({
   onLinkClick,
 }: {
   pathname: string;
-  session: { username: string; roles: string[] } | null;
+  session: { user: { preferred_username?: string; username?: string; roles: string[] } } | null;
   visibleItems: typeof NAV_ITEMS;
   onLinkClick: () => void;
 }) {
@@ -73,13 +73,13 @@ function SidebarNav({
           <div className="flex items-center gap-3">
             <div className="h-8 w-8 rounded-full bg-[#1E293B] flex items-center justify-center">
               <span className="text-xs font-medium text-[#60A5FA] uppercase">
-                {session.username.slice(0, 2)}
+                {(session.user.preferred_username ?? session.user.username ?? 'U').slice(0, 2)}
               </span>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate">{session.username}</p>
+              <p className="text-sm font-medium text-white truncate">{session.user.preferred_username}</p>
               <p className="text-[11px] text-[#94A3B8] capitalize truncate">
-                {session.roles[0]?.replace('_', ' ')}
+                {session.user.roles[0]?.replace('_', ' ')}
               </p>
             </div>
           </div>
@@ -95,7 +95,7 @@ export function AppSidebar() {
   const [mobileOpen, setMobileOpen] = useState(false);
 
   const visibleItems = NAV_ITEMS.filter((item) =>
-    session?.roles.some((r) => (item.roles as UserRole[]).includes(r))
+    session?.user.roles.some((r) => (item.roles as UserRole[]).includes(r))
   );
 
   return (

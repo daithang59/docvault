@@ -54,7 +54,7 @@ export default function DocumentDetailPage({ params }: Props) {
           <DocumentVersionsCard
             versions={doc.versions ?? []}
             canDownload={canDl}
-            onDownload={(version) => download(id, version)}
+            onDownload={() => download(id)}
           />
           <DocumentWorkflowTimeline history={history} />
         </div>

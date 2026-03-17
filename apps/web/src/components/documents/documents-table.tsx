@@ -71,7 +71,7 @@ export function DocumentsTable({
     {
       accessorKey: 'classification',
       header: 'Classification',
-      cell: ({ row }) => <ClassificationBadge classification={row.original.classification} />,
+      cell: ({ row }) => <ClassificationBadge classification={(row.original.classificationLevel ?? row.original.classification) as import('@/types/enums').ClassificationLevel} />,
     },
     {
       accessorKey: 'status',
