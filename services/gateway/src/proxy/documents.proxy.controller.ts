@@ -15,7 +15,12 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
 import { Response } from 'express';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiConsumes, ApiOperation, ApiTags } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiConsumes,
+  ApiOperation,
+  ApiTags,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
@@ -31,7 +36,9 @@ export class DocumentsProxyController {
   @Post(':docId/upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Proxy -> document-service POST /documents/:docId/upload' })
+  @ApiOperation({
+    summary: 'Proxy -> document-service POST /documents/:docId/upload',
+  })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -64,7 +71,8 @@ export class DocumentsProxyController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'Proxy -> document-service POST /documents/:docId/presign-download',
+    summary:
+      'Proxy -> document-service POST /documents/:docId/presign-download',
   })
   @HttpCode(200)
   async presignDownload(
@@ -84,7 +92,8 @@ export class DocumentsProxyController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'Proxy -> document-service GET /documents/:docId/versions/:version/stream',
+    summary:
+      'Proxy -> document-service GET /documents/:docId/versions/:version/stream',
   })
   async streamVersion(
     @Param('docId') docId: string,

@@ -7,7 +7,13 @@ import { MetadataModule } from './metadata/metadata.module';
 import { AuditModule } from './audit/audit.module';
 
 @Module({
-  imports: [AuthModule, AuditModule, MetadataModule, StorageModule, DocumentsModule],
+  imports: [
+    AuthModule,
+    AuditModule,
+    MetadataModule,
+    StorageModule,
+    DocumentsModule,
+  ],
   controllers: [AppController],
 })
 export class AppModule {}

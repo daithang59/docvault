@@ -18,7 +18,11 @@ export class WorkflowController {
   @Roles('editor', 'admin')
   @ApiOperation({ summary: 'Submit a document from DRAFT to PENDING' })
   submit(@Param('docId') docId: string, @Req() req: any) {
-    return this.workflowService.submit(docId, req.user, buildRequestContext(req));
+    return this.workflowService.submit(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/approve')
@@ -26,7 +30,11 @@ export class WorkflowController {
   @Roles('approver', 'admin')
   @ApiOperation({ summary: 'Approve a document from PENDING to PUBLISHED' })
   approve(@Param('docId') docId: string, @Req() req: any) {
-    return this.workflowService.approve(docId, req.user, buildRequestContext(req));
+    return this.workflowService.approve(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/reject')

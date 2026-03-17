@@ -1,4 +1,14 @@
-import { Body, Controller, Get, HttpCode, Param, Patch, Post, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  Param,
+  Patch,
+  Post,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
@@ -51,8 +61,14 @@ export class MetadataProxyController {
   @Patch('documents/:docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Proxy -> metadata-service PATCH /documents/:docId' })
-  async update(@Param('docId') docId: string, @Req() req: any, @Body() body: any) {
+  @ApiOperation({
+    summary: 'Proxy -> metadata-service PATCH /documents/:docId',
+  })
+  async update(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
     const response = await this.proxyService.forward(req, {
       method: 'PATCH',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,
@@ -64,8 +80,14 @@ export class MetadataProxyController {
   @Post('documents/:docId/acl')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Proxy -> metadata-service POST /documents/:docId/acl' })
-  async upsertAcl(@Param('docId') docId: string, @Req() req: any, @Body() body: any) {
+  @ApiOperation({
+    summary: 'Proxy -> metadata-service POST /documents/:docId/acl',
+  })
+  async upsertAcl(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/acl`,
@@ -77,7 +99,9 @@ export class MetadataProxyController {
   @Get('documents/:docId/acl')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'compliance_officer', 'admin')
-  @ApiOperation({ summary: 'Proxy -> metadata-service GET /documents/:docId/acl' })
+  @ApiOperation({
+    summary: 'Proxy -> metadata-service GET /documents/:docId/acl',
+  })
   async listAcl(@Param('docId') docId: string, @Req() req: any) {
     const response = await this.proxyService.forward(req, {
       method: 'GET',
@@ -89,8 +113,14 @@ export class MetadataProxyController {
   @Post('documents/:docId/versions')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Proxy -> metadata-service POST /documents/:docId/versions' })
-  async createVersion(@Param('docId') docId: string, @Req() req: any, @Body() body: any) {
+  @ApiOperation({
+    summary: 'Proxy -> metadata-service POST /documents/:docId/versions',
+  })
+  async createVersion(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/versions`,
@@ -102,8 +132,14 @@ export class MetadataProxyController {
   @Post('documents/:docId/status')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'admin')
-  @ApiOperation({ summary: 'Proxy -> metadata-service POST /documents/:docId/status' })
-  async updateStatus(@Param('docId') docId: string, @Req() req: any, @Body() body: any) {
+  @ApiOperation({
+    summary: 'Proxy -> metadata-service POST /documents/:docId/status',
+  })
+  async updateStatus(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/status`,
@@ -116,7 +152,8 @@ export class MetadataProxyController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'Proxy -> metadata-service POST /documents/:docId/download-authorize',
+    summary:
+      'Proxy -> metadata-service POST /documents/:docId/download-authorize',
   })
   @HttpCode(200)
   async authorizeDownload(
