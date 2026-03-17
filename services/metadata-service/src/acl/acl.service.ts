@@ -69,7 +69,9 @@ export class AclService {
       (!roles.includes('editor') && !roles.includes('admin')) ||
       (ownerId !== actorId && !roles.includes('admin'))
     ) {
-      throw new ForbiddenException('Only the owner editor or admin can update ACL');
+      throw new ForbiddenException(
+        'Only the owner editor or admin can update ACL',
+      );
     }
   }
 }

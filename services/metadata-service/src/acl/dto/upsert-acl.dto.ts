@@ -1,4 +1,8 @@
-import { AclEffect, AclSubjectType, DocumentPermission } from '@prisma/client';
+import {
+  AclEffect,
+  AclSubjectType,
+  DocumentPermission,
+} from '../../../generated/prisma';
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 
 export class UpsertAclDto {

@@ -12,7 +12,9 @@ export class NotificationController {
 
   @Post('notify')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: 'Accept a notification event and log it in dev mode' })
+  @ApiOperation({
+    summary: 'Accept a notification event and log it in dev mode',
+  })
   notify(@Body() body: NotifyDto) {
     return this.notificationService.notify(body);
   }

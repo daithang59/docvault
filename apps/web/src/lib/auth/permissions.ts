@@ -20,6 +20,11 @@ export function canViewDocuments(session: Session | null): boolean {
   return true; // All authenticated users
 }
 
+export function canViewDocumentDetail(session: Session | null): boolean {
+  void session;
+  return true; // All authenticated users can view detail (compliance_officer, viewer, etc.)
+}
+
 export function canCreateDocument(session: Session | null): boolean {
   return hasAnyRole(session, ['editor', 'admin']);
 }

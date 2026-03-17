@@ -61,7 +61,11 @@ export class DocumentsController {
   @Roles('editor', 'admin')
   @ApiOperation({ summary: 'Create a document metadata record' })
   create(@Body() body: CreateDocumentDto, @Req() req: any) {
-    return this.documentsService.create(body, req.user, buildRequestContext(req));
+    return this.documentsService.create(
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Patch(':docId')
