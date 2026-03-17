@@ -3,7 +3,11 @@ import {
   Injectable,
   NotFoundException,
 } from '@nestjs/common';
-import { AclEffect, AclSubjectType, DocumentPermission } from '@prisma/client';
+import {
+  AclEffect,
+  AclSubjectType,
+  DocumentPermission,
+} from '../../generated/prisma';
 import { createHmac } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';

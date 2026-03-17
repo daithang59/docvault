@@ -1,7 +1,12 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-const DOCUMENT_STATUS_VALUES = ['DRAFT', 'PENDING', 'PUBLISHED', 'ARCHIVED'] as const;
+const DOCUMENT_STATUS_VALUES = [
+  'DRAFT',
+  'PENDING',
+  'PUBLISHED',
+  'ARCHIVED',
+] as const;
 const WORKFLOW_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'ARCHIVE'] as const;
 
 export class UpdateStatusDto {
