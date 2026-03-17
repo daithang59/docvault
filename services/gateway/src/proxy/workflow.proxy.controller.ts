@@ -60,7 +60,7 @@ export class WorkflowProxyController {
 
   @Post(':docId/archive')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('approver', 'admin')
+  @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Proxy -> workflow-service POST /workflow/:docId/archive',
   })

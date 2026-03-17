@@ -188,6 +188,48 @@ pnpm dev
 - Audit: `http://localhost:3004/docs`
 - Notification: `http://localhost:3005/docs`
 
+### 7. Frontend Web App
+
+The frontend is a Next.js 15 app in `apps/web`.
+
+**Run:**
+
+```bash
+cd apps/web
+npm install      # or: pnpm install
+npm run dev      # starts at http://localhost:3001 (use port 3001 if 3000 is taken by gateway)
+```
+
+> **Port note:** The gateway uses port `3000`. Run FE with `npm run dev -- --port 3001` to avoid conflict.
+
+**Env config:**
+
+Copy `apps/web/.env.example` to `apps/web/.env.local`:
+
+```bash
+cp apps/web/.env.example apps/web/.env.local
+```
+
+`.env.local` contents:
+
+```env
+NEXT_PUBLIC_APP_NAME=DocVault
+NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
+```
+
+**Login modes:**
+
+- **Demo Login** (no backend): Select a role (viewer/editor/approver/compliance_officer/admin), enter any username → creates a mock session. UI and route guards work without real backend.
+- **JWT Token Login**: Paste a real JWT from Keycloak. The FE will extract user info and authenticate against the real backend.
+
+**Build for production:**
+
+```bash
+cd apps/web
+npm run build
+npm start   # starts at http://localhost:3000
+```
+
 ## Sequence flows
 
 ### Upload and publish
