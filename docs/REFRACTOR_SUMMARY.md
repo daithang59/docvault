@@ -246,20 +246,34 @@ Tất cả service mới/đã refactor đều được bổ sung:
 - `pnpm build`
 - `pnpm test`
 - `node --check scripts/e2e-check.mjs`
+- `docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d`
+- `pnpm --filter metadata-service prisma:deploy`
+- `pnpm --filter audit-service prisma:deploy`
+- `node scripts/e2e-check.mjs`
 
-Chưa chạy full live E2E trong turn refactor:
+Các case live E2E đã pass:
 
-- `pnpm test:e2e`
-
-Lý do: chưa boot full infra + tất cả service trong cùng turn verify.
+- no token -> `401`
+- expired-like token -> `401`
+- viewer create -> `403`
+- editor create -> `201`
+- upload -> object xuất hiện trong MinIO
+- viewer download DRAFT -> `403`
+- submit -> `PENDING`
+- approve -> `PUBLISHED`
+- approve lần 2 -> `409`
+- viewer published download -> `200`
+- compliance officer download -> `403`
+- compliance officer audit query -> `200`
+- viewer audit query -> `403`
 
 ## 9. Ghi chú thực tế
 
-- Workspace hiện có thể build/test pass ở mức source code
-- Full E2E runtime cần được chạy sau khi:
-  - bring up infra
-  - tạo `.env` cho từng service
-  - migrate metadata DB và audit DB
-  - start 6 service
+- Workspace hiện có thể build, lint, và chạy live E2E pass
+- Trong lúc bring-up runtime đã phải fix thêm một số vấn đề hạ tầng/code:
+  - Prisma client của `metadata-service` và `audit-service` bị đè lẫn nhau trong workspace
+  - JWT verification cần tương thích token Keycloak có `azp` thay vì `aud`
+  - downstream `403/409` từ metadata bị nuốt thành `500` ở service trung gian
+  - một số service thiếu hẳn cấu hình ESLint dù đã khai báo script `lint`
 
 Nếu cần, file này có thể được dùng làm changelog implementation cho PR hoặc checkpoint.

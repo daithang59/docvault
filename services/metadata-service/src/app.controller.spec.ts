@@ -14,7 +14,10 @@ describe('AppController', () => {
 
   describe('health', () => {
     it('should return health status', () => {
-      expect(appController.health()).toEqual({ status: 'ok', service: 'metadata-service' });
+      expect(appController.health()).toEqual({
+        status: 'ok',
+        service: 'metadata-service',
+      });
     });
   });
 });

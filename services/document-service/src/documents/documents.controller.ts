@@ -7,7 +7,6 @@ import {
   Post,
   Req,
   Res,
-  StreamableFile,
   UploadedFile,
   UseGuards,
   UseInterceptors,
@@ -37,7 +36,9 @@ export class DocumentsController {
   @Post(':docId/upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({ summary: 'Upload a document blob and register a version pointer' })
+  @ApiOperation({
+    summary: 'Upload a document blob and register a version pointer',
+  })
   @ApiConsumes('multipart/form-data')
   @UseInterceptors(
     FileInterceptor('file', {
@@ -61,7 +62,9 @@ export class DocumentsController {
   @Post(':docId/presign-download')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
-  @ApiOperation({ summary: 'Create a presigned URL after metadata authorizes download' })
+  @ApiOperation({
+    summary: 'Create a presigned URL after metadata authorizes download',
+  })
   @HttpCode(200)
   presignDownload(
     @Param('docId') docId: string,

@@ -84,6 +84,24 @@ Completed locally:
 - `apps/web`: `npx tsc --noEmit` -> pass
 - `apps/web`: `npm run lint` -> pass
 - `apps/web`: `npm run build` -> pass
+- `services/gateway`: `pnpm --filter gateway lint` -> pass
+- `services/metadata-service`: `pnpm --filter metadata-service lint` -> pass
+- `services/document-service`: `pnpm --filter document-service lint` -> pass
+- `services/workflow-service`: `pnpm --filter workflow-service lint` -> pass
+- `services/audit-service`: `pnpm --filter audit-service lint` -> pass
+- `services/notification-service`: `pnpm --filter notification-service lint` -> pass
+- `services/gateway`: `pnpm --filter gateway build` -> pass
+- `services/metadata-service`: `pnpm --filter metadata-service build` -> pass
+- `services/document-service`: `pnpm --filter document-service build` -> pass
+- `services/workflow-service`: `pnpm --filter workflow-service build` -> pass
+- `services/audit-service`: `pnpm --filter audit-service build` -> pass
+- `services/notification-service`: `pnpm --filter notification-service build` -> pass
+- Infra + Keycloak + MinIO + PostgreSQL + MongoDB started successfully through `docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d`
+- Prisma migrations deployed successfully:
+  - `pnpm --filter metadata-service prisma:deploy`
+  - `pnpm --filter audit-service prisma:deploy`
+- Live smoke/E2E completed successfully:
+  - `node scripts/e2e-check.mjs` -> pass
 - Build output confirmed primary routes compile:
   - `/`
   - `/login`
@@ -96,14 +114,30 @@ Completed locally:
   - `/audit`
   - `/settings`
 
-Blocked in current environment:
+Validated end-to-end runtime behaviors:
 
-- Gateway unavailable at `http://localhost:3000`
-- Keycloak unavailable at `http://localhost:8080`
-- Metadata/document/workflow/audit services unavailable at `localhost:3001-3004`
-- End-to-end smoke script `node scripts/e2e-check.mjs` therefore could not be executed
-- Live integration verification for document list/detail/upload/submit/approve/reject/archive/audit/download remains blocked by missing running backend
-- Runtime route smoke via a started Next server could not be completed from this tool because background process launch was blocked by shell policy; build-time route generation still succeeded
+- no token -> `401`
+- expired-like token -> `401`
+- viewer create -> `403`
+- editor create -> `201`
+- upload -> `201` and blob confirmed in MinIO
+- viewer download draft -> `403`
+- submit -> `201`, resulting status `PENDING`
+- approve -> `201`, resulting status `PUBLISHED`
+- approve same document twice -> `409`
+- viewer published presign download -> `200`
+- viewer published stream download -> `200`
+- compliance officer metadata access -> `200`
+- compliance officer download deny -> `403`
+- compliance officer audit query -> `200`
+- viewer audit query deny -> `403`
+
+Backend fixes required before live verification could pass:
+
+- Prisma client generation for `metadata-service` and `audit-service` had to be isolated per service because shared workspace generation under `@prisma/client` caused schema collisions at build time.
+- Keycloak bearer validation in backend services had to accept client identity via `aud` or `azp`; the seeded Keycloak password-grant tokens use `azp=docvault-gateway` without a matching `aud`.
+- `document-service` and `workflow-service` downstream Axios failures had to be remapped back into Nest `HttpException`s so metadata `403/409/...` responses were not surfaced as generic `500`.
+- Several service packages were missing ESLint config files even though they declared `lint` scripts; matching `.eslintrc.js` / `.prettierrc` files were added so backend lint now runs consistently.
 
 ## Remaining Risks Before Phase 3B
 
@@ -114,4 +148,3 @@ Blocked in current environment:
 - Archive role semantics differ between prompt/docs and `workflow-service` code.
 - Gateway CORS behavior is still unclear from this FE workspace; JWT login therefore keeps a token-parse fallback when `/me` cannot be called from the browser.
 - Refresh token / silent re-auth is still absent.
-

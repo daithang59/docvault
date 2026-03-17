@@ -9,7 +9,10 @@ export class ProxyService {
 
   async forward(
     req: any,
-    config: AxiosRequestConfig & { url: string; responseType?: 'json' | 'stream' },
+    config: AxiosRequestConfig & {
+      url: string;
+      responseType?: 'json' | 'stream';
+    },
   ) {
     try {
       return await firstValueFrom(
@@ -33,10 +36,7 @@ export class ProxyService {
         }
         throw new HttpException(data, error.response.status);
       }
-      throw new HttpException(
-        { message: ['Gateway proxy error'] },
-        500,
-      );
+      throw new HttpException({ message: ['Gateway proxy error'] }, 500);
     }
   }
 }

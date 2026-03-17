@@ -61,7 +61,12 @@ export class WorkflowService {
 
       return updated;
     } catch (error) {
-      await this.auditWorkflowError(docId, context, 'DOCUMENT_SUBMITTED', error);
+      await this.auditWorkflowError(
+        docId,
+        context,
+        'DOCUMENT_SUBMITTED',
+        error,
+      );
       throw error;
     }
   }
@@ -212,7 +217,12 @@ export class WorkflowService {
       action,
       resourceType: 'DOCUMENT',
       resourceId: docId,
-      result: status === 409 ? 'CONFLICT' : status && status >= 400 && status < 500 ? 'DENY' : 'ERROR',
+      result:
+        status === 409
+          ? 'CONFLICT'
+          : status && status >= 400 && status < 500
+            ? 'DENY'
+            : 'ERROR',
       reason:
         axiosError.response?.data?.message?.[0] ??
         axiosError.response?.data?.message ??

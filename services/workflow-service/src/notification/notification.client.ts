@@ -13,7 +13,7 @@ export class NotificationClient {
   async notify(
     context: RequestContext,
     body: {
-      type: 'SUBMITTED' | 'APPROVED' | 'REJECTED';
+      type: 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
       docId: string;
       actorId: string;
       reason?: string;

@@ -1,4 +1,3 @@
-import { createHash } from 'crypto';
 import { AuditService } from './audit.service';
 
 // --- Mock PrismaService ---
