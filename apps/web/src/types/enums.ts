@@ -5,11 +5,11 @@ export type DocumentStatus = 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED';
 
 export type ClassificationLevel = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'SECRET';
 
-export type AclPermission = 'READ' | 'WRITE' | 'DELETE' | 'APPROVE' | 'AUDIT' | 'SHARE';
+export type AclPermission = 'READ' | 'DOWNLOAD' | 'WRITE' | 'APPROVE';
 
 export type AclEffect = 'ALLOW' | 'DENY';
 
-export type AclSubjectType = 'USER' | 'ROLE' | 'GROUP';
+export type AclSubjectType = 'USER' | 'ROLE' | 'GROUP' | 'ALL';
 
 export type UserRole =
   | 'viewer'
@@ -20,6 +20,6 @@ export type UserRole =
 
 export type WorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'ARCHIVE';
 
-export type AuditResult = 'SUCCESS' | 'FAILURE' | 'DENIED';
+export type AuditResult = 'SUCCESS' | 'DENY' | 'ERROR' | 'CONFLICT';
 
 export type SortDirection = 'asc' | 'desc';

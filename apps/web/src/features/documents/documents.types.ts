@@ -4,22 +4,19 @@ import type {
   AclPermission,
   AclEffect,
   AclSubjectType,
+  WorkflowAction,
 } from '@/types/enums';
 import type { PaginationParams } from '@/types/pagination';
 
-// ── Document list item (returned by GET /metadata/documents) ─────────────────
-
-export interface DocumentListItem {
+export interface DocumentSummaryDto {
   id: string;
   title: string;
-  description?: string;
+  description?: string | null;
   status: DocumentStatus;
-  classificationLevel: ClassificationLevel;
-  classification?: ClassificationLevel;  // Phase 1 alias for classificationLevel
+  classification: ClassificationLevel;
   ownerId: string;
   ownerDisplay?: string;
-  currentVersionNumber?: number;
-  currentVersion?: number;               // Phase 1 alias for currentVersionNumber
+  currentVersion: number;
   filename?: string;
   mimeType?: string;
   fileSize?: number;
@@ -28,107 +25,140 @@ export interface DocumentListItem {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  classificationLevel?: ClassificationLevel;
+  currentVersionNumber?: number;
 }
 
-// ── Document detail (GET /metadata/documents/:id) ────────────────────────────
+export type DocumentListItem = DocumentSummaryDto;
 
-export interface DocumentVersion {
+export interface DocumentVersionDto {
   id: string;
-  versionNumber: number;
+  docId?: string;
+  version: number;
+  objectKey: string;
+  checksum: string;
+  size: number;
   filename: string;
-  mimeType?: string;
+  contentType?: string | null;
+  createdAt: string;
+  createdBy: string;
+  versionNumber?: number;
   fileSize?: number;
-  uploadedById: string;
-  uploadedAt: string;
+  mimeType?: string | null;
+  uploadedAt?: string;
+  uploadedById?: string;
   storagePath?: string;
-  // Phase 1 backward-compat aliases
-  version?: number;           // alias for versionNumber
-  size?: number;              // alias for fileSize
-  checksum?: string;
-  contentType?: string;       // alias for mimeType
-  createdAt?: string;         // alias for uploadedAt
-  createdBy?: string;         // alias for uploadedById
 }
 
-export interface WorkflowHistoryEntry {
+export type DocumentVersion = DocumentVersionDto;
+
+export interface WorkflowHistoryItemDto {
   id: string;
-  action: string;
+  docId?: string;
+  action: WorkflowAction;
   actorId: string;
   actorDisplay?: string;
-  fromStatus?: DocumentStatus;
+  fromStatus: DocumentStatus;
   toStatus: DocumentStatus;
-  comment?: string;
-  reason?: string;             // Phase 1 alias for comment
+  reason?: string | null;
   createdAt: string;
+  comment?: string | null;
 }
 
-export interface AclEntry {
+export type WorkflowHistoryEntry = WorkflowHistoryItemDto;
+
+export interface DocumentAclEntryDto {
   id: string;
+  docId?: string;
   subjectType: AclSubjectType;
-  subjectId: string;
+  subjectId?: string | null;
   subjectDisplay?: string;
   permission: AclPermission;
   effect: AclEffect;
   createdAt: string;
 }
 
-export interface DocumentDetail extends DocumentListItem {
-  acl: AclEntry[];
-  aclEntries?: AclEntry[];         // Phase 1 backward compat alias for acl
-  versions: DocumentVersion[];
-  workflowHistory: WorkflowHistoryEntry[];
+export type AclEntry = DocumentAclEntryDto;
+
+export interface DocumentDetailDto extends DocumentSummaryDto {
+  versions: DocumentVersionDto[];
+  aclEntries: DocumentAclEntryDto[];
+  acl?: DocumentAclEntryDto[];
+  workflowHistory?: WorkflowHistoryItemDto[];
 }
 
-// ── DTOs ─────────────────────────────────────────────────────────────────────
+export type DocumentDetail = DocumentDetailDto;
 
-export interface CreateDocumentDto {
+export interface CreateDocumentRequest {
   title: string;
   description?: string;
-  classificationLevel: ClassificationLevel;
+  classification?: ClassificationLevel;
   tags?: string[];
 }
 
-export interface UpdateDocumentDto {
+export interface UpdateDocumentRequest {
   title?: string;
   description?: string;
-  classificationLevel?: ClassificationLevel;
+  classification?: ClassificationLevel;
   tags?: string[];
 }
 
-// ── List filters ──────────────────────────────────────────────────────────────
+export type CreateDocumentDto = CreateDocumentRequest;
+export type UpdateDocumentDto = UpdateDocumentRequest;
 
 export interface DocumentListFilters extends PaginationParams {
   q?: string;
   status?: DocumentStatus;
+  classification?: ClassificationLevel;
   classificationLevel?: ClassificationLevel;
   ownerId?: string;
   tags?: string[];
 }
 
-// ── ACL DTO ──────────────────────────────────────────────────────────────────
-
 export interface AddAclEntryDto {
   subjectType: AclSubjectType;
-  subjectId: string;
+  subjectId?: string;
   permission: AclPermission;
   effect: AclEffect;
 }
 
-// ── Workflow ──────────────────────────────────────────────────────────────────
-
-export interface WorkflowActionDto {
-  comment?: string;
+export interface UploadVersionResponse {
+  docId: string;
+  version: number;
+  filename: string;
+  size: number;
+  checksum: string;
+  objectKey: string;
+  contentType?: string | null;
 }
 
-// ── Download ─────────────────────────────────────────────────────────────────
+export type SubmitDocumentRequest = Record<string, never>;
+
+export type ApproveDocumentRequest = Record<string, never>;
+
+export interface RejectDocumentRequest {
+  reason?: string;
+}
+
+export type ArchiveDocumentRequest = Record<string, never>;
 
 export interface DownloadAuthorizationResult {
-  downloadToken: string;
-  expiresAt?: string;
+  docId: string;
+  version: number;
+  objectKey: string;
+  filename: string;
+  contentType?: string | null;
+  expiresInSeconds: number;
+  expiresAt: string;
+  grantToken: string;
+  downloadToken?: string;
 }
 
 export interface PresignedDownloadResult {
   url: string;
-  filename: string;
+  docId?: string;
+  version?: number;
+  filename?: string;
   expiresAt?: string;
+  expiresInSeconds?: number;
 }

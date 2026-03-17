@@ -3,7 +3,6 @@
 import { use } from 'react';
 import { useDocumentDetail } from '@/lib/hooks/use-document-detail';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
-import { useAcl } from '@/lib/hooks/use-acl';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DocumentHeader } from '@/components/documents/document-header';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
@@ -12,7 +11,7 @@ import { DocumentAclCard } from '@/components/documents/document-acl-card';
 import { DocumentActionPanel } from '@/components/documents/document-action-panel';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { canDownloadDocument, canManageAcl } from '@/lib/auth/guards';
+import { canDownloadDocument, canManageAcl, canReadAcl } from '@/lib/auth/guards';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
 import { queryKeys } from '@/lib/constants/query-keys';
@@ -29,14 +28,15 @@ export default function DocumentDetailPage({ params }: Props) {
 
   const { data: doc, isLoading, isError, refetch } = useDocumentDetail(id);
   const { data: history = [] } = useWorkflowHistory(id);
-  const { data: acl = [] } = useAcl(id);
   const { download } = useDownloadDocument({ onError: (msg) => toast.error(msg) });
 
   if (isLoading) return <LoadingState label="Loading document..." />;
   if (isError || !doc) return <ErrorState message="Failed to load document." onRetry={refetch} />;
 
   const canDl = canDownloadDocument(session, doc);
-  const canAcl = canManageAcl(session);
+  const canAcl = canManageAcl(session, doc);
+  const canShowAcl = canReadAcl(session) || canAcl;
+  const aclEntries = canShowAcl ? (doc.aclEntries ?? doc.acl ?? []) : [];
 
   function handleActionComplete() {
     qc.invalidateQueries({ queryKey: queryKeys.documentDetail(id) });
@@ -46,7 +46,7 @@ export default function DocumentDetailPage({ params }: Props) {
 
   return (
     <div>
-      <DocumentHeader doc={{ ...doc, aclEntries: acl, versions: doc.versions ?? [] }} />
+      <DocumentHeader doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Left col: versions + timeline */}
@@ -62,14 +62,16 @@ export default function DocumentDetailPage({ params }: Props) {
         {/* Right col: actions + ACL */}
         <div className="space-y-5">
           <DocumentActionPanel
-            doc={{ ...doc, aclEntries: acl, versions: doc.versions ?? [] }}
+            doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
             onActionComplete={handleActionComplete}
           />
-          <DocumentAclCard
-            docId={id}
-            entries={acl}
-            canManage={canAcl}
-          />
+          {canShowAcl && (
+            <DocumentAclCard
+              docId={id}
+              entries={aclEntries}
+              canManage={canAcl}
+            />
+          )}
         </div>
       </div>
     </div>

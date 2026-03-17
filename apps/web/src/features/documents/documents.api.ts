@@ -1,5 +1,6 @@
 import apiClient from '@/lib/api/client';
-import { unwrap } from '@/lib/api/response';
+import { apiEndpoints } from '@/lib/api/endpoints';
+import { normalizePaginatedResponse, unwrap } from '@/lib/api/response';
 import type {
   DocumentListItem,
   DocumentDetail,
@@ -11,67 +12,150 @@ import type {
   WorkflowHistoryEntry,
   DownloadAuthorizationResult,
   PresignedDownloadResult,
+  UploadVersionResponse,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
 
-// ── Metadata service endpoints ────────────────────────────────────────────────
+function normalizeDocumentSummary(document: DocumentListItem): DocumentListItem {
+  return {
+    ...document,
+    classificationLevel: document.classification,
+    currentVersionNumber: document.currentVersion,
+  };
+}
+
+function normalizeDocumentAclEntry(entry: AclEntry): AclEntry {
+  return {
+    ...entry,
+    subjectId: entry.subjectId ?? undefined,
+  };
+}
+
+function normalizeWorkflowHistoryEntry(entry: WorkflowHistoryEntry): WorkflowHistoryEntry {
+  return {
+    ...entry,
+    comment: entry.reason ?? undefined,
+  };
+}
+
+function normalizeDocumentDetail(document: DocumentDetail): DocumentDetail {
+  return {
+    ...normalizeDocumentSummary(document),
+    versions: (document.versions ?? []).map((version) => ({
+      ...version,
+      versionNumber: version.version,
+      fileSize: version.size,
+      mimeType: version.contentType ?? undefined,
+      uploadedAt: version.createdAt,
+      uploadedById: version.createdBy,
+      storagePath: version.objectKey,
+    })),
+    aclEntries: (document.aclEntries ?? []).map(normalizeDocumentAclEntry),
+    acl: (document.aclEntries ?? []).map(normalizeDocumentAclEntry),
+  };
+}
 
 export async function getDocuments(
   filters?: DocumentListFilters,
 ): Promise<PaginatedResponse<DocumentListItem>> {
-  const res = await apiClient.get('/metadata/documents', { params: filters });
-  return unwrap(res);
+  const res = await apiClient.get<DocumentListItem[]>(apiEndpoints.metadata.documents.list);
+  const normalized = unwrap(res).map(normalizeDocumentSummary);
+
+  return normalizePaginatedResponse(
+    normalized.filter((document) => {
+      if (filters?.status && document.status !== filters.status) return false;
+      if (filters?.ownerId && document.ownerId !== filters.ownerId) return false;
+      if (filters?.classification && document.classification !== filters.classification) return false;
+      if (filters?.classificationLevel && document.classification !== filters.classificationLevel) return false;
+      if (filters?.tags?.length && !filters.tags.every((tag) => document.tags.includes(tag))) return false;
+      if (filters?.q) {
+        const query = filters.q.toLowerCase();
+        const matchesText =
+          document.title.toLowerCase().includes(query) ||
+          (document.description ?? '').toLowerCase().includes(query) ||
+          document.tags.some((tag) => tag.toLowerCase().includes(query));
+
+        if (!matchesText) return false;
+      }
+
+      return true;
+    }),
+  );
 }
 
 export async function getDocument(id: string): Promise<DocumentDetail> {
-  const res = await apiClient.get(`/metadata/documents/${id}`);
-  return unwrap(res);
+  const res = await apiClient.get<DocumentDetail>(apiEndpoints.metadata.documents.detail(id));
+  return normalizeDocumentDetail(unwrap(res));
 }
 
 export async function createDocument(dto: CreateDocumentDto): Promise<DocumentDetail> {
-  const res = await apiClient.post('/metadata/documents', dto);
-  return unwrap(res);
+  const res = await apiClient.post<DocumentListItem>(apiEndpoints.metadata.documents.create, dto);
+  return normalizeDocumentDetail({
+    ...unwrap(res),
+    versions: [],
+    aclEntries: [],
+  });
 }
 
 export async function updateDocument(id: string, dto: UpdateDocumentDto): Promise<DocumentDetail> {
-  const res = await apiClient.patch(`/metadata/documents/${id}`, dto);
-  return unwrap(res);
+  const res = await apiClient.patch<DocumentListItem>(apiEndpoints.metadata.documents.update(id), dto);
+  return normalizeDocumentDetail({
+    ...unwrap(res),
+    versions: [],
+    aclEntries: [],
+  });
 }
 
 export async function getWorkflowHistory(id: string): Promise<WorkflowHistoryEntry[]> {
-  const res = await apiClient.get(`/metadata/documents/${id}/workflow-history`);
-  return unwrap(res);
+  const res = await apiClient.get<WorkflowHistoryEntry[]>(
+    apiEndpoints.metadata.documents.workflowHistory(id),
+  );
+  return unwrap(res).map(normalizeWorkflowHistoryEntry);
 }
 
 export async function getDocumentAcl(id: string): Promise<AclEntry[]> {
-  const res = await apiClient.get(`/metadata/documents/${id}/acl`);
-  return unwrap(res);
+  const res = await apiClient.get<AclEntry[]>(apiEndpoints.metadata.documents.acl(id));
+  return unwrap(res).map(normalizeDocumentAclEntry);
 }
 
 export async function addAclEntry(id: string, dto: AddAclEntryDto): Promise<AclEntry> {
-  const res = await apiClient.post(`/metadata/documents/${id}/acl`, dto);
-  return unwrap(res);
+  const res = await apiClient.post<AclEntry>(apiEndpoints.metadata.documents.acl(id), dto);
+  return normalizeDocumentAclEntry(unwrap(res));
 }
 
-export async function authorizeDownload(id: string): Promise<DownloadAuthorizationResult> {
-  const res = await apiClient.post(`/metadata/documents/${id}/download-authorize`);
-  return unwrap(res);
+export async function authorizeDownload(
+  id: string,
+  version?: number,
+): Promise<DownloadAuthorizationResult> {
+  const res = await apiClient.post<DownloadAuthorizationResult>(
+    apiEndpoints.metadata.documents.downloadAuthorize(id),
+    version ? { version } : {},
+  );
+  const authorization = unwrap(res);
+
+  return {
+    ...authorization,
+    downloadToken: authorization.grantToken,
+  };
 }
 
-// ── Document service endpoints ────────────────────────────────────────────────
-
-export async function uploadDocumentFile(id: string, file: File): Promise<void> {
+export async function uploadDocumentFile(id: string, file: File): Promise<UploadVersionResponse> {
   const formData = new FormData();
   formData.append('file', file);
-  await apiClient.post(`/documents/${id}/upload`, formData, {
+  const res = await apiClient.post<UploadVersionResponse>(apiEndpoints.documents.upload(id), formData, {
     headers: { 'Content-Type': 'multipart/form-data' },
   });
+
+  return unwrap(res);
 }
 
 export async function presignDownload(
   id: string,
-  downloadToken: string,
+  version?: number,
 ): Promise<PresignedDownloadResult> {
-  const res = await apiClient.post(`/documents/${id}/presign-download`, { downloadToken });
+  const res = await apiClient.post<PresignedDownloadResult>(
+    apiEndpoints.documents.presignDownload(id),
+    version ? { version } : {},
+  );
   return unwrap(res);
 }

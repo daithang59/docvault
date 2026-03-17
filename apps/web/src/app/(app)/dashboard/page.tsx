@@ -132,7 +132,7 @@ export default function DashboardPage() {
                   badge={stats.PENDING > 0 ? String(stats.PENDING) : undefined}
                 />
               </ProtectedAction>
-              <ProtectedAction roles={['compliance_officer', 'admin']}>
+              <ProtectedAction roles={['compliance_officer']}>
                 <QuickAction
                   href={ROUTES.AUDIT}
                   icon={Shield}

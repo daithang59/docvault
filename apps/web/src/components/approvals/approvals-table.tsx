@@ -46,9 +46,9 @@ export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
                     </div>
                   )}
                 </td>
-                <td className="px-4 py-3"><ClassificationBadge classification={doc.classification} /></td>
+                <td className="px-4 py-3"><ClassificationBadge classification={doc.classificationLevel ?? doc.classification} /></td>
                 <td className="px-4 py-3 text-xs font-mono text-[#64748B]">{doc.ownerId.slice(0, 10)}…</td>
-                <td className="px-4 py-3 text-sm text-[#64748B] font-mono">v{doc.currentVersion}</td>
+                <td className="px-4 py-3 text-sm text-[#64748B] font-mono">v{doc.currentVersionNumber ?? doc.currentVersion}</td>
                 <td className="px-4 py-3 text-sm text-[#64748B] whitespace-nowrap">{formatDateTime(doc.updatedAt)}</td>
                 <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
                 <td className="px-4 py-3">
