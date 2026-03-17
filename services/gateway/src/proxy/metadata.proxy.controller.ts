@@ -168,4 +168,18 @@ export class MetadataProxyController {
     });
     return response.data;
   }
+  @Get('documents/:docId/workflow-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary:
+      'Proxy -> metadata-service GET /documents/:docId/workflow-history',
+  })
+  async getWorkflowHistory(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/workflow-history`,
+    });
+    return response.data;
+  }
 }
