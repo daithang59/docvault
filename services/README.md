@@ -1,19 +1,33 @@
-# Thu Muc `services`
+# Thu muc `services`
 
 Thu muc nay chua cac backend service cua DocVault.
 
-## Trang thai tung service
+## Trang thai hien tai
 
-| Service | Trang thai | Ghi chu |
-|--------|------------|--------|
-| `gateway` | Da co code | NestJS gateway, JWT auth, RBAC, proxy metadata |
-| `metadata-service` | Da co code | NestJS demo metadata API, role guard, Prisma schema |
-| `document-service` | Placeholder | Chua co source code |
-| `workflow-service` | Placeholder | Chua co source code |
-| `audit-service` | Placeholder | Chua co source code |
-| `notification-service` | Placeholder | Chua co source code |
+Tat ca service duoi day deu da co source code NestJS chay that:
 
-## Cach dung
+| Service | Port mac dinh | Vai tro |
+|--------|---------------|--------|
+| `gateway` | `3000` | Xac thuc JWT, RBAC, proxy vao downstream service |
+| `metadata-service` | `3001` | Metadata, ACL, workflow history, download authorization |
+| `document-service` | `3002` | Upload/download blob, MinIO, presign/stream |
+| `workflow-service` | `3003` | Submit/approve/reject/archive |
+| `audit-service` | `3004` | Append/query audit event, hash chain |
+| `notification-service` | `3005` | Notification sink cho dev |
 
-- Voi service da co code: doc README trong folder service de biet env, lenh chay va endpoint
-- Voi service placeholder: README se mo ta vai tro du kien de lam moc khi implement
+## Cach chay nhanh
+
+Mỗi service co file `.env.example` rieng. Can copy thanh `.env` truoc khi chay.
+
+Lenh chay watch mode:
+
+```bash
+pnpm --filter metadata-service start:dev
+pnpm --filter audit-service start:dev
+pnpm --filter document-service start:dev
+pnpm --filter notification-service start:dev
+pnpm --filter workflow-service start:dev
+pnpm --filter gateway start:dev
+```
+
+Huong dan chay full stack chi tiet nam o `../docs/RUN_PROJECT.md`.

@@ -10,7 +10,7 @@ Password for all seeded users: **`Passw0rd!`**
 | `editor1` | `editor` | Create docs, upload files, submit for approval, archive own published docs |
 | `approver1` | `approver` | Approve / reject pending docs |
 | `co1` | `compliance_officer` | Query audit logs — **cannot download files** |
-| `admin1` | `admin` | All capabilities of all roles |
+| `admin1` | `admin` | Local admin role for most management actions, but not every route is fully superuser-open |
 
 > **Note:** `co1` has both `co` and `compliance_officer` Keycloak roles. The gateway normalizes `co` → `compliance_officer`.
 
@@ -31,7 +31,7 @@ curl -s -X POST \
 
 ### B. Demo Login (No Backend Required)
 
-1. Go to `http://localhost:3001/login`
+1. Go to `http://localhost:3100/login`
 2. Click "Demo Login" tab
 3. Enter any username (e.g. `demo_editor`)
 4. Select a role from the dropdown
@@ -53,5 +53,7 @@ Demo sessions are stored in localStorage and simulate role-based UI without call
 | Archive (PUBLISHED→ARCHIVED) | ❌ | ✅ (owner only) | ❌ | ❌ | ✅ |
 | Download published doc | ✅ | ✅ | ✅ | ❌ (always denied) | ✅ |
 | View approvals queue | ❌ | ❌ | ✅ | ❌ | ✅ |
-| Query audit logs | ❌ | ❌ | ❌ | ✅ | ✅ |
+| Query audit logs | ❌ | ❌ | ❌ | ✅ | ❌ |
 | Manage ACL | ❌ | ✅ | ❌ | ❌ | ✅ |
+
+> Current runtime note: `GET /api/audit/query` is guarded for `compliance_officer` only at gateway/service level.
