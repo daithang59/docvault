@@ -10,18 +10,18 @@ All services running:
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
 
 # Backend services (each in separate terminal)
-pnpm --filter gateway start:dev
 pnpm --filter metadata-service start:dev
-pnpm --filter document-service start:dev
-pnpm --filter workflow-service start:dev
 pnpm --filter audit-service start:dev
+pnpm --filter document-service start:dev
 pnpm --filter notification-service start:dev
+pnpm --filter workflow-service start:dev
+pnpm --filter gateway start:dev
 
 # Frontend
-cd apps/web && npm run dev -- --port 3001
+pnpm --filter web dev -- --port 3100
 ```
 
-Navigate to: **http://localhost:3001**
+Navigate to: **http://localhost:3100**
 
 ---
 
@@ -116,6 +116,6 @@ Covers all flows automatically. See [README.md](../README.md#e2e-checks-covered)
 
 ## Notes for Presenter
 
-- Demo Login mode simulates the full UI without needing a real JWT — useful for UI demos
-- In Demo mode, API calls will fail with network errors (expected) — use it to show UI/UX, not actual data
-- For a full live demo, boot all services and use JWT Login with Keycloak tokens
+- Demo Login mode can be used to inspect role-based UI quickly
+- For a real end-to-end demo, keep all backend services running and prefer JWT Login with Keycloak tokens
+- Frontend should run on port `3100` to avoid conflicts with gateway `3000` and metadata-service `3001`
