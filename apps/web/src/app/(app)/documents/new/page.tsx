@@ -25,7 +25,7 @@ export default function NewDocumentPage() {
       const doc = await createDoc.mutateAsync({
         title: values.title,
         description: values.description || undefined,
-        classification: values.classification,
+        classificationLevel: values.classification as import('@/types/enums').ClassificationLevel,
         tags: values.tags,
       });
       toast.success(TOAST_MESSAGES.DOCUMENT_CREATED);

@@ -1,28 +1,11 @@
-export type AuditResult = 'SUCCESS' | 'DENY';
+/**
+ * Compatibility shim for types/audit.ts.
+ * Re-exports canonical audit types from features/audit.
+ * @deprecated Import from @/features/audit/audit.types directly.
+ */
+export type {
+  AuditLogEntry,
+  AuditQueryFilters,
+} from '@/features/audit/audit.types';
 
-export interface AuditLogEntry {
-  eventId: string;
-  timestamp: string;
-  actorId: string;
-  actorRoles: string[];
-  action: string;
-  resourceType: string;
-  resourceId: string;
-  result: AuditResult;
-  reason: string | null;
-  ip: string | null;
-  traceId: string | null;
-  prevHash: string | null;
-  hash: string;
-}
-
-export interface AuditQueryFilters {
-  actorId?: string;
-  action?: string;
-  resourceType?: string;
-  resourceId?: string;
-  result?: AuditResult;
-  from?: string;
-  to?: string;
-  limit?: number;
-}
+export type { AuditResult } from '@/types/enums';

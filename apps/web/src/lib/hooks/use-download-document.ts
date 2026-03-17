@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useCallback } from 'react';
-import { downloadAuthorize } from '@/lib/api/metadata';
-import { presignDownload } from '@/lib/api/documents';
-import { ApiError } from '@/types/api';
+import { authorizeDownload, presignDownload } from '@/features/documents/documents.api';
+import { ApiError } from '@/lib/api/errors';
+import { triggerBrowserDownload } from '@/lib/utils/download';
 
 interface UseDownloadDocumentOptions {
   onError?: (message: string) => void;
@@ -13,27 +13,17 @@ export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
   const [isDownloading, setIsDownloading] = useState(false);
 
   const download = useCallback(
-    async (docId: string, version?: number) => {
+    async (docId: string) => {
       setIsDownloading(true);
       try {
-        // Step 1: Authorize download
-        const auth = await downloadAuthorize(docId, version ? { version } : {});
+        // Step 1: Authorize download — get a short-lived download token
+        const { downloadToken } = await authorizeDownload(docId);
 
-        // Step 2: Get presigned URL
-        const presign = await presignDownload(docId, {
-          grantToken: auth.grantToken,
-          version: auth.version,
-        });
+        // Step 2: Exchange token for presigned URL
+        const { url, filename } = await presignDownload(docId, downloadToken);
 
-        // Step 3: Trigger download
-        const a = document.createElement('a');
-        a.href = presign.url;
-        a.download = auth.filename;
-        a.target = '_blank';
-        a.rel = 'noopener noreferrer';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
+        // Step 3: Trigger browser download
+        triggerBrowserDownload(url, filename || `document-${docId}`);
       } catch (err) {
         const message =
           err instanceof ApiError
@@ -44,7 +34,7 @@ export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
         setIsDownloading(false);
       }
     },
-    [options]
+    [options],
   );
 
   return { download, isDownloading };

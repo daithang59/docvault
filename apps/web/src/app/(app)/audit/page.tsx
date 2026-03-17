@@ -8,13 +8,13 @@ import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { AuditQueryFilters } from '@/types/audit';
+import type { AuditQueryFilters } from '@/features/audit/audit.types';
 
 export default function AuditPage() {
   const { session } = useAuth();
   const [filters, setFilters] = useState<AuditQueryFilters>({ limit: 100 });
 
-  const hasAccess = session?.roles.some((r) => ['compliance_officer', 'admin'].includes(r));
+  const hasAccess = session?.user.roles.some((r) => ['compliance_officer', 'admin'].includes(r));
 
   const { data: logs, isLoading, isError, refetch } = useAuditQuery(filters);
 
@@ -37,7 +37,7 @@ export default function AuditPage() {
 
       {isLoading && <LoadingState label="Querying audit logs..." />}
       {isError && <ErrorState message="Failed to load audit logs." onRetry={refetch} />}
-      {!isLoading && !isError && <AuditTable data={logs ?? []} />}
+      {!isLoading && !isError && <AuditTable data={logs?.data ?? []} />}
     </div>
   );
 }

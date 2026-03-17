@@ -9,12 +9,14 @@ import { EmptyState } from '@/components/common/empty-state';
 
 interface DocumentVersionsCardProps {
   versions: DocumentVersion[];
-  onDownload?: (version: number) => void;
+  onDownload?: () => void;
   canDownload: boolean;
 }
 
 export function DocumentVersionsCard({ versions, onDownload, canDownload }: DocumentVersionsCardProps) {
-  const sorted = [...versions].sort((a, b) => b.version - a.version);
+  const sorted = [...versions].sort(
+    (a, b) => (b.versionNumber ?? b.version ?? 0) - (a.versionNumber ?? a.version ?? 0)
+  );
 
   return (
     <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden">
@@ -40,20 +42,26 @@ export function DocumentVersionsCard({ versions, onDownload, canDownload }: Docu
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
                   <span className="text-xs font-medium text-white bg-[#2563EB] px-1.5 py-0.5 rounded">
-                    v{v.version}
+                    v{v.versionNumber ?? v.version ?? 1}
                   </span>
                   <span className="text-sm font-medium text-[#1E293B] truncate">{v.filename}</span>
                 </div>
                 <div className="flex flex-wrap gap-3 text-xs text-[#94A3B8]">
-                  <span>{formatBytes(v.size)}</span>
-                  {v.contentType && <span>{v.contentType}</span>}
-                  <span title={v.checksum}>SHA: {truncateMiddle(v.checksum, 12)}</span>
-                  <span>{formatDateTime(v.createdAt)}</span>
+                  {(v.fileSize ?? v.size) != null && (
+                    <span>{formatBytes((v.fileSize ?? v.size)!)}</span>
+                  )}
+                  {(v.mimeType ?? v.contentType) && (
+                    <span>{v.mimeType ?? v.contentType}</span>
+                  )}
+                  {v.checksum && (
+                    <span title={v.checksum}>SHA: {truncateMiddle(v.checksum, 12)}</span>
+                  )}
+                  <span>{formatDateTime(v.uploadedAt ?? v.createdAt ?? '')}</span>
                 </div>
               </div>
               {canDownload && onDownload && (
                 <button
-                  onClick={() => onDownload(v.version)}
+                  onClick={() => onDownload()}
                   className="shrink-0 p-1.5 rounded-lg text-[#94A3B8] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
                   title="Download this version"
                 >

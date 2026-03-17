@@ -17,10 +17,10 @@ export default function ApprovalsPage() {
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
 
   // Check access
-  const hasAccess = session?.roles.some((r) => ['approver', 'admin'].includes(r));
+  const hasAccess = session?.user.roles.some((r) => ['approver', 'admin'].includes(r));
 
   const pendingDocs = useMemo(
-    () => (docs ?? []).filter((d) => d.status === 'PENDING'),
+    () => (docs?.data ?? []).filter((d: DocumentListItem) => d.status === 'PENDING'),
     [docs]
   );
 

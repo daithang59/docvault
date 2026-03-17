@@ -44,7 +44,7 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
             )}
             <div className="space-y-4">
               {sorted.map((entry, idx) => {
-                const config = ACTION_CONFIG[entry.action] ?? ACTION_CONFIG.SUBMIT;
+                const config = ACTION_CONFIG[entry.action as keyof typeof ACTION_CONFIG] ?? ACTION_CONFIG.SUBMIT;
                 const Icon = config.icon;
                 return (
                   <div key={entry.id} className="flex gap-3 relative">

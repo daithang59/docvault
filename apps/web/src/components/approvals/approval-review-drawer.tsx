@@ -73,7 +73,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           <div>
             <div className="flex flex-wrap gap-2 mb-2">
               <StatusBadge status={doc.status} />
-              <ClassificationBadge classification={doc.classification} />
+              <ClassificationBadge classification={(doc.classificationLevel ?? doc.classification) as import('@/types/enums').ClassificationLevel} />
             </div>
             <h3 className="text-lg font-semibold text-[#0F172A] mb-1">{doc.title}</h3>
             {doc.description && (
