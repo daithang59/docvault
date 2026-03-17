@@ -4,17 +4,28 @@
  * @deprecated Prefer importing directly from @/features/documents/documents.types
  */
 export type {
+  DocumentSummaryDto,
   DocumentListItem,
+  DocumentDetailDto,
   DocumentDetail,
+  DocumentVersionDto,
   DocumentVersion,
+  WorkflowHistoryItemDto,
   WorkflowHistoryEntry,
+  DocumentAclEntryDto,
   AclEntry,
+  CreateDocumentRequest,
+  UpdateDocumentRequest,
   CreateDocumentDto,
   UpdateDocumentDto,
   AddAclEntryDto,
+  UploadVersionResponse,
+  SubmitDocumentRequest,
+  ApproveDocumentRequest,
+  RejectDocumentRequest,
+  ArchiveDocumentRequest,
   DownloadAuthorizationResult as DownloadAuthorizeResponse,
   PresignedDownloadResult as PresignDownloadResponse,
-  WorkflowActionDto,
 } from '@/features/documents/documents.types';
 
 // Aliases for old field names used in Phase 1 components
@@ -34,7 +45,6 @@ export interface DownloadAuthorizeRequest {
 }
 
 export interface PresignDownloadRequest {
-  grantToken: string;
   version?: number;
 }
 

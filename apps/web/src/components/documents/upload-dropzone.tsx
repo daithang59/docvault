@@ -57,7 +57,12 @@ export function UploadDropzone({
   return (
     <div className={cn('space-y-3', className)}>
       <div
-        onDragOver={(e) => { e.preventDefault(); !disabled && setIsDragging(true); }}
+        onDragOver={(e) => {
+          e.preventDefault();
+          if (!disabled) {
+            setIsDragging(true);
+          }
+        }}
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
         className={cn(

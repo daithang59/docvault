@@ -20,6 +20,15 @@ export interface Session {
   user: UserInfo;
 }
 
+/** Gateway `/me` response */
+export interface CurrentUserDto {
+  sub: string;
+  username?: string;
+  email?: string;
+  roles: UserRole[];
+  raw?: Record<string, unknown>;
+}
+
 /** Auth context value exposed via useAuth() */
 export interface AuthContextValue {
   session: Session | null;

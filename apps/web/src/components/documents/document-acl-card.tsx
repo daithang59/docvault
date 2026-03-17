@@ -102,6 +102,23 @@ function AclAddForm({
     permission: 'READ',
     effect: 'ALLOW',
   });
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit() {
+    const normalizedSubjectId =
+      form.subjectType === 'ALL' ? undefined : form.subjectId?.trim();
+
+    if (form.subjectType !== 'ALL' && !normalizedSubjectId) {
+      setError('Subject ID is required unless subject type is ALL.');
+      return;
+    }
+
+    setError(null);
+    await onSubmit({
+      ...form,
+      subjectId: normalizedSubjectId,
+    });
+  }
 
   return (
     <div className="px-5 py-4 border-b border-[#F1F5F9] bg-[#F8FAFC]">
@@ -112,16 +129,20 @@ function AclAddForm({
           <input
             value={form.subjectId ?? ''}
             onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
-            placeholder="User/Role/Group ID"
+            placeholder={form.subjectType === 'ALL' ? 'Not required for ALL' : 'User/Role/Group ID'}
+            disabled={form.subjectType === 'ALL'}
             className="w-full px-3 py-1.5 text-sm border border-[#CBD5E1] rounded-lg bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none focus:border-[#2563EB] transition"
           />
         </div>
         <Select label="Permission" value={form.permission} options={['READ', 'DOWNLOAD', 'WRITE', 'APPROVE']} onChange={(v) => setForm({ ...form, permission: v as Permission })} />
         <Select label="Effect" value={form.effect} options={['ALLOW', 'DENY']} onChange={(v) => setForm({ ...form, effect: v as Effect })} />
       </div>
+      {error && (
+        <p className="mb-3 text-xs text-[#B91C1C]">{error}</p>
+      )}
       <div className="flex gap-2">
         <button
-          onClick={() => onSubmit(form)}
+          onClick={handleSubmit}
           disabled={isLoading}
           className="px-4 py-1.5 rounded-lg bg-[#2563EB] text-white text-xs font-medium hover:bg-[#1D4ED8] transition disabled:opacity-50"
         >

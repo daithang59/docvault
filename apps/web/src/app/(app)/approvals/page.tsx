@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { DocumentListItem } from '@/types/document';
+import { canViewApprovals } from '@/lib/auth/guards';
 
 export default function ApprovalsPage() {
   const { session } = useAuth();
@@ -17,7 +18,7 @@ export default function ApprovalsPage() {
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
 
   // Check access
-  const hasAccess = session?.user.roles.some((r) => ['approver', 'admin'].includes(r));
+  const hasAccess = canViewApprovals(session);
 
   const pendingDocs = useMemo(
     () => (docs?.data ?? []).filter((d: DocumentListItem) => d.status === 'PENDING'),
