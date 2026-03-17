@@ -41,4 +41,13 @@ export const TOAST_MESSAGES = {
   ARCHIVE_UNAVAILABLE: 'Unable to archive this document.',
   DOWNLOAD_RESTRICTED: 'Only published documents can be downloaded.',
   ACL_UPDATED: 'Access control updated.',
+  // 409 Conflict messages — business-specific
+  CONFLICT_SUBMIT: 'Tài liệu không còn ở trạng thái có thể gửi duyệt.',
+  CONFLICT_APPROVE: 'Tài liệu không còn chờ duyệt.',
+  CONFLICT_REJECT: 'Tài liệu không còn chờ duyệt.',
+  CONFLICT_ARCHIVE: 'Tài liệu không thể lưu trữ ở trạng thái hiện tại.',
+  CONFLICT_UPLOAD: 'Không thể tải phiên bản mới lên tài liệu ở trạng thái này.',
+  // Forbidden
+  FORBIDDEN_DOWNLOAD: 'Bạn không có quyền tải tài liệu này.',
+  FORBIDDEN_ACTION: 'Bạn không có quyền thực hiện thao tác này.',
 } as const;

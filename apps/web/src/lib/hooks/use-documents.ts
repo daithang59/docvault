@@ -52,6 +52,7 @@ export function useSubmitDocument(docId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
       qc.invalidateQueries({ queryKey: queryKeys.documents });
       qc.invalidateQueries({ queryKey: queryKeys.workflowHistory(docId) });
+      qc.invalidateQueries({ queryKey: queryKeys.approvals });
     },
   });
 }
@@ -64,6 +65,7 @@ export function useApproveDocument(docId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
       qc.invalidateQueries({ queryKey: queryKeys.documents });
       qc.invalidateQueries({ queryKey: queryKeys.workflowHistory(docId) });
+      qc.invalidateQueries({ queryKey: queryKeys.approvals });
     },
   });
 }
@@ -76,6 +78,7 @@ export function useRejectDocument(docId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
       qc.invalidateQueries({ queryKey: queryKeys.documents });
       qc.invalidateQueries({ queryKey: queryKeys.workflowHistory(docId) });
+      qc.invalidateQueries({ queryKey: queryKeys.approvals });
     },
   });
 }
@@ -88,6 +91,7 @@ export function useArchiveDocument(docId: string) {
       qc.invalidateQueries({ queryKey: queryKeys.documentDetail(docId) });
       qc.invalidateQueries({ queryKey: queryKeys.documents });
       qc.invalidateQueries({ queryKey: queryKeys.workflowHistory(docId) });
+      qc.invalidateQueries({ queryKey: queryKeys.approvals });
     },
   });
 }
