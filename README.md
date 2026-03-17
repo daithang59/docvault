@@ -123,6 +123,8 @@ Legacy tables from the early prototype can remain in `docvault_metadata`; the re
 
 ## Local run
 
+For the latest step-by-step local setup, see `docs/RUN_PROJECT.md`.
+
 ### 1. Install dependencies
 
 ```bash
@@ -173,11 +175,13 @@ pnpm --filter notification-service start:dev
 pnpm --filter gateway start:dev
 ```
 
-Or run all watchers at once:
+Optional:
 
 ```bash
 pnpm dev
 ```
+
+Note: `pnpm dev` runs the whole workspace, including `apps/web`. The web app defaults to port `3000`, which conflicts with the gateway. The safer local setup is to run backend services separately and run the frontend on port `3100`.
 
 ### 6. Swagger
 
@@ -190,17 +194,15 @@ pnpm dev
 
 ### 7. Frontend Web App
 
-The frontend is a Next.js 15 app in `apps/web`.
+The frontend is a Next.js 16 app in `apps/web`.
 
 **Run:**
 
 ```bash
-cd apps/web
-npm install      # or: pnpm install
-npm run dev      # starts at http://localhost:3001 (use port 3001 if 3000 is taken by gateway)
+pnpm --filter web dev -- --port 3100
 ```
 
-> **Port note:** The gateway uses port `3000`. Run FE with `npm run dev -- --port 3001` to avoid conflict.
+> **Port note:** Use port `3100` for the frontend. Ports `3000` to `3005` are already used by gateway and backend services.
 
 **Env config:**
 
@@ -225,9 +227,8 @@ NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 **Build for production:**
 
 ```bash
-cd apps/web
-npm run build
-npm start   # starts at http://localhost:3000
+pnpm --filter web build
+pnpm --filter web start -- --port 3100
 ```
 
 ## Sequence flows
