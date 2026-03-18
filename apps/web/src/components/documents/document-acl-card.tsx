@@ -123,7 +123,7 @@ function AclAddForm({
   return (
     <div className="px-5 py-4 border-b border-[#F1F5F9] bg-[#F8FAFC]">
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'GROUP', 'ALL']} onChange={(v) => setForm({ ...form, subjectType: v as SubjectType })} />
+        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'ALL']} onChange={(v) => setForm({ ...form, subjectType: v as SubjectType })} />
         <div>
           <label className="block text-xs font-medium text-[#64748B] mb-1">Subject ID</label>
           <input
