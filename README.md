@@ -1,382 +1,382 @@
 # DocVault
 
-DocVault is a NestJS monorepo that now runs the MVP as actual microservices instead of a proto-microservice with all business logic inside `metadata-service`.
+**DocVault** là hệ thống quản lý tài liệu doanh nghiệp theo kiến trúc **microservices**, xây dựng với NestJS. Hệ thống hỗ trợ vòng đời tài liệu đầy đủ: tạo → upload → duyệt → xuất bản → lưu trữ, kèm theo kiểm soát truy cập (RBAC) và nhật ký audit chống giả mạo.
 
-## Architecture
+---
+
+## Kiến trúc hệ thống
+
+### Sơ đồ tổng quan các tầng
 
 ```mermaid
-graph TD
-    %% Actors
-    Viewer[Viewer]
-    Editor[Editor]
-    Approver[Approver]
-    CO[Compliance Officer]
-
-    %% Gateway
-    Gateway[API Gateway<br/>Auth & Routing]
-
-    %% Services
-    subgraph Microservices
-        Meta[Metadata Service<br/>PostgreSQL]
-        Doc[Document Service<br/>MinIO]
-        WF[Workflow Service]
-        Audit[Audit Service<br/>PostgreSQL]
+flowchart TB
+    subgraph CLIENT["🖥️ Client"]
+        FE["Frontend Next.js\n:3010"]
     end
 
-    %% Connections
-    Viewer -->|JWT| Gateway
-    Editor -->|JWT| Gateway
-    Approver -->|JWT| Gateway
-    CO -->|JWT| Gateway
+    subgraph GATEWAY["🔐 API Gateway — :3000"]
+        GW["gateway\nXác thực JWT · RBAC · Routing · Audit wrapper"]
+    end
 
-    Gateway -->|/api/metadata| Meta
-    Gateway -->|/api/documents| Doc
-    Gateway -->|/api/workflow| WF
-    Gateway -->|/api/audit| Audit
+    subgraph SERVICES["⚙️ Microservices"]
+        direction LR
+        META["metadata-service\n:3001\nMetadata · ACL · Status · History"]
+        DOC["document-service\n:3002\nUpload · Download · MinIO"]
+        WF["workflow-service\n:3003\nState machine · Submit · Approve"]
+        AUDIT["audit-service\n:3004\nHash-chain audit log"]
+        NOTIF["notification-service\n:3005\nThông báo"]
+    end
 
-    Doc -.->|Sync Metadata/Versions| Meta
-    WF -.->|Update Status| Meta
-    
-    Gateway -.->|Log Request| Audit
-    Meta -.->|Log Changes| Audit
-    Doc -.->|Log Upload/Download| Audit
-    WF -.->|Log Transitions| Audit
+    subgraph INFRA["🐳 Docker Infrastructure"]
+        direction LR
+        KC["Keycloak\n:8080\nAuth & Users"]
+        PG["PostgreSQL\n:5432\nDatabase"]
+        MINIO["MinIO\n:9000\nObject Storage"]
+    end
+
+    FE -->|"Bearer JWT"| GW
+
+    GW -->|"/api/metadata"| META
+    GW -->|"/api/documents"| DOC
+    GW -->|"/api/workflow"| WF
+    GW -->|"/api/audit"| AUDIT
+    GW -->|"/api/notify"| NOTIF
+
+    DOC -.->|"register version"| META
+    WF -.->|"update status"| META
+    WF -.->|"notify"| NOTIF
+
+    GW -.->|"audit events"| AUDIT
+    META -.->|"audit events"| AUDIT
+    DOC -.->|"audit events"| AUDIT
+    WF -.->|"audit events"| AUDIT
+
+    GW -.->|"verify token"| KC
+    META -.->|"read/write"| PG
+    AUDIT -.->|"read/write"| PG
+    DOC -.->|"store files"| MINIO
 ```
 
-### Service boundaries
-
-- `services/gateway`
-  - Verifies Keycloak JWT by issuer/audience/expiration
-  - Applies route-level RBAC
-  - Routes `/api/metadata`, `/api/documents`, `/api/workflow`, `/api/audit`, `/api/notify`
-  - Propagates `X-Request-Id`, `X-User-Id`, `X-Roles`
-  - Emits gateway audit wrapper events: `REQUEST_RECEIVED`, `REQUEST_OK`, `REQUEST_DENIED`
-- `services/metadata-service`
-  - Source-of-truth for metadata, ACL, tags, status, current version pointer
-  - Owns download authorization policy and records workflow history
-  - Endpoints:
-    - `POST /documents`
-    - `GET /documents`
-    - `GET /documents/:docId`
-    - `PATCH /documents/:docId`
-    - `POST /documents/:docId/acl`
-    - `GET /documents/:docId/acl`
-    - `POST /documents/:docId/versions`
-    - `POST /documents/:docId/status`
-    - `POST /documents/:docId/download-authorize`
-    - `GET /documents/:docId/workflow-history`
-- `services/document-service`
-  - Owns MinIO upload/download/presign, checksum, object key generation
-  - Object key format: `doc/{docId}/v{n}/{filename}`
-  - Calls metadata-service to register uploaded version pointers
-  - Endpoints:
-    - `POST /documents/:docId/upload`
-    - `POST /documents/:docId/presign-download`
-    - `GET /documents/:docId/versions/:version/stream`
-- `services/workflow-service`
-  - Owns workflow state machine and transition validation (`DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`)
-  - Calls metadata-service to update status
-  - Calls audit-service and notification-service
-  - Endpoints:
-    - `POST /workflow/:docId/submit`
-    - `POST /workflow/:docId/approve`
-    - `POST /workflow/:docId/reject`
-    - `POST /workflow/:docId/archive`
-- `services/audit-service`
-  - Append-only audit ingest and query with **Tamper-evident Hash Chain** security
-  - `GET /audit/query` is `compliance_officer` only
-  - Endpoints:
-    - `POST /audit/events`
-    - `GET /audit/query`
-- `services/notification-service`
-  - MVP notification sink
-  - Logs `SUBMITTED`, `APPROVED`, `REJECTED`
-  - Endpoint:
-    - `POST /notify`
-
-### Core rules
-
-- Roles used by the services:
-  - `viewer`
-  - `editor`
-  - `approver`
-  - `compliance_officer`
-  - `admin` is still accepted for local admin tasks
-- `co` from the existing Keycloak realm is normalized to `compliance_officer` so the old seed keeps working.
-- `compliance_officer` can query audit but is always denied file download.
-- Download is enforced in backend by metadata-service policy plus document-service grant verification.
-
-## Data model
-
-### Metadata DB (`docvault_metadata`)
-
-- `documents` (includes tags, classification, publishedAt, archivedAt)
-- `document_versions`
-- `document_acl` (supports USER, ROLE, GROUP)
-- `document_workflow_history`
-
-### Audit DB (`docvault_audit`)
-
-- `audit_events`
-
-Legacy tables from the early prototype can remain in `docvault_metadata`; the refactored services no longer use them.
-
-## Local run
-
-### 1. Install dependencies
-
-```bash
-pnpm install
-```
-
-### 2. Start infrastructure
-
-```bash
-docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
-```
-
-This brings up:
-
-- Postgres
-- MongoDB (unused by the MVP after this refactor, but left in compose)
-- MinIO
-- Keycloak
-
-### 3. Copy env files
-
-Create `.env` files from:
-
-- `services/gateway/.env.example`
-- `services/metadata-service/.env.example`
-- `services/document-service/.env.example`
-- `services/workflow-service/.env.example`
-- `services/audit-service/.env.example`
-- `services/notification-service/.env.example`
-
-### 4. Apply database migrations
-
-```bash
-pnpm --filter metadata-service prisma:deploy
-pnpm --filter audit-service prisma:deploy
-```
-
-### 5. Start services
-
-Run each service in its own terminal:
-
-```bash
-pnpm --filter metadata-service start:dev
-pnpm --filter document-service start:dev
-pnpm --filter workflow-service start:dev
-pnpm --filter audit-service start:dev
-pnpm --filter notification-service start:dev
-pnpm --filter gateway start:dev
-```
-
-Or run all watchers at once:
-
-```bash
-pnpm dev
-```
-
-### 6. Swagger
-
-- Gateway: `http://localhost:3000/docs`
-- Metadata: `http://localhost:3001/docs`
-- Document: `http://localhost:3002/docs`
-- Workflow: `http://localhost:3003/docs`
-- Audit: `http://localhost:3004/docs`
-- Notification: `http://localhost:3005/docs`
-
-### 7. Frontend Web App
-
-The frontend is a Next.js 15 app in `apps/web`.
-
-**Run:**
-
-```bash
-cd apps/web
-npm install      # or: pnpm install
-npm run dev      # starts at http://localhost:3001 (use port 3001 if 3000 is taken by gateway)
-```
-
-> **Port note:** The gateway uses port `3000`. Run FE with `npm run dev -- --port 3001` to avoid conflict.
-
-**Env config:**
-
-Copy `apps/web/.env.example` to `apps/web/.env.local`:
-
-```bash
-cp apps/web/.env.example apps/web/.env.local
-```
-
-`.env.local` contents:
-
-```env
-NEXT_PUBLIC_APP_NAME=DocVault
-NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
-```
-
-**Login modes:**
-
-- **Demo Login** (no backend): Select a role (viewer/editor/approver/compliance_officer/admin), enter any username → creates a mock session. UI and route guards work without real backend.
-- **JWT Token Login**: Paste a real JWT from Keycloak. The FE will extract user info and authenticate against the real backend.
-
-**Build for production:**
-
-```bash
-cd apps/web
-npm run build
-npm start   # starts at http://localhost:3000
-```
-
-## Sequence flows
-
-### Upload and publish
-
-1. `editor1` creates metadata through gateway `POST /api/metadata/documents`
-2. `editor1` uploads blob through gateway `POST /api/documents/:docId/upload`
-3. document-service uploads to MinIO and calls metadata-service `POST /documents/:docId/versions`
-4. `editor1` submits workflow through gateway `POST /api/workflow/:docId/submit`
-5. workflow-service validates `DRAFT -> PENDING` and updates metadata status
-6. `approver1` approves through gateway `POST /api/workflow/:docId/approve`
-7. workflow-service validates `PENDING -> PUBLISHED` and updates metadata status
-8. `viewer1` downloads through gateway `POST /api/documents/:docId/presign-download` or `GET /api/documents/:docId/versions/:version/stream`
-
-### Compliance flow
-
-1. `co1` can read metadata and query audit through `GET /api/audit/query`
-2. `co1` is denied by `POST /api/metadata/documents/:docId/download-authorize`
-3. `co1` is denied by `POST /api/documents/:docId/presign-download`
-4. `co1` is denied by `GET /api/documents/:docId/versions/:version/stream`
-
-## Use Cases (Business Flows)
+### Vòng đời tài liệu
 
 ```mermaid
 flowchart LR
-    %% Actors
-    V((Viewer))
-    E((Editor))
-    A((Approver))
-    CO((Compliance Officer))
+    DRAFT(["📝 DRAFT"])
+    PENDING(["⏳ PENDING"])
+    PUBLISHED(["✅ PUBLISHED"])
+    ARCHIVED(["📦 ARCHIVED"])
 
-    subgraph "DocVault System"
-        direction TB
-        UC1([Create Document & Metadata])
-        UC2([Upload Document File])
-        UC3([Assign ACL & Roles/Groups])
-        UC4([Submit Workflow: Draft -> Pending])
-        UC5([Approve Document: Pending -> Published])
-        UC6([Archive Document: Published -> Archived])
-        UC7([Download Published File])
-        UC8([Query Audit Logs])
+    DRAFT -->|"Editor submit"| PENDING
+    PENDING -->|"Approver approve"| PUBLISHED
+    PENDING -->|"Approver reject"| DRAFT
+    PUBLISHED -->|"Editor archive"| ARCHIVED
+```
+
+---
+
+## Biểu đồ Use Case
+
+```mermaid
+flowchart LR
+    subgraph ACTORS["👤 Người dùng"]
+        V(["Viewer"])
+        E(["Editor"])
+        A(["Approver"])
+        CO(["Compliance Officer"])
+        ADM(["Admin"])
     end
+
+    subgraph USECASES["📋 Chức năng hệ thống"]
+        UC1["Xem danh sách tài liệu"]
+        UC2["Xem chi tiết tài liệu"]
+        UC3["Tạo tài liệu mới"]
+        UC4["Upload file"]
+        UC5["Phân quyền ACL"]
+        UC6["Submit để duyệt\nDRAFT → PENDING"]
+        UC7["Duyệt tài liệu\nPENDING → PUBLISHED"]
+        UC8["Từ chối tài liệu\nPENDING → DRAFT"]
+        UC9["Lưu trữ tài liệu\nPUBLISHED → ARCHIVED"]
+        UC10["Tải file đã xuất bản"]
+        UC11["Xem audit log"]
+    end
+
+    V --> UC1
+    V --> UC2
+    V --> UC10
 
     E --> UC1
     E --> UC2
     E --> UC3
     E --> UC4
+    E --> UC5
+    E --> UC6
+    E --> UC9
+    E --> UC10
 
-    A --> UC5
-    A --> UC6
-    A --> UC3
-    
-    V --> UC7
+    A --> UC1
+    A --> UC2
+    A --> UC7
+    A --> UC8
+    A --> UC10
 
-    CO --> UC8
-    
-    %% Implicit capabilities (Editor and Approver can often download/view too if ACL allows)
-    E -.-> UC7
-    A -.-> UC7
+    CO --> UC1
+    CO --> UC2
+    CO --> UC11
+
+    ADM --> UC1
+    ADM --> UC2
+    ADM --> UC3
+    ADM --> UC4
+    ADM --> UC5
+    ADM --> UC6
+    ADM --> UC7
+    ADM --> UC8
+    ADM --> UC9
+    ADM --> UC10
+    ADM --> UC11
 ```
 
-### 1. Document Creation & Upload (Editor)
-- An **Editor** creates a new document entry with metadata, assigning classification (e.g., `CONFIDENTIAL`) and tags (e.g., `finance`, `report`). The document starts in the `DRAFT` state.
-- The Editor uploads the physical file (PDF/Docx), which is streamed to MinIO. The Document Service registers the new version with the Metadata Service.
+> ⚠️ **Lưu ý:** Compliance Officer **không thể tải file** dù có bất kỳ quyền ACL nào — luật này được enforce ở tầng `metadata-service`.
 
-### 2. Group & Role based Access Control
-- The document owner or an Admin can assign ACL permissions. Instead of just picking single users, they can assign permissions (`READ`, `WRITE`, `APPROVE`) to specific **GROUPs** (e.g., `finance-team`) or roles (`approver`).
+### Vai trò người dùng
 
-### 3. Document Approval Workflow
-- When the draft is ready, the Editor **Submits** the workflow. The state transitions from `DRAFT` to `PENDING`.
-- An **Approver** reviews the document and triggers **Approve**. The state transitions from `PENDING` to `PUBLISHED`, and `publishedAt` is recorded.
-- Every transition automatically generates an atomic record in the `document_workflow_history` table and an audit event.
+| Vai trò | Quyền chính |
+|---------|-------------|
+| `viewer` | Xem danh sách, xem chi tiết, tải file đã xuất bản |
+| `editor` | Tạo tài liệu, upload file, submit duyệt, lưu trữ (tài liệu của mình) |
+| `approver` | Duyệt / từ chối tài liệu đang chờ |
+| `compliance_officer` | Xem audit log — **không được tải file** |
+| `admin` | Toàn quyền |
 
-### 4. Secure File Download (Viewer)
-- A **Viewer** requests to download a document.
-- The Gateway routes the request to Document Service, which synchronously calls Metadata Service to evaluate the ACL policy.
-- If the document is `PUBLISHED` and the Viewer has `READ` permission (via user, role, or group), a short-lived MinIO presigned URL is returned.
+---
 
-### 5. Document Archival
-- When a published document reaches the end of its lifecycle, an Admin or Approver triggers the **Archive** action.
-- The document transitions to `ARCHIVED`, locking it from further active workflows while retaining history.
+## Yêu cầu cài đặt
 
-### 6. Compliance Audit Tracking (Compliance Officer)
-- Every significant action (create, upload, download, workflow state change) generates an audit event.
-- The Audit Service links events securely using a **Tamper-evident Hash Chain** (`SHA-256(prevHash + payload)`), making it impossible to silently alter history.
-- A **Compliance Officer** can query these logs securely. However, the system enforces a strict rule: Compliance Officers can *never* download the actual document blobs, ensuring separation of duties.
+| Công cụ | Phiên bản tối thiểu |
+|---------|---------------------|
+| Node.js | 18+ |
+| pnpm | 8+ |
+| Docker Desktop | 24+ |
+| Git | bất kỳ |
 
-## Demo and checks
+---
 
-### Demo script
+## Hướng dẫn chạy dự án
+
+### Bước 1 — Cài dependencies
 
 ```bash
-./scripts/demo.sh
+pnpm install
 ```
 
-The wrapper calls:
+### Bước 2 — Khởi động hạ tầng (Docker)
+
+Lệnh này sẽ khởi động: **PostgreSQL**, **MinIO**, **Keycloak** (kèm seed realm & user mẫu).
+
+```bash
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
+```
+
+Chờ tất cả container **healthy** (khoảng 30–60 giây):
+
+```bash
+docker compose -f infra/docker-compose.dev.yml ps
+```
+
+> **Services sau khi chạy:**
+> - PostgreSQL: `localhost:5432`
+> - MinIO Console: [http://localhost:9001](http://localhost:9001) (user: `minioadmin` / `minioadminpw`)
+> - Keycloak Admin: [http://localhost:8080](http://localhost:8080) (user: `admin` / `adminpw`)
+
+### Bước 3 — Chạy database migration
+
+```bash
+# metadata-service (PostgreSQL)
+pnpm --filter metadata-service prisma:deploy
+
+# audit-service (PostgreSQL)
+pnpm --filter audit-service prisma:deploy
+```
+
+### Bước 4 — Khởi động các Backend Service
+
+Mỗi service chạy trong một terminal riêng:
+
+```bash
+# Terminal 1 — metadata-service (port 3001)
+pnpm --filter metadata-service start:dev
+
+# Terminal 2 — document-service (port 3002)
+pnpm --filter document-service start:dev
+
+# Terminal 3 — workflow-service (port 3003)
+pnpm --filter workflow-service start:dev
+
+# Terminal 4 — audit-service (port 4004)
+pnpm --filter audit-service start:dev
+
+# Terminal 5 — notification-service (port 3005)
+pnpm --filter notification-service start:dev
+
+# Terminal 6 — gateway (port 3000) — khởi động SAU CÙNG
+pnpm --filter gateway start:dev
+```
+
+> **Thứ tự quan trọng:** Gateway phải khởi động **sau** khi các services khác đã sẵn sàng.
+
+### Bước 5 — Khởi động Frontend
+
+```bash
+cd apps/web
+
+# Sao chép file env
+cp .env.example .env.local
+
+# Chạy dev server
+npx next dev -p 3010
+```
+
+Mở trình duyệt: [http://localhost:3010](http://localhost:3010)
+
+---
+
+## Kiểm tra hệ thống
+
+### Chạy E2E kiểm tra toàn bộ luồng BE
 
 ```bash
 node scripts/e2e-check.mjs
 ```
 
-### E2E checks covered
+Bao gồm các kiểm tra:
+- Không có token → 401
+- Token hết hạn → 401
+- Viewer tạo tài liệu → 403
+- Editor tạo + upload → 201, file lưu vào MinIO ✅
+- Viewer tải khi draft → 403
+- Editor submit → PENDING
+- Approver approve → PUBLISHED
+- Approve lần 2 → 409 Conflict
+- Viewer tải khi PUBLISHED → 200
+- Compliance Officer tải file → 403
+- Compliance Officer xem audit → 200
+- Viewer xem audit → 403
 
-- no token -> metadata 401
-- expired-like token -> metadata 401
-- viewer create document -> 403
-- editor create document -> 201
-- editor upload -> object exists in MinIO
-- viewer download while document is `DRAFT` -> 403
-- editor submit -> `PENDING`
-- approver approve -> `PUBLISHED`
-- second approve -> 409
-- viewer published download -> 200
-- compliance officer download -> 403
-- compliance officer audit query -> 200
-- viewer audit query -> 403
+### API Swagger
 
-`EXPIRED_ACCESS_TOKEN` can be provided to the script if you want to use a real expired token instead of the default expired-like invalid JWT used for the 401 check.
+Sau khi services chạy:
 
-## Seed users
+| Service | Swagger UI |
+|---------|-----------|
+| Gateway | [http://localhost:3000/docs](http://localhost:3000/docs) |
+| metadata-service | [http://localhost:3001/docs](http://localhost:3001/docs) |
+| document-service | [http://localhost:3002/docs](http://localhost:3002/docs) |
+| workflow-service | [http://localhost:3003/docs](http://localhost:3003/docs) |
+| audit-service | [http://localhost:3004/docs](http://localhost:3004/docs) |
+| notification-service | [http://localhost:3005/docs](http://localhost:3005/docs) |
 
-Password for every seeded user: `Passw0rd!`
+---
 
-| Username | Role mapping |
-| --- | --- |
-| `viewer1` | `viewer` |
-| `editor1` | `editor` |
-| `approver1` | `approver` |
-| `co1` | `co` + `compliance_officer` |
-| `admin1` | `admin` |
+## Tài khoản demo (Keycloak)
 
-## Migration notes
+Mật khẩu tất cả tài khoản: **`Passw0rd!`**
 
-### Metadata service
+| Username | Vai trò | Mô tả |
+|----------|---------|-------|
+| `viewer1` | viewer | Xem & tải tài liệu đã xuất bản |
+| `editor1` | editor | Tạo, upload, submit tài liệu |
+| `approver1` | approver | Duyệt / từ chối tài liệu |
+| `co1` | compliance_officer | Xem audit log (không tải được file) |
+| `admin1` | admin | Toàn quyền |
 
-- New runtime tables:
-  - `documents`
-  - `document_versions`
-  - `document_acl`
-- New migration: `services/metadata-service/prisma/migrations/20260315000000_refactor_microservices_boundary`
-- Old prototype tables are not used by the refactored code paths.
+### Lấy JWT token từ Keycloak
 
-### Audit service
+```bash
+curl -s -X POST \
+  http://localhost:8080/realms/docvault/protocol/openid-connect/token \
+  -H "Content-Type: application/x-www-form-urlencoded" \
+  -d "client_id=docvault-gateway&client_secret=dev-gateway-secret&grant_type=password&username=editor1&password=Passw0rd!" \
+  | jq -r '.access_token'
+```
 
-- New database: `docvault_audit`
-- New runtime table:
-  - `audit_events`
-- New migration: `services/audit-service/prisma/migrations/20260315001000_init_audit_service`
-- `infra/db/init-postgres.sql` now creates `docvault_audit` and enables `uuid-ossp` in both databases.
+---
 
-If you already have an older Postgres volume from the proto-microservice setup, recreate it or create `docvault_audit` manually before running the new migrations.
+## Luồng nghiệp vụ chính
+
+### Upload và Xuất bản tài liệu
+
+```
+Editor                    Gateway              Services
+  │                          │                    │
+  ├─ POST /api/metadata/documents ──────────────► │ Tạo metadata (DRAFT)
+  ├─ POST /api/documents/:id/upload ───────────► │ Upload lên MinIO
+  ├─ POST /api/workflow/:id/submit ────────────► │ DRAFT → PENDING
+  │                                               │
+Approver                                          │
+  ├─ POST /api/workflow/:id/approve ───────────► │ PENDING → PUBLISHED
+  │                                               │
+Viewer                                            │
+  └─ POST /api/documents/:id/presign-download ──► │ Lấy URL tải file
+```
+
+### Luồng Compliance
+
+```
+Compliance Officer   Gateway         metadata-service
+  │                    │                    │
+  ├─ GET /api/metadata/documents ─────────► │ Xem danh sách → 200 ✅
+  ├─ GET /api/audit/query ─────────────────► │ Xem audit log → 200 ✅
+  └─ POST /api/documents/:id/presign-download │ Tải file → 403 ❌ (luôn bị chặn)
+```
+
+---
+
+## Cấu trúc thư mục
+
+```
+docvault/
+├── apps/
+│   └── web/                    # Frontend Next.js 15
+├── services/
+│   ├── gateway/                # API Gateway (NestJS, port 3000)
+│   ├── metadata-service/       # Quản lý metadata & ACL (port 3001)
+│   ├── document-service/       # Upload/Download MinIO (port 3002)
+│   ├── workflow-service/       # State machine duyệt tài liệu (port 3003)
+│   ├── audit-service/          # Audit log chống giả mạo (port 3004)
+│   └── notification-service/   # Thông báo (port 3005)
+├── infra/
+│   ├── docker-compose.dev.yml  # Infra: Postgres, MinIO, Keycloak
+│   ├── .env.example            # Cấu hình infra mẫu
+│   └── keycloak/               # Realm config & seed users
+├── scripts/
+│   ├── e2e-check.mjs           # Script kiểm tra E2E tự động
+│   └── demo.sh                 # Demo script
+└── docs/
+    ├── demo-users.md           # Thông tin tài khoản & phân quyền
+    ├── demo-flow.md            # Kịch bản demo từng bước
+    └── verification-report.md  # Báo cáo kiểm tra tích hợp
+```
+
+---
+
+## Mô hình dữ liệu
+
+### Database `docvault_metadata` (PostgreSQL)
+
+- `documents` — metadata, tags, phân loại, trạng thái, publishedAt, archivedAt
+- `document_versions` — con trỏ tới các phiên bản file trên MinIO
+- `document_acl` — kiểm soát quyền truy cập (USER / ROLE / GROUP)
+- `document_workflow_history` — lịch sử chuyển trạng thái
+
+### Database `docvault_audit` (PostgreSQL)
+
+- `audit_events` — sự kiện audit với **hash chain SHA-256** chống giả mạo
+
+---
+
+## Ghi chú quan trọng
+
+- **Compliance Officer** luôn bị từ chối tải file, kể cả khi ACL cho phép (logic trong `metadata-service/policy.service.ts`).
+- **Archive** chỉ dành cho editor sở hữu tài liệu hoặc admin (không phải approver).
+- Gateway tự động ghi audit cho mọi request nhận được.
+- Trạng thái tài liệu: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.

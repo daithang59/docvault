@@ -1,14 +1,18 @@
 # Docs
 
-- `README.md`
-  - Main architecture, local run, demo flow, migration notes
+- `RUN_PROJECT.md`
+  - Huong dan chay local end-to-end moi nhat cho backend, frontend, env va e2e
 - `PROJECT_STATUS.md`
-  - Short summary of the repo after the microservice refactor
+  - Snapshot trang thai codebase theo runtime hien tai
+- `demo-flow.md`
+  - Kich ban demo tay tung buoc sau khi stack da chay
+- `demo-users.md`
+  - User seed, role mapping va cach login
 - `REFRACTOR_SUMMARY.md`
-  - Consolidated list of the refactor changes that were applied
+  - Tong hop cac thay doi refactor da ap dung
 - `ERD.md`
-  - Current ERD and data ownership by bounded context
+  - ERD hien tai va ownership theo bounded context
 - `README_CONTEXT.md`
-  - Original planning context and roadmap
+  - Context planning va roadmap ban dau
 
-Read `../README.md` first if you want the latest runnable setup.
+Neu can chay du an, doc `RUN_PROJECT.md` truoc.
