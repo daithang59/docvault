@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 \"c:\\\\NT114\\\\docvault\\\\.agent\\\\skills\\\\ui-ux-pro-max-skill-main\\\\ui-ux-pro-max-skill-main\\\\src\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"SaaS dashboard enterprise\" --stack nextjs --domain product -n 5)",
+      "Bash(python3 \"c:\\\\NT114\\\\docvault\\\\.agent\\\\skills\\\\ui-ux-pro-max-skill-main\\\\ui-ux-pro-max-skill-main\\\\src\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"minimalism clean professional dark\" --stack nextjs --domain style -n 5)"
+    ]
+  }
+}
