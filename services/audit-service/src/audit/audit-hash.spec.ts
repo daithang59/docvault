@@ -1,25 +1,37 @@
 import { AuditService } from './audit.service';
 
-// --- Mock PrismaService ---
-const mockCreate = jest.fn();
-const mockFindFirst = jest.fn();
-const mockFindMany = jest.fn();
-
-const mockPrisma = {
-  auditEvent: {
-    create: mockCreate,
-    findFirst: mockFindFirst,
-    findMany: mockFindMany,
-  },
-};
+/**
+ * Unit tests for AuditService hash chain logic.
+ *
+ * Uses a plain mock model (no module mocking needed) — the service
+ * only needs `findOne().sort().lean()` and `create()`, so we wire
+ * those up directly in the test.
+ */
 
 describe('AuditService — Hash Chain', () => {
+  // Plain mock model — no NestJS/Mongoose dependency
+  let mockLean: jest.Mock;
+  let mockCreate: jest.Mock;
   let service: AuditService;
 
   beforeEach(() => {
-    jest.clearAllMocks();
-    service = new AuditService(mockPrisma as any);
-    mockCreate.mockImplementation(({ data }) => Promise.resolve(data));
+    mockLean = jest.fn();
+    mockCreate = jest.fn();
+
+    const mockModel = {
+      create: mockCreate,
+      // MongoDB: findOne({}).sort({ timestamp: -1 }).lean()
+      findOne: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({ lean: mockLean }),
+      }),
+    };
+
+    service = new AuditService(mockModel as any);
+
+    mockLean.mockResolvedValue(null);
+    mockCreate.mockImplementation((data) =>
+      Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
+    );
   });
 
   const baseDto = {
@@ -32,8 +44,6 @@ describe('AuditService — Hash Chain', () => {
   };
 
   it('first event has prevHash = null', async () => {
-    mockFindFirst.mockResolvedValue(null); // no prior events
-
     const result = await service.create(baseDto);
 
     expect(result.prevHash).toBeNull();
@@ -43,10 +53,9 @@ describe('AuditService — Hash Chain', () => {
   });
 
   it('second event chains from first event hash', async () => {
-    mockFindFirst.mockResolvedValue(null);
     const first = await service.create(baseDto);
+    mockLean.mockResolvedValue({ hash: first.hash });
 
-    mockFindFirst.mockResolvedValue({ hash: first.hash });
     const second = await service.create({
       ...baseDto,
       action: 'DOCUMENT_SUBMITTED',
@@ -58,13 +67,13 @@ describe('AuditService — Hash Chain', () => {
   });
 
   it('hash is deterministic for same input', async () => {
-    mockFindFirst.mockResolvedValue(null);
-
     const result1 = await service.create(baseDto);
 
-    jest.clearAllMocks();
-    mockFindFirst.mockResolvedValue(null);
-    mockCreate.mockImplementation(({ data }) => Promise.resolve(data));
+    // Reset mocks so findOne returns null again (fresh chain)
+    mockLean.mockResolvedValue(null);
+    mockCreate.mockImplementation((data) =>
+      Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
+    );
 
     const result2 = await service.create(baseDto);
 
@@ -72,13 +81,12 @@ describe('AuditService — Hash Chain', () => {
   });
 
   it('different inputs produce different hashes', async () => {
-    mockFindFirst.mockResolvedValue(null);
-
     const result1 = await service.create(baseDto);
 
-    jest.clearAllMocks();
-    mockFindFirst.mockResolvedValue(null);
-    mockCreate.mockImplementation(({ data }) => Promise.resolve(data));
+    mockLean.mockResolvedValue(null);
+    mockCreate.mockImplementation((data) =>
+      Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
+    );
 
     const result2 = await service.create({
       ...baseDto,
@@ -89,8 +97,6 @@ describe('AuditService — Hash Chain', () => {
   });
 
   it('hash includes all canonical fields', async () => {
-    mockFindFirst.mockResolvedValue(null);
-
     const result = await service.create({
       ...baseDto,
       reason: 'test reason',
