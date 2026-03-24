@@ -110,4 +110,61 @@ export class AuditService {
     const input = `${prevHash ?? ''}|${canonicalPayload}`;
     return createHash('sha256').update(input, 'utf8').digest('hex');
   }
+
+  /**
+   * Verify the integrity of the hash chain from the first event up to `limit` events.
+   * Returns { valid: true } if every hash links correctly; otherwise throws with details.
+   */
+  async verifyChain(limit = 1000): Promise<{ valid: boolean; checked: number; firstBrokenIndex?: number; message?: string }> {
+    const events = await this.auditEvent
+      .find({}, { _id: 0 })
+      .sort({ timestamp: 1 })
+      .limit(limit)
+      .lean();
+
+    if (events.length === 0) {
+      return { valid: true, checked: 0 };
+    }
+
+    for (let i = 0; i < events.length; i++) {
+      const event = events[i] as any;
+      const canonicalPayload = this.buildCanonicalPayload({
+        eventId: event.eventId,
+        timestamp: event.timestamp?.toISOString?.() ?? event.timestamp,
+        actorId: event.actorId,
+        actorRoles: event.actorRoles,
+        action: event.action,
+        resourceType: event.resourceType,
+        resourceId: event.resourceId,
+        result: event.result,
+        reason: event.reason,
+        ip: event.ip,
+        traceId: event.traceId,
+      });
+      const expectedHash = this.computeHash(
+        i === 0 ? null : (events[i - 1] as any).hash,
+        canonicalPayload,
+      );
+
+      if (event.hash !== expectedHash) {
+        return {
+          valid: false,
+          checked: i + 1,
+          firstBrokenIndex: i,
+          message: `Hash mismatch at event index ${i} (eventId=${event.eventId}). Expected=${expectedHash}, got=${event.hash}`,
+        };
+      }
+
+      if (event.prevHash !== (i === 0 ? null : (events[i - 1] as any).hash)) {
+        return {
+          valid: false,
+          checked: i + 1,
+          firstBrokenIndex: i,
+          message: `prevHash mismatch at event index ${i} (eventId=${event.eventId}). Expected=${i === 0 ? null : (events[i - 1] as any).hash}, got=${event.prevHash}`,
+        };
+      }
+    }
+
+    return { valid: true, checked: events.length };
+  }
 }

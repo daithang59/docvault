@@ -109,9 +109,18 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
 
 ### libs/contracts
 
-- `libs/contracts/openapi/gateway.yaml` — OpenAPI 3.0 contract cho gateway route.
+- `libs/contracts/openapi/gateway.yaml` — OpenAPI 3.0 spec đầy đủ cho tất cả endpoints (metadata, documents, workflow, audit, notify).
 - `libs/contracts/events/` — Thư mục đặt event schema (hiện trống).
-- `libs/auth/` — Dự định chứa shared auth utilities (hiện trống, chưa dùng).
+
+### libs/auth
+
+- `libs/auth/` — Shared auth primitives cho tất cả services:
+  - `JwtStrategy` — Passport strategy Keycloak JWKS + RS256
+  - `RolesGuard` + `Roles()` — Role-based access control
+  - `AuthModule` — NestJS module re-export
+  - `ServiceUser`, `RequestContext`, `buildActorId()`, `buildRequestContext()` — Shared types & helpers
+  - `ROLES`, `READER_ROLES` — Canonical role constants
+- **Migration**: 6 services hiện vẫn có inline auth files; nên migrate sang dùng `@docvault/auth`.
 
 ## Infrastructure
 

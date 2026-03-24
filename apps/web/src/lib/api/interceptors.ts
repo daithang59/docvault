@@ -1,6 +1,7 @@
 import { apiClient } from './client';
 import { parseApiError } from './errors';
-import { clearSession, loadSession } from '@/lib/auth/session';
+import { clearSession, loadSession, saveSession } from '@/lib/auth/session';
+import { refreshSessionIfNeeded } from '@/lib/auth/refresh';
 
 let interceptorsApplied = false;
 
@@ -21,17 +22,25 @@ export function applyInterceptors(): void {
     return config;
   });
 
-  // ── Response: normalize errors, handle 401 ────────────────────────────────
+  // ── Response: normalize errors, handle 401 with refresh ──────────────────
   apiClient.interceptors.response.use(
     (response) => response,
-    (error) => {
+    async (error) => {
       const apiError = parseApiError(error);
 
-      // Optionally handle 401 by redirecting to login
       if (apiError.isUnauthorized() && typeof window !== 'undefined') {
-        clearSession();
+        // Attempt token refresh on 401
+        const refreshed = await refreshSessionIfNeeded();
+        if (refreshed) {
+          saveSession(refreshed);
+          // Retry the original request with the new token
+          const originalRequest = error.config;
+          originalRequest.headers['Authorization'] = `Bearer ${refreshed.accessToken}`;
+          return apiClient(originalRequest);
+        }
 
-        // Avoid redirect loops when already on login page
+        // Refresh failed — clear session and redirect to login
+        clearSession();
         if (!window.location.pathname.startsWith('/login')) {
           window.location.href = '/login';
         }
