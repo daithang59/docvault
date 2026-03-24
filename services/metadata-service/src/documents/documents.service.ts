@@ -20,8 +20,62 @@ export class DocumentsService {
     private readonly auditClient: AuditClient,
   ) {}
 
-  findAll() {
+  /**
+   * List documents with row-level ACL filtering.
+   *
+   * The `userOrContext` parameter accepts either a ServiceUser (direct call)
+   * or a RequestContext (when called via gateway proxy, where req.user is
+   * stripped and user info is carried in x-user-id / x-roles headers).
+   */
+  findAll(userOrContext?: ServiceUser | RequestContext) {
+    let actorId: string;
+    let roles: string[];
+    let isAdmin: boolean;
+
+    if (!userOrContext) {
+      return [];
+    }
+
+    if ('roles' in userOrContext && !Array.isArray(userOrContext.roles)) {
+      // It's a ServiceUser
+      actorId = buildActorId(userOrContext);
+      roles = userOrContext.roles ?? [];
+    } else {
+      // It's a RequestContext (from proxy)
+      actorId = userOrContext.actorId;
+      roles = userOrContext.roles ?? [];
+    }
+
+    isAdmin = roles.includes('admin');
+
+    if (isAdmin) {
+      return this.prisma.document.findMany({
+        orderBy: { createdAt: 'desc' },
+      });
+    }
+
     return this.prisma.document.findMany({
+      where: {
+        OR: [
+          // Documents the user owns
+          { ownerId: actorId },
+          // Documents where user has explicit ACL entry
+          { aclEntries: { some: { subjectId: actorId } } },
+          // Documents where user's role has ACL entry
+          ...(roles.length > 0
+            ? [{ aclEntries: { some: { subjectId: { in: roles } } } }]
+            : []),
+          // Published documents visible to default reader roles
+          {
+            status: 'PUBLISHED',
+            aclEntries: { some: { subjectType: 'ALL' as const } },
+          },
+          // All published documents for known roles
+          ...(['viewer', 'editor', 'approver'].some((r) => roles.includes(r))
+            ? [{ status: 'PUBLISHED' }]
+            : []),
+        ],
+      },
       orderBy: { createdAt: 'desc' },
     });
   }

@@ -43,9 +43,9 @@ export class DocumentsController {
   @Get()
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
-  @ApiOperation({ summary: 'List document metadata records' })
-  findAll() {
-    return this.documentsService.findAll();
+  @ApiOperation({ summary: 'List document metadata records (ACL-filtered)' })
+  findAll(@Req() req: any) {
+    return this.documentsService.findAll(buildRequestContext(req));
   }
 
   @Get(':docId')

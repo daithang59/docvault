@@ -24,13 +24,18 @@ const DEMO_ROLES: { value: UserRole; label: string; description: string }[] = [
 export default function LoginPage() {
   const router = useRouter();
   const { login } = useAuth();
-  const [mode, setMode] = useState<'demo' | 'jwt'>('demo');
+  const [mode, setMode] = useState<'demo' | 'jwt'>(
+    process.env.NODE_ENV === 'production' ? 'jwt' : 'demo',
+  );
   const [selectedRole, setSelectedRole] = useState<UserRole>('editor');
   const [username, setUsername] = useState('');
   const [jwtToken, setJwtToken] = useState('');
   const [jwtError, setJwtError] = useState('');
 
   function handleDemoLogin() {
+    if (process.env.NODE_ENV === 'production') {
+      return; // Demo login disabled in production
+    }
     const displayName = username.trim() || `demo_${selectedRole}`;
     const session: Session = {
       accessToken: `demo_token_${selectedRole}_${Date.now()}`,
@@ -215,6 +220,7 @@ export default function LoginPage() {
             </div>
 
             {/* Mode toggle — pill tabs */}
+            {process.env.NODE_ENV !== 'production' && (
             <div
               className="flex gap-1 p-1 rounded-xl mb-6"
               style={{ background: 'rgba(241,245,249,0.8)', border: '1px solid rgba(226,232,240,0.6)' }}
@@ -240,6 +246,7 @@ export default function LoginPage() {
                 JWT Token
               </button>
             </div>
+            )}
 
             {/* Username */}
             <div className="mb-4">

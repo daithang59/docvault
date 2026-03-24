@@ -1,4 +1,5 @@
 import {
+  DeleteObjectCommand,
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -71,6 +72,16 @@ export class StorageService {
 
     return this.client.send(
       new GetObjectCommand({
+        Bucket: this.bucket,
+        Key: objectKey,
+      }),
+    );
+  }
+
+  /** Delete an object — used for rollback when version creation fails. */
+  async deleteObject(objectKey: string) {
+    await this.client.send(
+      new DeleteObjectCommand({
         Bucket: this.bucket,
         Key: objectKey,
       }),
