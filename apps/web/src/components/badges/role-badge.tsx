@@ -3,12 +3,12 @@
 import { UserRole } from '@/types/auth';
 import { cn } from '@/lib/utils/cn';
 
-const roleStyles: Record<UserRole, string> = {
-  viewer: 'bg-[#F8FAFC] text-[#475569]',
-  editor: 'bg-[#EFF6FF] text-[#1D4ED8]',
-  approver: 'bg-[#F5F3FF] text-[#6D28D9]',
-  compliance_officer: 'bg-[#FFF1F2] text-[#BE123C]',
-  admin: 'bg-[#E2E8F0] text-[#0F172A]',
+const roleStyles: Record<UserRole, { bg: string; text: string; border: string; shadow: string }> = {
+  viewer: { bg: '#F8FAFC', text: '#64748B', border: '#E2E8F0', shadow: 'rgba(0,0,0,0.04)' },
+  editor: { bg: '#EFF6FF', text: '#3B82F6', border: '#BFDBFE', shadow: 'rgba(59,130,246,0.12)' },
+  approver: { bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE', shadow: 'rgba(124,58,237,0.12)' },
+  compliance_officer: { bg: '#FFF7F7', text: '#E11D48', border: '#FECDD3', shadow: 'rgba(225,29,72,0.12)' },
+  admin: { bg: '#0F172A', text: '#F8FAFC', border: '#334155', shadow: 'rgba(0,0,0,0.15)' },
 };
 
 const roleLabels: Record<UserRole, string> = {
@@ -25,13 +25,19 @@ interface RoleBadgeProps {
 }
 
 export function RoleBadge({ role, className }: RoleBadgeProps) {
+  const style = roleStyles[role];
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold',
-        roleStyles[role],
+        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all hover:-translate-y-0.5',
         className
       )}
+      style={{
+        backgroundColor: style.bg,
+        color: style.text,
+        borderColor: style.border,
+        boxShadow: `0 1px 2px ${style.shadow}`,
+      }}
     >
       {roleLabels[role]}
     </span>

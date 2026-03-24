@@ -54,16 +54,17 @@ export function SearchInput({
         onChange={handleChange}
         placeholder={placeholder}
         className={cn(
-          'w-full rounded-md border border-slate-200 bg-white py-2 pl-9 pr-8',
-          'text-sm text-slate-900 placeholder:text-slate-400',
+          'w-full rounded-xl border border-slate-200/80 bg-white/80 py-2 pl-9 pr-8',
+          'text-sm text-slate-800 placeholder:text-slate-400',
           'focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400',
-          'transition-colors',
+          'transition-all duration-200',
         )}
+        style={{ backdropFilter: 'blur(8px)' }}
       />
       {localValue && (
         <button
           onClick={handleClear}
-          className="absolute right-2 text-slate-400 hover:text-slate-600 transition-colors"
+          className="absolute right-2.5 text-slate-400 hover:text-slate-600 transition-all active:scale-90 p-1 rounded-lg hover:bg-slate-100"
           aria-label="Clear search"
           type="button"
         >
