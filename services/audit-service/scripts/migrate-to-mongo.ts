@@ -23,18 +23,18 @@ import { MongoClient, Collection } from 'mongodb';
 const BATCH_SIZE = 500;
 
 interface PgAuditEvent {
-  eventid: string;
+  eventId: string;
   timestamp: Date;
-  actorid: string;
-  actorroles: string[];
+  actorId: string;
+  actorRoles: string[];
   action: string;
-  resourcetype: string;
-  resourceid: string | null;
+  resourceType: string;
+  resourceId: string | null;
   result: string;
   reason: string | null;
   ip: string | null;
-  traceid: string | null;
-  prevhash: string | null;
+  traceId: string | null;
+  prevHash: string | null;
   hash: string;
 }
 
@@ -123,11 +123,11 @@ async function main() {
 
   while (offset < total) {
     const { rows: batch } = await pg.query<PgAuditEvent>(
-      `SELECT eventid, timestamp, actorid, actorroles, action,
-              resourcetype, resourceid, result, reason, ip, traceid,
-              prevhash, hash
+      `SELECT "eventId", "timestamp", "actorId", "actorRoles", "action",
+              "resourceType", "resourceId", "result", "reason", "ip", "traceId",
+              "prevHash", "hash"
        FROM audit_events
-       ORDER BY timestamp ASC
+       ORDER BY "timestamp" ASC
        LIMIT ${BATCH_SIZE} OFFSET ${offset}`,
     );
 
@@ -138,33 +138,33 @@ async function main() {
     for (const row of batch) {
       // Recompute hash chain from scratch in MongoDB
       const canonicalPayload = buildCanonicalPayload({
-        eventId: row.eventid,
+        eventId: row.eventId,
         timestamp: row.timestamp.toISOString(),
-        actorId: row.actorid,
-        actorRoles: row.actorroles,
+        actorId: row.actorId,
+        actorRoles: row.actorRoles,
         action: row.action,
-        resourceType: row.resourcetype,
-        resourceId: row.resourceid ?? undefined,
+        resourceType: row.resourceType,
+        resourceId: row.resourceId ?? undefined,
         result: row.result,
         reason: row.reason ?? undefined,
         ip: row.ip ?? undefined,
-        traceId: row.traceid ?? undefined,
+        traceId: row.traceId ?? undefined,
       });
 
       const hash = computeHash(prevHash, canonicalPayload);
 
       mongoEvents.push({
-        eventId: row.eventid,
+        eventId: row.eventId,
         timestamp: row.timestamp,
-        actorId: row.actorid,
-        actorRoles: row.actorroles,
+        actorId: row.actorId,
+        actorRoles: row.actorRoles,
         action: row.action,
-        resourceType: row.resourcetype,
-        resourceId: row.resourceid ?? undefined,
+        resourceType: row.resourceType,
+        resourceId: row.resourceId ?? undefined,
         result: row.result,
         reason: row.reason ?? undefined,
         ip: row.ip ?? undefined,
-        traceId: row.traceid ?? undefined,
+        traceId: row.traceId ?? undefined,
         prevHash: prevHash ?? undefined,
         hash,
       });
