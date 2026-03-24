@@ -32,7 +32,9 @@ pnpm --filter <service-name> test -- --testPathPattern=foo.spec.ts
 
 # Prisma migration (chạy sau khi Docker infra đã healthy)
 pnpm --filter metadata-service prisma:deploy
-pnpm --filter audit-service prisma:deploy
+
+# Migrate audit logs từ PostgreSQL → MongoDB (chạy KHI audit-service đang STOP)
+pnpm --filter audit-service migrate:to-mongo
 
 # E2E verification script (chạy khi tất cả services + infra đã chạy)
 node scripts/e2e-check.mjs
@@ -72,7 +74,7 @@ Client → Gateway (:3000) → Backend Services (:3001–:3005)
 | `metadata-service` | 3001 | Metadata, ACL, trạng thái, lịch sử | PostgreSQL (Prisma) |
 | `document-service` | 3002 | Upload/download file, MinIO S3 | — |
 | `workflow-service` | 3003 | State machine DRAFT→PENDING→PUBLISHED→ARCHIVED | — |
-| `audit-service` | 3004 | Audit log với hash-chain SHA-256 | PostgreSQL (Prisma) |
+| `audit-service` | 3004 | Audit log với hash-chain SHA-256 | MongoDB (Mongoose) |
 | `notification-service` | 3005 | Thông báo | — |
 
 ### Auth flow (quan trọng)
@@ -99,8 +101,11 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
 ### Prisma schema
 
 - `metadata-service/prisma/schema.prisma` — 4 bảng: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
-- `audit-service/prisma/schema.prisma` — 1 bảng: `audit_events` với cột `previous_hash` cho hash chain.
 - Generated client nằm trong `generated/prisma/` — **không chỉnh sửa tay**.
+
+### MongoDB schema
+
+- `audit-service/src/mongo/audit-event.schema.ts` — Mongoose schema cho `audit_events` collection. Hash chain SHA-256 được tính lại hoàn toàn tại runtime.
 
 ### libs/contracts
 
@@ -119,8 +124,9 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
 
 **Quan trọng**: Gateway phải khởi động **sau cùng**, sau khi tất cả backend services đã ready:
 
-1. Docker infra (PostgreSQL, MinIO, Keycloak)
-2. `prisma:deploy` cho metadata-service và audit-service
-3. metadata-service → document-service → workflow-service → audit-service → notification-service
+1. Docker infra (PostgreSQL, MinIO, Keycloak, MongoDB)
+2. `prisma:deploy` cho metadata-service
+3. metadata-service → document-service → workflow-service → notification-service → audit-service (MongoDB không cần migration)
+4. Chạy `migrate:to-mongo` để migrate audit logs cũ (nếu có)
 4. Gateway
 5. Frontend (`apps/web/`)
