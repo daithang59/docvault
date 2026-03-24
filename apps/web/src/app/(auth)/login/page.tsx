@@ -104,63 +104,138 @@ export default function LoginPage() {
 
 
   return (
-    <div className="min-h-screen bg-[#F8FAFC] flex">
-      {/* Left panel - Brand */}
-      <div className="hidden lg:flex flex-col justify-between w-[420px] bg-[#0F172A] p-10 shrink-0">
-        <div>
-          <div className="flex items-center gap-3 mb-12">
-            <div className="h-10 w-10 rounded-xl bg-[#2563EB] flex items-center justify-center">
-              <Shield className="h-5 w-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-white">DocVault</h1>
-              <p className="text-xs text-[#94A3B8] tracking-wider uppercase">Document System</p>
-            </div>
-          </div>
-          <h2 className="text-3xl font-semibold text-white leading-tight mb-4">
-            Secure document management for modern enterprises.
-          </h2>
-          <p className="text-[#94A3B8] text-sm leading-relaxed">
-            Control access, manage workflows, and ensure compliance across every document lifecycle stage.
-          </p>
+    <div className="min-h-screen flex bg-slate-50">
+      {/* Left panel — Brand: glassmorphism dark with ambient glow */}
+      <div
+        className="hidden lg:flex flex-col justify-between relative w-[460px] shrink-0 overflow-hidden"
+        style={{
+          background: 'linear-gradient(160deg, rgba(15,23,42,0.97) 0%, rgba(15,23,42,1) 60%, rgba(30,41,59,0.95) 100%)',
+          backdropFilter: 'blur(24px)',
+        }}
+      >
+        {/* Ambient background orbs */}
+        <div className="absolute inset-0 pointer-events-none overflow-hidden">
+          <div className="absolute -top-24 -left-24 w-80 h-80 rounded-full bg-blue-500/10 blur-3xl" />
+          <div className="absolute top-1/3 right-0 w-60 h-60 rounded-full bg-violet-500/10 blur-3xl translate-x-1/2" />
+          <div className="absolute bottom-0 left-1/4 w-96 h-96 rounded-full bg-indigo-500/5 blur-3xl translate-y-1/2" />
+          {/* Grid overlay */}
+          <div
+            className="absolute inset-0 opacity-[0.03]"
+            style={{
+              backgroundImage: 'linear-gradient(rgba(255,255,255,0.5) 1px, transparent 1px), linear-gradient(90deg, rgba(255,255,255,0.5) 1px, transparent 1px)',
+              backgroundSize: '40px 40px',
+            }}
+          />
         </div>
 
-        <div className="space-y-4">
-          {['Role-based access control', 'Immutable audit trail', 'Workflow state management', 'Secure file storage'].map((feat) => (
-            <div key={feat} className="flex items-center gap-3">
-              <div className="h-2 w-2 rounded-full bg-[#2563EB]" />
-              <span className="text-sm text-[#CBD5E1]">{feat}</span>
+        {/* Content */}
+        <div className="relative flex flex-col justify-between h-full p-10 z-10">
+          <div>
+            {/* Logo */}
+            <div className="flex items-center gap-3 mb-16">
+              {/* Logo icon with glass effect */}
+              <div className="relative h-11 w-11 rounded-xl overflow-hidden">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-violet-600" />
+                <div className="absolute inset-0.5 rounded-[8px] bg-[#0F172A] flex items-center justify-center">
+                  <Shield className="h-5 w-5 text-blue-400" />
+                </div>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-white tracking-tight">DocVault</h1>
+                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">Document System</p>
+              </div>
             </div>
-          ))}
+
+            {/* Headline */}
+            <div className="mb-8">
+              <h2 className="text-[28px] font-semibold text-white leading-[1.25] mb-4 tracking-tight">
+                Secure document management for{' '}
+                <span className="bg-gradient-to-r from-blue-400 to-violet-400 bg-clip-text text-transparent">
+                  modern enterprises.
+                </span>
+              </h2>
+              <p className="text-sm text-slate-400 leading-relaxed">
+                Control access, manage workflows, and ensure compliance across every document lifecycle stage.
+              </p>
+            </div>
+          </div>
+
+          {/* Feature list */}
+          <div className="space-y-3">
+            {[
+              { icon: '🛡️', label: 'Role-based access control', glow: 'rgba(59,130,246,0.4)' },
+              { icon: '🔗', label: 'Immutable audit trail', glow: 'rgba(124,58,237,0.4)' },
+              { icon: '⚡', label: 'Workflow state management', glow: 'rgba(59,130,246,0.3)' },
+              { icon: '🔒', label: 'Secure file storage', glow: 'rgba(34,197,94,0.4)' },
+            ].map((feat) => (
+              <div key={feat.label} className="flex items-center gap-3 group">
+                <div
+                  className="h-7 w-7 rounded-lg flex items-center justify-center text-sm shrink-0 transition-transform group-hover:scale-110"
+                  style={{
+                    background: `linear-gradient(135deg, ${feat.glow.replace('0.4', '0.15')}, ${feat.glow.replace('0.4', '0.05')})`,
+                    border: `1px solid ${feat.glow.replace('0.4', '0.3')}`,
+                  }}
+                >
+                  {feat.icon}
+                </div>
+                <span className="text-sm text-slate-300 group-hover:text-white transition-colors">{feat.label}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
-      {/* Right panel - Login form */}
+      {/* Right panel — Login form: clean white with subtle shadow */}
       <div className="flex-1 flex items-center justify-center p-8">
-        <div className="w-full max-w-md">
+        <div className="w-full max-w-[420px]">
           {/* Logo mobile */}
           <div className="flex items-center gap-3 mb-8 lg:hidden">
-            <div className="h-9 w-9 rounded-xl bg-[#2563EB] flex items-center justify-center">
-              <Shield className="h-4 w-4 text-white" />
+            <div className="relative h-9 w-9 rounded-xl overflow-hidden">
+              <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-violet-600" />
+              <div className="absolute inset-0.5 rounded-[8px] bg-[#0F172A] flex items-center justify-center">
+                <Shield className="h-4 w-4 text-blue-400" />
+              </div>
             </div>
-            <span className="text-xl font-bold text-[#0F172A]">DocVault</span>
+            <span className="text-xl font-bold text-slate-800">DocVault</span>
           </div>
 
-          <div className="bg-white border border-[#E2E8F0] rounded-2xl p-8 shadow-sm">
-            <h2 className="text-2xl font-semibold text-[#0F172A] mb-1">Sign in</h2>
-            <p className="text-sm text-[#64748B] mb-6">Access your secure document portal</p>
+          {/* Form card */}
+          <div
+            className="rounded-2xl p-8"
+            style={{
+              background: 'rgba(255,255,255,0.95)',
+              backdropFilter: 'blur(16px)',
+              border: '1px solid rgba(226,232,240,0.8)',
+              boxShadow: '0 25px 50px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.04)',
+            }}
+          >
+            <div className="mb-6">
+              <h2 className="text-2xl font-semibold text-slate-800 mb-1">Welcome back</h2>
+              <p className="text-sm text-slate-500">Sign in to your secure document portal</p>
+            </div>
 
-            {/* Mode toggle */}
-            <div className="flex gap-1 bg-[#F1F5F9] p-1 rounded-xl mb-6">
+            {/* Mode toggle — pill tabs */}
+            <div
+              className="flex gap-1 p-1 rounded-xl mb-6"
+              style={{ background: 'rgba(241,245,249,0.8)', border: '1px solid rgba(226,232,240,0.6)' }}
+            >
               <button
                 onClick={() => setMode('demo')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all ${mode === 'demo' ? 'bg-white text-[#1E293B] shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  mode === 'demo'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
                 Demo Login
               </button>
               <button
                 onClick={() => setMode('jwt')}
-                className={`flex-1 py-1.5 text-sm font-medium rounded-lg transition-all ${mode === 'jwt' ? 'bg-white text-[#1E293B] shadow-sm' : 'text-[#64748B] hover:text-[#1E293B]'}`}
+                className={`flex-1 py-2 text-sm font-medium rounded-lg transition-all duration-200 ${
+                  mode === 'jwt'
+                    ? 'bg-white text-slate-800 shadow-sm'
+                    : 'text-slate-500 hover:text-slate-700'
+                }`}
               >
                 JWT Token
               </button>
@@ -168,19 +243,21 @@ export default function LoginPage() {
 
             {/* Username */}
             <div className="mb-4">
-              <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Username</label>
+              <label className="block text-sm font-semibold text-slate-700 mb-1.5">
+                Username
+              </label>
               <input
                 value={username}
                 onChange={(e) => setUsername(e.target.value)}
                 placeholder={mode === 'demo' ? `demo_${selectedRole}` : 'Your name'}
-                className="w-full px-3.5 py-2.5 text-sm border border-[#CBD5E1] rounded-xl bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition"
+                className="w-full px-3.5 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
               />
             </div>
 
             {mode === 'demo' ? (
               <>
                 <div className="mb-6">
-                  <label className="block text-sm font-medium text-[#1E293B] mb-2">Select Role</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-2">Select Role</label>
                   <div className="space-y-2">
                     {DEMO_ROLES.map((role) => (
                       <button
@@ -188,26 +265,32 @@ export default function LoginPage() {
                         onClick={() => setSelectedRole(role.value)}
                         className={`w-full text-left px-4 py-3 rounded-xl border transition-all ${
                           selectedRole === role.value
-                            ? 'border-[#2563EB] bg-[#EFF6FF]'
-                            : 'border-[#E2E8F0] hover:border-[#CBD5E1] hover:bg-[#F8FAFC]'
+                            ? 'border-blue-400/60 bg-blue-50/60'
+                            : 'border-slate-200/80 hover:border-slate-300 hover:bg-slate-50/80'
                         }`}
                       >
                         <div className="flex items-center justify-between">
-                          <span className={`text-sm font-medium ${selectedRole === role.value ? 'text-[#1D4ED8]' : 'text-[#1E293B]'}`}>
+                          <span className={`text-sm font-medium ${selectedRole === role.value ? 'text-blue-600' : 'text-slate-700'}`}>
                             {role.label}
                           </span>
                           {selectedRole === role.value && (
-                            <div className="h-2 w-2 rounded-full bg-[#2563EB]" />
+                            <div
+                              className="h-2 w-2 rounded-full"
+                              style={{
+                                background: '#2563EB',
+                                boxShadow: '0 0 6px rgba(37,99,235,0.6)',
+                              }}
+                            />
                           )}
                         </div>
-                        <p className="text-xs text-[#94A3B8] mt-0.5">{role.description}</p>
+                        <p className="text-xs text-slate-400 mt-0.5">{role.description}</p>
                       </button>
                     ))}
                   </div>
                 </div>
                 <button
                   onClick={handleDemoLogin}
-                  className="w-full py-3 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-semibold transition"
+                  className="w-full py-3 rounded-xl text-white text-sm font-semibold transition-all active:scale-[0.98] btn-primary"
                 >
                   Enter as {DEMO_ROLES.find((r) => r.value === selectedRole)?.label}
                 </button>
@@ -215,27 +298,27 @@ export default function LoginPage() {
             ) : (
               <>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-[#1E293B] mb-1.5">JWT Token</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">JWT Token</label>
                   <textarea
                     value={jwtToken}
                     onChange={(e) => setJwtToken(e.target.value)}
                     rows={4}
                     placeholder="Paste your JWT access token here..."
-                    className="w-full px-3.5 py-2.5 text-xs font-mono border border-[#CBD5E1] rounded-xl bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition resize-none"
+                    className="w-full px-3.5 py-2.5 text-xs font-mono border border-slate-200 rounded-xl bg-white text-slate-800 placeholder:text-slate-400 outline-none transition-all focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400 resize-none"
                   />
                   {jwtError && (
-                    <p className="text-xs text-[#DC2626] mt-1">{jwtError}</p>
+                    <p className="text-xs text-red-500 mt-1">{jwtError}</p>
                   )}
-                  <p className="text-xs text-[#94A3B8] mt-1">
+                  <p className="text-xs text-slate-400 mt-1.5">
                     Roles will be extracted from the token. If parsing fails, select a fallback role below.
                   </p>
                 </div>
                 <div className="mb-4">
-                  <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Fallback Role</label>
+                  <label className="block text-sm font-semibold text-slate-700 mb-1.5">Fallback Role</label>
                   <select
                     value={selectedRole}
                     onChange={(e) => setSelectedRole(e.target.value as UserRole)}
-                    className="w-full px-3 py-2.5 text-sm border border-[#CBD5E1] rounded-xl bg-white text-[#1E293B] outline-none focus:border-[#2563EB] transition"
+                    className="w-full px-3 py-2.5 text-sm border border-slate-200 rounded-xl bg-white text-slate-800 outline-none transition-all focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                   >
                     {DEMO_ROLES.map((r) => (
                       <option key={r.value} value={r.value}>{r.label}</option>
@@ -244,7 +327,7 @@ export default function LoginPage() {
                 </div>
                 <button
                   onClick={handleJwtLogin}
-                  className="w-full py-3 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-semibold transition"
+                  className="w-full py-3 rounded-xl text-white text-sm font-semibold transition-all active:scale-[0.98] btn-primary"
                 >
                   Sign in with Token
                 </button>
@@ -252,7 +335,7 @@ export default function LoginPage() {
             )}
           </div>
 
-          <p className="text-center text-xs text-[#94A3B8] mt-6">
+          <p className="text-center text-xs text-slate-400 mt-6">
             DocVault — Secure Document Management System
           </p>
         </div>
