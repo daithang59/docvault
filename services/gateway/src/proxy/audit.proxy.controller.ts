@@ -33,7 +33,7 @@ export class AuditProxyController {
 
   @Get('query')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('compliance_officer')
+  @Roles('compliance_officer', 'admin')
   @ApiOperation({ summary: 'Proxy -> audit-service GET /audit/query' })
   async query(@Req() req: any, @Query() query: any) {
     const response = await this.proxyService.forward(req, {
