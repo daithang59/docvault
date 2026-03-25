@@ -36,7 +36,9 @@ export class DocumentsService {
       return [];
     }
 
-    if ('roles' in userOrContext && !Array.isArray(userOrContext.roles)) {
+    const isServiceUser = 'sub' in userOrContext;
+
+    if (isServiceUser) {
       // It's a ServiceUser
       actorId = buildActorId(userOrContext);
       roles = userOrContext.roles ?? [];
@@ -67,12 +69,12 @@ export class DocumentsService {
             : []),
           // Published documents visible to default reader roles
           {
-            status: 'PUBLISHED',
+            status: 'PUBLISHED' as const,
             aclEntries: { some: { subjectType: 'ALL' as const } },
           },
           // All published documents for known roles
           ...(['viewer', 'editor', 'approver'].some((r) => roles.includes(r))
-            ? [{ status: 'PUBLISHED' }]
+            ? [{ status: 'PUBLISHED' as const }]
             : []),
         ],
       },

@@ -43,4 +43,17 @@ export class AuditProxyController {
     });
     return response.data;
   }
+
+  @Get('verify-chain')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Proxy -> audit-service GET /audit/verify-chain' })
+  async verifyChain(@Req() req: any, @Query() query: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.AUDIT_SERVICE_URL}/audit/verify-chain`,
+      params: query,
+    });
+    return response.data;
+  }
 }

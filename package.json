@@ -8,6 +8,7 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:e2e": "node scripts/e2e-check.mjs",
+    "start:sequential": "node scripts/start-sequential.mjs",
     "format": "prettier -w ."
   },
   "devDependencies": {
