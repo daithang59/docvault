@@ -59,12 +59,12 @@ export default function NewDocumentPage() {
       roles={['editor', 'admin']}
       fallback={<div className="text-center py-16 text-[#64748B]">You do not have permission to create documents.</div>}
     >
-      <PageHeader
-        title="New Document"
-        subtitle="Create a new document entry and optionally upload the initial file."
-      />
-      <div className="max-w-2xl">
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 space-y-6">
+      <div className="max-w-2xl mx-auto">
+        <PageHeader
+          title="New Document"
+          subtitle="Create a new document entry and optionally upload the initial file."
+        />
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-6 space-y-6">
           <DocumentForm
             submitLabel="Save Draft"
             onSubmit={handleSubmit}
