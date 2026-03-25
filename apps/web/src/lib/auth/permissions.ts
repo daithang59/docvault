@@ -108,7 +108,7 @@ export function canReadAcl(session: Session | null): boolean {
 }
 
 export function canViewAudit(session: Session | null): boolean {
-  return hasRole(session, 'compliance_officer');
+  return hasAnyRole(session, ['compliance_officer', 'admin']);
 }
 
 export function canViewApprovals(session: Session | null): boolean {
