@@ -1,29 +1,41 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useDocuments } from '@/lib/hooks/use-documents';
+import { useApprovalQueue } from '@/features/approvals/approvals.hooks';
 import { useAuth } from '@/lib/auth/auth-context';
 import { PageHeader } from '@/components/common/page-header';
 import { ApprovalsTable } from '@/components/common/approvals/approvals-table';
 import { ApprovalReviewDrawer } from '@/components/common/approvals/approval-review-drawer';
+import { TablePagination } from '@/components/data-table/table-pagination';
 import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { DocumentListItem } from '@/types/document';
 import { canViewApprovals } from '@/lib/auth/guards';
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 
 export default function ApprovalsPage() {
   const { session } = useAuth();
-  const { data: docs, isLoading, isError, refetch } = useDocuments();
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
+
+  const { data: docs, isLoading, isError, refetch } = useApprovalQueue();
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
 
   // Check access
   const hasAccess = canViewApprovals(session);
 
   const pendingDocs = useMemo(
-    () => (docs?.data ?? []).filter((d: DocumentListItem) => d.status === 'PENDING'),
+    () => docs?.data ?? [],
     [docs]
   );
+
+  const total = docs?.total ?? pendingDocs.length;
+  const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return pendingDocs.slice(start, start + pageSize);
+  }, [pendingDocs, page, pageSize]);
 
   if (!hasAccess) {
     return (
@@ -57,10 +69,20 @@ export default function ApprovalsPage() {
           icon="list"
         />
       ) : (
-        <ApprovalsTable
-          data={pendingDocs}
-          onReview={(doc) => setSelectedDoc(doc)}
-        />
+        <>
+          <ApprovalsTable
+            data={paginated}
+            onReview={(doc) => setSelectedDoc(doc)}
+          />
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={total}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          />
+        </>
       )}
 
       <ApprovalReviewDrawer
