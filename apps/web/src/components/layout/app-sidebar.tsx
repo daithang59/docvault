@@ -119,7 +119,7 @@ export function AppSidebar() {
   return (
     <>
       {/* Desktop sidebar — glassmorphism dark */}
-      <aside className="hidden lg:flex flex-col w-[248px] h-screen sticky top-0 shrink-0 border-r border-white/5"
+      <aside className="hidden lg:flex flex-col w-[248px] h-[100dvh] sticky top-0 shrink-0 border-r border-white/5"
         style={{
           background: 'linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,1) 100%)',
           backdropFilter: 'blur(20px)',
@@ -164,7 +164,7 @@ export function AppSidebar() {
             onClick={() => setMobileOpen(false)}
           />
           <aside
-            className="relative flex flex-col w-[280px] h-full z-10 shrink-0 border-r border-white/5"
+            className="relative flex flex-col w-[280px] h-[100dvh] z-10 shrink-0 border-r border-white/5"
             style={{
               background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,1) 100%)',
               backdropFilter: 'blur(20px)',

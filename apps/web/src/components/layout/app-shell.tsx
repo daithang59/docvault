@@ -9,12 +9,11 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="flex min-h-screen overflow-hidden bg-slate-50/50">
+    <div className="flex h-[100dvh] overflow-hidden bg-slate-50/50">
       <AppSidebar />
-      <div className="flex flex-col flex-1 min-w-0 overflow-hidden">
+      <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
         <AppTopbar />
-        <main className="flex-1 overflow-y-auto">
-          {/* Subtle gradient fade at top of content */}
+        <main className="flex-1 overflow-y-auto min-h-0">
           <div className="max-w-7xl mx-auto px-6 py-6">
             {children}
           </div>
