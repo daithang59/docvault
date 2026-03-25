@@ -61,21 +61,21 @@ export default function EditDocumentPage({ params }: Props) {
 
   return (
     <div>
-      <Link
-        href={ROUTES.DOCUMENT_DETAIL(id)}
-        className="inline-flex items-center gap-1.5 text-sm text-[#64748B] hover:text-[#1E293B] transition mb-4"
-      >
-        <ArrowLeft className="h-4 w-4" />
-        Back to document
-      </Link>
+      <div className="max-w-2xl mx-auto">
+        <Link
+          href={ROUTES.DOCUMENT_DETAIL(id)}
+          className="inline-flex items-center gap-1.5 text-sm text-[#64748B] hover:text-[#1E293B] transition mb-4"
+        >
+          <ArrowLeft className="h-4 w-4" />
+          Back to document
+        </Link>
 
-      <PageHeader
-        title="Edit Document"
-        subtitle="Update the metadata for this document."
-      />
+        <PageHeader
+          title="Edit Document"
+          subtitle="Update the metadata for this document."
+        />
 
-      <div className="max-w-2xl">
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6">
+        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-6">
           <DocumentForm
             defaultValues={{
               title: doc.title,
