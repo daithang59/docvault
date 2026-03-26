@@ -67,12 +67,33 @@
   /* Classification */
   --class-public-bg: #F0FDF4;
   --class-public-text: #166534;
+  --class-public-border: #BBF7D0;
   --class-internal-bg: #EFF6FF;
   --class-internal-text: #1D4ED8;
+  --class-internal-border: #BFDBFE;
   --class-confidential-bg: #FFFBEB;
   --class-confidential-text: #92400E;
+  --class-confidential-border: #FDE68A;
   --class-secret-bg: #FEF2F2;
   --class-secret-text: #B91C1C;
+  --class-secret-border: #FECACA;
+
+  /* Role badges */
+  --role-viewer-bg: #F8FAFC;
+  --role-viewer-text: #64748B;
+  --role-viewer-border: #E2E8F0;
+  --role-editor-bg: #EFF6FF;
+  --role-editor-text: #3B82F6;
+  --role-editor-border: #BFDBFE;
+  --role-approver-bg: #F5F3FF;
+  --role-approver-text: #7C3AED;
+  --role-approver-border: #DDD6FE;
+  --role-compliance_officer-bg: #FFF1F2;
+  --role-compliance_officer-text: #E11D48;
+  --role-compliance_officer-border: #FECDD3;
+  --role-admin-bg: #0F172A;
+  --role-admin-text: #F8FAFC;
+  --role-admin-border: #334155;
 
   /* Semantic */
   --color-success: #16A34A;
@@ -148,6 +169,23 @@
   --stat-published-bg: #DCFCE7;
   --stat-published-text: #166534;
 
+  /* ── Login page surfaces ─────────────────────────────────────────────────── */
+  --login-page-bg: #F8FAFC;
+  --login-card-bg: rgba(255, 255, 255, 0.95);
+  --login-card-border: rgba(226, 232, 240, 0.8);
+  --login-card-shadow: 0 25px 50px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.04);
+  --login-divider: #E2E8F0;
+  --login-divider-label-bg: #FFFFFF;
+  --login-error-bg: #FEF2F2;
+  --login-error-border: #FECACA;
+  --login-error-text: #DC2626;
+  --login-heading: #1E293B;
+  --login-sub: #64748B;
+  --login-hint: #94A3B8;
+  --login-demo-user: #475569;
+  --login-demo-sep: #CBD5E1;
+  --login-demo-pwd: #94A3B8;
+
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
@@ -217,6 +255,54 @@
   --state-error-text: #FCA5A5;
   --destructive-hover-bg: rgba(127, 29, 29, 0.35);
 
+  /* ── Status badges ──────────────────────────────────────────────────────── */
+  --status-draft-bg: rgba(148, 163, 184, 0.15);
+  --status-draft-text: #94A3B8;
+  --status-draft-border: rgba(148, 163, 184, 0.25);
+
+  --status-pending-bg: rgba(251, 191, 36, 0.15);
+  --status-pending-text: #FCD34D;
+  --status-pending-border: rgba(251, 191, 36, 0.3);
+
+  --status-published-bg: rgba(52, 211, 153, 0.15);
+  --status-published-text: #34D399;
+  --status-published-border: rgba(52, 211, 153, 0.3);
+
+  --status-archived-bg: rgba(107, 114, 128, 0.15);
+  --status-archived-text: #9CA3AF;
+  --status-archived-border: rgba(107, 114, 128, 0.25);
+
+  /* ── Classification badges ──────────────────────────────────────────────── */
+  --class-public-bg: rgba(34, 197, 94, 0.12);
+  --class-public-text: #4ADE80;
+  --class-public-border: rgba(34, 197, 94, 0.25);
+  --class-internal-bg: rgba(59, 130, 246, 0.12);
+  --class-internal-text: #60A5FA;
+  --class-internal-border: rgba(59, 130, 246, 0.25);
+  --class-confidential-bg: rgba(245, 158, 11, 0.12);
+  --class-confidential-text: #FBBF24;
+  --class-confidential-border: rgba(245, 158, 11, 0.25);
+  --class-secret-bg: rgba(239, 68, 68, 0.12);
+  --class-secret-text: #FCA5A5;
+  --class-secret-border: rgba(239, 68, 68, 0.25);
+
+  /* ── Role badges ────────────────────────────────────────────────────────── */
+  --role-viewer-bg: rgba(100, 116, 139, 0.15);
+  --role-viewer-text: #94A3B8;
+  --role-viewer-border: rgba(100, 116, 139, 0.25);
+  --role-editor-bg: rgba(59, 130, 246, 0.15);
+  --role-editor-text: #60A5FA;
+  --role-editor-border: rgba(59, 130, 246, 0.3);
+  --role-approver-bg: rgba(124, 58, 237, 0.15);
+  --role-approver-text: #A78BFA;
+  --role-approver-border: rgba(124, 58, 237, 0.3);
+  --role-compliance_officer-bg: rgba(225, 29, 72, 0.15);
+  --role-compliance_officer-text: #FDA4AF;
+  --role-compliance_officer-border: rgba(225, 29, 72, 0.25);
+  --role-admin-bg: rgba(96, 165, 250, 0.18);
+  --role-admin-text: #F1F5F9;
+  --role-admin-border: rgba(96, 165, 250, 0.35);
+
   /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
   --skeleton-from: #1E293B;
   --skeleton-via: #334155;
@@ -231,6 +317,23 @@
   --stat-pending-text: #FCD34D;
   --stat-published-bg: rgba(52, 211, 153, 0.15);
   --stat-published-text: #34D399;
+
+  /* ── Login page surfaces ─────────────────────────────────────────────────── */
+  --login-page-bg: #0B1220;
+  --login-card-bg: rgba(17, 24, 39, 0.95);
+  --login-card-border: rgba(51, 65, 85, 0.6);
+  --login-card-shadow: 0 25px 50px rgba(0,0,0,0.4), 0 8px 20px rgba(0,0,0,0.25);
+  --login-divider: #334155;
+  --login-divider-label-bg: #111827;
+  --login-error-bg: rgba(127, 29, 29, 0.4);
+  --login-error-border: rgba(185, 28, 28, 0.5);
+  --login-error-text: #FCA5A5;
+  --login-heading: #F1F5F9;
+  --login-sub: #94A3B8;
+  --login-hint: #64748B;
+  --login-demo-user: #CBD5E1;
+  --login-demo-sep: #475569;
+  --login-demo-pwd: #64748B;
 }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */

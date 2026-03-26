@@ -19,10 +19,10 @@ export function DocumentVersionsCard({ versions, onDownload, canDownload }: Docu
   );
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#F1F5F9]">
-        <h3 className="text-sm font-semibold text-[#0F172A]">Version History</h3>
-        <p className="text-xs text-[#94A3B8] mt-0.5">{versions.length} version{versions.length !== 1 ? 's' : ''}</p>
+    <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+      <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>Version History</h3>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{versions.length} version{versions.length !== 1 ? 's' : ''}</p>
       </div>
 
       {sorted.length === 0 ? (
@@ -33,20 +33,26 @@ export function DocumentVersionsCard({ versions, onDownload, canDownload }: Docu
           className="py-8"
         />
       ) : (
-        <div className="divide-y divide-[#F8FAFC]">
+        <div className="divide-y" style={{ borderColor: 'var(--border-soft)' }}>
           {sorted.map((v) => (
-            <div key={v.id} className="flex items-start gap-3 px-5 py-4 hover:bg-[#F8FAFC] transition-colors">
-              <div className="h-9 w-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center shrink-0 mt-0.5">
-                <FileText className="h-4 w-4 text-[#2563EB]" />
+            <div key={v.id} className="flex items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-card-hover)]">
+              <div
+                className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                style={{ background: 'var(--stat-total-bg)' }}
+              >
+                <FileText className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
               </div>
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-0.5">
-                  <span className="text-xs font-medium text-white bg-[#2563EB] px-1.5 py-0.5 rounded">
+                  <span
+                    className="text-xs font-medium text-white px-1.5 py-0.5 rounded"
+                    style={{ background: 'var(--color-primary)' }}
+                  >
                     v{v.versionNumber ?? v.version ?? 1}
                   </span>
-                  <span className="text-sm font-medium text-[#1E293B] truncate">{v.filename}</span>
+                  <span className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{v.filename}</span>
                 </div>
-                <div className="flex flex-wrap gap-3 text-xs text-[#94A3B8]">
+                <div className="flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-faint)' }}>
                   {(v.fileSize ?? v.size) != null && (
                     <span>{formatBytes((v.fileSize ?? v.size)!)}</span>
                   )}
@@ -62,7 +68,8 @@ export function DocumentVersionsCard({ versions, onDownload, canDownload }: Docu
               {canDownload && onDownload && (
                 <button
                   onClick={() => onDownload()}
-                  className="shrink-0 p-1.5 rounded-lg text-[#94A3B8] hover:text-[#2563EB] hover:bg-[#EFF6FF] transition-colors"
+                  className="shrink-0 p-1.5 rounded-lg transition-colors"
+                  style={{ color: 'var(--text-faint)' }}
                   title="Download this version"
                 >
                   <Download className="h-4 w-4" />

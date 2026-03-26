@@ -36,8 +36,8 @@ export default function EditDocumentPage({ params }: Props) {
   if (!canEdit) {
     return (
       <div className="py-16 text-center">
-        <p className="text-[#64748B]">You do not have permission to edit this document.</p>
-        <Link href={ROUTES.DOCUMENT_DETAIL(id)} className="text-[#2563EB] text-sm mt-2 inline-block hover:underline">
+        <p className="text-[var(--text-muted)]">You do not have permission to edit this document.</p>
+        <Link href={ROUTES.DOCUMENT_DETAIL(id)} className="mt-2 inline-block text-sm text-[var(--color-primary)] hover:underline">
           Back to document
         </Link>
       </div>
@@ -61,10 +61,10 @@ export default function EditDocumentPage({ params }: Props) {
 
   return (
     <div>
-      <div className="max-w-2xl mx-auto">
+      <div className="mx-auto max-w-2xl">
         <Link
           href={ROUTES.DOCUMENT_DETAIL(id)}
-          className="inline-flex items-center gap-1.5 text-sm text-[#64748B] hover:text-[#1E293B] transition mb-4"
+          className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-main)]"
         >
           <ArrowLeft className="h-4 w-4" />
           Back to document
@@ -75,7 +75,7 @@ export default function EditDocumentPage({ params }: Props) {
           subtitle="Update the metadata for this document."
         />
 
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-6">
+        <div className="rounded-2xl border bg-[var(--bg-card)] p-4 sm:p-6" style={{ borderColor: 'var(--border-soft)' }}>
           <DocumentForm
             defaultValues={{
               title: doc.title,
@@ -89,7 +89,8 @@ export default function EditDocumentPage({ params }: Props) {
           >
             <Link
               href={ROUTES.DOCUMENT_DETAIL(id)}
-              className="px-5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC] transition"
+              className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
+              style={{ borderColor: 'var(--border-strong)' }}
             >
               Cancel
             </Link>
