@@ -4,20 +4,7 @@ import { loadSession } from './session';
 import { parseJwt, extractRoles, extractUsername, extractUserId } from './token';
 import type { Session } from '@/types/auth';
 import type { UserInfo } from '@/features/auth/auth.types';
-import { buildUserInfoFromTokenPayload } from './token';
-
 const REFRESH_THRESHOLD_SECONDS = 60; // Refresh if token expires in < 60s
-
-function isTokenExpired(token: string): boolean {
-  try {
-    const payload = parseJwt(token);
-    if (!payload?.exp) return true;
-    // exp is Unix timestamp in seconds
-    return payload.exp * 1000 <= Date.now();
-  } catch {
-    return true;
-  }
-}
 
 function tokenExpiresSoon(token: string): boolean {
   try {
