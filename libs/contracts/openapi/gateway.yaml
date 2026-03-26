@@ -5,15 +5,23 @@ info:
     Unified API gateway for DocVault — secure document management system.
 
     ## Authentication
-    All endpoints require a Bearer JWT token issued by Keycloak.
-    Include the token in the `Authorization` header: `Bearer <token>`
+
+    **Development (localhost):** After signing in via `/auth/login`, the gateway sets an
+    `dv_access_token` cookie. Subsequent API calls automatically include this cookie.
+
+    **Production:** Pass the Keycloak JWT in the `Authorization` header:
+    `Authorization: Bearer <token>`
+
+    Both methods are accepted on all protected endpoints.
 
     ## Roles
-    - `viewer` — read published documents
-    - `editor` — create, upload, submit documents
-    - `approver` — approve/reject pending documents
-    - `compliance_officer` — read audit logs and document metadata
-    - `admin` — full access
+    | Role | Permissions |
+    |------|-------------|
+    | `viewer` | Read published documents, download files |
+    | `editor` | Create, upload, submit, archive documents |
+    | `approver` | Approve/reject pending documents |
+    | `compliance_officer` | Read audit logs and metadata (cannot download files) |
+    | `admin` | Full access |
 
     ## Document Lifecycle
     ```
@@ -22,7 +30,7 @@ info:
 
     ## Compliance Officer Restriction
     Compliance officers (`compliance_officer`) are **never allowed** to download files,
-    regardless of ACL configuration.
+    regardless of ACL configuration — enforced by policy.service.ts.
   version: 0.1.0
 servers:
   - url: http://localhost:3000
@@ -32,6 +40,7 @@ servers:
 
 security:
   - bearerAuth: []
+  - cookieAuth: []
 
 components:
   securitySchemes:
@@ -39,7 +48,12 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Keycloak-issued RS256 JWT token
+      description: Keycloak-issued RS256 JWT token passed as `Authorization: Bearer <token>`
+    cookieAuth:
+      type: apiKey
+      in: cookie
+      name: dv_access_token
+      description: JWT issued by the gateway after Keycloak OIDC login — set automatically by the frontend
 
   schemas:
     # ─── Common ───────────────────────────────────────────────────────────────
@@ -258,6 +272,58 @@ components:
 # ─── Paths ───────────────────────────────────────────────────────────────────
 paths:
 
+  # ─── Auth ──────────────────────────────────────────────────────────────────
+  /auth/login:
+    get:
+      summary: Initiate Keycloak OIDC login
+      operationId: authLogin
+      description: |
+        Redirects the browser to the Keycloak login page. After successful authentication,
+        Keycloak redirects back to `/auth/callback` with an authorization code.
+      security: []
+      responses:
+        '302':
+          description: Redirect to Keycloak login page
+
+  /auth/callback:
+    get:
+      summary: Keycloak OIDC callback
+      operationId: authCallback
+      description: |
+        Receives the authorization code from Keycloak, exchanges it for tokens,
+        and sets session cookies (`dv_access_token`, `dv_refresh_token`, `dv_user`)
+        on the gateway origin.
+      security: []
+      parameters:
+        - in: query
+          name: code
+          schema:
+            type: string
+          description: Authorization code from Keycloak
+        - in: query
+          name: state
+          schema:
+            type: string
+          description: CSRF state parameter
+        - in: query
+          name: error
+          schema:
+            type: string
+          description: Error from Keycloak (e.g., access_denied)
+      responses:
+        '302':
+          description: Redirect to frontend with `?auth=ok` on success, or `?error=<reason>` on failure
+
+  /auth/logout:
+    post:
+      summary: Logout — clear session and redirect to Keycloak
+      operationId: authLogout
+      description: Clears session cookies and redirects to Keycloak to invalidate the SSO session.
+      security: []
+      responses:
+        '302':
+          description: Redirect to Keycloak logout then back to frontend login page
+
   # ─── Health ────────────────────────────────────────────────────────────────
   /health:
     get:
@@ -280,6 +346,7 @@ paths:
       operationId: getCurrentUser
       security:
         - bearerAuth: []
+        - cookieAuth: []
       responses:
         '200':
           description: Current user info
@@ -301,6 +368,7 @@ paths:
       operationId: listDocuments
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       responses:
         '200':
@@ -327,6 +395,7 @@ paths:
       operationId: createDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       requestBody:
         required: true
@@ -352,6 +421,7 @@ paths:
       operationId: getDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -372,6 +442,7 @@ paths:
       operationId: updateDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -399,6 +470,7 @@ paths:
       operationId: createVersion
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -426,6 +498,7 @@ paths:
       operationId: updateStatus
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -526,6 +599,7 @@ paths:
       operationId: getWorkflowHistory
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -546,6 +620,7 @@ paths:
       operationId: uploadDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Documents]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -579,6 +654,7 @@ paths:
       operationId: presignDownload
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Downloads]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -605,6 +681,7 @@ paths:
       operationId: streamVersion
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Downloads]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -633,6 +710,7 @@ paths:
       operationId: submitDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -650,6 +728,7 @@ paths:
       operationId: approveDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -667,6 +746,7 @@ paths:
       operationId: rejectDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -689,6 +769,7 @@ paths:
       operationId: archiveDocument
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Workflow]
       parameters:
         - $ref: '#/components/parameters/docId'
@@ -707,6 +788,7 @@ paths:
       operationId: createAuditEvent
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Audit]
       requestBody:
         required: true
@@ -743,6 +825,7 @@ paths:
       operationId: queryAudit
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Audit]
       parameters:
         - in: query
@@ -789,6 +872,7 @@ paths:
       operationId: verifyChain
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Audit]
       parameters:
         - in: query
@@ -817,6 +901,7 @@ paths:
       operationId: sendNotification
       security:
         - bearerAuth: []
+        - cookieAuth: []
       tags: [Notifications]
       requestBody:
         required: true

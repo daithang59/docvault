@@ -158,7 +158,33 @@ async function bootstrap() {
   const config = new DocumentBuilder()
     .setTitle('DocVault Gateway')
     .setVersion('0.1.0')
-    .addBearerAuth()
+    .setDescription(
+      'API Gateway cho hệ thống DocVault.\n\n' +
+      '## Authentication\n\n' +
+      '**Development (localhost):** Sử dụng **Cookie Auth** — JWT được set qua cookie `dv_access_token` ' +
+      'sau khi đăng nhập qua `/api/auth/login`.\n\n' +
+      '**Production:** Sử dụng **Bearer Token** — JWT từ Keycloak, gửi kèm header:\n' +
+      '`Authorization: Bearer <token>`\n\n' +
+      '## Roles\n\n' +
+      '| Role | Mô tả |\n' +
+      '|------|--------|\n' +
+      '| `viewer` | Xem danh sách, tải file đã xuất bản |\n' +
+      '| `editor` | Tạo, upload, submit, archive tài liệu |\n' +
+      '| `approver` | Duyệt / từ chối tài liệu |\n' +
+      '| `compliance_officer` | Xem audit log |\n' +
+      '| `admin` | Toàn quyền |\n\n' +
+      '## Document Lifecycle\n\n' +
+      '`DRAFT → PENDING → PUBLISHED → ARCHIVED`',
+    )
+    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
+    .addCookieAuth('dv_access_token', { type: 'apiKey', in: 'cookie', name: 'dv_access_token' }, 'cookie')
+    .addTag('auth', 'Keycloak OIDC authentication endpoints (development SSO flow)')
+    .addTag('app', 'Health check and session info')
+    .addTag('metadata-proxy', 'Proxy to metadata-service: documents, ACL, metadata')
+    .addTag('documents-proxy', 'Proxy to document-service: upload, download, presign URLs')
+    .addTag('workflow-proxy', 'Proxy to workflow-service: submit, approve, reject, archive')
+    .addTag('audit-proxy', 'Proxy to audit-service: audit events and chain verification')
+    .addTag('notify-proxy', 'Proxy to notification-service: notifications')
     .build();
 
   const document = SwaggerModule.createDocument(app, config);

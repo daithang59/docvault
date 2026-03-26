@@ -70,7 +70,8 @@
 
       "attributes": {
         "access.token.lifespan": "900"
-      }
+      },
+      "fullScopeAllowed": true
     }
   ],
 

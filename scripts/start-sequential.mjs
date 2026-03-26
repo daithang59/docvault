@@ -1,5 +1,63 @@
 import process from 'node:process';
 import { spawn } from 'node:child_process';
+import { Writable } from 'node:stream';
+
+// Basic ANSI 16-color codes — works reliably in VS Code integrated terminal
+const COLORS = {
+  reset:   '\x1b[0m',
+  bold:    '\x1b[1m',
+  dim:     '\x1b[2m',
+  red:     '\x1b[31m',
+  green:   '\x1b[32m',
+  yellow:  '\x1b[33m',
+  blue:    '\x1b[34m',
+  magenta: '\x1b[35m',
+  cyan:    '\x1b[36m',
+  white:   '\x1b[37m',
+};
+
+// Each service gets a unique color pair: [stdout prefix, stderr prefix]
+// Order must match SERVICES array order.
+const SERVICE_COLORS = [
+  [COLORS.cyan,    COLORS.cyan],    // metadata-service     — cyan
+  [COLORS.green,   COLORS.green],  // document-service      — green
+  [COLORS.yellow,  COLORS.yellow], // workflow-service      — yellow
+  [COLORS.magenta, COLORS.magenta],// notification-service  — magenta
+  [COLORS.blue,    COLORS.blue],   // audit-service         — blue
+  [COLORS.red,     COLORS.red],    // gateway               — red
+];
+
+// Always enable ANSI (prefix color is applied by the script, not the service output)
+const USE_ANSI = true;
+
+/**
+ * Creates a transform stream that prepends a prefix to every line.
+ */
+function createPrefixTransformStream(prefix, dest) {
+  let carry = ''; // hold partial line data between chunks
+
+  const transform = new Writable({
+    write(chunk, encoding, callback) {
+      const text = carry + chunk.toString();
+      const lines = text.split('\n');
+      carry = lines.pop() ?? ''; // incomplete last line, save for next chunk
+
+      for (const line of lines) {
+        if (line.length === 0) continue;
+        dest.write(`${prefix}${line}\n`);
+      }
+      callback();
+    },
+    final(callback) {
+      if (carry.length > 0) {
+        dest.write(`${prefix}${carry}\n`);
+      }
+      callback();
+    },
+  });
+
+  return transform;
+}
 
 const SERVICES = [
   {
@@ -126,18 +184,35 @@ async function waitForHealth(healthUrl, serviceName) {
   throw new Error(`Timed out waiting for ${serviceName} health endpoint: ${healthUrl}`);
 }
 
-function startService(service) {
+function startService(service, colorIdx) {
   log(`Starting ${service.name} on :${service.port}...`);
+
+  const [stdoutColor, stderrColor] = SERVICE_COLORS[colorIdx] ?? [COLORS.white, COLORS.white];
+  const label = service.name.padEnd(22, ' ');
+
+  // stdout transform (dim variant — add bold to brighten)
+  const stdoutPrefix = USE_ANSI ? `${stdoutColor}[${label}] ${COLORS.reset}` : `[${service.name}] `;
+  const stdoutTransform = createPrefixTransformStream(stdoutPrefix, process.stdout);
+
+  // stderr transform
+  const stderrPrefix = USE_ANSI
+    ? `${stderrColor}[${label}] ${COLORS.reset}`
+    : `[${service.name}] `;
+  const stderrTransform = createPrefixTransformStream(stderrPrefix, process.stderr);
 
   const child = spawn(
     pnpmCommand(),
     ['--filter', service.name, 'start:dev'],
     {
       env: process.env,
-      stdio: 'inherit',
+      stdio: ['ignore', 'pipe', 'pipe'],
       shell: shouldUseShell(),
     },
   );
+
+  // Wire up prefixed output
+  child.stdout?.on('data', (chunk) => stdoutTransform.write(chunk));
+  child.stderr?.on('data', (chunk) => stderrTransform.write(chunk));
 
   child.on('error', (error) => {
     if (!shuttingDown) {
@@ -209,14 +284,14 @@ process.on('SIGTERM', () => {
 async function main() {
   log('Boot sequence started. Make sure Docker infra is already healthy first.');
 
-  for (const service of SERVICES) {
+  for (const [idx, service] of SERVICES.entries()) {
     if (service.beforeStart?.length) {
       for (const step of service.beforeStart) {
         await runPnpmStep(step);
       }
     }
 
-    startService(service);
+    startService(service, idx);
     await waitForHealth(service.healthUrl, service.name);
     log(`${service.name} is healthy at ${service.healthUrl}`);
 
