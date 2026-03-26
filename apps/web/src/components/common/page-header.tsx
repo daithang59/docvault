@@ -13,14 +13,14 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, badge, className }: PageHeaderProps) {
   return (
-    <div className={cn('flex items-start justify-between gap-4 mb-6', className)}>
-      <div className="flex-1 min-w-0">
-        <div className="flex items-center gap-3 mb-1">
-          <h1 className="text-2xl font-semibold text-slate-800 truncate tracking-tight">{title}</h1>
+    <div className={cn('mb-6 flex items-start justify-between gap-4', className)}>
+      <div className="min-w-0 flex-1">
+        <div className="mb-1 flex items-center gap-3">
+          <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--text-strong)]">{title}</h1>
           {badge}
         </div>
         {subtitle && (
-          <p className="text-sm text-slate-500">{subtitle}</p>
+          <p className="text-sm text-[var(--text-muted)]">{subtitle}</p>
         )}
       </div>
       {actions && (

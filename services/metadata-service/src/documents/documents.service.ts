@@ -4,6 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { ClassificationLevel } from '../../generated/prisma';
 import { AuditClient } from '../audit/audit.client';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -21,7 +22,7 @@ export class DocumentsService {
   ) {}
 
   /**
-   * List documents with row-level ACL filtering.
+   * List documents with row-level ACL + classification filtering.
    *
    * The `userOrContext` parameter accepts either a ServiceUser (direct call)
    * or a RequestContext (when called via gateway proxy, where req.user is
@@ -39,11 +40,9 @@ export class DocumentsService {
     const isServiceUser = 'sub' in userOrContext;
 
     if (isServiceUser) {
-      // It's a ServiceUser
       actorId = buildActorId(userOrContext);
       roles = userOrContext.roles ?? [];
     } else {
-      // It's a RequestContext (from proxy)
       actorId = userOrContext.actorId;
       roles = userOrContext.roles ?? [];
     }
@@ -59,22 +58,52 @@ export class DocumentsService {
     return this.prisma.document.findMany({
       where: {
         OR: [
-          // Documents the user owns
+          // Documents the user owns (always visible regardless of classification)
           { ownerId: actorId },
-          // Documents where user has explicit ACL entry
+          // Documents where user has explicit ACL entry (DOWNLOAD permission)
           { aclEntries: { some: { subjectId: actorId } } },
           // Documents where user's role has ACL entry
           ...(roles.length > 0
             ? [{ aclEntries: { some: { subjectId: { in: roles } } } }]
             : []),
-          // Published documents visible to default reader roles
-          {
-            status: 'PUBLISHED' as const,
-            aclEntries: { some: { subjectType: 'ALL' as const } },
-          },
-          // All published documents for known roles
-          ...(['viewer', 'editor', 'approver'].some((r) => roles.includes(r))
-            ? [{ status: 'PUBLISHED' as const }]
+          // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
+          ...(roles.length > 0
+            ? [{ status: 'PUBLISHED' as const, classification: 'PUBLIC' as const }]
+            : []),
+          // INTERNAL: viewer+ sees PUBLISHED + INTERNAL
+          ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
+            roles.includes(r),
+          )
+            ? [
+                {
+                  status: 'PUBLISHED' as const,
+                  classification: 'INTERNAL' as const,
+                },
+              ]
+            : []),
+          // CONFIDENTIAL: editor+ sees PUBLISHED + CONFIDENTIAL (owner or ACL)
+          ...(['editor', 'approver', 'admin'].some((r) =>
+            roles.includes(r),
+          )
+            ? [
+                {
+                  status: 'PUBLISHED' as const,
+                  classification: 'CONFIDENTIAL' as const,
+                },
+                { ownerId: actorId },
+                { aclEntries: { some: { subjectId: actorId } } },
+              ]
+            : []),
+          // SECRET: approver+ sees PUBLISHED + SECRET (owner or ACL)
+          ...(['approver', 'admin'].some((r) => roles.includes(r))
+            ? [
+                {
+                  status: 'PUBLISHED' as const,
+                  classification: 'SECRET' as const,
+                },
+                { ownerId: actorId },
+                { aclEntries: { some: { subjectId: actorId } } },
+              ]
             : []),
         ],
       },

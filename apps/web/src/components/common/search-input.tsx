@@ -22,7 +22,6 @@ export function SearchInput({
   const [localValue, setLocalValue] = useState(value);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync external value changes
   useEffect(() => {
     setLocalValue(value);
   }, [value]);
@@ -46,7 +45,7 @@ export function SearchInput({
     <div className={cn('relative flex items-center', className)}>
       <Search
         size={16}
-        className="absolute left-3 text-slate-400 pointer-events-none"
+        className="absolute left-3 text-[var(--text-muted)] pointer-events-none"
       />
       <input
         type="text"
@@ -54,9 +53,10 @@ export function SearchInput({
         onChange={handleChange}
         placeholder={placeholder}
         className={cn(
-          'w-full rounded-xl border border-slate-200/80 bg-white/80 py-2 pl-9 pr-8',
-          'text-sm text-slate-800 placeholder:text-slate-400',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400',
+          'w-full rounded-xl border py-2 pl-9 pr-8 text-sm',
+          'bg-[var(--input-bg)] text-[var(--input-text)] placeholder:text-[var(--input-placeholder)]',
+          'border-[var(--input-border)]',
+          'focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]',
           'transition-all duration-200',
         )}
         style={{ backdropFilter: 'blur(8px)' }}
@@ -64,7 +64,7 @@ export function SearchInput({
       {localValue && (
         <button
           onClick={handleClear}
-          className="absolute right-2.5 text-slate-400 hover:text-slate-600 transition-all active:scale-90 p-1 rounded-lg hover:bg-slate-100"
+          className="absolute right-2.5 flex items-center justify-center p-1 rounded-lg text-[var(--text-muted)] transition-all active:scale-90 hover:bg-[var(--bg-muted)]"
           aria-label="Clear search"
           type="button"
         >

@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service';
 import { sha256Hex } from '../storage/checksum.helper';
 import { PresignDownloadDto } from './dto/presign-download.dto';
 import { verifyGrantToken } from './download-grant.util';
+import { WatermarkService } from '../watermark/watermark.service';
 
 @Injectable()
 export class DocumentsService {
@@ -23,6 +24,7 @@ export class DocumentsService {
     private readonly metadataClient: MetadataClient,
     private readonly storageService: StorageService,
     private readonly auditClient: AuditClient,
+    private readonly watermarkService: WatermarkService,
   ) {}
 
   async upload(
@@ -108,6 +110,29 @@ export class DocumentsService {
         authorization.grantToken,
         context.actorId,
       );
+
+      // SECURITY: CONFIDENTIAL/SECRET documents must go through the streaming
+      // path so the watermark can be applied. Reject presigned URL for these.
+      if (grantPayload.watermarkRequired) {
+        await this.auditClient.emitEvent(context, {
+          action: 'DOCUMENT_DOWNLOAD_URL_ISSUED',
+          resourceType: 'DOCUMENT',
+          resourceId: docId,
+          result: 'SUCCESS',
+          reason: 'Redirected to streaming endpoint due to classification',
+        });
+        return {
+          docId,
+          version: grantPayload.version,
+          filename: grantPayload.filename,
+          expiresAt: authorization.expiresAt,
+          expiresInSeconds: authorization.expiresInSeconds,
+          url: null,
+          watermarkRequired: true,
+          streamingEndpoint: `/documents/${docId}/versions/${grantPayload.version}/stream`,
+        };
+      }
+
       const url = await this.storageService.createDownloadUrl({
         objectKey: grantPayload.objectKey,
         filename: grantPayload.filename,
@@ -163,8 +188,23 @@ export class DocumentsService {
         grantPayload.objectKey,
       );
 
+      const rawBuffer = await this.readStreamToBuffer(object.Body as any);
+
+      let finalBuffer = rawBuffer;
+      if (grantPayload.watermarkRequired) {
+        finalBuffer = this.watermarkService.applyWatermark(rawBuffer, {
+          username: context.actorId,
+          timestamp: new Date().toISOString(),
+          classification: grantPayload.classification,
+        });
+      }
+
+      const auditAction = grantPayload.watermarkRequired
+        ? 'DOCUMENT_DOWNLOADED_WATERMARKED'
+        : 'DOCUMENT_DOWNLOADED';
+
       await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOADED',
+        action: auditAction,
         resourceType: 'DOCUMENT',
         resourceId: docId,
         result: 'SUCCESS',
@@ -173,7 +213,7 @@ export class DocumentsService {
       return {
         filename: grantPayload.filename,
         contentType: grantPayload.contentType,
-        stream: new StreamableFile(object.Body as any),
+        stream: new StreamableFile(finalBuffer),
       };
     } catch (error) {
       await this.auditDownloadError(docId, context, error);
@@ -192,6 +232,14 @@ export class DocumentsService {
         'Only the owner editor or admin can upload document blobs',
       );
     }
+  }
+
+  private async readStreamToBuffer(stream: any): Promise<Buffer> {
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 
   private async auditDownloadError(

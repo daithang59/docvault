@@ -24,7 +24,6 @@ const CLASSIFICATIONS: ClassificationLevel[] = ['PUBLIC', 'INTERNAL', 'CONFIDENT
 export function DocumentFilters({ filters, onChange }: DocumentFiltersProps) {
   const [search, setSearch] = useState(filters.search);
 
-  // Debounce search
   useEffect(() => {
     const timer = setTimeout(() => {
       onChange({ ...filters, search });
@@ -39,15 +38,15 @@ export function DocumentFilters({ filters, onChange }: DocumentFiltersProps) {
   const hasActiveFilters = filters.search || filters.status || filters.classification;
 
   return (
-    <div className="flex flex-wrap items-center gap-2 mb-4">
+    <div className="mb-4 flex flex-wrap items-center gap-2">
       {/* Search */}
-      <div className="relative flex-1 min-w-[200px]">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-[#94A3B8]" />
+      <div className="relative min-w-[200px] flex-1">
+        <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
         <input
           value={search}
           onChange={(e) => setSearch(e.target.value)}
           placeholder="Search documents..."
-          className="w-full pl-9 pr-3 py-2 text-sm border border-[#CBD5E1] rounded-xl bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition"
+          className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]"
         />
       </div>
 
@@ -91,7 +90,7 @@ export function DocumentFilters({ filters, onChange }: DocumentFiltersProps) {
             setSearch('');
             onChange({ search: '', status: '', classification: '', sort: 'updatedAt', sortDir: 'desc' });
           }}
-          className="flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm text-[#64748B] hover:text-[#1E293B] hover:bg-[#F1F5F9] border border-[#CBD5E1] bg-white transition"
+          className="flex items-center gap-1.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)]"
         >
           <X className="h-3.5 w-3.5" />
           Reset
@@ -118,9 +117,9 @@ function SelectFilter({
         value={value}
         onChange={(e) => onChange(e.target.value)}
         className={cn(
-          'appearance-none pl-3 pr-8 py-2 text-sm border rounded-xl bg-white outline-none transition cursor-pointer',
-          'focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]',
-          value ? 'border-[#2563EB] text-[#1D4ED8]' : 'border-[#CBD5E1] text-[#64748B]'
+          'cursor-pointer appearance-none rounded-xl border bg-[var(--input-bg)] py-2 pl-3 pr-8 text-sm outline-none transition',
+          'focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]',
+          value ? 'border-[var(--border-focus)] text-[var(--color-primary)]' : 'border-[var(--input-border)] text-[var(--text-muted)]',
         )}
       >
         <option value="">{placeholder}</option>
@@ -130,7 +129,7 @@ function SelectFilter({
           </option>
         ))}
       </select>
-      <ChevronDown className="absolute right-2.5 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-[#94A3B8] pointer-events-none" />
+      <ChevronDown className="pointer-events-none absolute right-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-[var(--text-muted)]" />
     </div>
   );
 }

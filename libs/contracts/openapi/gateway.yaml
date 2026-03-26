@@ -64,6 +64,18 @@ components:
         message: { type: string }
         error: { type: string }
 
+    # ─── Classification ───────────────────────────────────────────────────────
+    ClassificationLevel:
+      type: string
+      enum: [PUBLIC, INTERNAL, CONFIDENTIAL, SECRET]
+      description: |
+        Document security classification level.
+        - PUBLIC: Anyone authenticated can view and download
+        - INTERNAL: viewer+ role, must be PUBLISHED
+        - CONFIDENTIAL: editor+ role, PUBLISHED, owner or explicit ACL required
+        - SECRET: approver+ role, PUBLISHED, owner or explicit ACL required
+        CONFIDENTIAL and SECRET documents are watermarked on download.
+
     # ─── Documents ─────────────────────────────────────────────────────────────
     DocumentStatus:
       type: string
@@ -75,11 +87,13 @@ components:
         id: { type: string }
         title: { type: string }
         description: { type: string }
-        classification: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
         status: { $ref: '#/components/schemas/DocumentStatus' }
         currentVersion: { type: integer, nullable: true }
         ownerId: { type: string }
         tags: { type: array, items: { type: string } }
+        publishedAt: { type: string, format: date-time, nullable: true, description: Set when document is published. Used for retention. }
+        archivedAt: { type: string, format: date-time, nullable: true }
         createdAt: { type: string, format: date-time }
         updatedAt: { type: string, format: date-time }
 
@@ -195,6 +209,8 @@ components:
         contentType: { type: string }
         expiresInSeconds: { type: integer }
         expiresAt: { type: string, format: date-time }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        watermarkRequired: { type: boolean, description: If true, document must be streamed (watermark applied). Presigned URL is not available. }
 
     PresignedDownloadUrl:
       type: object
@@ -204,7 +220,9 @@ components:
         filename: { type: string }
         expiresInSeconds: { type: integer }
         expiresAt: { type: string, format: date-time }
-        url: { type: string, format: uri, description: MinIO presigned download URL }
+        url: { type: string, format: uri, nullable: true, description: MinIO presigned download URL. Null when watermarkRequired is true (use streaming endpoint instead). }
+        watermarkRequired: { type: boolean, default: false }
+        streamingEndpoint: { type: string, nullable: true, description: Path to the streaming endpoint for watermarked downloads. Present when url is null. }
 
     # ─── Audit ────────────────────────────────────────────────────────────────
     AuditEventResult:
@@ -249,6 +267,19 @@ components:
         message: { type: string, nullable: true }
 
     # ─── Notification ─────────────────────────────────────────────────────────
+    NotificationRecord:
+      type: object
+      required: [id, type, docId, actorId, createdAt, read]
+      properties:
+        id: { type: string, description: 'Unique notification ID' }
+        type: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, ARCHIVED] }
+        docId: { type: string }
+        actorId: { type: string }
+        reason: { type: string, nullable: true }
+        traceId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+
     Notification:
       type: object
       required: [type, docId, actorId]
@@ -678,6 +709,12 @@ paths:
   /documents/{docId}/versions/{version}/stream:
     get:
       summary: Stream a document version directly
+      description: |
+        Returns the document binary as a streaming response.
+
+        **Watermarking:** For documents classified as CONFIDENTIAL or SECRET,
+        a watermark containing user identity, timestamp, and classification level
+        is prepended to the file bytes before streaming.
       operationId: streamVersion
       security:
         - bearerAuth: []
@@ -692,7 +729,7 @@ paths:
             type: integer
       responses:
         '200':
-          description: Binary file stream
+          description: Binary file stream (watermarked for CONFIDENTIAL/SECRET)
           content:
             '*/*':
               schema:
@@ -896,6 +933,24 @@ paths:
 
   # ─── Notifications ─────────────────────────────────────────────────────────
   /notify:
+    get:
+      summary: List notifications for the current user
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Notifications]
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationRecord'
+        '401':
+          description: Unauthorized
     post:
       summary: Send a notification (internal — called by workflow-service)
       operationId: sendNotification
@@ -920,6 +975,26 @@ paths:
                   accepted: { type: boolean }
                   type: { type: string }
                   docId: { type: string }
+        '401':
+          description: Unauthorized
+
+  /notify/mark-read:
+    post:
+      summary: Mark all notifications as read
+      operationId: markAllNotificationsRead
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Notifications]
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
         '401':
           description: Unauthorized
 

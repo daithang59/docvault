@@ -16,9 +16,9 @@ export function RhfTextarea({ name, label, helperText, className, ...rest }: Rhf
   return (
     <div className="flex flex-col gap-1.5">
       {label && (
-        <label htmlFor={name} className="text-sm font-medium text-slate-700">
+        <label htmlFor={name} className="text-sm font-medium text-[var(--text-main)]">
           {label}
-          {rest.required && <span className="text-red-500 ml-0.5">*</span>}
+          {rest.required && <span className="text-[var(--color-destructive)] ml-0.5">*</span>}
         </label>
       )}
       <textarea
@@ -26,18 +26,19 @@ export function RhfTextarea({ name, label, helperText, className, ...rest }: Rhf
         {...register(name)}
         rows={3}
         className={cn(
-          'w-full rounded-md border border-slate-200 bg-white px-3 py-2',
-          'text-sm text-slate-900 placeholder:text-slate-400 resize-y',
-          'focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400',
-          'disabled:bg-slate-50 disabled:cursor-not-allowed',
+          'w-full rounded-xl border px-3 py-2 text-sm resize-y',
+          'bg-[var(--input-bg)] text-[var(--input-text)] placeholder:text-[var(--input-placeholder)]',
+          'border-[var(--input-border)]',
+          'focus:outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]',
+          'disabled:bg-[var(--input-disabled-bg)] disabled:cursor-not-allowed',
           'transition-colors',
-          error && 'border-red-400 focus:ring-red-500/20',
+          error && 'border-[var(--color-destructive)]/60 focus:ring-[var(--color-destructive)]/25',
           className,
         )}
         {...rest}
       />
-      {helperText && !error && <p className="text-xs text-slate-500">{helperText}</p>}
-      {error && <p className="text-xs text-red-600" role="alert">{error.message as string}</p>}
+      {helperText && !error && <p className="text-xs text-[var(--text-muted)]">{helperText}</p>}
+      {error && <p className="text-xs text-[var(--color-destructive)]" role="alert">{error.message as string}</p>}
     </div>
   );
 }

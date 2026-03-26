@@ -57,14 +57,17 @@ export default function NewDocumentPage() {
   return (
     <ProtectedAction
       roles={['editor', 'admin']}
-      fallback={<div className="text-center py-16 text-[#64748B]">You do not have permission to create documents.</div>}
+      fallback={<div className="py-16 text-center text-[var(--text-muted)]">You do not have permission to create documents.</div>}
     >
-      <div className="max-w-2xl mx-auto">
+      <div className="mx-auto max-w-2xl">
         <PageHeader
           title="New Document"
           subtitle="Create a new document entry and optionally upload the initial file."
         />
-        <div className="bg-white border border-[#E2E8F0] rounded-2xl p-4 sm:p-6 space-y-6">
+        <div
+          className="space-y-6 rounded-2xl border p-4 sm:p-6"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
+        >
           <DocumentForm
             submitLabel="Save Draft"
             onSubmit={handleSubmit}
@@ -72,8 +75,9 @@ export default function NewDocumentPage() {
           >
             <button
               type="button"
-              onClick={() => {}}
-              className="px-5 py-2.5 rounded-xl border border-[#CBD5E1] bg-white text-sm font-medium text-[#64748B] hover:bg-[#F8FAFC] transition"
+              onClick={() => router.back()}
+              className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
+              style={{ borderColor: 'var(--border-strong)' }}
               disabled={isLoading}
             >
               Cancel
@@ -81,9 +85,9 @@ export default function NewDocumentPage() {
           </DocumentForm>
 
           {/* File upload section */}
-          <div className="border-t border-[#F1F5F9] pt-5">
-            <h3 className="text-sm font-semibold text-[#0F172A] mb-1">Initial File (optional)</h3>
-            <p className="text-xs text-[#94A3B8] mb-4">
+          <div className="border-t pt-5" style={{ borderColor: 'var(--border-soft)' }}>
+            <h3 className="mb-1 text-sm font-semibold text-[var(--text-strong)]">Initial File (optional)</h3>
+            <p className="mb-4 text-xs text-[var(--text-muted)]">
               Attach a file to this document. You can also upload later from the document detail page.
             </p>
             <UploadDropzone

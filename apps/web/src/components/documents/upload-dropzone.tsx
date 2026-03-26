@@ -22,7 +22,7 @@ export function UploadDropzone({
   const [error, setError] = useState<string | null>(null);
 
   const validate = (file: File) => {
-    const maxSize = 100 * 1024 * 1024; // 100 MB
+    const maxSize = 100 * 1024 * 1024;
     if (file.size > maxSize) {
       setError('File exceeds the 100 MB limit.');
       return false;
@@ -66,17 +66,17 @@ export function UploadDropzone({
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
         className={cn(
-          'border-2 border-dashed rounded-xl p-8 text-center transition-all',
+          'rounded-xl border-2 border-dashed p-8 text-center transition-all',
           isDragging
-            ? 'border-[#2563EB] bg-[#EFF6FF]'
-            : 'border-[#CBD5E1] bg-[#F8FAFC] hover:border-[#2563EB] hover:bg-[#EFF6FF]',
-          disabled && 'opacity-50 pointer-events-none'
+            ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
+            : 'border-[var(--input-border)] bg-[var(--bg-subtle)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]',
+          disabled && 'pointer-events-none opacity-50'
         )}
       >
-        <Upload className="h-8 w-8 mx-auto mb-3 text-[#94A3B8]" />
-        <p className="text-sm font-medium text-[#1E293B] mb-1">
+        <Upload className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
+        <p className="mb-1 text-sm font-medium text-[var(--text-main)]">
           Drop file here or{' '}
-          <label className="text-[#2563EB] cursor-pointer hover:underline">
+          <label className="cursor-pointer text-[var(--color-primary)] hover:underline">
             browse
             <input
               type="file"
@@ -86,23 +86,23 @@ export function UploadDropzone({
             />
           </label>
         </p>
-        <p className="text-xs text-[#94A3B8]">Any file type, max 100 MB</p>
+        <p className="text-xs text-[var(--text-muted)]">Any file type, max 100 MB</p>
       </div>
 
       {/* Selected file preview */}
       {selectedFile && (
-        <div className="flex items-center gap-3 p-3 bg-white border border-[#E2E8F0] rounded-xl">
-          <div className="h-9 w-9 rounded-lg bg-[#EFF6FF] flex items-center justify-center shrink-0">
-            <File className="h-4 w-4 text-[#2563EB]" />
+        <div className="flex items-center gap-3 rounded-xl border p-3" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-[var(--color-primary-light)]">
+            <File className="h-4 w-4 text-[var(--color-primary)]" />
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-[#1E293B] truncate">{selectedFile.name}</p>
-            <p className="text-xs text-[#94A3B8]">{formatBytes(selectedFile.size)}</p>
+          <div className="min-w-0 flex-1">
+            <p className="truncate text-sm font-medium text-[var(--text-main)]">{selectedFile.name}</p>
+            <p className="text-xs text-[var(--text-muted)]">{formatBytes(selectedFile.size)}</p>
           </div>
           <button
             type="button"
             onClick={() => { onFileSelect(null); setError(null); }}
-            className="text-[#94A3B8] hover:text-[#1E293B] transition-colors"
+            className="text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)]"
           >
             <X className="h-4 w-4" />
           </button>
@@ -111,7 +111,7 @@ export function UploadDropzone({
 
       {/* Error */}
       {error && (
-        <div className="flex items-center gap-2 text-sm text-[#DC2626]">
+        <div className="flex items-center gap-2 text-sm text-[var(--color-destructive)]">
           <AlertCircle className="h-4 w-4 shrink-0" />
           {error}
         </div>

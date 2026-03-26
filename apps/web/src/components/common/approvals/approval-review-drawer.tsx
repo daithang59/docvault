@@ -54,47 +54,41 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
 
   return (
     <>
-      {/* Overlay */}
-      <div className="fixed inset-0 bg-black/30 z-40 backdrop-blur-sm" onClick={onClose} />
+      <div className="fixed inset-0 z-40 bg-black/30 backdrop-blur-sm" onClick={onClose} />
 
-      {/* Drawer */}
-      <div className="fixed right-0 top-0 h-full w-full max-w-md bg-white z-50 shadow-2xl flex flex-col">
-        {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-[#E2E8F0]">
-          <h2 className="text-base font-semibold text-[#0F172A]">Review Document</h2>
-          <button onClick={onClose} className="text-[#94A3B8] hover:text-[#1E293B] transition-colors">
+      <div className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col border-l" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)', boxShadow: 'var(--surface-shadow-lg)' }}>
+        <div className="flex items-center justify-between border-b px-6 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+          <h2 className="text-base font-semibold text-[var(--text-strong)]">Review Document</h2>
+          <button onClick={onClose} className="text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)]">
             <X className="h-5 w-5" />
           </button>
         </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto px-6 py-5 space-y-5">
-          {/* Meta */}
+        <div className="flex-1 space-y-5 overflow-y-auto px-6 py-5">
           <div>
-            <div className="flex flex-wrap gap-2 mb-2">
+            <div className="mb-2 flex flex-wrap gap-2">
               <StatusBadge status={doc.status} />
               <ClassificationBadge classification={(doc.classificationLevel ?? doc.classification) as import('@/types/enums').ClassificationLevel} />
             </div>
-            <h3 className="text-lg font-semibold text-[#0F172A] mb-1">{doc.title}</h3>
+            <h3 className="mb-1 text-lg font-semibold text-[var(--text-strong)]">{doc.title}</h3>
             {doc.description && (
-              <p className="text-sm text-[#64748B] leading-relaxed">{truncateEnd(doc.description, 200)}</p>
+              <p className="text-sm leading-relaxed text-[var(--text-muted)]">{truncateEnd(doc.description, 200)}</p>
             )}
           </div>
 
-          <div className="grid grid-cols-2 gap-4 bg-[#F8FAFC] rounded-xl p-4">
+          <div className="grid grid-cols-2 gap-4 rounded-xl bg-[var(--bg-subtle)] p-4">
             <InfoItem label="Owner" value={doc.ownerId.slice(0, 12) + '…'} mono />
             <InfoItem label="Version" value={`v${doc.currentVersion}`} />
             <InfoItem label="Updated" value={formatDateTime(doc.updatedAt)} />
             <InfoItem label="Created" value={formatDateTime(doc.createdAt)} />
           </div>
 
-          {/* Tags */}
           {doc.tags.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-[#64748B] mb-2 uppercase tracking-wide">Tags</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Tags</p>
               <div className="flex flex-wrap gap-1.5">
                 {doc.tags.map((tag) => (
-                  <span key={tag} className="text-xs px-2 py-0.5 bg-[#EFF6FF] text-[#1D4ED8] rounded-lg">
+                  <span key={tag} className="rounded-lg bg-[var(--color-primary-light)] px-2 py-0.5 text-xs text-[var(--color-primary)]">
                     {tag}
                   </span>
                 ))}
@@ -102,16 +96,15 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
             </div>
           )}
 
-          {/* Workflow history */}
           {history && history.length > 0 && (
             <div>
-              <p className="text-xs font-medium text-[#64748B] mb-2 uppercase tracking-wide">Recent History</p>
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-[var(--text-muted)]">Recent History</p>
               <div className="space-y-2">
                 {history.slice(0, 3).map((h) => (
                   <div key={h.id} className="flex items-center gap-2 text-xs">
-                    <span className="px-2 py-0.5 bg-[#F1F5F9] text-[#64748B] rounded font-medium">{h.action}</span>
-                    <span className="text-[#94A3B8]">{h.fromStatus} → {h.toStatus}</span>
-                    <span className="text-[#94A3B8] ml-auto">{formatDateTime(h.createdAt)}</span>
+                    <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 font-medium text-[var(--text-muted)]">{h.action}</span>
+                    <span className="text-[var(--text-faint)]">{h.fromStatus} → {h.toStatus}</span>
+                    <span className="ml-auto text-[var(--text-faint)]">{formatDateTime(h.createdAt)}</span>
                   </div>
                 ))}
               </div>
@@ -119,18 +112,17 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           )}
         </div>
 
-        {/* Actions */}
-        <div className="px-6 py-4 border-t border-[#E2E8F0] flex gap-2">
+        <div className="flex gap-2 border-t px-6 py-4" style={{ borderColor: 'var(--border-soft)' }}>
           <button
             onClick={() => setConfirmType('approve')}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white border border-[#86EFAC] text-[#166534] text-sm font-medium hover:bg-[#DCFCE7] transition"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--status-published-border)] bg-[var(--status-published-bg)] py-2.5 text-sm font-medium text-[var(--status-published-text)] transition hover:brightness-95"
           >
             <CheckCircle className="h-4 w-4" />
             Approve
           </button>
           <button
             onClick={() => setConfirmType('reject')}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white border border-[#FCA5A5] text-[#B91C1C] text-sm font-medium hover:bg-[#FEF2F2] transition"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--state-error-border)] bg-[var(--state-error-bg)] py-2.5 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95"
           >
             <XCircle className="h-4 w-4" />
             Reject
@@ -160,7 +152,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           onChange={(e) => setRejectReason(e.target.value)}
           placeholder="Reason for rejection (optional)..."
           rows={3}
-          className="w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-xl resize-none outline-none focus:border-[#2563EB] transition"
+          className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)] outline-none transition focus:border-[var(--border-focus)]"
         />
       </ConfirmDialog>
     </>
@@ -170,8 +162,8 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
 function InfoItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
   return (
     <div>
-      <p className="text-[11px] text-[#94A3B8] uppercase tracking-wide mb-0.5">{label}</p>
-      <p className={`text-sm text-[#1E293B] ${mono ? 'font-mono text-xs' : ''}`}>{value}</p>
+      <p className="mb-0.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
+      <p className={`text-[var(--text-main)] ${mono ? 'font-mono text-xs' : 'text-sm'}`}>{value}</p>
     </div>
   );
 }

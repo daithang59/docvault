@@ -33,8 +33,9 @@ export type RequestContext = {
 };
 
 /** Build the actorId string from a ServiceUser — prefer username, fall back to sub */
-export function buildActorId(user: ServiceUser): string {
-  return user.username ?? user.sub;
+export function buildActorId(user: ServiceUser | undefined): string {
+  if (!user) return 'unknown';
+  return user.username ?? user.sub ?? 'unknown';
 }
 
 /** Build a RequestContext from an Express Request */
@@ -52,7 +53,7 @@ export function buildRequestContext(req: any): RequestContext {
   return {
     traceId: req.traceId ?? req.headers['x-request-id'],
     authorization: req.headers.authorization,
-    actorId: user ? buildActorId(user) : (req.headers['x-user-id'] ?? 'anonymous'),
+    actorId: user ? buildActorId(user) : (req.headers['x-user-id'] ?? 'unknown'),
     roles: user?.roles ?? headerRoles,
     ip: req.ip,
   };
