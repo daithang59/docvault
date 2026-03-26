@@ -29,7 +29,7 @@ export default function AuditPage() {
   if (!hasAccess) {
     return (
       <div className="py-16 text-center">
-        <p className="text-[#64748B]">You do not have permission to access audit logs.</p>
+        <p className="text-[var(--text-muted)]">You do not have permission to access audit logs.</p>
       </div>
     );
   }
