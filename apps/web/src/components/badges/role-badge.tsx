@@ -3,6 +3,14 @@
 import { UserRole } from '@/types/auth';
 import { cn } from '@/lib/utils/cn';
 
+const VALID_ROLES = new Set<UserRole>([
+  'viewer',
+  'editor',
+  'approver',
+  'compliance_officer',
+  'admin',
+]);
+
 const roleStyles: Record<UserRole, { bg: string; text: string; border: string; shadow: string }> = {
   viewer: { bg: '#F8FAFC', text: '#64748B', border: '#E2E8F0', shadow: 'rgba(0,0,0,0.04)' },
   editor: { bg: '#EFF6FF', text: '#3B82F6', border: '#BFDBFE', shadow: 'rgba(59,130,246,0.12)' },
@@ -25,6 +33,7 @@ interface RoleBadgeProps {
 }
 
 export function RoleBadge({ role, className }: RoleBadgeProps) {
+  if (!VALID_ROLES.has(role)) return null;
   const style = roleStyles[role];
   return (
     <span
