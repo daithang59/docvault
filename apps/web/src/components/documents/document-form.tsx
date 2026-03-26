@@ -21,7 +21,7 @@ interface DocumentFormProps {
   onSubmit: (values: DocumentFormValues) => void | Promise<void>;
   submitLabel?: string;
   isLoading?: boolean;
-  children?: React.ReactNode; // extra action slot
+  children?: React.ReactNode;
 }
 
 const CLASSIFICATIONS: { value: ClassificationLevel; label: string }[] = [
@@ -71,38 +71,39 @@ export function DocumentForm({
     <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
       {/* Title */}
       <div>
-        <label className="block text-sm font-medium text-[#1E293B] mb-1.5">
-          Title <span className="text-[#DC2626]">*</span>
+        <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
+          Title <span className="text-[var(--color-destructive)]">*</span>
         </label>
         <input
           {...register('title')}
           placeholder="Enter document title"
           className={cn(
-            'w-full px-3.5 py-2.5 text-sm rounded-xl border bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none transition',
-            'focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB]',
-            errors.title ? 'border-[#DC2626]' : 'border-[#CBD5E1]'
+            'w-full rounded-xl border px-3.5 py-2.5 text-sm outline-none transition',
+            'bg-[var(--input-bg)] text-[var(--input-text)] placeholder:text-[var(--input-placeholder)]',
+            'focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]',
+            errors.title ? 'border-[var(--color-destructive)]' : 'border-[var(--input-border)]',
           )}
         />
         {errors.title && (
-          <p className="text-xs text-[#DC2626] mt-1">{errors.title.message}</p>
+          <p className="mt-1 text-xs text-[var(--color-destructive)]">{errors.title.message}</p>
         )}
       </div>
 
       {/* Description */}
       <div>
-        <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Description</label>
+        <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">Description</label>
         <textarea
           {...register('description')}
           rows={3}
           placeholder="Brief description of this document..."
-          className="w-full px-3.5 py-2.5 text-sm rounded-xl border border-[#CBD5E1] bg-white text-[#1E293B] placeholder:text-[#94A3B8] outline-none focus:ring-2 focus:ring-[#2563EB]/20 focus:border-[#2563EB] transition resize-none"
+          className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3.5 py-2.5 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)] transition resize-none"
         />
       </div>
 
       {/* Classification */}
       <div>
-        <label className="block text-sm font-medium text-[#1E293B] mb-1.5">
-          Classification <span className="text-[#DC2626]">*</span>
+        <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
+          Classification <span className="text-[var(--color-destructive)]">*</span>
         </label>
         <Controller
           control={control}
@@ -115,10 +116,10 @@ export function DocumentForm({
                   type="button"
                   onClick={() => field.onChange(value)}
                   className={cn(
-                    'px-3 py-2 rounded-xl text-sm font-medium border transition-all',
+                    'rounded-xl border px-3 py-2 text-sm font-medium transition-all',
                     field.value === value
-                      ? 'bg-[#2563EB] text-white border-[#2563EB]'
-                      : 'bg-white text-[#64748B] border-[#CBD5E1] hover:border-[#2563EB] hover:text-[#2563EB]'
+                      ? 'text-white border-[var(--color-primary)] bg-[var(--color-primary)]'
+                      : 'bg-[var(--input-bg)] text-[var(--text-muted)] border-[var(--input-border)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]',
                   )}
                 >
                   {label}
@@ -131,15 +132,15 @@ export function DocumentForm({
 
       {/* Tags */}
       <div>
-        <label className="block text-sm font-medium text-[#1E293B] mb-1.5">Tags</label>
-        <div className="min-h-[42px] flex flex-wrap gap-1.5 items-center px-3 py-2 border border-[#CBD5E1] rounded-xl bg-white focus-within:ring-2 focus-within:ring-[#2563EB]/20 focus-within:border-[#2563EB] transition">
+        <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">Tags</label>
+        <div className="min-h-[42px] flex flex-wrap items-center gap-1.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 transition focus-within:ring-2 focus-within:ring-[var(--focus-ring)] focus-within:border-[var(--border-focus)]">
           {tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 px-2 py-0.5 rounded-lg text-xs font-medium bg-[#EFF6FF] text-[#1D4ED8]"
+              className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-primary-light)] px-2 py-0.5 text-xs font-medium text-[var(--color-primary)]"
             >
               {tag}
-              <button type="button" onClick={() => removeTag(tag)} className="hover:text-[#DC2626]">
+              <button type="button" onClick={() => removeTag(tag)} className="hover:text-[var(--color-destructive)]">
                 <X className="h-3 w-3" />
               </button>
             </span>
@@ -148,10 +149,10 @@ export function DocumentForm({
             type="text"
             placeholder={tags.length === 0 ? 'Type and press Enter to add tags...' : ''}
             onKeyDown={addTag}
-            className="flex-1 min-w-[120px] text-sm text-[#1E293B] placeholder:text-[#94A3B8] outline-none bg-transparent"
+            className="min-w-[120px] flex-1 bg-transparent text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none"
           />
         </div>
-        <p className="text-xs text-[#94A3B8] mt-1">{tags.length}/50 tags</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">{tags.length}/50 tags</p>
       </div>
 
       {/* Actions */}
@@ -159,7 +160,7 @@ export function DocumentForm({
         <button
           type="submit"
           disabled={isLoading}
-          className="px-5 py-2.5 rounded-xl text-white text-sm font-semibold transition-all active:scale-[0.98] disabled:opacity-50 btn-primary"
+          className="btn-primary rounded-xl px-5 py-2.5 text-sm font-semibold text-white transition-all active:scale-[0.98] disabled:opacity-50"
         >
           {isLoading ? 'Saving...' : submitLabel}
         </button>
