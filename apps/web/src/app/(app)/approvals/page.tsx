@@ -22,7 +22,6 @@ export default function ApprovalsPage() {
   const { data: docs, isLoading, isError, refetch } = useApprovalQueue();
   const [selectedDoc, setSelectedDoc] = useState<DocumentListItem | null>(null);
 
-  // Check access
   const hasAccess = canViewApprovals(session);
 
   const pendingDocs = useMemo(
@@ -40,7 +39,7 @@ export default function ApprovalsPage() {
   if (!hasAccess) {
     return (
       <div className="py-16 text-center">
-        <p className="text-[#64748B]">You do not have permission to access approvals.</p>
+        <p className="text-[var(--text-muted)]">You do not have permission to access approvals.</p>
       </div>
     );
   }
@@ -55,7 +54,7 @@ export default function ApprovalsPage() {
         subtitle="Review pending submissions and publish approved documents."
         badge={
           pendingDocs.length > 0 ? (
-            <span className="text-xs font-bold text-white bg-[#92400E] px-2 py-0.5 rounded-full">
+            <span className="rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: 'var(--status-pending-text)' }}>
               {pendingDocs.length}
             </span>
           ) : null

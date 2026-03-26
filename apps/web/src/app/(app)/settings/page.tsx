@@ -15,14 +15,14 @@ export default function SettingsPage() {
       title="Thông tin hệ thống"
       description="Thông tin phiên đăng nhập và cấu hình môi trường"
     >
-      <div className="grid gap-6 max-w-2xl">
+      <div className="grid max-w-2xl gap-6">
         {/* Session info */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <User size={18} className="text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-800">Phiên đăng nhập</h2>
+        <div className="rounded-lg border bg-[var(--bg-card)]" style={{ borderColor: 'var(--border-soft)' }}>
+          <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+            <User size={18} className="text-[var(--text-muted)]" />
+            <h2 className="text-sm font-semibold text-[var(--text-strong)]">Phiên đăng nhập</h2>
           </div>
-          <div className="px-5 py-4 space-y-3 text-sm">
+          <div className="space-y-3 px-5 py-4 text-sm">
             <Row label="Username" value={user?.username ?? user?.sub ?? '—'} />
             <Row label="Subject (sub)" value={user?.sub ?? '—'} mono />
             <Row label="Loại phiên" value={user ? 'Authenticated' : 'Demo / Not logged in'} />
@@ -30,10 +30,10 @@ export default function SettingsPage() {
         </div>
 
         {/* Roles */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <Shield size={18} className="text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-800">Vai trò hiện tại</h2>
+        <div className="rounded-lg border bg-[var(--bg-card)]" style={{ borderColor: 'var(--border-soft)' }}>
+          <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+            <Shield size={18} className="text-[var(--text-muted)]" />
+            <h2 className="text-sm font-semibold text-[var(--text-strong)]">Vai trò hiện tại</h2>
           </div>
           <div className="px-5 py-4">
             {user?.roles && user.roles.length > 0 ? (
@@ -43,18 +43,18 @@ export default function SettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-slate-400">Không có role nào được gán.</p>
+              <p className="text-sm text-[var(--text-muted)]">Không có role nào được gán.</p>
             )}
           </div>
         </div>
 
         {/* Environment */}
-        <div className="rounded-lg border border-slate-200 bg-white">
-          <div className="flex items-center gap-3 px-5 py-4 border-b border-slate-100">
-            <Globe size={18} className="text-slate-500" />
-            <h2 className="text-sm font-semibold text-slate-800">Môi trường</h2>
+        <div className="rounded-lg border bg-[var(--bg-card)]" style={{ borderColor: 'var(--border-soft)' }}>
+          <div className="flex items-center gap-3 border-b px-5 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+            <Globe size={18} className="text-[var(--text-muted)]" />
+            <h2 className="text-sm font-semibold text-[var(--text-strong)]">Môi trường</h2>
           </div>
-          <div className="px-5 py-4 space-y-3 text-sm">
+          <div className="space-y-3 px-5 py-4 text-sm">
             <Row label="Ứng dụng" value={process.env.NEXT_PUBLIC_APP_NAME ?? 'DocVault'} />
             <Row
               label="API Gateway URL"
@@ -78,12 +78,10 @@ function Row({
   mono?: boolean;
 }) {
   return (
-    <div className="flex justify-between items-center gap-4">
-      <span className="text-slate-500 shrink-0">{label}</span>
+    <div className="flex items-center justify-between gap-4">
+      <span className="shrink-0 text-[var(--text-muted)]">{label}</span>
       <span
-        className={`text-right truncate max-w-[280px] text-slate-700 ${
-          mono ? 'font-mono text-xs' : ''
-        }`}
+        className={`max-w-[280px] truncate text-right text-[var(--text-main)] ${mono ? 'font-mono text-xs' : ''}`}
       >
         {value}
       </span>

@@ -13,7 +13,7 @@ export function AppLogo({ collapsed }: AppLogoProps) {
       {!collapsed && (
         <div className="flex flex-col leading-tight">
           <span className="text-sm font-bold text-white tracking-tight">DocVault</span>
-          <span className="text-[10px] text-slate-400 font-medium uppercase tracking-widest">Enterprise</span>
+          <span className="text-[10px] text-[var(--text-faint)] font-medium uppercase tracking-widest">Enterprise</span>
         </div>
       )}
     </div>
