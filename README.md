@@ -163,13 +163,44 @@ flowchart LR
 
 ## Hướng dẫn chạy dự án
 
-### Bước 1 — Cài dependencies
+### Cách nhanh — Một lệnh duy nhất
+
+```bash
+pnpm start:sequential
+```
+
+Script tự động khởi động **tất cả services theo đúng thứ tự**, polling health endpoint trước khi chuyển sang service tiếp theo:
+
+```
+metadata-service (:3001) → document-service (:3002) → workflow-service (:3003)
+  → notification-service (:3005) → audit-service (:3004) → gateway (:3000)
+```
+
+Các bước tùy chọn (Prisma deploy, audit log migration) mặc định bị bỏ qua. Bật bằng:
+
+```bash
+RUN_PRISMA_DEPLOY=1 RUN_AUDIT_MIGRATION=1 pnpm start:sequential
+```
+
+Tùy chỉnh health-check timeout:
+
+```bash
+SERVICE_HEALTH_TIMEOUT_MS=180000 pnpm start:sequential
+```
+
+> Đảm bảo Docker infra đã chạy trước (xem Bước 1 bên dưới).
+
+---
+
+### Cách chi tiết — Từng bước
+
+#### Bước 1 — Cài dependencies
 
 ```bash
 pnpm install
 ```
 
-### Bước 2 — Khởi động hạ tầng (Docker)
+#### Bước 2 — Khởi động hạ tầng (Docker)
 
 Lệnh này sẽ khởi động: **PostgreSQL**, **MinIO**, **Keycloak** (kèm seed realm & user mẫu).
 
@@ -188,7 +219,7 @@ docker compose -f infra/docker-compose.dev.yml ps
 > - MinIO Console: [http://localhost:9001](http://localhost:9001) (user: `minioadmin` / `minioadminpw`)
 > - Keycloak Admin: [http://localhost:8080](http://localhost:8080) (user: `admin` / `adminpw`)
 
-### Bước 3 — Chạy database migration
+#### Bước 3 — Chạy database migration
 
 ```bash
 # metadata-service (PostgreSQL)
@@ -198,7 +229,7 @@ pnpm --filter metadata-service prisma:deploy
 pnpm --filter audit-service prisma:deploy
 ```
 
-### Bước 4 — Khởi động các Backend Service
+#### Bước 4 — Khởi động các Backend Service
 
 Mỗi service chạy trong một terminal riêng:
 
@@ -212,7 +243,7 @@ pnpm --filter document-service start:dev
 # Terminal 3 — workflow-service (port 3003)
 pnpm --filter workflow-service start:dev
 
-# Terminal 4 — audit-service (port 4004)
+# Terminal 4 — audit-service (port 3004)
 pnpm --filter audit-service start:dev
 
 # Terminal 5 — notification-service (port 3005)
@@ -224,7 +255,7 @@ pnpm --filter gateway start:dev
 
 > **Thứ tự quan trọng:** Gateway phải khởi động **sau** khi các services khác đã sẵn sàng.
 
-### Bước 5 — Khởi động Frontend
+#### Bước 5 — Khởi động Frontend
 
 ```bash
 cd apps/web
@@ -350,10 +381,13 @@ docvault/
 │   └── keycloak/               # Realm config & seed users
 ├── scripts/
 │   ├── e2e-check.mjs           # Script kiểm tra E2E tự động
+│   ├── start-sequential.mjs    # Script khởi động tuần tự tất cả services
 │   └── demo.sh                 # Demo script
 └── docs/
     ├── demo-users.md           # Thông tin tài khoản & phân quyền
     ├── demo-flow.md            # Kịch bản demo từng bước
+    ├── ERD.md                  # Entity Relationship Diagram chi tiết
+    ├── PROJECT_STATUS.md       # Trạng thái project & known gaps
     └── verification-report.md  # Báo cáo kiểm tra tích hợp
 ```
 

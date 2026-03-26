@@ -32,6 +32,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextValue = {
     session,
     isAuthenticated: session !== null,
+    hydrated,
     login,
     logout,
     hasRole: (role: UserRole) => hasRole(session as Parameters<typeof hasRole>[0], role),
