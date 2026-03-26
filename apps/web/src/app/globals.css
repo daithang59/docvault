@@ -535,3 +535,23 @@ body {
   background: var(--color-primary-light);
   color: var(--color-primary);
 }
+
+/* ── Empty-state float animation ───────────────────────────────────────────── */
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.empty-float {
+  animation: emptyFloat 3s ease-in-out infinite;
+}
+
+/* ── Custom toast accents ──────────────────────────────────────────────────── */
+.toast-success {
+  border-left: 3px solid var(--color-success) !important;
+}
+.toast-error {
+  border-left: 3px solid var(--state-error-text) !important;
+}
+.toast-info {
+  border-left: 3px solid var(--color-primary) !important;
+}
