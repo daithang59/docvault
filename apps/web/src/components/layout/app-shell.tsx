@@ -9,7 +9,7 @@ interface AppShellProps {
 
 export function AppShell({ children }: AppShellProps) {
   return (
-    <div className="flex h-[100dvh] overflow-hidden bg-slate-50/50">
+    <div className="flex h-[100dvh] overflow-hidden bg-[var(--bg-app)] text-[var(--text-main)]">
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
         <AppTopbar />

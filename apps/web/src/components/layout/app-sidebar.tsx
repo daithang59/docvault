@@ -9,7 +9,6 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
 import { UserRole } from '@/types/auth';
 
-// Extracted outside the render function to avoid re-creation on each render
 function SidebarNav({
   pathname,
   session,
@@ -24,27 +23,27 @@ function SidebarNav({
   const avatarInitials = (session?.user.preferred_username ?? session?.user.username ?? 'U').slice(0, 2).toUpperCase();
 
   return (
-    <div className="flex flex-col h-full relative overflow-hidden">
+    <div className="relative flex h-full flex-col overflow-hidden">
       {/* Glassmorphism gradient overlay at top */}
-      <div className="absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-blue-500/10 to-transparent pointer-events-none" />
+      <div className="pointer-events-none absolute inset-x-0 top-0 h-32 bg-gradient-to-b from-[var(--color-primary)]/[0.07] to-transparent" />
 
       {/* Logo */}
-      <div className="relative flex items-center gap-3 px-6 py-5 border-b border-white/5">
+      <div className="relative flex items-center gap-3 border-b px-6 py-5" style={{ borderColor: 'var(--sidebar-border)' }}>
         {/* Logo icon with glass effect */}
-        <div className="relative flex h-9 w-9 items-center justify-center rounded-xl overflow-hidden">
+        <div className="relative flex h-9 w-9 items-center justify-center overflow-hidden rounded-xl">
           <div className="absolute inset-0 bg-gradient-to-br from-[#2563EB] to-[#4F46E5]" />
           <div className="absolute inset-0 bg-white/10" />
           <Shield className="relative h-4 w-4 text-white drop-shadow" />
         </div>
         <div>
-          <h1 className="text-sm font-bold text-white tracking-tight">DocVault</h1>
-          <p className="text-[10px] text-slate-400 uppercase tracking-widest font-medium">Document System</p>
+          <h1 className="text-sm font-bold tracking-tight text-[var(--sidebar-text-active)]">DocVault</h1>
+          <p className="text-[10px] font-medium uppercase tracking-widest text-[var(--sidebar-text)]">Document System</p>
         </div>
       </div>
 
       {/* Nav */}
-      <nav className="relative flex-1 px-3 py-4 overflow-y-auto">
-        <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-widest px-3 mb-3">
+      <nav className="relative flex-1 overflow-y-auto px-3 py-4">
+        <p className="mb-3 px-3 text-[10px] font-semibold uppercase tracking-widest text-[var(--sidebar-text)]" style={{ opacity: 0.6 }}>
           Navigation
         </p>
         {visibleItems.map((item) => {
@@ -60,17 +59,19 @@ function SidebarNav({
               onClick={onLinkClick}
               className={cn(
                 'sidebar-nav-item mb-0.5',
-                isActive && 'active'
+                isActive && 'active',
               )}
             >
-              {/* Active indicator bar */}
               {isActive && (
-                <span className="absolute left-0 top-1/2 -translate-y-1/2 h-5 w-0.5 rounded-full bg-blue-500 -ml-3" />
+                <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[var(--color-primary)]" />
               )}
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-blue-400' : 'text-slate-400')} />
+              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-[var(--color-primary)]' : 'text-[var(--sidebar-text)]')} />
               <span className="flex-1">{item.label}</span>
               {isActive && (
-                <span className="h-1.5 w-1.5 rounded-full bg-blue-400 shadow-[0_0_6px_rgba(96,165,250,0.8)] shrink-0" />
+                <span
+                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
+                  style={{ boxShadow: '0 0 6px var(--color-primary-glow)' }}
+                />
               )}
             </Link>
           );
@@ -79,24 +80,22 @@ function SidebarNav({
 
       {/* User info */}
       {session && (
-        <div className="relative px-4 py-4 border-t border-white/5">
-          {/* Glow effect */}
+        <div className="relative px-4 py-4 border-t" style={{ borderColor: 'var(--sidebar-border)' }}>
           <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
-          <div className="flex items-center gap-3 mt-2">
-            {/* Avatar with gradient ring */}
-            <div className="relative h-9 w-9 rounded-xl overflow-hidden shrink-0">
+          <div className="mt-2 flex items-center gap-3">
+            <div className="relative h-9 w-9 shrink-0 overflow-hidden rounded-xl">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500/30 to-violet-500/30" />
-              <div className="absolute inset-0.5 rounded-[8px] bg-[#0F172A] flex items-center justify-center">
-                <span className="text-[11px] font-bold text-blue-400 uppercase tracking-tight">
+              <div className="absolute inset-0.5 flex items-center justify-center rounded-[8px] bg-[var(--sidebar-bg)]">
+                <span className="text-[11px] font-bold uppercase tracking-tight text-[var(--color-primary)]">
                   {avatarInitials}
                 </span>
               </div>
             </div>
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium text-white truncate leading-tight">
+              <p className="truncate text-sm font-medium leading-tight text-[var(--sidebar-text-active)]">
                 {session.user.preferred_username}
               </p>
-              <p className="text-[11px] text-slate-400 truncate capitalize mt-0.5">
+              <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--sidebar-text)]">
                 {session.user.roles[0]?.replace('_', ' ')}
               </p>
             </div>
@@ -119,20 +118,25 @@ export function AppSidebar() {
   return (
     <>
       {/* Desktop sidebar — glassmorphism dark */}
-      <aside className="hidden lg:flex flex-col w-[248px] h-[100dvh] sticky top-0 shrink-0 border-r border-white/5"
+      <aside
+        className="hidden lg:flex w-[248px] shrink-0 flex-col border-r"
         style={{
           background: 'linear-gradient(180deg, rgba(15,23,42,0.95) 0%, rgba(15,23,42,1) 100%)',
+          borderColor: 'var(--sidebar-border)',
           backdropFilter: 'blur(20px)',
           WebkitBackdropFilter: 'blur(20px)',
+          height: '100dvh',
+          position: 'sticky',
+          top: 0,
         }}
       >
         {/* Subtle ambient glow */}
-        <div className="absolute inset-0 pointer-events-none overflow-hidden">
-          <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-blue-500/[0.03] to-transparent" />
-          <div className="absolute bottom-0 right-0 w-32 h-32 bg-violet-500/[0.03] rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+        <div className="pointer-events-none absolute inset-0 overflow-hidden">
+          <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[var(--color-primary)]/[0.04] to-transparent" />
+          <div className="absolute bottom-0 right-0 h-32 w-32 -translate-y-1/2 translate-x-1/2 rounded-full bg-violet-500/[0.03]" style={{ filter: 'blur(24px)' }} />
         </div>
 
-        <div className="relative flex flex-col h-full">
+        <div className="relative flex h-full flex-col">
           <SidebarNav
             pathname={pathname}
             session={session}
@@ -145,7 +149,7 @@ export function AppSidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(true)}
-        className="lg:hidden fixed top-4 left-4 z-40 p-2.5 rounded-xl text-white transition-all active:scale-95"
+        className="lg:hidden fixed left-4 top-4 z-40 rounded-xl p-2.5 text-white transition-all active:scale-95"
         style={{
           background: 'rgba(15,23,42,0.85)',
           backdropFilter: 'blur(12px)',
@@ -158,27 +162,29 @@ export function AppSidebar() {
 
       {/* Mobile sidebar overlay */}
       {mobileOpen && (
-        <div className="lg:hidden fixed inset-0 z-50 flex">
+        <div className="fixed inset-0 z-50 flex lg:hidden">
           <div
             className="absolute inset-0 bg-black/60 backdrop-blur-sm"
             onClick={() => setMobileOpen(false)}
           />
           <aside
-            className="relative flex flex-col w-[280px] h-[100dvh] z-10 shrink-0 border-r border-white/5"
+            className="relative z-10 flex w-[280px] shrink-0 flex-col border-r"
             style={{
               background: 'linear-gradient(180deg, rgba(15,23,42,0.98) 0%, rgba(15,23,42,1) 100%)',
+              borderColor: 'var(--sidebar-border)',
               backdropFilter: 'blur(20px)',
               WebkitBackdropFilter: 'blur(20px)',
+              height: '100dvh',
             }}
           >
             {/* Ambient glow */}
-            <div className="absolute inset-0 pointer-events-none overflow-hidden">
-              <div className="absolute top-0 inset-x-0 h-40 bg-gradient-to-b from-blue-500/[0.04] to-transparent" />
+            <div className="pointer-events-none absolute inset-0 overflow-hidden">
+              <div className="absolute inset-x-0 top-0 h-40 bg-gradient-to-b from-[var(--color-primary)]/[0.05] to-transparent" />
             </div>
 
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-4 right-4 z-20 text-slate-400 hover:text-white transition-colors p-1 rounded-lg hover:bg-white/5"
+              className="absolute right-4 top-4 z-20 flex items-center justify-center rounded-lg p-1 text-[var(--sidebar-text)] transition-colors hover:bg-white/5 hover:text-[var(--sidebar-text-active)]"
             >
               <X className="h-5 w-5" />
             </button>
