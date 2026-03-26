@@ -53,12 +53,12 @@ export default function DashboardPage() {
 
       {/* Stat cards */}
       <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {STAT_CARDS.map((card) => {
+        {STAT_CARDS.map((card, idx) => {
           const Icon = card.icon;
           return (
             <div
               key={card.label}
-              className="rounded-2xl border p-5"
+              className={`animate-in card-interactive rounded-2xl border p-5 delay-${idx + 1}`}
               style={{
                 background: 'var(--bg-card)',
                 borderColor: 'var(--border-soft)',
@@ -86,7 +86,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Recent documents */}
-        <div className="lg:col-span-2">
+        <div className="lg:col-span-2 animate-in delay-5">
           <div
             className="overflow-hidden rounded-2xl border"
             style={{
@@ -143,7 +143,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Quick actions */}
-        <div>
+        <div className="animate-in delay-5">
           <div
             className="overflow-hidden rounded-2xl border"
             style={{
@@ -207,11 +207,11 @@ function QuickAction({ href, icon: Icon, label, description, badge }: {
   return (
     <Link
       href={href}
-      className="group flex items-center gap-3 rounded-xl border border-transparent px-4 py-3 transition-all hover:border-[var(--border-soft)]"
+      className="group flex items-center gap-3 rounded-xl border border-transparent px-4 py-3 transition-all hover:border-[var(--border-soft)] hover:bg-[var(--bg-card-hover)]"
       style={{ borderColor: 'transparent' }}
     >
       <div
-        className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-colors"
+        className="qa-icon flex h-8 w-8 shrink-0 items-center justify-center rounded-lg transition-all"
         style={{ background: 'var(--bg-muted)' }}
       >
         <Icon
@@ -232,7 +232,7 @@ function QuickAction({ href, icon: Icon, label, description, badge }: {
         </span>
       )}
       <ArrowRight
-        className="h-3.5 w-3.5 shrink-0 transition-colors"
+        className="qa-arrow h-3.5 w-3.5 shrink-0"
         style={{ color: 'var(--text-muted)' }}
       />
     </Link>
