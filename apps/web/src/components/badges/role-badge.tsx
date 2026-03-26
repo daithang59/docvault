@@ -11,14 +11,6 @@ const VALID_ROLES = new Set<UserRole>([
   'admin',
 ]);
 
-const roleStyles: Record<UserRole, { bg: string; text: string; border: string; shadow: string }> = {
-  viewer: { bg: '#F8FAFC', text: '#64748B', border: '#E2E8F0', shadow: 'rgba(0,0,0,0.04)' },
-  editor: { bg: '#EFF6FF', text: '#3B82F6', border: '#BFDBFE', shadow: 'rgba(59,130,246,0.12)' },
-  approver: { bg: '#F5F3FF', text: '#7C3AED', border: '#DDD6FE', shadow: 'rgba(124,58,237,0.12)' },
-  compliance_officer: { bg: '#FFF7F7', text: '#E11D48', border: '#FECDD3', shadow: 'rgba(225,29,72,0.12)' },
-  admin: { bg: '#0F172A', text: '#F8FAFC', border: '#334155', shadow: 'rgba(0,0,0,0.15)' },
-};
-
 const roleLabels: Record<UserRole, string> = {
   viewer: 'Viewer',
   editor: 'Editor',
@@ -34,7 +26,6 @@ interface RoleBadgeProps {
 
 export function RoleBadge({ role, className }: RoleBadgeProps) {
   if (!VALID_ROLES.has(role)) return null;
-  const style = roleStyles[role];
   return (
     <span
       className={cn(
@@ -42,10 +33,10 @@ export function RoleBadge({ role, className }: RoleBadgeProps) {
         className
       )}
       style={{
-        backgroundColor: style.bg,
-        color: style.text,
-        borderColor: style.border,
-        boxShadow: `0 1px 2px ${style.shadow}`,
+        backgroundColor: `var(--role-${role}-bg)`,
+        color: `var(--role-${role}-text)`,
+        borderColor: `var(--role-${role}-border)`,
+        boxShadow: `0 1px 2px rgba(0,0,0,0.06)`,
       }}
     >
       {roleLabels[role]}

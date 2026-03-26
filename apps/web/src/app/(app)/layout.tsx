@@ -20,7 +20,7 @@ export default function AppLayout({ children }: { children: React.ReactNode }) {
 
   if (!hydrated || !isAuthenticated || !session) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
+      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)]">
         <LoadingState label="Signing you in..." />
       </div>
     );

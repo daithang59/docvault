@@ -64,7 +64,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
+    <div className="min-h-screen flex" style={{ background: 'var(--login-page-bg)' }}>
       {/* Left panel — Brand */}
       <div
         className="hidden lg:flex flex-col justify-between relative w-[460px] shrink-0 overflow-hidden"
@@ -98,7 +98,7 @@ export default function LoginPage() {
               </div>
               <div>
                 <h1 className="text-xl font-bold text-white tracking-tight">DocVault</h1>
-                <p className="text-[10px] text-slate-500 uppercase tracking-widest font-medium">
+                <p className="text-[10px] uppercase tracking-widest font-medium" style={{ color: 'var(--login-hint)' }}>
                   Document System
                 </p>
               </div>
@@ -111,7 +111,7 @@ export default function LoginPage() {
                   modern enterprises.
                 </span>
               </h2>
-              <p className="text-sm text-slate-400 leading-relaxed">
+              <p className="text-sm leading-relaxed" style={{ color: 'var(--login-hint)' }}>
                 Control access, manage workflows, and ensure compliance across every document
                 lifecycle stage.
               </p>
@@ -143,7 +143,7 @@ export default function LoginPage() {
                 >
                   {feat.icon}
                 </div>
-                <span className="text-sm text-slate-300 group-hover:text-white transition-colors">
+                <span className="text-sm transition-colors group-hover:text-white" style={{ color: 'var(--login-sub)' }}>
                   {feat.label}
                 </span>
               </div>
@@ -163,25 +163,32 @@ export default function LoginPage() {
                 <Shield className="h-4 w-4 text-blue-400" />
               </div>
             </div>
-            <span className="text-xl font-bold text-slate-800">DocVault</span>
+            <span className="text-xl font-bold" style={{ color: 'var(--login-heading)' }}>DocVault</span>
           </div>
 
           <div
             className="rounded-2xl p-8"
             style={{
-              background: 'rgba(255,255,255,0.95)',
+              background: 'var(--login-card-bg)',
               backdropFilter: 'blur(16px)',
-              border: '1px solid rgba(226,232,240,0.8)',
-              boxShadow: '0 25px 50px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.04)',
+              border: `1px solid var(--login-card-border)`,
+              boxShadow: 'var(--login-card-shadow)',
             }}
           >
             <div className="mb-6">
-              <h2 className="text-2xl font-semibold text-slate-800 mb-1">Welcome back</h2>
-              <p className="text-sm text-slate-500">Sign in to your secure document portal</p>
+              <h2 className="text-2xl font-semibold mb-1" style={{ color: 'var(--login-heading)' }}>Welcome back</h2>
+              <p className="text-sm" style={{ color: 'var(--login-sub)' }}>Sign in to your secure document portal</p>
             </div>
 
             {callbackError && (
-              <div className="mb-4 p-3 rounded-xl bg-red-50 border border-red-200 text-sm text-red-600">
+              <div
+                className="mb-4 p-3 rounded-xl text-sm"
+                style={{
+                  background: 'var(--login-error-bg)',
+                  border: '1px solid var(--login-error-border)',
+                  color: 'var(--login-error-text)',
+                }}
+              >
                 {callbackError}
               </div>
             )}
@@ -197,18 +204,18 @@ export default function LoginPage() {
 
             <div className="relative mb-6">
               <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t border-slate-200" />
+                <div className="w-full" style={{ borderTop: '1px solid var(--login-divider)' }} />
               </div>
               <div className="relative flex justify-center text-xs">
-                <span className="px-2 bg-white text-slate-400">
+                <span className="px-2" style={{ background: 'var(--login-divider-label-bg)', color: 'var(--login-hint)' }}>
                   Use your Keycloak credentials
                 </span>
               </div>
             </div>
 
             {/* Credentials info */}
-            <div className="space-y-2 text-xs text-slate-500 mb-4">
-              <p className="font-medium text-slate-700">Demo accounts:</p>
+            <div className="space-y-2 text-xs mb-4" style={{ color: 'var(--login-sub)' }}>
+              <p className="font-medium" style={{ color: 'var(--login-heading)' }}>Demo accounts:</p>
               <div className="grid grid-cols-2 gap-1">
                 {[
                   { user: 'viewer1', role: 'viewer' },
@@ -217,18 +224,18 @@ export default function LoginPage() {
                   { user: 'co1', role: 'compliance' },
                 ].map(({ user, role }) => (
                   <div key={user} className="flex items-center gap-1.5">
-                    <span className="font-mono text-slate-600">{user}</span>
-                    <span className="text-slate-300">/</span>
-                    <span className="text-slate-400">Passw0rd!</span>
-                    <span className="text-slate-300">·</span>
-                    <span className="text-blue-500">{role}</span>
+                    <span className="font-mono" style={{ color: 'var(--login-demo-user)' }}>{user}</span>
+                    <span style={{ color: 'var(--login-demo-sep)' }}>/</span>
+                    <span style={{ color: 'var(--login-demo-pwd)' }}>Passw0rd!</span>
+                    <span style={{ color: 'var(--login-demo-sep)' }}>·</span>
+                    <span style={{ color: 'var(--color-primary)' }}>{role}</span>
                   </div>
                 ))}
               </div>
             </div>
           </div>
 
-          <p className="text-center text-xs text-slate-400 mt-6">
+          <p className="text-center text-xs mt-6" style={{ color: 'var(--login-hint)' }}>
             DocVault — Secure Document Management System
           </p>
         </div>

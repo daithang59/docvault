@@ -6,10 +6,10 @@ import { Send, CheckCircle, XCircle, Archive } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 
 const ACTION_CONFIG = {
-  SUBMIT: { icon: Send, color: 'text-[#2563EB]', bg: 'bg-[#EFF6FF]', label: 'Submitted' },
-  APPROVE: { icon: CheckCircle, color: 'text-[#166534]', bg: 'bg-[#DCFCE7]', label: 'Approved' },
-  REJECT: { icon: XCircle, color: 'text-[#B91C1C]', bg: 'bg-[#FEF2F2]', label: 'Rejected' },
-  ARCHIVE: { icon: Archive, color: 'text-[#4B5563]', bg: 'bg-[#E5E7EB]', label: 'Archived' },
+  SUBMIT: { icon: Send, color: 'text-[var(--color-primary)]', bg: 'bg-[var(--stat-total-bg)]', label: 'Submitted' },
+  APPROVE: { icon: CheckCircle, color: 'text-[var(--status-published-text)]', bg: 'bg-[var(--stat-published-bg)]', label: 'Approved' },
+  REJECT: { icon: XCircle, color: 'text-[var(--state-error-text)]', bg: 'bg-[var(--state-error-bg)]', label: 'Rejected' },
+  ARCHIVE: { icon: Archive, color: 'text-[var(--text-muted)]', bg: 'bg-[var(--bg-muted)]', label: 'Archived' },
 };
 
 interface DocumentWorkflowTimelineProps {
@@ -22,10 +22,10 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
   );
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#F1F5F9]">
-        <h3 className="text-sm font-semibold text-[#0F172A]">Workflow Timeline</h3>
-        <p className="text-xs text-[#94A3B8] mt-0.5">{history.length} transition{history.length !== 1 ? 's' : ''}</p>
+    <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+      <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
+        <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>Workflow Timeline</h3>
+        <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{history.length} transition{history.length !== 1 ? 's' : ''}</p>
       </div>
 
       {sorted.length === 0 ? (
@@ -40,7 +40,7 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
           <div className="relative">
             {/* Vertical line */}
             {sorted.length > 1 && (
-              <div className="absolute left-4 top-8 bottom-8 w-px bg-[#E2E8F0]" />
+              <div className="absolute left-4 top-8 bottom-8 w-px" style={{ background: 'var(--border-soft)' }} />
             )}
             <div className="space-y-4">
               {sorted.map((entry, idx) => {
@@ -55,20 +55,20 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
                     {/* Content */}
                     <div className="flex-1 min-w-0 pb-1">
                       <div className="flex items-center gap-2 flex-wrap">
-                        <span className="text-sm font-medium text-[#1E293B]">{config.label}</span>
-                        <span className="text-xs text-[#94A3B8]">
+                        <span className="text-sm font-medium" style={{ color: 'var(--text-main)' }}>{config.label}</span>
+                        <span className="text-xs" style={{ color: 'var(--text-faint)' }}>
                           {entry.fromStatus} → {entry.toStatus}
                         </span>
                         {idx === 0 && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-[#F1F5F9] text-[#64748B] rounded font-medium">Latest</span>
+                          <span className="text-[10px] px-1.5 py-0.5 rounded font-medium" style={{ background: 'var(--bg-muted)', color: 'var(--text-muted)' }}>Latest</span>
                         )}
                       </div>
-                      <div className="flex flex-wrap gap-3 mt-0.5 text-xs text-[#94A3B8]">
+                      <div className="flex flex-wrap gap-3 mt-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>
                         <span>By <span className="font-mono">{entry.actorId.slice(0, 8)}…</span></span>
                         <span>{formatDateTime(entry.createdAt)}</span>
                       </div>
                       {entry.reason && (
-                        <p className="text-xs text-[#64748B] mt-1 italic">&ldquo;{entry.reason}&rdquo;</p>
+                        <p className="text-xs mt-1 italic" style={{ color: 'var(--text-muted)' }}>&ldquo;{entry.reason}&rdquo;</p>
                       )}
                     </div>
                   </div>
