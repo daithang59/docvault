@@ -62,17 +62,25 @@ function SidebarNav({
                 isActive && 'active',
               )}
             >
-              {isActive && (
-                <span className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[var(--color-primary)]" />
-              )}
-              <Icon className={cn('h-4 w-4 shrink-0', isActive ? 'text-[var(--color-primary)]' : 'text-[var(--sidebar-text)]')} />
+              {/* Active indicator — always rendered, animated via CSS */}
+              <span
+                className="absolute -left-3 top-1/2 h-5 w-0.5 -translate-y-1/2 rounded-full bg-[var(--color-primary)] transition-all duration-300"
+                style={{
+                  opacity: isActive ? 1 : 0,
+                  transform: `translateY(-50%) scaleY(${isActive ? 1 : 0.3})`,
+                }}
+              />
+              <Icon className={cn('h-4 w-4 shrink-0 transition-colors duration-200', isActive ? 'text-[var(--color-primary)]' : 'text-[var(--sidebar-text)]')} />
               <span className="flex-1">{item.label}</span>
-              {isActive && (
-                <span
-                  className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)]"
-                  style={{ boxShadow: '0 0 6px var(--color-primary-glow)' }}
-                />
-              )}
+              {/* Active dot — always rendered, animated */}
+              <span
+                className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)] transition-all duration-300"
+                style={{
+                  opacity: isActive ? 1 : 0,
+                  transform: `scale(${isActive ? 1 : 0})`,
+                  boxShadow: isActive ? '0 0 6px var(--color-primary-glow)' : 'none',
+                }}
+              />
             </Link>
           );
         })}

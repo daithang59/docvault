@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -41,6 +41,16 @@ export function DocumentsTable({
   const { session } = useAuth();
   const [sorting, setSorting] = useState<SortingState>([]);
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [hoveredRow, setHoveredRow] = useState<string | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleRowEnter = useCallback((id: string) => {
+    hoverTimer.current = setTimeout(() => setHoveredRow(id), 350);
+  }, []);
+  const handleRowLeave = useCallback(() => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    setHoveredRow(null);
+  }, []);
 
   const columns: ColumnDef<DocumentListItem>[] = [
     {
@@ -48,25 +58,49 @@ export function DocumentsTable({
       header: ({ column }) => (
         <SortableHeader label="Title" column={column} />
       ),
-      cell: ({ row }) => (
-        <div>
-          <Link href={ROUTES.DOCUMENT_DETAIL(row.original.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
-            {truncateEnd(row.original.title, 60)}
-          </Link>
-          {row.original.tags.length > 0 && (
-            <div className="mt-1 flex flex-wrap gap-1">
-              {row.original.tags.slice(0, 3).map((tag) => (
-                <span key={tag} className="rounded bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
-                  {tag}
-                </span>
-              ))}
-              {row.original.tags.length > 3 && (
-                <span className="text-[10px] text-[var(--text-faint)]">+{row.original.tags.length - 3}</span>
-              )}
-            </div>
-          )}
-        </div>
-      ),
+      cell: ({ row }) => {
+        const doc = row.original;
+        const isHovered = hoveredRow === doc.id;
+        return (
+          <div className="relative">
+            <Link href={ROUTES.DOCUMENT_DETAIL(doc.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
+              {truncateEnd(doc.title, 60)}
+            </Link>
+            {doc.tags.length > 0 && (
+              <div className="mt-1 flex flex-wrap gap-1">
+                {doc.tags.slice(0, 3).map((tag) => (
+                  <span key={tag} className="rounded bg-[var(--bg-muted)] px-1.5 py-0.5 text-[10px] text-[var(--text-muted)]">
+                    {tag}
+                  </span>
+                ))}
+                {doc.tags.length > 3 && (
+                  <span className="text-[10px] text-[var(--text-faint)]">+{doc.tags.length - 3}</span>
+                )}
+              </div>
+            )}
+            {/* Hover preview tooltip */}
+            {isHovered && doc.description && (
+              <div
+                className="absolute left-0 top-full z-30 mt-2 w-72 rounded-xl border p-3 animate-fade"
+                style={{
+                  background: 'var(--surface-overlay-strong)',
+                  borderColor: 'var(--surface-border)',
+                  backdropFilter: 'blur(16px)',
+                  boxShadow: 'var(--surface-shadow-lg)',
+                }}
+              >
+                <p className="text-xs leading-relaxed" style={{ color: 'var(--text-main)' }}>
+                  {doc.description.length > 150 ? doc.description.slice(0, 150) + '…' : doc.description}
+                </p>
+                <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-faint)' }}>
+                  <span>Owner: <span className="font-mono">{doc.ownerId.slice(0, 8)}…</span></span>
+                  <span>{formatDateTime(doc.updatedAt)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+        );
+      },
     },
     {
       accessorKey: 'classification',
@@ -204,6 +238,8 @@ export function DocumentsTable({
                   borderColor: 'var(--table-row-border)',
                   background: rowIndex % 2 === 0 ? 'transparent' : 'var(--table-row-alt-bg)',
                 }}
+                onMouseEnter={() => handleRowEnter(row.original.id)}
+                onMouseLeave={handleRowLeave}
               >
                 {row.getVisibleCells().map((cell) => (
                   <td key={cell.id} className="px-4 py-3 transition-colors group-hover:bg-[var(--bg-muted)]/30">
