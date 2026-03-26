@@ -29,19 +29,27 @@ export function EmptyState({
   const Icon = icons[icon];
   return (
     <div className={cn('flex flex-col items-center justify-center py-16 text-center', className)}>
-      <div
-        className="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl"
-        style={{
-          background: 'linear-gradient(135deg, rgba(241,245,249,0.9), rgba(226,232,240,0.6))',
-          border: '1px solid rgba(226,232,240,0.8)',
-          boxShadow: '0 2px 8px rgba(0,0,0,0.04)',
-        }}
-      >
-        <Icon className="h-7 w-7 text-slate-400" />
+      {/* Icon with radial glow + float animation */}
+      <div className="relative mx-auto mb-5">
+        {/* Radial glow */}
+        <div
+          className="absolute inset-0 scale-[2] rounded-full blur-2xl opacity-40"
+          style={{ background: 'var(--color-primary-light)' }}
+        />
+        <div
+          className="empty-float relative flex h-16 w-16 items-center justify-center rounded-2xl border"
+          style={{
+            background: 'var(--state-info-bg)',
+            borderColor: 'var(--state-info-border)',
+            boxShadow: '0 4px 16px rgba(0,0,0,0.06)',
+          }}
+        >
+          <Icon className="h-7 w-7" style={{ color: 'var(--color-primary)' }} />
+        </div>
       </div>
-      <h3 className="text-base font-semibold text-slate-700 mb-1">{title}</h3>
+      <h3 className="mb-1 text-base font-semibold text-[var(--text-main)]">{title}</h3>
       {description && (
-        <p className="text-sm text-slate-400 max-w-xs mb-4">{description}</p>
+        <p className="mb-5 max-w-xs text-sm" style={{ color: 'var(--text-muted)' }}>{description}</p>
       )}
       {action}
     </div>

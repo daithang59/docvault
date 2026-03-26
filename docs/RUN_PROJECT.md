@@ -18,7 +18,9 @@ Tài liệu này là hướng dẫn chạy DocVault trên máy local theo trạn
   - `3005` notification-service
   - `3100` frontend web, nên dùng port này để tránh đụng backend
   - `5432` Postgres
+  - `5555` Prisma Studio (PostgreSQL GUI)
   - `8080` Keycloak
+  - `8081` MongoDB Express (MongoDB GUI)
   - `9000` MinIO API
   - `9001` MinIO Console
 
@@ -35,20 +37,21 @@ pnpm install
 Infra local đang nằm trong `infra/docker-compose.dev.yml`.
 
 ```bash
-docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
 Lệnh này sẽ khởi động:
 
 - Postgres
 - MongoDB
+- MongoDB Express (GUI cho MongoDB)
 - MinIO
 - MinIO init job
 - Keycloak
 
 Lưu ý:
 
-- MongoDB hiện vẫn còn trong compose nhưng không phải thành phần chính của MVP runtime hiện tại.
+- MongoDB chứa audit logs (audit-service dùng MongoDB thay vì PostgreSQL).
 - Nếu bạn đã có volume Postgres cũ từ giai đoạn proto-microservice, nên xóa volume cũ hoặc tạo lại database trước khi migrate.
 
 ## 4. Tạo file môi trường
@@ -89,6 +92,26 @@ Sau khi Postgres đã lên:
 pnpm --filter metadata-service prisma:deploy
 pnpm --filter audit-service prisma:deploy
 ```
+
+### Xem data (GUI)
+
+Sau khi Docker infra đã chạy, có thể mở giao diện GUI để xem trực tiếp:
+
+**PostgreSQL — Prisma Studio** (metadata-service):
+
+```bash
+pnpm --filter metadata-service prisma:studio
+```
+
+Mở: http://localhost:5555
+
+Xem 4 bảng: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
+
+**MongoDB — MongoDB Express**:
+
+Mở: http://localhost:8081
+
+Đăng nhập: `mongoadmin` / `mongoadminpw`
 
 ## 6. Khởi động backend
 

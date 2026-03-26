@@ -6,6 +6,7 @@ import type { AuthContextValue } from '@/features/auth/auth.types';
 import type { UserRole } from '@/types/enums';
 import { saveSession, loadSession, clearSession } from '@/lib/auth/session';
 import { hasRole, hasAnyRole } from '@/lib/auth/roles';
+import { queryClient } from '@/providers/query-provider';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
@@ -23,6 +24,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = useCallback(() => {
     clearSession();
+    queryClient.clear();        // Wipe all cached queries so no stale data leaks into the next session
     setSession(null);
   }, []);
 

@@ -55,25 +55,26 @@ export function RhfMultiSelect({
         return (
           <div className="flex flex-col gap-1.5">
             {label && (
-              <label className="text-sm font-medium text-slate-700">{label}</label>
+              <label className="text-sm font-medium text-[var(--text-main)]">{label}</label>
             )}
             <div
               className={cn(
-                'flex flex-wrap gap-1.5 rounded-md border border-slate-200 bg-white px-3 py-2 min-h-[40px]',
-                'focus-within:ring-2 focus-within:ring-blue-500/20 focus-within:border-blue-400',
-                error && 'border-red-400',
+                'min-h-[40px] flex flex-wrap gap-1.5 rounded-xl border px-3 py-2',
+                'bg-[var(--input-bg)] border-[var(--input-border)]',
+                'focus-within:ring-2 focus-within:ring-[var(--focus-ring)] focus-within:border-[var(--border-focus)]',
+                error && 'border-[var(--color-destructive)]/60',
               )}
             >
               {values.map((tag) => (
                 <span
                   key={tag}
-                  className="inline-flex items-center gap-1 rounded bg-blue-50 px-2 py-0.5 text-xs font-medium text-blue-700 border border-blue-100"
+                  className="inline-flex items-center gap-1 rounded border border-[var(--color-primary)]/20 bg-[var(--color-primary-light)] px-2 py-0.5 text-xs font-medium text-[var(--color-primary)]"
                 >
                   {tag}
                   <button
                     type="button"
                     onClick={() => removeTag(tag)}
-                    className="text-blue-400 hover:text-blue-700 transition-colors"
+                    className="text-[var(--color-primary)]/80 transition-colors hover:text-[var(--color-destructive)]"
                     aria-label={`Remove ${tag}`}
                   >
                     <X size={10} />
@@ -87,7 +88,7 @@ export function RhfMultiSelect({
                 onKeyDown={handleKeyDown}
                 onBlur={() => inputValue && addTag(inputValue)}
                 placeholder={values.length === 0 ? placeholder : ''}
-                className="flex-1 min-w-[120px] text-sm text-slate-900 placeholder:text-slate-400 focus:outline-none bg-transparent"
+                className="min-w-[120px] flex-1 bg-transparent text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] focus:outline-none"
                 list={`${name}-suggestions`}
               />
               {suggestions.length > 0 && (
@@ -96,8 +97,8 @@ export function RhfMultiSelect({
                 </datalist>
               )}
             </div>
-            {helperText && !error && <p className="text-xs text-slate-500">{helperText}</p>}
-            {error && <p className="text-xs text-red-600" role="alert">{error.message as string}</p>}
+            {helperText && !error && <p className="text-xs text-[var(--text-muted)]">{helperText}</p>}
+            {error && <p className="text-xs text-[var(--color-destructive)]" role="alert">{error.message as string}</p>}
           </div>
         );
       }}

@@ -145,31 +145,29 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
   if (!hasAnyAction) return null;
 
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl overflow-hidden">
-      <div className="px-5 py-4 border-b border-[#F1F5F9]">
-        <h3 className="text-sm font-semibold text-[#0F172A]">Actions</h3>
+    <div className="overflow-hidden rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+      <div className="border-b px-5 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+        <h3 className="text-sm font-semibold text-[var(--text-strong)]">Actions</h3>
       </div>
-      <div className="p-5 space-y-2.5">
+      <div className="space-y-2.5 p-5">
 
-        {/* Edit */}
         {canEditDocument(session, doc) && (
           <Link
             href={ROUTES.DOCUMENT_EDIT(doc.id)}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl border border-[#CBD5E1] text-sm font-medium text-[#1E293B] hover:bg-[#F8FAFC] transition-colors"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
           >
-            <Pencil className="h-4 w-4 text-[#94A3B8]" />
+            <Pencil className="h-4 w-4 text-[var(--text-muted)]" />
             Edit Metadata
           </Link>
         )}
 
-        {/* Upload new version */}
         {canUploadVersion(session, doc) && (
           <>
             <button
               onClick={() => setShowUpload(!showUpload)}
-              className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl border border-[#CBD5E1] text-sm font-medium text-[#1E293B] hover:bg-[#F8FAFC] transition-colors"
+              className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
             >
-              <Upload className="h-4 w-4 text-[#94A3B8]" />
+              <Upload className="h-4 w-4 text-[var(--text-muted)]" />
               Upload New Version
             </button>
             {showUpload && (
@@ -182,7 +180,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
                   <button
                     onClick={handleUpload}
                     disabled={upload.isPending}
-                    className="w-full px-4 py-2.5 rounded-xl bg-[#2563EB] text-white text-sm font-medium hover:bg-[#1D4ED8] transition disabled:opacity-50"
+                    className="btn-primary w-full rounded-xl px-4 py-2.5 text-sm font-medium text-white transition disabled:opacity-50"
                   >
                     {upload.isPending ? 'Uploading...' : 'Upload Version'}
                   </button>
@@ -192,69 +190,62 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
           </>
         )}
 
-        {/* Submit */}
         {canSubmitDocument(session, doc) && (
           <button
             onClick={() => setConfirmType('submit')}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl bg-[#2563EB] text-white text-sm font-medium hover:bg-[#1D4ED8] transition"
+            className="btn-primary flex w-full items-center gap-2.5 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition"
           >
             <Send className="h-4 w-4" />
             Submit for Approval
           </button>
         )}
 
-        {/* Approve */}
         {canApproveDocument(session, doc) && (
           <button
             onClick={() => setConfirmType('approve')}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl bg-white border border-[#86EFAC] text-[#166534] text-sm font-medium hover:bg-[#DCFCE7] transition"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--status-published-border)] bg-[var(--status-published-bg)] px-4 py-2.5 text-sm font-medium text-[var(--status-published-text)] transition hover:brightness-95"
           >
             <CheckCircle className="h-4 w-4" />
             Approve Document
           </button>
         )}
 
-        {/* Reject */}
         {canRejectDocument(session, doc) && (
           <button
             onClick={() => setConfirmType('reject')}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl bg-white border border-[#FCA5A5] text-[#B91C1C] text-sm font-medium hover:bg-[#FEF2F2] transition"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-4 py-2.5 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95"
           >
             <XCircle className="h-4 w-4" />
             Reject Document
           </button>
         )}
 
-        {/* Archive */}
         {canArchiveDocument(session, doc) && (
           <button
             onClick={() => setConfirmType('archive')}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] text-[#64748B] text-sm font-medium hover:bg-[#F1F5F9] transition"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
           >
             <Archive className="h-4 w-4" />
             Archive Document
           </button>
         )}
 
-        {/* Download */}
         {canDownloadDocument(session, doc) && (
           <button
             onClick={() => download(doc.id)}
             disabled={isDownloading}
-            className="flex items-center gap-2.5 w-full px-4 py-2.5 rounded-xl bg-white border border-[#CBD5E1] text-[#1E293B] text-sm font-medium hover:bg-[#F8FAFC] transition disabled:opacity-50"
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)] disabled:opacity-50"
           >
-            <Download className="h-4 w-4 text-[#94A3B8]" />
+            <Download className="h-4 w-4 text-[var(--text-muted)]" />
             {isDownloading ? 'Preparing download...' : 'Download'}
           </button>
         )}
 
-        {/* Manage ACL */}
         {canManageAcl(session, doc) && doc.status === 'DRAFT' && (
-          <p className="text-xs text-[#94A3B8] text-center pt-1">ACL management available in the Access Control panel below.</p>
+          <p className="pt-1 text-center text-xs text-[var(--text-muted)]">ACL management available in the Access Control panel below.</p>
         )}
       </div>
 
-      {/* Confirm dialogs */}
       <ConfirmDialog
         open={confirmType === 'submit'}
         onOpenChange={(o) => !o && setConfirmType(null)}
@@ -285,7 +276,7 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
           onChange={(e) => setRejectReason(e.target.value)}
           placeholder="Reason for rejection (optional)..."
           rows={3}
-          className="w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-xl resize-none outline-none focus:border-[#2563EB] transition"
+          className="w-full resize-none rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)] outline-none transition focus:border-[var(--border-focus)]"
         />
       </ConfirmDialog>
       <ConfirmDialog

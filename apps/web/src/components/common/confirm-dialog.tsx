@@ -49,36 +49,44 @@ export function ConfirmDialog({
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={() => !isLoading && onOpenChange(false)}
       />
-      <div className="relative bg-white rounded-2xl shadow-xl p-6 max-w-md w-full mx-4 z-10">
-        <div className="flex gap-4 mb-4">
+      <div
+        className="relative z-10 mx-4 w-full max-w-md rounded-2xl border p-6"
+        style={{
+          background: 'var(--surface-overlay-strong)',
+          borderColor: 'var(--surface-border)',
+          boxShadow: 'var(--surface-shadow-lg)',
+        }}
+      >
+        <div className="mb-4 flex gap-4">
           {variant === 'destructive' && (
-            <div className="shrink-0 flex h-10 w-10 items-center justify-center rounded-full bg-[#FEF2F2]">
-              <AlertTriangle className="h-5 w-5 text-[#DC2626]" />
+            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full" style={{ background: 'var(--state-error-bg)' }}>
+              <AlertTriangle className="h-5 w-5" style={{ color: 'var(--state-error-text)' }} />
             </div>
           )}
           <div>
-            <h2 className="text-base font-semibold text-[#0F172A]">{title}</h2>
+            <h2 className="text-base font-semibold text-[var(--text-strong)]">{title}</h2>
             {description && (
-              <p className="text-sm text-[#64748B] mt-1">{description}</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{description}</p>
             )}
           </div>
         </div>
         {children && <div className="mb-4">{children}</div>}
-        <div className="flex gap-2 justify-end">
+        <div className="flex justify-end gap-2">
           <button
             onClick={() => onOpenChange(false)}
             disabled={isLoading}
-            className="px-4 py-2 rounded-xl bg-white border border-[#CBD5E1] text-sm font-medium text-[#1E293B] hover:bg-[#F8FAFC] transition-colors disabled:opacity-50"
+            className="rounded-xl border bg-[var(--input-bg)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)] disabled:opacity-50"
+            style={{ borderColor: 'var(--border-strong)' }}
           >
             {cancelLabel}
           </button>
           <button
             onClick={handleConfirm}
             disabled={isLoading}
-            className={`px-4 py-2 rounded-xl text-sm font-medium text-white transition-colors disabled:opacity-50 ${
+            className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
               variant === 'destructive'
-                ? 'bg-[#DC2626] hover:bg-[#B91C1C]'
-                : 'bg-[#2563EB] hover:bg-[#1D4ED8]'
+                ? 'bg-[var(--color-destructive)] hover:brightness-95'
+                : 'btn-primary'
             }`}
           >
             {isLoading ? 'Processing...' : confirmLabel}

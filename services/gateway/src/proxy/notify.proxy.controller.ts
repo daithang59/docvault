@@ -1,4 +1,4 @@
-import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -29,6 +29,30 @@ export class NotifyProxyController {
       method: 'POST',
       url: `${process.env.NOTIFICATION_SERVICE_URL}/notify`,
       data: body,
+    });
+    return response.data;
+  }
+
+  /** Fetch notifications for the authenticated user. */
+  @Get('notify')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'List notifications for the current user' })
+  async list(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.NOTIFICATION_SERVICE_URL}/notify`,
+    });
+    return response.data;
+  }
+
+  /** Mark all notifications as read for the authenticated user. */
+  @Post('notify/mark-read')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Mark all notifications as read' })
+  async markAllRead(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.NOTIFICATION_SERVICE_URL}/notify/mark-read`,
     });
     return response.data;
   }

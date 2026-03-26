@@ -12,29 +12,28 @@ interface DocumentHeaderProps {
 
 export function DocumentHeader({ doc }: DocumentHeaderProps) {
   return (
-    <div className="bg-white border border-[#E2E8F0] rounded-2xl p-6 mb-6">
-      <div className="flex flex-wrap items-start gap-3 mb-3">
+    <div className="mb-6 rounded-2xl border bg-[var(--bg-card)] p-6" style={{ borderColor: 'var(--border-soft)' }}>
+      <div className="mb-3 flex flex-wrap items-start gap-3">
         <StatusBadge status={doc.status} />
         <ClassificationBadge classification={doc.classification} />
-        <span className="text-xs font-mono text-[#94A3B8] bg-[#F1F5F9] px-2 py-0.5 rounded">
+        <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 font-mono text-xs text-[var(--text-muted)]">
           v{doc.currentVersion}
         </span>
       </div>
 
-      <h1 className="text-2xl font-semibold text-[#0F172A] mb-2 leading-tight">
+      <h1 className="mb-2 text-2xl font-semibold leading-tight text-[var(--text-strong)]">
         {doc.title}
       </h1>
       {doc.description && (
-        <p className="text-sm text-[#64748B] mb-4 leading-relaxed">{doc.description}</p>
+        <p className="mb-4 text-sm leading-relaxed text-[var(--text-muted)]">{doc.description}</p>
       )}
 
-      {/* Tags */}
       {doc.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1.5 mb-4">
+        <div className="mb-4 flex flex-wrap gap-1.5">
           {doc.tags.map((tag) => (
             <span
               key={tag}
-              className="inline-flex items-center gap-1 text-xs px-2 py-0.5 bg-[#EFF6FF] text-[#1D4ED8] rounded-lg"
+              className="inline-flex items-center gap-1 rounded-lg bg-[var(--color-primary-light)] px-2 py-0.5 text-xs text-[var(--color-primary)]"
             >
               <Tag className="h-3 w-3" />
               {tag}
@@ -43,8 +42,7 @@ export function DocumentHeader({ doc }: DocumentHeaderProps) {
         </div>
       )}
 
-      {/* Metadata grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 pt-4 border-t border-[#F1F5F9]">
+      <div className="grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4" style={{ borderColor: 'var(--border-soft)' }}>
         <MetaItem label="Owner" icon={User} value={doc.ownerDisplay ?? `${doc.ownerId.slice(0, 8)}…`} mono={!doc.ownerDisplay} />
         <MetaItem label="Created" icon={Calendar} value={formatDateTime(doc.createdAt)} />
         <MetaItem label="Updated" icon={Calendar} value={formatDateTime(doc.updatedAt)} />
@@ -72,13 +70,13 @@ function MetaItem({
 }) {
   return (
     <div>
-      <div className="flex items-center gap-1.5 mb-0.5">
-        <Icon className="h-3 w-3 text-[#94A3B8]" />
-        <span className="text-[11px] text-[#94A3B8] uppercase tracking-wide font-medium">
+      <div className="mb-0.5 flex items-center gap-1.5">
+        <Icon className="h-3 w-3 text-[var(--text-faint)]" />
+        <span className="text-[11px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
           {label}
         </span>
       </div>
-      <p className={`text-sm text-[#1E293B] truncate ${mono ? 'font-mono text-xs' : ''}`}>
+      <p className={`truncate text-[var(--text-main)] ${mono ? 'font-mono text-xs' : 'text-sm'}`}>
         {value}
       </p>
     </div>

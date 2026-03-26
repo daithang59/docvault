@@ -70,7 +70,6 @@ export default function DocumentsPage() {
     return result;
   }, [docs, filters]);
 
-  // Pagination
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
     const start = (page - 1) * pageSize;
@@ -115,7 +114,7 @@ export default function DocumentsPage() {
       toast.error(msg);
     } finally {
       setTargetDoc(null); setActionType(null); setRejectReason('');
-      setPage(1); // reset to first page after mutation so the user sees the updated list
+      setPage(1);
     }
   }
 
@@ -126,7 +125,7 @@ export default function DocumentsPage() {
         subtitle="Manage and review secure documents across their lifecycle."
         actions={
           <ProtectedAction roles={['editor', 'admin']}>
-            <Link href={ROUTES.DOCUMENTS_NEW} className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-[#2563EB] hover:bg-[#1D4ED8] text-white text-sm font-medium transition">
+            <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
               <FilePlus className="h-4 w-4" />
               New Document
             </Link>
@@ -140,13 +139,13 @@ export default function DocumentsPage() {
         <EmptyState
           title="No documents found"
           description={filters.search || filters.status || filters.classification
-            ? "Try adjusting your filters."
-            : "Create your first document to get started."
+            ? 'Try adjusting your filters.'
+            : 'Create your first document to get started.'
           }
           icon="document"
           action={
             <ProtectedAction roles={['editor', 'admin']}>
-              <Link href={ROUTES.DOCUMENTS_NEW} className="px-4 py-2 rounded-xl bg-[#2563EB] text-white text-sm font-medium hover:bg-[#1D4ED8] transition">
+              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
                 Create Document
               </Link>
             </ProtectedAction>
@@ -203,7 +202,7 @@ export default function DocumentsPage() {
           onChange={(e) => setRejectReason(e.target.value)}
           placeholder="Reason for rejection (optional)..."
           rows={3}
-          className="w-full px-3 py-2 text-sm border border-[#CBD5E1] rounded-xl resize-none outline-none focus:border-[#2563EB] transition"
+          className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)] outline-none transition focus:border-[var(--border-focus)]"
         />
       </ConfirmDialog>
       <ConfirmDialog

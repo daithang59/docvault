@@ -67,12 +67,33 @@
   /* Classification */
   --class-public-bg: #F0FDF4;
   --class-public-text: #166534;
+  --class-public-border: #BBF7D0;
   --class-internal-bg: #EFF6FF;
   --class-internal-text: #1D4ED8;
+  --class-internal-border: #BFDBFE;
   --class-confidential-bg: #FFFBEB;
   --class-confidential-text: #92400E;
+  --class-confidential-border: #FDE68A;
   --class-secret-bg: #FEF2F2;
   --class-secret-text: #B91C1C;
+  --class-secret-border: #FECACA;
+
+  /* Role badges */
+  --role-viewer-bg: #F8FAFC;
+  --role-viewer-text: #64748B;
+  --role-viewer-border: #E2E8F0;
+  --role-editor-bg: #EFF6FF;
+  --role-editor-text: #3B82F6;
+  --role-editor-border: #BFDBFE;
+  --role-approver-bg: #F5F3FF;
+  --role-approver-text: #7C3AED;
+  --role-approver-border: #DDD6FE;
+  --role-compliance_officer-bg: #FFF1F2;
+  --role-compliance_officer-text: #E11D48;
+  --role-compliance_officer-border: #FECDD3;
+  --role-admin-bg: #0F172A;
+  --role-admin-text: #F8FAFC;
+  --role-admin-border: #334155;
 
   /* Semantic */
   --color-success: #16A34A;
@@ -95,11 +116,224 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
+  /* Surfaces for translucent UI (topbar, popovers) */
+  --surface-overlay: rgba(255, 255, 255, 0.85);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.96);
+  --surface-border: rgba(226, 232, 240, 0.8);
+  --surface-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --surface-shadow-lg: 0 20px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #CBD5E1;
+  --scrollbar-thumb-hover: #94A3B8;
+
+  /* ── Form inputs ─────────────────────────────────────────────────────────── */
+  --input-border: #E2E8F0;
+  --input-bg: #FFFFFF;
+  --input-text: #1E293B;
+  --input-placeholder: #94A3B8;
+  --input-disabled-bg: #F8FAFC;
+  --input-disabled-text: #94A3B8;
+  --focus-ring: rgba(37, 99, 235, 0.2);
+
+  /* ── Table ───────────────────────────────────────────────────────────────── */
+  --table-surface-bg: rgba(255, 255, 255, 0.92);
+  --table-surface-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  --table-header-bg: linear-gradient(180deg, #F8FAFC 0%, #F5F7FA 100%);
+  --table-header-text: #64748B;
+  --table-header-border: rgba(226, 232, 240, 0.7);
+  --table-row-border: rgba(226, 232, 240, 0.4);
+  --table-row-alt-bg: rgba(248, 250, 252, 0.4);
+
+  /* ── State surfaces ──────────────────────────────────────────────────────── */
+  --state-info-bg: rgba(241, 245, 249, 0.9);
+  --state-info-border: rgba(226, 232, 240, 0.8);
+  --state-info-text: #64748B;
+  --state-error-bg: #FEF2F2;
+  --state-error-border: #FECACA;
+  --state-error-text: #DC2626;
+  --destructive-hover-bg: #FEF2F2;
+
+  /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
+  --skeleton-from: #f1f5f9;
+  --skeleton-via: #e2e8f0;
+  --skeleton-to: #f1f5f9;
+
+  /* ── Dashboard stat icons ───────────────────────────────────────────────── */
+  --stat-total-bg: #EFF6FF;
+  --stat-total-text: #2563EB;
+  --stat-draft-bg: #F1F5F9;
+  --stat-draft-text: #334155;
+  --stat-pending-bg: #FEF3C7;
+  --stat-pending-text: #92400E;
+  --stat-published-bg: #DCFCE7;
+  --stat-published-text: #166534;
+
+  /* ── Login page surfaces ─────────────────────────────────────────────────── */
+  --login-page-bg: #F8FAFC;
+  --login-card-bg: rgba(255, 255, 255, 0.95);
+  --login-card-border: rgba(226, 232, 240, 0.8);
+  --login-card-shadow: 0 25px 50px rgba(0,0,0,0.08), 0 8px 20px rgba(0,0,0,0.04);
+  --login-divider: #E2E8F0;
+  --login-divider-label-bg: #FFFFFF;
+  --login-error-bg: #FEF2F2;
+  --login-error-border: #FECACA;
+  --login-error-text: #DC2626;
+  --login-heading: #1E293B;
+  --login-sub: #64748B;
+  --login-hint: #94A3B8;
+  --login-demo-user: #475569;
+  --login-demo-sep: #CBD5E1;
+  --login-demo-pwd: #94A3B8;
+
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dark {
+  --color-primary: #60A5FA;
+  --color-primary-hover: #3B82F6;
+  --color-primary-light: rgba(96, 165, 250, 0.18);
+  --color-primary-glow: rgba(96, 165, 250, 0.2);
+  --gradient-primary: linear-gradient(135deg, #3B82F6, #6366F1);
+
+  --bg-app: #0B1220;
+  --bg-subtle: #111827;
+  --bg-card: #111827;
+  --bg-card-hover: #1F2937;
+  --bg-muted: #1E293B;
+  --bg-input: #0F172A;
+
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-border: rgba(148, 163, 184, 0.18);
+
+  --border-soft: #1E293B;
+  --border-strong: #334155;
+  --border-focus: #60A5FA;
+
+  --text-strong: #F8FAFC;
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+
+  --surface-overlay: rgba(11, 18, 32, 0.78);
+  --surface-overlay-strong: rgba(11, 18, 32, 0.92);
+  --surface-border: rgba(51, 65, 85, 0.8);
+  --surface-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --surface-shadow-lg: 0 18px 36px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.3);
+
+  --scrollbar-thumb: #334155;
+  --scrollbar-thumb-hover: #475569;
+
+  /* ── Form inputs ─────────────────────────────────────────────────────────── */
+  --input-border: #1E293B;
+  --input-bg: #0F172A;
+  --input-text: #E2E8F0;
+  --input-placeholder: #475569;
+  --input-disabled-bg: #111827;
+  --input-disabled-text: #475569;
+  --focus-ring: rgba(96, 165, 250, 0.25);
+
+  /* ── Table ───────────────────────────────────────────────────────────────── */
+  --table-surface-bg: rgba(17, 24, 39, 0.92);
+  --table-surface-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15);
+  --table-header-bg: linear-gradient(180deg, #1E293B 0%, #1F2937 100%);
+  --table-header-text: #94A3B8;
+  --table-header-border: rgba(51, 65, 85, 0.8);
+  --table-row-border: rgba(51, 65, 85, 0.5);
+  --table-row-alt-bg: rgba(30, 41, 59, 0.35);
+
+  /* ── State surfaces ──────────────────────────────────────────────────────── */
+  --state-info-bg: rgba(30, 41, 59, 0.8);
+  --state-info-border: rgba(51, 65, 85, 0.7);
+  --state-info-text: #94A3B8;
+  --state-error-bg: rgba(127, 29, 29, 0.5);
+  --state-error-border: rgba(185, 28, 28, 0.6);
+  --state-error-text: #FCA5A5;
+  --destructive-hover-bg: rgba(127, 29, 29, 0.35);
+
+  /* ── Status badges ──────────────────────────────────────────────────────── */
+  --status-draft-bg: rgba(148, 163, 184, 0.15);
+  --status-draft-text: #94A3B8;
+  --status-draft-border: rgba(148, 163, 184, 0.25);
+
+  --status-pending-bg: rgba(251, 191, 36, 0.15);
+  --status-pending-text: #FCD34D;
+  --status-pending-border: rgba(251, 191, 36, 0.3);
+
+  --status-published-bg: rgba(52, 211, 153, 0.15);
+  --status-published-text: #34D399;
+  --status-published-border: rgba(52, 211, 153, 0.3);
+
+  --status-archived-bg: rgba(107, 114, 128, 0.15);
+  --status-archived-text: #9CA3AF;
+  --status-archived-border: rgba(107, 114, 128, 0.25);
+
+  /* ── Classification badges ──────────────────────────────────────────────── */
+  --class-public-bg: rgba(34, 197, 94, 0.12);
+  --class-public-text: #4ADE80;
+  --class-public-border: rgba(34, 197, 94, 0.25);
+  --class-internal-bg: rgba(59, 130, 246, 0.12);
+  --class-internal-text: #60A5FA;
+  --class-internal-border: rgba(59, 130, 246, 0.25);
+  --class-confidential-bg: rgba(245, 158, 11, 0.12);
+  --class-confidential-text: #FBBF24;
+  --class-confidential-border: rgba(245, 158, 11, 0.25);
+  --class-secret-bg: rgba(239, 68, 68, 0.12);
+  --class-secret-text: #FCA5A5;
+  --class-secret-border: rgba(239, 68, 68, 0.25);
+
+  /* ── Role badges ────────────────────────────────────────────────────────── */
+  --role-viewer-bg: rgba(100, 116, 139, 0.15);
+  --role-viewer-text: #94A3B8;
+  --role-viewer-border: rgba(100, 116, 139, 0.25);
+  --role-editor-bg: rgba(59, 130, 246, 0.15);
+  --role-editor-text: #60A5FA;
+  --role-editor-border: rgba(59, 130, 246, 0.3);
+  --role-approver-bg: rgba(124, 58, 237, 0.15);
+  --role-approver-text: #A78BFA;
+  --role-approver-border: rgba(124, 58, 237, 0.3);
+  --role-compliance_officer-bg: rgba(225, 29, 72, 0.15);
+  --role-compliance_officer-text: #FDA4AF;
+  --role-compliance_officer-border: rgba(225, 29, 72, 0.25);
+  --role-admin-bg: rgba(96, 165, 250, 0.18);
+  --role-admin-text: #F1F5F9;
+  --role-admin-border: rgba(96, 165, 250, 0.35);
+
+  /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
+  --skeleton-from: #1E293B;
+  --skeleton-via: #334155;
+  --skeleton-to: #1E293B;
+
+  /* ── Dashboard stat icons ───────────────────────────────────────────────── */
+  --stat-total-bg: rgba(96, 165, 250, 0.15);
+  --stat-total-text: #60A5FA;
+  --stat-draft-bg: rgba(148, 163, 184, 0.15);
+  --stat-draft-text: #94A3B8;
+  --stat-pending-bg: rgba(251, 191, 36, 0.15);
+  --stat-pending-text: #FCD34D;
+  --stat-published-bg: rgba(52, 211, 153, 0.15);
+  --stat-published-text: #34D399;
+
+  /* ── Login page surfaces ─────────────────────────────────────────────────── */
+  --login-page-bg: #0B1220;
+  --login-card-bg: rgba(17, 24, 39, 0.95);
+  --login-card-border: rgba(51, 65, 85, 0.6);
+  --login-card-shadow: 0 25px 50px rgba(0,0,0,0.4), 0 8px 20px rgba(0,0,0,0.25);
+  --login-divider: #334155;
+  --login-divider-label-bg: #111827;
+  --login-error-bg: rgba(127, 29, 29, 0.4);
+  --login-error-border: rgba(185, 28, 28, 0.5);
+  --login-error-text: #FCA5A5;
+  --login-heading: #F1F5F9;
+  --login-sub: #94A3B8;
+  --login-hint: #64748B;
+  --login-demo-user: #CBD5E1;
+  --login-demo-sep: #475569;
+  --login-demo-pwd: #64748B;
 }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
@@ -124,8 +358,8 @@ body {
 /* ── Scrollbar — subtle & modern ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ── Focus — clean blue ring ─────────────────────────────────────────────── */
 :focus-visible {
@@ -153,6 +387,34 @@ body {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid rgba(255,255,255,0.08);
+}
+
+.dark .glass-dark {
+  background: rgba(8, 14, 28, 0.88);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+/* ── Skeleton shimmer utility ─────────────────────────────────────────── */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-via) 50%,
+    var(--skeleton-to) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Error-state retry button ────────────────────────────────────────── */
+.retry-btn {
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  transition: background var(--transition-fast);
+}
+.retry-btn:hover {
+  background: var(--bg-muted);
 }
 
 /* ── Card hover lift — UX: depth on interaction ─────────────────────────── */
@@ -205,7 +467,7 @@ body {
 
 .sidebar-nav-item.active {
   background: var(--sidebar-item-active);
-  color: #60A5FA;
+  color: var(--color-primary);
   border-color: rgba(37, 99, 235, 0.3);
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15) inset;
 }
@@ -220,4 +482,76 @@ body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+/* ── Page-load animations — UX Pro Max ─────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-in {
+  animation: fadeInUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade {
+  animation: fadeIn 0.35s ease-out both;
+}
+
+/* Stagger delays */
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.10s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.20s; }
+.delay-5 { animation-delay: 0.25s; }
+
+/* ── Page content wrapper ──────────────────────────────────────────────────── */
+.page-content {
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Interactive card — hover lift + glow ───────────────────────────────────── */
+.card-interactive {
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-fast);
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+}
+
+/* ── Quick-action arrow slide ──────────────────────────────────────────────── */
+.qa-arrow {
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+.group:hover .qa-arrow {
+  transform: translateX(3px);
+  color: var(--color-primary);
+}
+.group:hover .qa-icon {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
+
+/* ── Empty-state float animation ───────────────────────────────────────────── */
+@keyframes emptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+.empty-float {
+  animation: emptyFloat 3s ease-in-out infinite;
+}
+
+/* ── Custom toast accents ──────────────────────────────────────────────────── */
+.toast-success {
+  border-left: 3px solid var(--color-success) !important;
+}
+.toast-error {
+  border-left: 3px solid var(--state-error-text) !important;
+}
+.toast-info {
+  border-left: 3px solid var(--color-primary) !important;
 }

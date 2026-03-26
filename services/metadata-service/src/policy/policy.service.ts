@@ -6,6 +6,7 @@ import {
 import {
   AclEffect,
   AclSubjectType,
+  ClassificationLevel,
   DocumentPermission,
 } from '../../generated/prisma';
 import { createHmac } from 'crypto';
@@ -17,6 +18,7 @@ import {
   ServiceUser,
   buildActorId,
 } from '../common/request-context';
+import { CLASSIFICATION_WATERMARK_LEVELS } from '../common/classification.constants';
 
 @Injectable()
 export class PolicyService {
@@ -99,23 +101,25 @@ export class PolicyService {
       roles,
       AclEffect.ALLOW,
     );
-    const hasDefaultRoleAccess = roles.some((role) =>
-      ['viewer', 'editor', 'approver', 'admin'].includes(role),
+
+    // --- Classification-based access check ---
+    const classificationReason = this.getClassificationDeniedReason(
+      document.classification as ClassificationLevel,
+      roles,
+      actorId,
+      document.ownerId,
+      hasExplicitAllow,
     );
 
-    if (
-      !hasExplicitAllow &&
-      actorId !== document.ownerId &&
-      !hasDefaultRoleAccess
-    ) {
+    if (classificationReason) {
       await this.auditClient.emitEvent(context, {
         action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
         resourceType: 'DOCUMENT',
         resourceId: docId,
         result: 'DENY',
-        reason: 'Download policy denied',
+        reason: classificationReason,
       });
-      throw new ForbiddenException('Download policy denied');
+      throw new ForbiddenException(classificationReason);
     }
 
     const expiresAt = new Date(Date.now() + this.expiresInSeconds * 1000);
@@ -135,6 +139,8 @@ export class PolicyService {
       contentType: versionRecord.contentType,
       expiresInSeconds: this.expiresInSeconds,
       expiresAt: expiresAt.toISOString(),
+      classification: document.classification,
+      watermarkRequired: CLASSIFICATION_WATERMARK_LEVELS[document.classification as ClassificationLevel],
       grantToken: this.createGrantToken({
         actorId,
         docId,
@@ -143,6 +149,8 @@ export class PolicyService {
         filename: versionRecord.filename,
         contentType: versionRecord.contentType ?? undefined,
         expiresAt: expiresAt.toISOString(),
+        classification: document.classification,
+        watermarkRequired: CLASSIFICATION_WATERMARK_LEVELS[document.classification as ClassificationLevel],
       }),
     };
   }
@@ -155,6 +163,56 @@ export class PolicyService {
       return 'Only published documents can be downloaded';
     }
     return null;
+  }
+
+  private getClassificationDeniedReason(
+    classification: ClassificationLevel,
+    roles: string[],
+    actorId: string,
+    ownerId: string,
+    hasExplicitAllow: boolean,
+  ): string | null {
+    switch (classification) {
+      case 'PUBLIC':
+        return null;
+
+      case 'INTERNAL':
+        if (
+          !roles.some((r) =>
+            ['viewer', 'editor', 'approver', 'admin'].includes(r),
+          )
+        ) {
+          return 'INTERNAL documents require at least the viewer role';
+        }
+        return null;
+
+      case 'CONFIDENTIAL':
+        if (
+          !roles.some((r) =>
+            ['editor', 'approver', 'admin'].includes(r),
+          )
+        ) {
+          return 'CONFIDENTIAL documents require at least the editor role';
+        }
+        if (actorId !== ownerId && !hasExplicitAllow) {
+          return 'CONFIDENTIAL documents require explicit ACL grant or document ownership';
+        }
+        return null;
+
+      case 'SECRET':
+        if (
+          !roles.some((r) => ['approver', 'admin'].includes(r))
+        ) {
+          return 'SECRET documents require at least the approver role';
+        }
+        if (actorId !== ownerId && !hasExplicitAllow) {
+          return 'SECRET documents require explicit ACL grant or document ownership';
+        }
+        return null;
+
+      default:
+        return 'Unknown classification level';
+    }
   }
 
   private matchesAcl(
@@ -196,6 +254,8 @@ export class PolicyService {
     filename: string;
     contentType?: string;
     expiresAt: string;
+    classification: string;
+    watermarkRequired: boolean;
   }) {
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const signature = createHmac(
