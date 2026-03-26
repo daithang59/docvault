@@ -1,6 +1,11 @@
 import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
@@ -24,7 +29,8 @@ export class WorkflowProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Submit document for approval',
-    description: 'Transitions a **DRAFT** document to **PENDING** status. ' +
+    description:
+      'Transitions a **DRAFT** document to **PENDING** status. ' +
       'The document becomes visible in the Approvals queue. ' +
       '**Only the document owner (editor) or admin may submit.**',
   })
@@ -47,7 +53,8 @@ export class WorkflowProxyController {
   @Roles('approver', 'admin')
   @ApiOperation({
     summary: 'Approve document',
-    description: 'Approves a **PENDING** document and transitions it to **PUBLISHED** status. ' +
+    description:
+      'Approves a **PENDING** document and transitions it to **PUBLISHED** status. ' +
       'Published documents are accessible to all viewers.',
   })
   async approve(@Param('docId') docId: string, @Req() req: any) {
@@ -69,7 +76,8 @@ export class WorkflowProxyController {
   @Roles('approver', 'admin')
   @ApiOperation({
     summary: 'Reject document',
-    description: 'Rejects a **PENDING** document and returns it to **DRAFT** status. ' +
+    description:
+      'Rejects a **PENDING** document and returns it to **DRAFT** status. ' +
       'An optional `reason` may be provided in the body.',
   })
   async reject(
@@ -96,7 +104,8 @@ export class WorkflowProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Archive published document',
-    description: 'Transitions a **PUBLISHED** document to **ARCHIVED** status. ' +
+    description:
+      'Transitions a **PUBLISHED** document to **ARCHIVED** status. ' +
       'Archived documents are no longer publicly accessible. ' +
       '**Only the document owner (editor) or admin may archive.**',
   })

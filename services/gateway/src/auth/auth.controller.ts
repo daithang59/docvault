@@ -1,4 +1,12 @@
-import { Controller, Get, Query, Res, Req, Post, HttpCode } from '@nestjs/common';
+import {
+  Controller,
+  Get,
+  Query,
+  Res,
+  Req,
+  Post,
+  HttpCode,
+} from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
 import { Response, Request } from 'express';
 import axios from 'axios';
@@ -28,7 +36,8 @@ export class AuthController {
     this.keycloakBaseUrl = process.env.KEYCLOAK_BASE_URL!;
     this.realm = process.env.KEYCLOAK_REALM!;
     this.clientId = process.env.KEYCLOAK_CLIENT_ID ?? 'docvault-gateway';
-    this.clientSecret = process.env.KEYCLOAK_CLIENT_SECRET ?? 'dev-gateway-secret';
+    this.clientSecret =
+      process.env.KEYCLOAK_CLIENT_SECRET ?? 'dev-gateway-secret';
     this.issuer = `${this.keycloakBaseUrl}/realms/${this.realm}`;
     this.frontendUrl = process.env.FRONTEND_URL ?? 'http://localhost:3006';
   }
@@ -50,7 +59,7 @@ export class AuthController {
   @ApiOperation({
     summary: 'Initiate Keycloak OIDC login (redirect to Keycloak)',
     description:
-      'Sets a CSRF state cookie and redirects the browser to Keycloak\'s login page. ' +
+      "Sets a CSRF state cookie and redirects the browser to Keycloak's login page. " +
       'After login, Keycloak redirects to `/api/auth/callback` (gateway) with an authorization code.',
   })
   login(@Res() res: Response) {
@@ -100,7 +109,9 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     if (error) {
-      return res.redirect(`${this.frontendUrl}/login?error=${encodeURIComponent(error)}`);
+      return res.redirect(
+        `${this.frontendUrl}/login?error=${encodeURIComponent(error)}`,
+      );
     }
 
     const cookies = parseCookies(req.headers.cookie ?? '');
@@ -167,8 +178,13 @@ export class AuthController {
 
       return res.redirect(`${this.frontendUrl}/login?auth=ok`);
     } catch (err: any) {
-      console.error('Keycloak token exchange failed:', err?.response?.data ?? err.message);
-      return res.redirect(`${this.frontendUrl}/login?error=token_exchange_failed`);
+      console.error(
+        'Keycloak token exchange failed:',
+        err?.response?.data ?? err.message,
+      );
+      return res.redirect(
+        `${this.frontendUrl}/login?error=token_exchange_failed`,
+      );
     }
   }
 
@@ -179,7 +195,8 @@ export class AuthController {
   @HttpCode(302)
   @ApiOperation({
     summary: 'Logout — clear session cookies and redirect to Keycloak',
-    description: 'Removes `dv_access_token`, `dv_refresh_token`, and `dv_user` cookies, then redirects to Keycloak to invalidate the SSO session.',
+    description:
+      'Removes `dv_access_token`, `dv_refresh_token`, and `dv_user` cookies, then redirects to Keycloak to invalidate the SSO session.',
   })
   logout(@Res() res: Response) {
     res.clearCookie('dv_access_token', { httpOnly: true, sameSite: 'lax' });

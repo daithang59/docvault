@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback } from 'react';
 import type { Session } from '@/features/auth/auth.types';
 import type { AuthContextValue } from '@/features/auth/auth.types';
 import type { UserRole } from '@/types/enums';
@@ -10,14 +10,11 @@ import { hasRole, hasAnyRole } from '@/lib/auth/roles';
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(null);
-  const [hydrated, setHydrated] = useState(false);
-
-  // Defer reading localStorage until after client-side mount to avoid SSR mismatch.
-  useEffect(() => {
-    setSession(loadSession() as Session | null);
-    setHydrated(true);
-  }, []);
+  const [session, setSession] = useState<Session | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return loadSession() as Session | null;
+  });
+  const [hydrated] = useState(true);
 
   const login = useCallback((newSession: Session) => {
     saveSession(newSession as Parameters<typeof saveSession>[0]);

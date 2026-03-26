@@ -1,6 +1,11 @@
 import { Body, Controller, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { ProxyService } from './proxy.service';
 
 @ApiTags('notify-proxy')
@@ -15,7 +20,8 @@ export class NotifyProxyController {
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({
     summary: 'Send notification',
-    description: 'Internal endpoint used by workflow-service to send notifications to users ' +
+    description:
+      'Internal endpoint used by workflow-service to send notifications to users ' +
       '(e.g., when a document is submitted for approval or when it is approved/rejected).',
   })
   async notify(@Req() req: any, @Body() body: any) {

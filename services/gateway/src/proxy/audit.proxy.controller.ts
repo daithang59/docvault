@@ -1,6 +1,19 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
@@ -17,7 +30,8 @@ export class AuditProxyController {
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({
     summary: 'Emit audit event',
-    description: 'Internal endpoint used by gateway and other services to emit audit log entries. ' +
+    description:
+      'Internal endpoint used by gateway and other services to emit audit log entries. ' +
       'Each event is linked to the previous via a SHA-256 hash chain for tamper-evidence.',
   })
   async create(@Req() req: any, @Body() body: any) {
@@ -35,7 +49,8 @@ export class AuditProxyController {
   @Roles('compliance_officer', 'admin')
   @ApiOperation({
     summary: 'Query audit logs',
-    description: 'Search audit events with optional filters: `actorId`, `action`, `resourceType`, ' +
+    description:
+      'Search audit events with optional filters: `actorId`, `action`, `resourceType`, ' +
       '`resourceId`, `from`, `to`, and pagination params.',
   })
   async query(@Req() req: any, @Query() query: any) {
@@ -53,7 +68,8 @@ export class AuditProxyController {
   @Roles('compliance_officer', 'admin')
   @ApiOperation({
     summary: 'Verify audit hash chain',
-    description: 'Recomputes and verifies the SHA-256 hash chain for all audit events. ' +
+    description:
+      'Recomputes and verifies the SHA-256 hash chain for all audit events. ' +
       'Returns `valid: true` if no tampering is detected, or `valid: false` with details of the broken link.',
   })
   async verifyChain(@Req() req: any, @Query() query: any) {
