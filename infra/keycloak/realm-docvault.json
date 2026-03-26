@@ -61,12 +61,17 @@
       "directAccessGrantsEnabled": true,
       "serviceAccountsEnabled": true,
 
-      "redirectUris": ["http://localhost:3000/*"],
-      "webOrigins": ["http://localhost:3000"],
+      "redirectUris": [
+        "http://localhost:3000/*",
+        "http://localhost:3006/*",
+        "http://localhost:3006/api/auth/callback"
+      ],
+      "webOrigins": ["http://localhost:3000", "http://localhost:3006"],
 
       "attributes": {
         "access.token.lifespan": "900"
-      }
+      },
+      "fullScopeAllowed": true
     }
   ],
 

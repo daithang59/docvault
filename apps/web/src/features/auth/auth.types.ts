@@ -33,6 +33,8 @@ export interface CurrentUserDto {
 export interface AuthContextValue {
   session: Session | null;
   isAuthenticated: boolean;
+  /** True once the session has been restored from localStorage on mount */
+  hydrated: boolean;
   login: (session: Session) => void;
   logout: () => void;
   hasRole: (role: UserRole) => boolean;

@@ -56,31 +56,41 @@ export class DocumentsService {
       },
     });
 
-    const versionRecord = await this.metadataClient.createVersion(
-      docId,
-      {
-        version: nextVersion,
-        objectKey,
+    try {
+      const versionRecord = await this.metadataClient.createVersion(
+        docId,
+        {
+          version: nextVersion,
+          objectKey,
+          checksum,
+          size: file.size,
+          filename: file.originalname,
+          contentType: file.mimetype,
+        },
+        context,
+      );
+
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_UPLOADED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'SUCCESS',
+      });
+
+      return {
+        ...versionRecord,
         checksum,
-        size: file.size,
-        filename: file.originalname,
-        contentType: file.mimetype,
-      },
-      context,
-    );
-
-    await this.auditClient.emitEvent(context, {
-      action: 'DOCUMENT_UPLOADED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
-    });
-
-    return {
-      ...versionRecord,
-      checksum,
-      objectKey,
-    };
+        objectKey,
+      };
+    } catch (error) {
+      // Rollback: delete the orphaned file from MinIO
+      await this.storageService.deleteObject(objectKey).catch((e) => {
+        console.error(
+          `[DocumentsService] Failed to cleanup orphaned object ${objectKey}: ${e.message}`,
+        );
+      });
+      throw error;
+    }
   }
 
   async presignDownload(
@@ -94,7 +104,10 @@ export class DocumentsService {
         { version: dto.version },
         context,
       );
-      const grantPayload = verifyGrantToken(authorization.grantToken);
+      const grantPayload = verifyGrantToken(
+        authorization.grantToken,
+        context.actorId,
+      );
       const url = await this.storageService.createDownloadUrl({
         objectKey: grantPayload.objectKey,
         filename: grantPayload.filename,
@@ -137,7 +150,10 @@ export class DocumentsService {
         { version },
         context,
       );
-      const grantPayload = verifyGrantToken(authorization.grantToken);
+      const grantPayload = verifyGrantToken(
+        authorization.grantToken,
+        context.actorId,
+      );
 
       if (grantPayload.version !== version) {
         throw new ForbiddenException('Requested version is not authorized');

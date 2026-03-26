@@ -20,6 +20,7 @@ import {
   ApiConsumes,
   ApiOperation,
   ApiTags,
+  ApiSecurity,
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
@@ -29,17 +30,30 @@ const FormData = require('form-data') as typeof import('form-data');
 
 @ApiTags('documents-proxy')
 @ApiBearerAuth()
+@ApiSecurity('cookie')
 @Controller('documents')
 export class DocumentsProxyController {
   constructor(private readonly proxyService: ProxyService) {}
 
+  /**
+   * Upload a file for a document.
+   *
+   * The file is stored in **MinIO** (S3-compatible object storage).
+   * After upload, call `POST /api/metadata/documents/:docId/versions` to register
+   * the version metadata, then `POST /api/workflow/:docId/submit` to request approval.
+   *
+   * Max file size: **20 MB**
+   */
   @Post(':docId/upload')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
-  @ApiOperation({
-    summary: 'Proxy -> document-service POST /documents/:docId/upload',
-  })
   @ApiConsumes('multipart/form-data')
+  @ApiOperation({
+    summary: 'Upload a file to document',
+    description:
+      'Upload a binary file (max 20 MB) to MinIO storage for the given document. ' +
+      'After upload, register the version via `POST /api/metadata/documents/:docId/versions`.',
+  })
   @UseInterceptors(
     FileInterceptor('file', {
       storage: memoryStorage(),
@@ -67,12 +81,21 @@ export class DocumentsProxyController {
     return response.data;
   }
 
+  /**
+   * Request a presigned download URL for a file.
+   *
+   * **Note:** `compliance_officer` is **always denied** — enforced at the policy layer.
+   * For PUBLISHED documents, `viewer` can download directly.
+   * For non-PUBLISHED documents, ACL checks apply.
+   */
   @Post(':docId/presign-download')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
-    summary:
-      'Proxy -> document-service POST /documents/:docId/presign-download',
+    summary: 'Get presigned download URL',
+    description:
+      'Returns a time-limited presigned URL from MinIO for direct file download. ' +
+      '**compliance_officer is always denied regardless of ACL.**',
   })
   @HttpCode(200)
   async presignDownload(
@@ -88,12 +111,19 @@ export class DocumentsProxyController {
     return response.data;
   }
 
+  /**
+   * Stream a specific file version directly.
+   *
+   * Authorization is checked by the policy service based on document status and ACL.
+   */
   @Get(':docId/versions/:version/stream')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
-    summary:
-      'Proxy -> document-service GET /documents/:docId/versions/:version/stream',
+    summary: 'Stream file version',
+    description:
+      'Stream a specific version of the document file directly through the gateway. ' +
+      'Used when MinIO is not directly accessible from the client.',
   })
   async streamVersion(
     @Param('docId') docId: string,

@@ -1,12 +1,14 @@
+// Load env FIRST — before any module that uses process.env
+import { config as dotenvConfig } from 'dotenv';
+import { join } from 'path';
+dotenvConfig({ path: join(__dirname, '../../.env') });
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
-import * as dotenv from 'dotenv';
 import { AppModule } from './app.module';
 import { HttpExceptionFilter } from './common/http-exception.filter';
-
-dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);

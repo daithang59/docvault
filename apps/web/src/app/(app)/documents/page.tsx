@@ -11,6 +11,7 @@ import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { ProtectedAction } from '@/components/common/protected-action';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { TablePagination } from '@/components/data-table/table-pagination';
 import { DocumentListItem } from '@/types/document';
 import { ROUTES } from '@/lib/constants/routes';
 import { FilePlus } from 'lucide-react';
@@ -19,6 +20,7 @@ import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
 import { parseApiError } from '@/lib/api/errors';
+import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 
 const DEFAULT_FILTERS: DocumentFiltersState = {
   search: '',
@@ -35,6 +37,8 @@ export default function DocumentsPage() {
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
 
   const submit = useSubmitDocument(targetDoc?.id ?? '');
   const approve = useApproveDocument(targetDoc?.id ?? '');
@@ -65,6 +69,13 @@ export default function DocumentsPage() {
     });
     return result;
   }, [docs, filters]);
+
+  // Pagination
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = useMemo(() => {
+    const start = (page - 1) * pageSize;
+    return filtered.slice(start, start + pageSize);
+  }, [filtered, page, pageSize]);
 
   if (isLoading) return (
     <div>
@@ -104,6 +115,7 @@ export default function DocumentsPage() {
       toast.error(msg);
     } finally {
       setTargetDoc(null); setActionType(null); setRejectReason('');
+      setPage(1); // reset to first page after mutation so the user sees the updated list
     }
   }
 
@@ -122,7 +134,7 @@ export default function DocumentsPage() {
         }
       />
 
-      <DocumentFilters filters={filters} onChange={setFilters} />
+      <DocumentFilters filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
 
       {filtered.length === 0 ? (
         <EmptyState
@@ -141,14 +153,24 @@ export default function DocumentsPage() {
           }
         />
       ) : (
-        <DocumentsTable
-          data={filtered}
-          onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
-          onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
-          onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
-          onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
-          onDownload={(doc) => download(doc.id)}
-        />
+        <>
+          <DocumentsTable
+            data={paginated}
+            onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+            onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+            onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+            onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+            onDownload={(doc) => download(doc.id)}
+          />
+          <TablePagination
+            page={page}
+            pageSize={pageSize}
+            total={filtered.length}
+            totalPages={totalPages}
+            onPageChange={(p) => setPage(p)}
+            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+          />
+        </>
       )}
 
       <ConfirmDialog

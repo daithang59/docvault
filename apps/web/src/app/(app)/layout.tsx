@@ -8,16 +8,17 @@ import { ROUTES } from '@/lib/constants/routes';
 import { LoadingState } from '@/components/common/loading-state';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
-  const { isAuthenticated, session } = useAuth();
+  const { isAuthenticated, session, hydrated } = useAuth();
   const router = useRouter();
 
   useEffect(() => {
+    if (!hydrated) return; // Wait for session to be restored from localStorage
     if (!isAuthenticated) {
       router.push(ROUTES.LOGIN);
     }
-  }, [isAuthenticated, router]);
+  }, [isAuthenticated, hydrated, router]);
 
-  if (!isAuthenticated || !session) {
+  if (!hydrated || !isAuthenticated || !session) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#F8FAFC]">
         <LoadingState label="Signing you in..." />

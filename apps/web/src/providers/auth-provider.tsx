@@ -9,12 +9,12 @@ import { hasRole, hasAnyRole } from '@/lib/auth/roles';
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
-function initSession(): Session | null {
-  return loadSession() as Session | null;
-}
-
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(initSession);
+  const [session, setSession] = useState<Session | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return loadSession() as Session | null;
+  });
+  const [hydrated] = useState(true);
 
   const login = useCallback((newSession: Session) => {
     saveSession(newSession as Parameters<typeof saveSession>[0]);
@@ -29,6 +29,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const value: AuthContextValue = {
     session,
     isAuthenticated: session !== null,
+    hydrated,
     login,
     logout,
     hasRole: (role: UserRole) => hasRole(session as Parameters<typeof hasRole>[0], role),
