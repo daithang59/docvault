@@ -20,15 +20,15 @@ export function PageShell({
   className,
 }: PageShellProps) {
   return (
-    <div className={cn('flex flex-col gap-6 h-full', className)}>
+    <div className={cn('flex h-full flex-col gap-6', className)}>
       {(title || description || actions) && (
         <div className="flex items-start justify-between gap-4">
           <div>
             {title && (
-              <h1 className="text-xl font-bold text-slate-900 tracking-tight">{title}</h1>
+              <h1 className="text-xl font-bold tracking-tight text-[var(--text-strong)]">{title}</h1>
             )}
             {description && (
-              <p className="mt-1 text-sm text-slate-500">{description}</p>
+              <p className="mt-1 text-sm text-[var(--text-muted)]">{description}</p>
             )}
           </div>
           {actions && (

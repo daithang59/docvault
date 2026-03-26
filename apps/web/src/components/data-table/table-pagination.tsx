@@ -29,18 +29,23 @@ export function TablePagination({
 
   return (
     <div className={cn('flex items-center justify-between px-1 py-3 text-sm', className)}>
-      <span className="text-slate-500">
+      <span className="text-[var(--text-muted)]">
         {total === 0 ? 'No results' : `Showing ${start}–${end} of ${total}`}
       </span>
 
       <div className="flex items-center gap-4">
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
-            <span className="text-xs text-slate-400 font-medium">Rows:</span>
+            <span className="text-xs font-medium text-[var(--text-muted)]">Rows:</span>
             <select
               value={pageSize}
               onChange={(e) => onPageSizeChange(Number(e.target.value))}
-              className="rounded-xl border border-slate-200/80 bg-white px-2 py-1 text-sm text-slate-600 focus:outline-none focus:ring-2 focus:ring-blue-500/20 transition-all"
+              className="rounded-xl border px-2 py-1 text-sm transition-all"
+              style={{
+                background: 'var(--input-bg)',
+                color: 'var(--input-text)',
+                borderColor: 'var(--input-border)',
+              }}
             >
               {pageSizeOptions.map((size) => (
                 <option key={size} value={size}>
@@ -56,27 +61,29 @@ export function TablePagination({
             onClick={() => onPageChange(page - 1)}
             disabled={page <= 1}
             className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-xl border text-slate-600',
-              'hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed',
-              'transition-all active:scale-95',
-              page <= 1 ? 'border-slate-200/60' : 'border-slate-200/80',
+              'flex h-8 w-8 items-center justify-center rounded-xl border transition-all active:scale-95',
+              page <= 1
+                ? 'cursor-not-allowed opacity-40'
+                : 'hover:bg-[var(--bg-muted)]',
             )}
+            style={{ borderColor: 'var(--input-border)', color: 'var(--text-main)' }}
             aria-label="Previous page"
           >
             <ChevronLeft size={16} />
           </button>
-          <span className="px-2 text-sm text-slate-500 font-medium whitespace-nowrap">
+          <span className="whitespace-nowrap px-2 text-sm font-medium text-[var(--text-muted)]">
             {page} / {totalPages || 1}
           </span>
           <button
             onClick={() => onPageChange(page + 1)}
             disabled={page >= totalPages}
             className={cn(
-              'flex h-8 w-8 items-center justify-center rounded-xl border text-slate-600',
-              'hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed',
-              'transition-all active:scale-95',
-              page >= totalPages ? 'border-slate-200/60' : 'border-slate-200/80',
+              'flex h-8 w-8 items-center justify-center rounded-xl border transition-all active:scale-95',
+              page >= totalPages
+                ? 'cursor-not-allowed opacity-40'
+                : 'hover:bg-[var(--bg-muted)]',
             )}
+            style={{ borderColor: 'var(--input-border)', color: 'var(--text-main)' }}
             aria-label="Next page"
           >
             <ChevronRight size={16} />
