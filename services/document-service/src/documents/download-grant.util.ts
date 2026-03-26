@@ -8,6 +8,8 @@ export type GrantPayload = {
   filename: string;
   contentType?: string;
   expiresAt: string;
+  classification: string;
+  watermarkRequired: boolean;
 };
 
 function getSecret() {
