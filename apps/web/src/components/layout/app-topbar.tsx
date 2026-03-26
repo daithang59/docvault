@@ -118,7 +118,8 @@ export function AppTopbar() {
 
   function handleLogout() {
     logout();
-    router.push(ROUTES.LOGIN);
+    // Redirect to server-side logout that also ends Keycloak SSO session
+    window.location.href = '/api/auth/logout';
   }
 
   function toggleNotifications() {
