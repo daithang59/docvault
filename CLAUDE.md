@@ -33,6 +33,9 @@ pnpm --filter <service-name> test -- --testPathPattern=foo.spec.ts
 # Prisma migration (chạy sau khi Docker infra đã healthy)
 pnpm --filter metadata-service prisma:deploy
 
+# Prisma Studio — GUI xem data PostgreSQL (chạy khi Docker infra đã chạy)
+pnpm --filter metadata-service prisma:studio
+
 # Migrate audit logs từ PostgreSQL → MongoDB (chạy KHI audit-service đang STOP)
 pnpm --filter audit-service migrate:to-mongo
 

@@ -73,8 +73,10 @@ async function bootstrap() {
       const actorId =
         req.user?.username ??
         req.user?.sub ??
-        req.headers['x-user-id'] ??
-        'anonymous';
+        req.headers['x-user-id'];
+
+      // Skip audit for unauthenticated requests — no value in logging anonymous actors
+      if (!actorId) return;
       const roles = (req.user?.roles ?? []) as string[];
       const result =
         res.statusCode >= 500

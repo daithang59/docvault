@@ -46,6 +46,7 @@ enum WorkflowAction {
   APPROVE
   REJECT
   ARCHIVE
+  RETENTION
 }
 
 model Document {
