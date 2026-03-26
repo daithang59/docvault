@@ -483,3 +483,55 @@ body {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
 }
+
+/* ── Page-load animations — UX Pro Max ─────────────────────────────────────── */
+@keyframes fadeInUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+.animate-in {
+  animation: fadeInUp 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+.animate-fade {
+  animation: fadeIn 0.35s ease-out both;
+}
+
+/* Stagger delays */
+.delay-1 { animation-delay: 0.05s; }
+.delay-2 { animation-delay: 0.10s; }
+.delay-3 { animation-delay: 0.15s; }
+.delay-4 { animation-delay: 0.20s; }
+.delay-5 { animation-delay: 0.25s; }
+
+/* ── Page content wrapper ──────────────────────────────────────────────────── */
+.page-content {
+  animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+/* ── Interactive card — hover lift + glow ───────────────────────────────────── */
+.card-interactive {
+  transition: transform var(--transition-base), box-shadow var(--transition-base), border-color var(--transition-fast);
+}
+.card-interactive:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-card-hover);
+  border-color: var(--border-strong);
+}
+
+/* ── Quick-action arrow slide ──────────────────────────────────────────────── */
+.qa-arrow {
+  transition: transform var(--transition-fast), color var(--transition-fast);
+}
+.group:hover .qa-arrow {
+  transform: translateX(3px);
+  color: var(--color-primary);
+}
+.group:hover .qa-icon {
+  background: var(--color-primary-light);
+  color: var(--color-primary);
+}
