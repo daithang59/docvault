@@ -267,6 +267,19 @@ components:
         message: { type: string, nullable: true }
 
     # ─── Notification ─────────────────────────────────────────────────────────
+    NotificationRecord:
+      type: object
+      required: [id, type, docId, actorId, createdAt, read]
+      properties:
+        id: { type: string, description: 'Unique notification ID' }
+        type: { type: string, enum: [SUBMITTED, APPROVED, REJECTED, ARCHIVED] }
+        docId: { type: string }
+        actorId: { type: string }
+        reason: { type: string, nullable: true }
+        traceId: { type: string, nullable: true }
+        createdAt: { type: string, format: date-time }
+        read: { type: boolean }
+
     Notification:
       type: object
       required: [type, docId, actorId]
@@ -920,6 +933,24 @@ paths:
 
   # ─── Notifications ─────────────────────────────────────────────────────────
   /notify:
+    get:
+      summary: List notifications for the current user
+      operationId: listNotifications
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Notifications]
+      responses:
+        '200':
+          description: Notification list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/NotificationRecord'
+        '401':
+          description: Unauthorized
     post:
       summary: Send a notification (internal — called by workflow-service)
       operationId: sendNotification
@@ -944,6 +975,26 @@ paths:
                   accepted: { type: boolean }
                   type: { type: string }
                   docId: { type: string }
+        '401':
+          description: Unauthorized
+
+  /notify/mark-read:
+    post:
+      summary: Mark all notifications as read
+      operationId: markAllNotificationsRead
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Notifications]
+      responses:
+        '200':
+          description: All notifications marked as read
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  ok: { type: boolean }
         '401':
           description: Unauthorized
 

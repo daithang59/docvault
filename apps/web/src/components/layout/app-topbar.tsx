@@ -1,13 +1,29 @@
 'use client';
 
-import { Bell, LogOut, ChevronDown } from 'lucide-react';
+import {
+  Bell,
+  CheckCheck,
+  LogOut,
+  ChevronDown,
+  FileCheck,
+  XCircle,
+  Send,
+  Archive,
+  Inbox,
+} from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter, usePathname } from 'next/navigation';
 import { ROUTES } from '@/lib/constants/routes';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { UserRole } from '@/types/auth';
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { formatRelative } from '@/lib/utils/date';
+import {
+  fetchNotifications,
+  markAllNotificationsRead,
+  NotificationRecord,
+} from '@/features/notifications/notifications.api';
 
 const pathLabels: Record<string, string> = {
   '/dashboard': 'Dashboard',
@@ -17,16 +33,79 @@ const pathLabels: Record<string, string> = {
   '/audit': 'Audit',
 };
 
+const NOTIF_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
+  SUBMITTED: { label: 'đã gửi duyệt', Icon: Send, color: 'text-blue-500 bg-blue-50' },
+  APPROVED:  { label: 'đã được phê duyệt', Icon: FileCheck, color: 'text-green-600 bg-green-50' },
+  REJECTED:  { label: 'đã bị từ chối', Icon: XCircle, color: 'text-red-500 bg-red-50' },
+  ARCHIVED:  { label: 'đã được lưu trữ', Icon: Archive, color: 'text-slate-500 bg-slate-50' },
+};
+
+function NotificationItem({ notif }: { notif: NotificationRecord }) {
+  const meta = NOTIF_META[notif.type] ?? NOTIF_META['SUBMITTED'];
+  const { Icon } = meta;
+  return (
+    <div className={cn('flex items-start gap-3 px-4 py-3 hover:bg-slate-50/80 transition-colors', !notif.read && 'bg-blue-50/30')}>
+      <div className={cn('mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', meta.color)}>
+        <Icon className="h-3.5 w-3.5" />
+      </div>
+      <div className="flex-1 min-w-0">
+        <p className="text-sm text-slate-700 leading-snug">
+          Tài liệu <span className="font-medium text-slate-900">{notif.docId.slice(0, 8)}…</span> {meta.label}.
+          {notif.reason && (
+            <span className="block text-xs text-slate-400 mt-0.5 truncate">{notif.reason}</span>
+          )}
+        </p>
+        <p className="text-xs text-slate-400 mt-1">{formatRelative(notif.createdAt)}</p>
+      </div>
+      {!notif.read && <span className="mt-1.5 h-1.5 w-1.5 flex-shrink-0 rounded-full bg-blue-500" />}
+    </div>
+  );
+}
+
 export function AppTopbar() {
   const { session, logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [notifOpen, setNotifOpen] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+  const [notifLoading, setNotifLoading] = useState(false);
+  const notifRef = useRef<HTMLDivElement>(null);
 
   const currentLabel =
     Object.entries(pathLabels).find(([path]) =>
       pathname.startsWith(path)
     )?.[1] ?? 'DocVault';
+
+  const unreadCount = notifications.filter((n) => !n.read).length;
+
+  // Close panel on outside click
+  useEffect(() => {
+    if (!notifOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
+        setNotifOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, [notifOpen]);
+
+  // Fetch notifications when panel opens
+  useEffect(() => {
+    if (!notifOpen) return;
+    setNotifLoading(true);
+    fetchNotifications()
+      .then((data) => {
+        setNotifications(data);
+        // Auto-mark read if there are unread
+        if (data.some((n) => !n.read)) {
+          markAllNotificationsRead().catch(() => {});
+        }
+      })
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }, [notifOpen]);
 
   function handleLogout() {
     logout();
@@ -61,17 +140,79 @@ export function AppTopbar() {
           <RoleBadge role={session.user.roles[0] as UserRole} />
         )}
 
-        {/* Notifications — subtle glass button */}
-        <button
-          className="h-8 w-8 rounded-xl flex items-center justify-center text-slate-400 hover:text-slate-700 hover:bg-slate-100 transition-all active:scale-95"
-          aria-label="Notifications"
-        >
-          <div className="relative">
-            <Bell className="h-4 w-4" />
-            {/* Notification dot */}
-            <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(37,99,235,0.6)]" />
-          </div>
-        </button>
+        {/* Notifications */}
+        <div className="relative" ref={notifRef}>
+          <button
+            onClick={() => setNotifOpen(!notifOpen)}
+            className={cn(
+              'h-8 w-8 rounded-xl flex items-center justify-center transition-all active:scale-95',
+              notifOpen
+                ? 'bg-blue-50 text-blue-600'
+                : 'text-slate-400 hover:text-slate-700 hover:bg-slate-100'
+            )}
+            aria-label="Notifications"
+          >
+            <div className="relative">
+              <Bell className="h-4 w-4" />
+              {unreadCount > 0 && (
+                <span className="absolute -top-0.5 -right-0.5 h-2 w-2 rounded-full bg-blue-500 shadow-[0_0_6px_rgba(37,99,235,0.6)]" />
+              )}
+            </div>
+          </button>
+
+          {notifOpen && (
+            <>
+              <div
+                className="fixed inset-0 z-10"
+                onClick={() => setNotifOpen(false)}
+              />
+              <div
+                className="absolute right-0 top-full mt-2 z-20 w-80 overflow-hidden rounded-2xl border border-slate-200/80 shadow-xl"
+                style={{
+                  background: 'rgba(255,255,255,0.97)',
+                  backdropFilter: 'blur(16px)',
+                  WebkitBackdropFilter: 'blur(16px)',
+                  boxShadow: '0 20px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04)',
+                }}
+              >
+                {/* Header */}
+                <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100">
+                  <p className="text-sm font-semibold text-slate-800">Thông báo</p>
+                  {unreadCount > 0 && (
+                    <button
+                      onClick={() => {
+                        markAllNotificationsRead().catch(() => {});
+                        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+                      }}
+                      className="flex items-center gap-1 text-xs text-blue-600 hover:text-blue-700 transition-colors"
+                    >
+                      <CheckCheck className="h-3.5 w-3.5" />
+                      Đánh dấu đã đọc
+                    </button>
+                  )}
+                </div>
+
+                {/* List */}
+                <div className="max-h-80 overflow-y-auto">
+                  {notifLoading ? (
+                    <div className="flex items-center justify-center py-8 text-sm text-slate-400">
+                      Đang tải…
+                    </div>
+                  ) : notifications.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-10 text-slate-400">
+                      <Inbox className="h-8 w-8 opacity-40" />
+                      <p className="text-sm">Không có thông báo nào</p>
+                    </div>
+                  ) : (
+                    notifications.map((notif) => (
+                      <NotificationItem key={notif.id} notif={notif} />
+                    ))
+                  )}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
 
         {/* User dropdown */}
         <div className="relative">

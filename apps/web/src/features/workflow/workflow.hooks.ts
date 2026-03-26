@@ -21,7 +21,7 @@ function useWorkflowMutation<TDto extends WorkflowActionDto | undefined>(
       qc.invalidateQueries({ queryKey: documentsKeys.detail(docId) });
       qc.invalidateQueries({ queryKey: documentsKeys.lists() });
       qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(docId) });
-      qc.invalidateQueries({ queryKey: approvalsKeys.queues() });
+      qc.invalidateQueries({ queryKey: approvalsKeys.all });
       qc.invalidateQueries({ queryKey: auditKeys.queries() });
       toast.success(successMessage);
     },
