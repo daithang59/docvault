@@ -35,10 +35,10 @@ const pathLabels: Record<string, string> = {
 };
 
 const NOTIF_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  SUBMITTED: { label: 'đã gửi duyệt', Icon: Send, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
-  APPROVED:  { label: 'đã được phê duyệt', Icon: FileCheck, color: 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-300' },
-  REJECTED:  { label: 'đã bị từ chối', Icon: XCircle, color: 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-300' },
-  ARCHIVED:  { label: 'đã được lưu trữ', Icon: Archive, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300' },
+  SUBMITTED: { label: 'was submitted for review', Icon: Send, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
+  APPROVED:  { label: 'was approved', Icon: FileCheck, color: 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-300' },
+  REJECTED:  { label: 'was rejected', Icon: XCircle, color: 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-300' },
+  ARCHIVED:  { label: 'was archived', Icon: Archive, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300' },
 };
 
 function NotificationItem({ notif }: { notif: NotificationRecord }) {
@@ -57,7 +57,7 @@ function NotificationItem({ notif }: { notif: NotificationRecord }) {
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug text-[var(--text-main)]">
-          Tài liệu <span className="font-medium text-[var(--text-strong)]">{notif.docId.slice(0, 8)}…</span> {meta.label}.
+          Document <span className="font-medium text-[var(--text-strong)]">{notif.docId.slice(0, 8)}…</span> {meta.label}.
           {notif.reason && (
             <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{notif.reason}</span>
           )}
@@ -192,7 +192,7 @@ export function AppTopbar() {
               }}
             >
               <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-soft)' }}>
-                <p className="text-sm font-semibold text-[var(--text-strong)]">Thông báo</p>
+                <p className="text-sm font-semibold text-[var(--text-strong)]">Notifications</p>
                 {unreadCount > 0 && (
                   <button
                     onClick={() => {
@@ -202,18 +202,18 @@ export function AppTopbar() {
                     className="flex items-center gap-1 text-xs text-[var(--color-primary)] transition-colors hover:opacity-85"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
-                    Đánh dấu đã đọc
+                    Mark all read
                   </button>
                 )}
               </div>
 
               <div className="max-h-80 overflow-y-auto">
                 {notifLoading ? (
-                  <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">Đang tải…</div>
+                  <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">Loading…</div>
                 ) : notifications.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-[var(--text-muted)]">
                     <Inbox className="h-8 w-8 opacity-40" />
-                    <p className="text-sm">Không có thông báo nào</p>
+                    <p className="text-sm">No notifications</p>
                   </div>
                 ) : (
                   notifications.map((notif) => <NotificationItem key={notif.id} notif={notif} />)
