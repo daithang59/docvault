@@ -31,13 +31,19 @@ async function bootstrap() {
   // Intercept OPTIONS preflight BEFORE guards run — guards would reject the
   // preflight with 401 because no Authorization header is present on CORS
   // preflight requests.
-  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) ?? [
-    'http://localhost:3006',
-  ];
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((s) =>
+    s.trim(),
+  ) ?? ['http://localhost:3006'];
   app.use((req: any, res: any, next: () => void) => {
     if (req.method === 'OPTIONS') {
-      res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? allowedOrigins[0]);
-      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Origin',
+        req.headers.origin ?? allowedOrigins[0],
+      );
+      res.setHeader(
+        'Access-Control-Allow-Methods',
+        'GET,POST,PUT,PATCH,DELETE,OPTIONS',
+      );
       res.setHeader(
         'Access-Control-Allow-Headers',
         'Authorization,Content-Type,X-Request-ID,X-User-ID,X-Roles',
@@ -160,30 +166,52 @@ async function bootstrap() {
     .setVersion('0.1.0')
     .setDescription(
       'API Gateway cho hệ thống DocVault.\n\n' +
-      '## Authentication\n\n' +
-      '**Development (localhost):** Sử dụng **Cookie Auth** — JWT được set qua cookie `dv_access_token` ' +
-      'sau khi đăng nhập qua `/api/auth/login`.\n\n' +
-      '**Production:** Sử dụng **Bearer Token** — JWT từ Keycloak, gửi kèm header:\n' +
-      '`Authorization: Bearer <token>`\n\n' +
-      '## Roles\n\n' +
-      '| Role | Mô tả |\n' +
-      '|------|--------|\n' +
-      '| `viewer` | Xem danh sách, tải file đã xuất bản |\n' +
-      '| `editor` | Tạo, upload, submit, archive tài liệu |\n' +
-      '| `approver` | Duyệt / từ chối tài liệu |\n' +
-      '| `compliance_officer` | Xem audit log |\n' +
-      '| `admin` | Toàn quyền |\n\n' +
-      '## Document Lifecycle\n\n' +
-      '`DRAFT → PENDING → PUBLISHED → ARCHIVED`',
+        '## Authentication\n\n' +
+        '**Development (localhost):** Sử dụng **Cookie Auth** — JWT được set qua cookie `dv_access_token` ' +
+        'sau khi đăng nhập qua `/api/auth/login`.\n\n' +
+        '**Production:** Sử dụng **Bearer Token** — JWT từ Keycloak, gửi kèm header:\n' +
+        '`Authorization: Bearer <token>`\n\n' +
+        '## Roles\n\n' +
+        '| Role | Mô tả |\n' +
+        '|------|--------|\n' +
+        '| `viewer` | Xem danh sách, tải file đã xuất bản |\n' +
+        '| `editor` | Tạo, upload, submit, archive tài liệu |\n' +
+        '| `approver` | Duyệt / từ chối tài liệu |\n' +
+        '| `compliance_officer` | Xem audit log |\n' +
+        '| `admin` | Toàn quyền |\n\n' +
+        '## Document Lifecycle\n\n' +
+        '`DRAFT → PENDING → PUBLISHED → ARCHIVED`',
     )
-    .addBearerAuth({ type: 'http', scheme: 'bearer', bearerFormat: 'JWT' }, 'bearer')
-    .addCookieAuth('dv_access_token', { type: 'apiKey', in: 'cookie', name: 'dv_access_token' }, 'cookie')
-    .addTag('auth', 'Keycloak OIDC authentication endpoints (development SSO flow)')
+    .addBearerAuth(
+      { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
+      'bearer',
+    )
+    .addCookieAuth(
+      'dv_access_token',
+      { type: 'apiKey', in: 'cookie', name: 'dv_access_token' },
+      'cookie',
+    )
+    .addTag(
+      'auth',
+      'Keycloak OIDC authentication endpoints (development SSO flow)',
+    )
     .addTag('app', 'Health check and session info')
-    .addTag('metadata-proxy', 'Proxy to metadata-service: documents, ACL, metadata')
-    .addTag('documents-proxy', 'Proxy to document-service: upload, download, presign URLs')
-    .addTag('workflow-proxy', 'Proxy to workflow-service: submit, approve, reject, archive')
-    .addTag('audit-proxy', 'Proxy to audit-service: audit events and chain verification')
+    .addTag(
+      'metadata-proxy',
+      'Proxy to metadata-service: documents, ACL, metadata',
+    )
+    .addTag(
+      'documents-proxy',
+      'Proxy to document-service: upload, download, presign URLs',
+    )
+    .addTag(
+      'workflow-proxy',
+      'Proxy to workflow-service: submit, approve, reject, archive',
+    )
+    .addTag(
+      'audit-proxy',
+      'Proxy to audit-service: audit events and chain verification',
+    )
     .addTag('notify-proxy', 'Proxy to notification-service: notifications')
     .build();
 

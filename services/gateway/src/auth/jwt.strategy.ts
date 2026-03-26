@@ -2,7 +2,6 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy, StrategyOptions } from 'passport-jwt';
 import * as jwksRsa from 'jwks-rsa';
-import * as jwt from 'jsonwebtoken';
 
 type TokenPayload = {
   sub: string;

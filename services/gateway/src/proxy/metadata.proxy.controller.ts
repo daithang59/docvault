@@ -10,7 +10,12 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiBearerAuth, ApiOperation, ApiTags, ApiSecurity } from '@nestjs/swagger';
+import {
+  ApiBearerAuth,
+  ApiOperation,
+  ApiTags,
+  ApiSecurity,
+} from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
@@ -27,7 +32,8 @@ export class MetadataProxyController {
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
     summary: 'List all documents (paginated)',
-    description: 'Returns a list of documents the current user has access to. ' +
+    description:
+      'Returns a list of documents the current user has access to. ' +
       'Results can be filtered by `status`, `ownerId`, `classification`, `tags`, and `q` (full-text search).',
   })
   async list(@Req() req: any) {
@@ -43,7 +49,8 @@ export class MetadataProxyController {
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
     summary: 'Get document detail',
-    description: 'Returns full document metadata including versions, ACL entries, and workflow history.',
+    description:
+      'Returns full document metadata including versions, ACL entries, and workflow history.',
   })
   async findOne(@Param('docId') docId: string, @Req() req: any) {
     const response = await this.proxyService.forward(req, {
@@ -58,7 +65,8 @@ export class MetadataProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Create a new document (DRAFT)',
-    description: 'Creates a new document in **DRAFT** status. ' +
+    description:
+      'Creates a new document in **DRAFT** status. ' +
       'After creation, upload a file via `POST /api/documents/:docId/upload`, ' +
       'then submit for review via `POST /api/workflow/:docId/submit`.',
   })
@@ -76,7 +84,8 @@ export class MetadataProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Update document metadata',
-    description: 'Update title, description, tags, or classification of a DRAFT document.',
+    description:
+      'Update title, description, tags, or classification of a DRAFT document.',
   })
   async update(
     @Param('docId') docId: string,
@@ -96,7 +105,8 @@ export class MetadataProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Add/update ACL entry',
-    description: 'Grant or revoke access for a user, role, or group on this document.',
+    description:
+      'Grant or revoke access for a user, role, or group on this document.',
   })
   async upsertAcl(
     @Param('docId') docId: string,
@@ -128,7 +138,8 @@ export class MetadataProxyController {
   @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Register a new file version',
-    description: 'Register metadata for a new uploaded file version. ' +
+    description:
+      'Register metadata for a new uploaded file version. ' +
       'The file must first be uploaded via `POST /api/documents/:docId/upload`.',
   })
   async createVersion(
@@ -149,7 +160,8 @@ export class MetadataProxyController {
   @Roles('editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Update document status (workflow transition)',
-    description: 'Manually trigger a workflow state transition. ' +
+    description:
+      'Manually trigger a workflow state transition. ' +
       'Normally transitions are handled by the workflow-service.',
   })
   async updateStatus(
@@ -170,7 +182,8 @@ export class MetadataProxyController {
   @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Authorize file download',
-    description: 'Checks ACL + role policy before allowing a file download. ' +
+    description:
+      'Checks ACL + role policy before allowing a file download. ' +
       '**Note:** `compliance_officer` is **always denied** regardless of ACL — enforced by policy.service.ts.',
   })
   @HttpCode(200)

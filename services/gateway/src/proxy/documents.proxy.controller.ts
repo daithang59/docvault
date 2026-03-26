@@ -50,7 +50,8 @@ export class DocumentsProxyController {
   @ApiConsumes('multipart/form-data')
   @ApiOperation({
     summary: 'Upload a file to document',
-    description: 'Upload a binary file (max 20 MB) to MinIO storage for the given document. ' +
+    description:
+      'Upload a binary file (max 20 MB) to MinIO storage for the given document. ' +
       'After upload, register the version via `POST /api/metadata/documents/:docId/versions`.',
   })
   @UseInterceptors(
@@ -92,7 +93,8 @@ export class DocumentsProxyController {
   @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Get presigned download URL',
-    description: 'Returns a time-limited presigned URL from MinIO for direct file download. ' +
+    description:
+      'Returns a time-limited presigned URL from MinIO for direct file download. ' +
       '**compliance_officer is always denied regardless of ACL.**',
   })
   @HttpCode(200)
@@ -119,7 +121,8 @@ export class DocumentsProxyController {
   @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Stream file version',
-    description: 'Stream a specific version of the document file directly through the gateway. ' +
+    description:
+      'Stream a specific version of the document file directly through the gateway. ' +
       'Used when MinIO is not directly accessible from the client.',
   })
   async streamVersion(

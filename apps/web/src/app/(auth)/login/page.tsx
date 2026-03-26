@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ROUTES } from '@/lib/constants/routes';
@@ -17,15 +17,16 @@ export default function LoginPage() {
   const { login } = useAuth();
 
   const [ssoLoading, setSsoLoading] = useState(false);
-  const [callbackError, setCallbackError] = useState<string | null>(null);
+
+  const errorParam = searchParams.get('error');
+  const authStatus = searchParams.get('auth');
+  const callbackError = useMemo(() => {
+    return errorParam ? `Login failed: ${errorParam}` : null;
+  }, [errorParam]);
 
   // ── Handle Keycloak callback redirects ─────────────────────────────────────
   useEffect(() => {
-    const authStatus = searchParams.get('auth');
-    const errorParam = searchParams.get('error');
-
     if (errorParam) {
-      setCallbackError(`Login failed: ${errorParam}`);
       // Clean the URL
       router.replace('/login');
       return;
@@ -51,11 +52,10 @@ export default function LoginPage() {
           router.push(ROUTES.DASHBOARD);
         })
         .catch(() => {
-          setCallbackError('Session expired or invalid. Please try again.');
           router.replace('/login');
         });
     }
-  }, [searchParams, login, router]);
+  }, [searchParams, authStatus, errorParam, login, router]);
 
   function handleSSOLogin() {
     setSsoLoading(true);

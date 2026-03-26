@@ -6,6 +6,14 @@ const CLIENT_ID = process.env.KEYCLOAK_CLIENT_ID ?? 'docvault-gateway';
 const CLIENT_SECRET = process.env.KEYCLOAK_CLIENT_SECRET ?? 'dev-gateway-secret';
 const FRONTEND_URL = process.env.FRONTEND_URL ?? 'http://localhost:3006';
 
+interface JwtPayload {
+  sub: string;
+  preferred_username?: string;
+  username?: string;
+  email?: string;
+  realm_access?: { roles?: string[] };
+}
+
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
@@ -49,7 +57,7 @@ export async function GET(req: NextRequest) {
     const tokens = await tokenRes.json();
     const { access_token, refresh_token, expires_in } = tokens;
 
-    const payload = JSON.parse(atob(access_token.split('.')[1])) as any;
+    const payload = JSON.parse(atob(access_token.split('.')[1])) as JwtPayload;
     const user = {
       sub: payload.sub,
       username: payload.preferred_username ?? payload.username,
