@@ -95,11 +95,142 @@
   --radius-xl: 20px;
   --radius-2xl: 28px;
 
+  /* Surfaces for translucent UI (topbar, popovers) */
+  --surface-overlay: rgba(255, 255, 255, 0.85);
+  --surface-overlay-strong: rgba(255, 255, 255, 0.96);
+  --surface-border: rgba(226, 232, 240, 0.8);
+  --surface-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.04);
+  --surface-shadow-lg: 0 20px 40px rgba(0,0,0,0.08), 0 4px 12px rgba(0,0,0,0.04);
+
+  /* Scrollbar */
+  --scrollbar-thumb: #CBD5E1;
+  --scrollbar-thumb-hover: #94A3B8;
+
+  /* ── Form inputs ─────────────────────────────────────────────────────────── */
+  --input-border: #E2E8F0;
+  --input-bg: #FFFFFF;
+  --input-text: #1E293B;
+  --input-placeholder: #94A3B8;
+  --input-disabled-bg: #F8FAFC;
+  --input-disabled-text: #94A3B8;
+  --focus-ring: rgba(37, 99, 235, 0.2);
+
+  /* ── Table ───────────────────────────────────────────────────────────────── */
+  --table-surface-bg: rgba(255, 255, 255, 0.92);
+  --table-surface-shadow: 0 1px 3px rgba(0,0,0,0.04), 0 4px 12px rgba(0,0,0,0.03);
+  --table-header-bg: linear-gradient(180deg, #F8FAFC 0%, #F5F7FA 100%);
+  --table-header-text: #64748B;
+  --table-header-border: rgba(226, 232, 240, 0.7);
+  --table-row-border: rgba(226, 232, 240, 0.4);
+  --table-row-alt-bg: rgba(248, 250, 252, 0.4);
+
+  /* ── State surfaces ──────────────────────────────────────────────────────── */
+  --state-info-bg: rgba(241, 245, 249, 0.9);
+  --state-info-border: rgba(226, 232, 240, 0.8);
+  --state-info-text: #64748B;
+  --state-error-bg: #FEF2F2;
+  --state-error-border: #FECACA;
+  --state-error-text: #DC2626;
+  --destructive-hover-bg: #FEF2F2;
+
+  /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
+  --skeleton-from: #f1f5f9;
+  --skeleton-via: #e2e8f0;
+  --skeleton-to: #f1f5f9;
+
+  /* ── Dashboard stat icons ───────────────────────────────────────────────── */
+  --stat-total-bg: #EFF6FF;
+  --stat-total-text: #2563EB;
+  --stat-draft-bg: #F1F5F9;
+  --stat-draft-text: #334155;
+  --stat-pending-bg: #FEF3C7;
+  --stat-pending-text: #92400E;
+  --stat-published-bg: #DCFCE7;
+  --stat-published-text: #166534;
+
   /* Transitions */
   --transition-fast: 150ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-base: 250ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-slow: 400ms cubic-bezier(0.4, 0, 0.2, 1);
   --transition-spring: 350ms cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.dark {
+  --color-primary: #60A5FA;
+  --color-primary-hover: #3B82F6;
+  --color-primary-light: rgba(96, 165, 250, 0.18);
+  --color-primary-glow: rgba(96, 165, 250, 0.2);
+  --gradient-primary: linear-gradient(135deg, #3B82F6, #6366F1);
+
+  --bg-app: #0B1220;
+  --bg-subtle: #111827;
+  --bg-card: #111827;
+  --bg-card-hover: #1F2937;
+  --bg-muted: #1E293B;
+  --bg-input: #0F172A;
+
+  --glass-bg: rgba(15, 23, 42, 0.6);
+  --glass-border: rgba(148, 163, 184, 0.18);
+
+  --border-soft: #1E293B;
+  --border-strong: #334155;
+  --border-focus: #60A5FA;
+
+  --text-strong: #F8FAFC;
+  --text-main: #E2E8F0;
+  --text-muted: #94A3B8;
+  --text-faint: #64748B;
+
+  --surface-overlay: rgba(11, 18, 32, 0.78);
+  --surface-overlay-strong: rgba(11, 18, 32, 0.92);
+  --surface-border: rgba(51, 65, 85, 0.8);
+  --surface-shadow-sm: 0 1px 0 rgba(0, 0, 0, 0.35);
+  --surface-shadow-lg: 0 18px 36px rgba(0,0,0,0.45), 0 6px 14px rgba(0,0,0,0.3);
+
+  --scrollbar-thumb: #334155;
+  --scrollbar-thumb-hover: #475569;
+
+  /* ── Form inputs ─────────────────────────────────────────────────────────── */
+  --input-border: #1E293B;
+  --input-bg: #0F172A;
+  --input-text: #E2E8F0;
+  --input-placeholder: #475569;
+  --input-disabled-bg: #111827;
+  --input-disabled-text: #475569;
+  --focus-ring: rgba(96, 165, 250, 0.25);
+
+  /* ── Table ───────────────────────────────────────────────────────────────── */
+  --table-surface-bg: rgba(17, 24, 39, 0.92);
+  --table-surface-shadow: 0 1px 3px rgba(0,0,0,0.25), 0 4px 12px rgba(0,0,0,0.15);
+  --table-header-bg: linear-gradient(180deg, #1E293B 0%, #1F2937 100%);
+  --table-header-text: #94A3B8;
+  --table-header-border: rgba(51, 65, 85, 0.8);
+  --table-row-border: rgba(51, 65, 85, 0.5);
+  --table-row-alt-bg: rgba(30, 41, 59, 0.35);
+
+  /* ── State surfaces ──────────────────────────────────────────────────────── */
+  --state-info-bg: rgba(30, 41, 59, 0.8);
+  --state-info-border: rgba(51, 65, 85, 0.7);
+  --state-info-text: #94A3B8;
+  --state-error-bg: rgba(127, 29, 29, 0.5);
+  --state-error-border: rgba(185, 28, 28, 0.6);
+  --state-error-text: #FCA5A5;
+  --destructive-hover-bg: rgba(127, 29, 29, 0.35);
+
+  /* ── Skeleton shimmer ────────────────────────────────────────────────────── */
+  --skeleton-from: #1E293B;
+  --skeleton-via: #334155;
+  --skeleton-to: #1E293B;
+
+  /* ── Dashboard stat icons ───────────────────────────────────────────────── */
+  --stat-total-bg: rgba(96, 165, 250, 0.15);
+  --stat-total-text: #60A5FA;
+  --stat-draft-bg: rgba(148, 163, 184, 0.15);
+  --stat-draft-text: #94A3B8;
+  --stat-pending-bg: rgba(251, 191, 36, 0.15);
+  --stat-pending-text: #FCD34D;
+  --stat-published-bg: rgba(52, 211, 153, 0.15);
+  --stat-published-text: #34D399;
 }
 
 /* ── Reset ────────────────────────────────────────────────────────────────── */
@@ -124,8 +255,8 @@ body {
 /* ── Scrollbar — subtle & modern ──────────────────────────────────────────── */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 9999px; }
-::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+::-webkit-scrollbar-thumb { background: var(--scrollbar-thumb); border-radius: 9999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--scrollbar-thumb-hover); }
 
 /* ── Focus — clean blue ring ─────────────────────────────────────────────── */
 :focus-visible {
@@ -153,6 +284,34 @@ body {
   backdrop-filter: var(--glass-blur);
   -webkit-backdrop-filter: var(--glass-blur);
   border: 1px solid rgba(255,255,255,0.08);
+}
+
+.dark .glass-dark {
+  background: rgba(8, 14, 28, 0.88);
+  border-color: rgba(148, 163, 184, 0.12);
+}
+
+/* ── Skeleton shimmer utility ─────────────────────────────────────────── */
+.skeleton-shimmer {
+  background: linear-gradient(
+    90deg,
+    var(--skeleton-from) 0%,
+    var(--skeleton-via) 50%,
+    var(--skeleton-to) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+
+/* ── Error-state retry button ────────────────────────────────────────── */
+.retry-btn {
+  background: var(--input-bg);
+  border: 1px solid var(--border-strong);
+  color: var(--text-main);
+  transition: background var(--transition-fast);
+}
+.retry-btn:hover {
+  background: var(--bg-muted);
 }
 
 /* ── Card hover lift — UX: depth on interaction ─────────────────────────── */
@@ -205,7 +364,7 @@ body {
 
 .sidebar-nav-item.active {
   background: var(--sidebar-item-active);
-  color: #60A5FA;
+  color: var(--color-primary);
   border-color: rgba(37, 99, 235, 0.3);
   box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.15) inset;
 }
