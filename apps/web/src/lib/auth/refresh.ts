@@ -10,7 +10,7 @@ function tokenExpiresSoon(token: string): boolean {
   try {
     const payload = parseJwt(token);
     if (!payload?.exp) return true;
-    const msUntilExpiry = payload.exp * 1000 - Date.now();
+    const msUntilExpiry = (payload.exp as number) * 1000 - Date.now();
     return msUntilExpiry < REFRESH_THRESHOLD_SECONDS * 1000;
   } catch {
     return true;
