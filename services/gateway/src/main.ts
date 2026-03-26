@@ -13,6 +13,43 @@ async function bootstrap() {
   const serviceName = 'gateway';
 
   app.setGlobalPrefix('api');
+  app.enableCors({
+    origin: process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) ?? [
+      'http://localhost:3006',
+    ],
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+    allowedHeaders: [
+      'Authorization',
+      'Content-Type',
+      'X-Request-ID',
+      'X-User-ID',
+      'X-Roles',
+    ],
+  });
+
+  // Intercept OPTIONS preflight BEFORE guards run — guards would reject the
+  // preflight with 401 because no Authorization header is present on CORS
+  // preflight requests.
+  const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(',').map((s) => s.trim()) ?? [
+    'http://localhost:3006',
+  ];
+  app.use((req: any, res: any, next: () => void) => {
+    if (req.method === 'OPTIONS') {
+      res.setHeader('Access-Control-Allow-Origin', req.headers.origin ?? allowedOrigins[0]);
+      res.setHeader('Access-Control-Allow-Methods', 'GET,POST,PUT,PATCH,DELETE,OPTIONS');
+      res.setHeader(
+        'Access-Control-Allow-Headers',
+        'Authorization,Content-Type,X-Request-ID,X-User-ID,X-Roles',
+      );
+      res.setHeader('Access-Control-Allow-Credentials', 'true');
+      res.setHeader('Access-Control-Max-Age', '86400');
+      res.status(204).send();
+      return;
+    }
+    next();
+  });
+
   app.useGlobalPipes(
     new ValidationPipe({
       whitelist: true,
