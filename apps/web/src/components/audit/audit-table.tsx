@@ -8,9 +8,12 @@ import { cn } from '@/lib/utils/cn';
 
 interface AuditTableProps {
   data: AuditLogEntry[];
+  total?: number;
+  page?: number;
+  pageSize?: number;
 }
 
-export function AuditTable({ data }: AuditTableProps) {
+export function AuditTable({ data, total = 0, page = 1, pageSize = 20 }: AuditTableProps) {
   if (data.length === 0) {
     return (
       <EmptyState
@@ -80,7 +83,13 @@ export function AuditTable({ data }: AuditTableProps) {
         </table>
       </div>
       <div className="px-4 py-3 border-t border-[#F1F5F9] bg-[#F8FAFC]">
-        <p className="text-xs text-[#94A3B8]">{data.length} record{data.length !== 1 ? 's' : ''}</p>
+        {total === 0 ? (
+          <p className="text-xs text-[#94A3B8]">No records</p>
+        ) : (
+          <p className="text-xs text-[#94A3B8]">
+            {Math.min((page - 1) * pageSize + 1, total)}–{Math.min(page * pageSize, total)} of {total} records
+          </p>
+        )}
       </div>
     </div>
   );

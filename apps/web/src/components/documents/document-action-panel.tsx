@@ -30,7 +30,6 @@ import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
-import { ApiError } from '@/types/api';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 
 interface DocumentActionPanelProps {

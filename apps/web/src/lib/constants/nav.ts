@@ -45,6 +45,6 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Audit',
     href: ROUTES.AUDIT,
     icon: Shield,
-    roles: ['compliance_officer'],
+    roles: ['compliance_officer', 'admin'],
   },
 ];
