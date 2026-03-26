@@ -24,18 +24,49 @@ export function LoadingState({ label = 'Loading...', className }: LoadingStatePr
 
 export function TableSkeleton({ rows = 5, cols = 5 }: { rows?: number; cols?: number }) {
   return (
-    <div className="space-y-2">
-      {Array.from({ length: rows }).map((_, i) => (
-        <div key={i} className="flex gap-4 p-3 rounded-xl animate-pulse">
-          {Array.from({ length: cols }).map((_, j) => (
-            <div
-              key={j}
-              className="skeleton-shimmer h-4 rounded-lg flex-1"
-              style={{ maxWidth: j === 0 ? '200px' : undefined }}
-            />
-          ))}
-        </div>
-      ))}
+    <div
+      className="overflow-hidden rounded-2xl border"
+      style={{
+        background: 'var(--table-surface-bg)',
+        borderColor: 'var(--border-soft)',
+        backdropFilter: 'blur(8px)',
+        boxShadow: 'var(--table-surface-shadow)',
+      }}
+    >
+      {/* Fake header */}
+      <div
+        className="flex gap-4 px-4 py-3 border-b"
+        style={{ background: 'var(--table-header-bg)', borderColor: 'var(--table-header-border)' }}
+      >
+        {Array.from({ length: cols }).map((_, j) => (
+          <div
+            key={j}
+            className="skeleton-shimmer h-3 rounded-full"
+            style={{ flex: j === 0 ? '2' : '1', opacity: 0.5 }}
+          />
+        ))}
+      </div>
+      {/* Rows */}
+      <div className="divide-y" style={{ borderColor: 'var(--table-row-border)' }}>
+        {Array.from({ length: rows }).map((_, i) => (
+          <div
+            key={i}
+            className="flex items-center gap-4 px-4 py-3.5"
+            style={{
+              background: i % 2 === 0 ? 'transparent' : 'var(--table-row-alt-bg)',
+              animationDelay: `${i * 0.05}s`,
+            }}
+          >
+            {Array.from({ length: cols }).map((_, j) => (
+              <div
+                key={j}
+                className="skeleton-shimmer h-4 rounded-lg"
+                style={{ flex: j === 0 ? '2' : '1' }}
+              />
+            ))}
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
@@ -45,9 +76,8 @@ export function CardSkeleton({ className }: { className?: string }) {
     <div
       className={cn('overflow-hidden rounded-2xl border p-6', className)}
       style={{
-        background: 'var(--surface-overlay-strong)',
+        background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
-        backdropFilter: 'blur(8px)',
       }}
     >
       <div className="skeleton-shimmer h-5 w-1/3 rounded-lg" />
