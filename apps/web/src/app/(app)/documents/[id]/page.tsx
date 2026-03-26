@@ -14,7 +14,7 @@ import { ErrorState } from '@/components/common/error-state';
 import { canDownloadDocument, canManageAcl, canReadAcl } from '@/lib/auth/guards';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
-import { queryKeys } from '@/lib/constants/query-keys';
+import { documentsKeys } from '@/features/documents/documents.keys';
 import { toast } from 'sonner';
 
 interface Props {
@@ -39,9 +39,9 @@ export default function DocumentDetailPage({ params }: Props) {
   const aclEntries = canShowAcl ? (doc.aclEntries ?? doc.acl ?? []) : [];
 
   function handleActionComplete() {
-    qc.invalidateQueries({ queryKey: queryKeys.documentDetail(id) });
-    qc.invalidateQueries({ queryKey: queryKeys.workflowHistory(id) });
-    qc.invalidateQueries({ queryKey: queryKeys.documents });
+    qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+    qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
+    qc.invalidateQueries({ queryKey: documentsKeys.lists() });
   }
 
   return (
