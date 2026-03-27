@@ -93,6 +93,23 @@ services:
       retries: 30
     networks: [docvault-net]
 
+  keycloak-init:
+    image: python:3.12-alpine
+    container_name: docvault-keycloak-init
+    depends_on:
+      keycloak:
+        condition: service_healthy
+    environment:
+      KEYCLOAK_URL: http://keycloak:8080
+      KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN}
+      KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
+      KEYCLOAK_REALM: docvault
+    entrypoint: ["/bin/sh", "-c", "apk add --no-cache curl > /dev/null 2>&1 && /bin/sh /seed-roles.sh"]
+    volumes:
+      - ./keycloak/seed-roles.sh:/seed-roles.sh:ro
+    networks: [docvault-net]
+    restart: "no"
+
   mongo-express:
     image: mongo-express:latest
     container_name: docvault-mongo-express

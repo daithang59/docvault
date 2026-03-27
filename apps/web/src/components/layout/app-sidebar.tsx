@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Shield, X, Menu } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { NAV_ITEMS } from '@/lib/constants/nav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
@@ -136,10 +136,18 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [mounted, setMounted] = useState(false);
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    session?.user.roles.some((r) => (item.roles as UserRole[]).includes(r))
-  );
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
+  // Prevent hydration mismatch: defer role-based filtering to client mount
+  const visibleItems = mounted
+    ? NAV_ITEMS.filter((item) =>
+        session?.user.roles.some((r) => (item.roles as UserRole[]).includes(r))
+      )
+    : NAV_ITEMS;
 
   return (
     <>

@@ -15,6 +15,10 @@ import { Type } from 'class-transformer';
 export class AuditController {
   constructor(private readonly auditService: AuditService) {}
 
+  /**
+   * Append a new audit event to the immutable log.
+   * Called by the gateway audit middleware with a forwarded JWT.
+   */
   @Post('events')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Append an audit event' })
@@ -24,8 +28,8 @@ export class AuditController {
 
   @Get('query')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('compliance_officer')
-  @ApiOperation({ summary: 'Query audit events (compliance officer only)' })
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Query audit events (compliance officer or admin)' })
   query(@Query() query: QueryAuditDto) {
     return this.auditService.query(query);
   }
