@@ -15,8 +15,8 @@ export function PageHeader({ title, subtitle, actions, badge, className }: PageH
   return (
     <div className={cn('mb-6 flex items-start justify-between gap-4', className)}>
       <div className="min-w-0 flex-1">
-        <div className="mb-1 flex items-center gap-3">
-          <h1 className="truncate text-2xl font-semibold tracking-tight text-[var(--text-strong)]">{title}</h1>
+        <div className="flex flex-wrap items-center gap-3">
+          <h1 className="truncate text-xl font-bold tracking-tight text-[var(--text-strong)]">{title}</h1>
           {badge}
         </div>
         {subtitle && (

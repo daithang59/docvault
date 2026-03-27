@@ -9,6 +9,7 @@ export interface UserInfo {
   email?: string;
   firstName?: string;
   lastName?: string;
+  displayName?: string;          // Computed full name: name ?? firstName+lastName
   roles: UserRole[];
 }
 
@@ -25,6 +26,9 @@ export interface CurrentUserDto {
   sub: string;
   username?: string;
   email?: string;
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
   roles: UserRole[];
   raw?: Record<string, unknown>;
 }

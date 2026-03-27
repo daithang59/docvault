@@ -7,4 +7,5 @@ export const ROUTES = {
   DOCUMENT_EDIT: (id: string) => `/documents/${id}/edit`,
   APPROVALS: '/approvals',
   AUDIT: '/audit',
+  PROFILE: '/profile',
 } as const;

@@ -147,6 +147,12 @@ export class AuthController {
         sub: payload.sub,
         username: payload.preferred_username ?? payload.username,
         email: payload.email,
+        firstName: payload.given_name,
+        lastName: payload.family_name,
+        displayName:
+          payload.name ??
+          [payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
+            undefined,
         roles: payload.realm_access?.roles ?? [],
       };
 
