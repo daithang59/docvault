@@ -13,7 +13,7 @@ import {
   User,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useRouter, usePathname } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { ROUTES } from '@/lib/constants/routes';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
@@ -26,14 +26,6 @@ import {
   markAllNotificationsRead,
   NotificationRecord,
 } from '@/features/notifications/notifications.api';
-
-const pathLabels: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/documents': 'Documents',
-  '/documents/new': 'New Document',
-  '/approvals': 'Approvals',
-  '/audit': 'Audit',
-};
 
 const NOTIF_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
   SUBMITTED: { label: 'was submitted for review', Icon: Send, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
@@ -78,15 +70,11 @@ function NotificationItem({ notif }: { notif: NotificationRecord }) {
 export function AppTopbar() {
   const { session, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  const currentLabel =
-    Object.entries(pathLabels).find(([path]) => pathname.startsWith(path))?.[1] ?? 'DocVault';
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -155,15 +143,14 @@ export function AppTopbar() {
         boxShadow: 'var(--surface-shadow-sm)',
       }}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-[var(--text-muted)] lg:hidden">DocVault</span>
-        <span className="hidden text-sm font-semibold text-[var(--text-strong)] lg:block">{currentLabel}</span>
+      <div className="flex items-center gap-3">
+        {session?.user.roles[0] && (
+          <RoleBadge role={session.user.roles[0] as UserRole} />
+        )}
       </div>
 
       <div className="flex items-center gap-2">
         <ThemeToggle />
-
-        {session?.user.roles[0] && <RoleBadge role={session.user.roles[0] as UserRole} />}
 
         <div className="relative" ref={notifRef}>
           <button

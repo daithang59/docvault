@@ -78,22 +78,22 @@
   --class-secret-text: #B91C1C;
   --class-secret-border: #FECACA;
 
-  /* Role badges */
-  --role-viewer-bg: #F8FAFC;
-  --role-viewer-text: #64748B;
-  --role-viewer-border: #E2E8F0;
-  --role-editor-bg: #EFF6FF;
-  --role-editor-text: #3B82F6;
-  --role-editor-border: #BFDBFE;
-  --role-approver-bg: #F5F3FF;
+  /* Role badges — glass/tint style for both modes */
+  --role-viewer-bg: rgba(100, 116, 139, 0.08);
+  --role-viewer-text: #475569;
+  --role-viewer-border: rgba(100, 116, 139, 0.25);
+  --role-editor-bg: rgba(59, 130, 246, 0.08);
+  --role-editor-text: #2563EB;
+  --role-editor-border: rgba(59, 130, 246, 0.3);
+  --role-approver-bg: rgba(124, 58, 237, 0.08);
   --role-approver-text: #7C3AED;
-  --role-approver-border: #DDD6FE;
-  --role-compliance_officer-bg: #FFF1F2;
+  --role-approver-border: rgba(124, 58, 237, 0.3);
+  --role-compliance_officer-bg: rgba(225, 29, 72, 0.08);
   --role-compliance_officer-text: #E11D48;
-  --role-compliance_officer-border: #FECDD3;
-  --role-admin-bg: #0F172A;
-  --role-admin-text: #F8FAFC;
-  --role-admin-border: #334155;
+  --role-compliance_officer-border: rgba(225, 29, 72, 0.25);
+  --role-admin-bg: rgba(30, 41, 59, 0.1);
+  --role-admin-text: #1E293B;
+  --role-admin-border: rgba(30, 41, 59, 0.25);
 
   /* Semantic */
   --color-success: #16A34A;
