@@ -10,6 +10,9 @@ export const metadata: Metadata = {
   description:
     'Enterprise-grade secure document lifecycle management system with role-based access control.',
   keywords: ['document management', 'RBAC', 'enterprise', 'audit', 'workflow'],
+  icons: {
+    icon: '/favicon.svg',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
