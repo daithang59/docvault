@@ -545,6 +545,12 @@ body {
   animation: emptyFloat 3s ease-in-out infinite;
 }
 
+@media (prefers-reduced-motion: reduce) {
+  .empty-float {
+    animation: none;
+  }
+}
+
 /* ── Custom toast accents ──────────────────────────────────────────────────── */
 .toast-success {
   border-left: 3px solid var(--color-success) !important;

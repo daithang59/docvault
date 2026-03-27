@@ -20,6 +20,9 @@ export interface CurrentUserDto {
   username?: string;
   email?: string;
   roles: UserRole[];
+  firstName?: string;
+  lastName?: string;
+  displayName?: string;
   raw?: JwtPayload;
 }
 
@@ -92,6 +95,12 @@ export function buildUserInfoFromTokenPayload(payload: JwtPayload): UserInfo {
     email: typeof payload.email === 'string' ? payload.email : undefined,
     firstName: typeof payload.given_name === 'string' ? payload.given_name : undefined,
     lastName: typeof payload.family_name === 'string' ? payload.family_name : undefined,
+    displayName:
+      typeof payload.name === 'string'
+        ? payload.name
+        : typeof payload.given_name === 'string' || typeof payload.family_name === 'string'
+          ? [payload.given_name, payload.family_name].filter(Boolean).join(' ')
+          : undefined,
     roles: extractRoles(payload),
   };
 }
@@ -108,12 +117,25 @@ export function buildSessionFromAccessToken(token: string): Session | null {
 
 export function buildUserInfoFromCurrentUserDto(currentUser: CurrentUserDto): UserInfo {
   const username = currentUser.username || currentUser.sub;
+  const raw = currentUser.raw;
+
+  const displayName =
+    typeof raw?.displayName === 'string'
+      ? raw.displayName
+      : typeof raw?.name === 'string'
+        ? raw.name
+        : typeof raw?.given_name === 'string' || typeof raw?.family_name === 'string'
+          ? [raw?.given_name, raw?.family_name].filter(Boolean).join(' ')
+          : undefined;
 
   return {
     sub: currentUser.sub,
     username,
     preferred_username: username,
     email: currentUser.email,
+    firstName: typeof raw?.given_name === 'string' ? raw.given_name : undefined,
+    lastName: typeof raw?.family_name === 'string' ? raw.family_name : undefined,
+    displayName,
     roles: normalizeUserRoles(currentUser.roles),
   };
 }

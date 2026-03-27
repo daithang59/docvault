@@ -2,6 +2,9 @@ export const apiEndpoints = {
   auth: {
     currentUser: '/me',
   },
+  users: {
+    profile: '/users/profile',
+  },
   metadata: {
     documents: {
       list: '/metadata/documents',
