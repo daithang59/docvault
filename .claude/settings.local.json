@@ -2,7 +2,22 @@
   "permissions": {
     "allow": [
       "Bash(python3 \"c:\\\\NT114\\\\docvault\\\\.agent\\\\skills\\\\ui-ux-pro-max-skill-main\\\\ui-ux-pro-max-skill-main\\\\src\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"SaaS dashboard enterprise\" --stack nextjs --domain product -n 5)",
-      "Bash(python3 \"c:\\\\NT114\\\\docvault\\\\.agent\\\\skills\\\\ui-ux-pro-max-skill-main\\\\ui-ux-pro-max-skill-main\\\\src\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"minimalism clean professional dark\" --stack nextjs --domain style -n 5)"
+      "Bash(python3 \"c:\\\\NT114\\\\docvault\\\\.agent\\\\skills\\\\ui-ux-pro-max-skill-main\\\\ui-ux-pro-max-skill-main\\\\src\\\\ui-ux-pro-max\\\\scripts\\\\search.py\" \"minimalism clean professional dark\" --stack nextjs --domain style -n 5)",
+      "Bash(timeout 30 bash -c \"while docker inspect --format=''{{.State.Health.Status}}'' docvault-keycloak 2>/dev/null | grep -v healthy > /dev/null; do sleep 2; done; docker inspect --format=''{{.State.Health.Status}}'' docvault-keycloak\")",
+      "Bash(findstr -i \"curl\\\\|wget\")",
+      "Bash(netstat -ano)",
+      "Bash(findstr \":3002\")",
+      "Bash(curl -s http://localhost:3001/api/health)",
+      "Bash(curl -s http://localhost:3004/api/health)",
+      "Bash(curl -s http://localhost:3003/api/health)",
+      "Bash(tasklist /fi \"PID eq 15292\")",
+      "Bash(findstr \":3001 :3003 :3004 :3005\")",
+      "Bash(powershell -Command \"Get-Process -Id \\(Get-NetTCPConnection -LocalPort 3002 -ErrorAction SilentlyContinue\\).OwningProcess | Select-Object Id, ProcessName, Path -First 1\")",
+      "Bash(powershell -Command \"Get-NetTCPConnection -LocalPort 3001,3003,3004 -ErrorAction SilentlyContinue | Select-Object LocalPort, OwningProcess\")",
+      "Bash(powershell -Command \"Stop-Process -Id 15292 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed PID 15292''\")",
+      "Bash(findstr \":3001 :3002 :3003 :3004 :3005\")",
+      "Bash(findstr \"LISTENING\")",
+      "Bash(powershell -Command \"Stop-Process -Id 18736 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed 3005 stale process''\")"
     ]
   }
 }
