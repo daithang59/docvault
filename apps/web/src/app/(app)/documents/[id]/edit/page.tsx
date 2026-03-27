@@ -8,6 +8,7 @@ import { DocumentForm, DocumentFormValues } from '@/components/documents/documen
 import { PageHeader } from '@/components/common/page-header';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
+import { EmptyState } from '@/components/common/empty-state';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -35,12 +36,19 @@ export default function EditDocumentPage({ params }: Props) {
   const canEdit = canEditDocument(session, doc);
   if (!canEdit) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[var(--text-muted)]">You do not have permission to edit this document.</p>
-        <Link href={ROUTES.DOCUMENT_DETAIL(id)} className="mt-2 inline-block text-sm text-[var(--color-primary)] hover:underline">
-          Back to document
-        </Link>
-      </div>
+      <EmptyState
+        icon="lock"
+        title="Không có quyền chỉnh sửa"
+        description="Bạn không có quyền chỉnh sửa tài liệu này."
+        action={
+          <Link
+            href={ROUTES.DOCUMENT_DETAIL(id)}
+            className="mt-2 inline-flex items-center gap-1.5 text-sm text-[var(--color-primary)] hover:underline"
+          >
+            Quay lại tài liệu
+          </Link>
+        }
+      />
     );
   }
 

@@ -298,6 +298,22 @@ components:
         sub: { type: string }
         username: { type: string }
         email: { type: string, nullable: true }
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        displayName: { type: string, nullable: true }
+        roles: { type: array, items: { type: string } }
+        raw: { type: object, description: 'Full JWT payload from Keycloak' }
+
+    UserProfile:
+      type: object
+      description: Full user profile fetched from Keycloak UserInfo endpoint
+      properties:
+        sub: { type: string }
+        username: { type: string }
+        displayName: { type: string, nullable: true }
+        firstName: { type: string, nullable: true }
+        lastName: { type: string, nullable: true }
+        email: { type: string, nullable: true }
         roles: { type: array, items: { type: string } }
 
 # ─── Paths ───────────────────────────────────────────────────────────────────
@@ -853,6 +869,22 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditEvent'
+        '401':
+          description: Unauthorized
+
+  /users/profile:
+    get:
+      summary: Get current user profile
+      operationId: getUserProfile
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: User profile from Keycloak UserInfo endpoint
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserProfile'
         '401':
           description: Unauthorized
 

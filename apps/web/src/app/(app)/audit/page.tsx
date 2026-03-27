@@ -7,11 +7,13 @@ import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
 import { TablePagination } from '@/components/data-table/table-pagination';
+import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import type { AuditQueryFilters } from '@/features/audit/audit.types';
 import { canViewAudit } from '@/lib/auth/guards';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { Shield } from 'lucide-react';
 
 export default function AuditPage() {
   const { session } = useAuth();
@@ -28,9 +30,17 @@ export default function AuditPage() {
 
   if (!hasAccess) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[var(--text-muted)]">You do not have permission to access audit logs.</p>
-      </div>
+      <EmptyState
+        icon="lock"
+        title="Không có quyền truy cập"
+        description="Bạn cần vai trò Compliance Officer hoặc Admin để xem nhật ký audit."
+        action={
+          <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
+            <Shield size={13} />
+            <span>Vai trò hiện tại của bạn không đủ quyền.</span>
+          </div>
+        }
+      />
     );
   }
 

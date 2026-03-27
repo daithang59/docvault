@@ -16,11 +16,29 @@ function SidebarNav({
   onLinkClick,
 }: {
   pathname: string;
-  session: { user: { preferred_username?: string; username?: string; roles: string[] } } | null;
+  session: {
+    user: {
+      preferred_username?: string;
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      roles: string[];
+    };
+  } | null;
   visibleItems: typeof NAV_ITEMS;
   onLinkClick: () => void;
 }) {
-  const avatarInitials = (session?.user.preferred_username ?? session?.user.username ?? 'U').slice(0, 2).toUpperCase();
+  const avatarInitials =
+    session?.user.firstName && session?.user.lastName
+      ? `${session.user.firstName[0]}${session.user.lastName[0]}`.toUpperCase()
+      : (session?.user.preferred_username ?? session?.user.username ?? 'U').slice(0, 2).toUpperCase();
+
+  const displayName =
+    session?.user.displayName ??
+    ([session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') ||
+      session?.user.preferred_username) ??
+    'User';
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -101,7 +119,7 @@ function SidebarNav({
             </div>
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium leading-tight text-[var(--sidebar-text-active)]">
-                {session.user.preferred_username}
+                {displayName}
               </p>
               <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--sidebar-text)]">
                 {session.user.roles[0]?.replace('_', ' ')}

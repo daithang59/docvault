@@ -4,6 +4,7 @@ import { WorkflowHistoryEntry } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
 import { Send, CheckCircle, XCircle, Archive } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
+import { useAuth } from '@/lib/auth/auth-context';
 
 const ACTION_CONFIG = {
   SUBMIT: { icon: Send, color: 'text-[var(--color-primary)]', bg: 'bg-[var(--stat-total-bg)]', label: 'Submitted' },
@@ -17,6 +18,8 @@ interface DocumentWorkflowTimelineProps {
 }
 
 export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelineProps) {
+  const { session } = useAuth();
+  const currentSub = session?.user.sub;
   const sorted = [...history].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -64,7 +67,14 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
                         )}
                       </div>
                       <div className="flex flex-wrap gap-3 mt-0.5 text-xs" style={{ color: 'var(--text-faint)' }}>
-                        <span>By <span className="font-mono">{entry.actorId.slice(0, 8)}…</span></span>
+                        <span>
+                          By{' '}
+                          {entry.actorId === currentSub && session?.user.displayName ? (
+                            <span className="font-medium text-[var(--text-main)]">{session.user.displayName}</span>
+                          ) : (
+                            <span className="font-medium">{entry.actorDisplay ?? entry.actorId}</span>
+                          )}
+                        </span>
                         <span>{formatDateTime(entry.createdAt)}</span>
                       </div>
                       {entry.reason && (

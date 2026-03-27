@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/common/error-state';
 import { DocumentListItem } from '@/types/document';
 import { canViewApprovals } from '@/lib/auth/guards';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { Shield } from 'lucide-react';
 
 export default function ApprovalsPage() {
   const { session } = useAuth();
@@ -38,9 +39,17 @@ export default function ApprovalsPage() {
 
   if (!hasAccess) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[var(--text-muted)]">You do not have permission to access approvals.</p>
-      </div>
+      <EmptyState
+        icon="lock"
+        title="Không có quyền truy cập"
+        description="Bạn cần vai trò Approver hoặc Admin để xem trang này."
+        action={
+          <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
+            <Shield size={13} />
+            <span>Vai trò hiện tại của bạn không đủ quyền.</span>
+          </div>
+        }
+      />
     );
   }
 
