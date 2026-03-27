@@ -2,9 +2,7 @@
 
 import { useMemo } from 'react';
 import { useDocuments } from '@/lib/hooks/use-documents';
-import { useAuth } from '@/lib/auth/auth-context';
 import { PageHeader } from '@/components/common/page-header';
-import { RoleBadge } from '@/components/badges/role-badge';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -13,11 +11,9 @@ import { FileText, FilePlus, CheckSquare, Shield, ArrowRight, TrendingUp } from 
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
 import { formatDateTime } from '@/lib/utils/date';
-import { UserRole } from '@/types/auth';
 import { truncateEnd } from '@/lib/utils/format';
 
 export default function DashboardPage() {
-  const { session } = useAuth();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const stats = useMemo(() => {
@@ -48,7 +44,6 @@ export default function DashboardPage() {
       <PageHeader
         title="Dashboard"
         subtitle="System overview and quick access to your documents."
-        badge={session?.user.roles[0] ? <RoleBadge role={session.user.roles[0] as UserRole} /> : null}
       />
 
       {/* Stat cards */}
