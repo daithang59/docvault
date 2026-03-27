@@ -65,7 +65,7 @@ function InfoCard({ icon, label, value, mono, muted }: InfoCardProps) {
 
 function SectionLabel({ children }: { children: React.ReactNode }) {
   return (
-    <div className="mb-3 flex items-center gap-3">
+    <div className="mt-10 mb-4 flex items-center gap-3">
       <div className="h-px flex-1" style={{ background: 'var(--border-soft)' }} />
       <span className="text-[11px] font-semibold uppercase tracking-widest text-[var(--text-faint)]">
         {children}

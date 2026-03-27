@@ -41,7 +41,8 @@ export function RoleBadge({ role, size = 'sm', className }: RoleBadgeProps) {
         backgroundColor: `var(--role-${role}-bg)`,
         color: `var(--role-${role}-text)`,
         borderColor: `var(--role-${role}-border)`,
-        boxShadow: '0 1px 2px rgba(0,0,0,0.06)',
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       }}
     >
       {roleLabels[role]}
