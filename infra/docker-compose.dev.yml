@@ -87,8 +87,8 @@ services:
     volumes:
       - ./keycloak/realm-docvault.json:/opt/keycloak/data/import/realm-docvault.json:ro
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://localhost:8080/health/ready || exit 1"]
-      interval: 5s
+      test: ["CMD", "timeout", "5", "bash", "-c", "exec 3<>/dev/tcp/localhost/8080 && exit 0 || exit 1"]
+      interval: 10s
       timeout: 5s
       retries: 30
     networks: [docvault-net]
