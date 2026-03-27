@@ -121,7 +121,7 @@ export default function ProfilePage() {
     >
       {/* ── Hero Card ───────────────────────────────────────── */}
       <div
-        className="relative overflow-hidden rounded-2xl border p-6"
+        className="animate-in delay-1 relative overflow-hidden rounded-2xl border p-6"
         style={{
           background: 'var(--bg-card)',
           borderColor: 'var(--border-soft)',
@@ -210,9 +210,9 @@ export default function ProfilePage() {
       </div>
 
       {/* ── Account Info ────────────────────────────────────── */}
-      <SectionLabel>Thông tin tài khoản</SectionLabel>
-
-      <div className="grid gap-3 sm:grid-cols-2">
+      <div className="animate-in delay-2">
+        <SectionLabel>Thông tin tài khoản</SectionLabel>
+        <div className="grid gap-3 sm:grid-cols-2">
         <InfoCard
           icon={<AtSign size={15} className="text-[var(--color-primary)]" />}
           label="Username"
@@ -237,36 +237,38 @@ export default function ProfilePage() {
           value="Keycloak SSO"
         />
       </div>
+      </div>
 
       {/* ── Roles ───────────────────────────────────────────── */}
-      <SectionLabel>Vai trò &amp; quyền hạn</SectionLabel>
-
-      <div
-        className="relative overflow-hidden rounded-xl border p-5"
-        style={{
-          background: 'var(--bg-card)',
-          borderColor: 'var(--border-soft)',
-        }}
-      >
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-muted)]">
-            <Shield size={18} className="text-[var(--text-muted)]" />
-          </div>
-          {user?.roles && user.roles.length > 0 ? (
-            <div className="flex flex-wrap gap-2">
-              {user.roles.map((role) => (
-                <RoleBadge key={role} role={role as UserRole} size="md" />
-              ))}
+      <div className="animate-in delay-3">
+        <SectionLabel>Vai trò &amp; quyền hạn</SectionLabel>
+        <div
+          className="relative overflow-hidden rounded-xl border p-5"
+          style={{
+            background: 'var(--bg-card)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <div className="flex items-center gap-4">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[var(--bg-muted)]">
+              <Shield size={18} className="text-[var(--text-muted)]" />
             </div>
-          ) : (
-            <p className="text-sm text-[var(--text-muted)]">Không có vai trò nào được gán.</p>
-          )}
+            {user?.roles && user.roles.length > 0 ? (
+              <div className="flex flex-wrap gap-2">
+                {user.roles.map((role) => (
+                  <RoleBadge key={role} role={role as UserRole} size="md" />
+                ))}
+              </div>
+            ) : (
+              <p className="text-sm text-[var(--text-muted)]">Không có vai trò nào được gán.</p>
+            )}
+          </div>
         </div>
       </div>
 
       {/* ── Keycloak Management ─────────────────────────────── */}
       <div
-        className="relative overflow-hidden rounded-xl border p-5"
+        className="animate-in delay-4 relative overflow-hidden rounded-xl border p-5"
         style={{
           borderColor: 'var(--border-soft)',
           background: 'var(--bg-card)',

@@ -151,8 +151,8 @@ export class AuthController {
         lastName: payload.family_name,
         displayName:
           payload.name ??
-          [payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
-            undefined,
+          ([payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
+            undefined),
         roles: payload.realm_access?.roles ?? [],
       };
 

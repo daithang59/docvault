@@ -66,11 +66,13 @@ export default function NewDocumentPage() {
         />
       }
     >
-      <div className="mx-auto max-w-2xl">
+      <div className="animate-in delay-1 mx-auto max-w-2xl">
         <PageHeader
           title="New Document"
           subtitle="Create a new document entry and optionally upload the initial file."
         />
+      </div>
+      <div className="animate-in delay-2 mx-auto max-w-2xl">
         <div
           className="space-y-6 rounded-2xl border p-4 sm:p-6"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}

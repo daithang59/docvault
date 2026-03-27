@@ -46,20 +46,24 @@ export default function AuditPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Audit"
-        subtitle="Inspect immutable audit records and access events."
-      />
+      <div className="animate-in delay-1">
+        <PageHeader
+          title="Audit"
+          subtitle="Inspect immutable audit records and access events."
+        />
+      </div>
 
-      <AuditFilters
-        filters={filters}
-        onChange={(f) => { setFilters(f); setPage(1); }}
-      />
+      <div className="animate-in delay-2">
+        <AuditFilters
+          filters={filters}
+          onChange={(f) => { setFilters(f); setPage(1); }}
+        />
+      </div>
 
       {isLoading && <LoadingState label="Querying audit logs..." />}
       {isError && <ErrorState message="Failed to load audit logs." onRetry={refetch} />}
       {!isLoading && !isError && (
-        <>
+        <div className="animate-in delay-3">
           <AuditTable
             data={logs?.data ?? []}
             total={total}
@@ -74,7 +78,7 @@ export default function AuditPage() {
             onPageChange={(p) => setPage(p)}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
           />
-        </>
+        </div>
       )}
     </div>
   );

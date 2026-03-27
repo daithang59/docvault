@@ -49,8 +49,8 @@ export class UsersController {
 
       const displayName =
         (user['displayName'] as string) ??
-        [user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
-          undefined;
+        ([user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
+          undefined);
 
       return {
         sub: user['sub'],
@@ -79,7 +79,7 @@ export class UsersController {
         sub: u.sub,
         username: u.preferred_username ?? u.username,
         displayName:
-          u.name ?? [u.given_name, u.family_name].filter(Boolean).join(' ') || undefined,
+          u.name ?? ([u.given_name, u.family_name].filter(Boolean).join(' ') || undefined),
         firstName: u.given_name,
         lastName: u.family_name,
         email: u.email,
@@ -93,8 +93,8 @@ export class UsersController {
 
       const displayName =
         (user['displayName'] as string) ??
-        [user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
-          undefined;
+        ([user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
+          undefined);
 
       return {
         sub: user['sub'],
