@@ -46,31 +46,41 @@ export default function DocumentDetailPage({ params }: Props) {
 
   return (
     <div>
-      <DocumentHeader doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
+      <div className="animate-in delay-1">
+        <DocumentHeader doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
+      </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Left col: versions + timeline */}
         <div className="lg:col-span-2 space-y-5">
-          <DocumentVersionsCard
-            versions={doc.versions ?? []}
-            canDownload={canDl}
-            onDownload={() => download(id)}
-          />
-          <DocumentWorkflowTimeline history={history} />
+          <div className="animate-in delay-2">
+            <DocumentVersionsCard
+              versions={doc.versions ?? []}
+              canDownload={canDl}
+              onDownload={() => download(id)}
+            />
+          </div>
+          <div className="animate-in delay-3">
+            <DocumentWorkflowTimeline history={history} />
+          </div>
         </div>
 
         {/* Right col: actions + ACL */}
         <div className="space-y-5">
-          <DocumentActionPanel
-            doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
-            onActionComplete={handleActionComplete}
-          />
-          {canShowAcl && (
-            <DocumentAclCard
-              docId={id}
-              entries={aclEntries}
-              canManage={canAcl}
+          <div className="animate-in delay-2">
+            <DocumentActionPanel
+              doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+              onActionComplete={handleActionComplete}
             />
+          </div>
+          {canShowAcl && (
+            <div className="animate-in delay-3">
+              <DocumentAclCard
+                docId={id}
+                entries={aclEntries}
+                canManage={canAcl}
+              />
+            </div>
           )}
         </div>
       </div>
