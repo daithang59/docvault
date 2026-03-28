@@ -4,16 +4,19 @@ import { DocumentVersion } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
 import { formatBytes } from '@/lib/utils/file';
 import { truncateMiddle } from '@/lib/utils/format';
-import { Download, FileText } from 'lucide-react';
+import { Download, Eye, FileText } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 
 interface DocumentVersionsCardProps {
+  docId: string;
   versions: DocumentVersion[];
   onDownload?: () => void;
+  onPreview?: (docId: string, version: DocumentVersion) => void;
   canDownload: boolean;
+  canPreview: boolean;
 }
 
-export function DocumentVersionsCard({ versions, onDownload, canDownload }: DocumentVersionsCardProps) {
+export function DocumentVersionsCard({ docId, versions, onDownload, onPreview, canDownload, canPreview }: DocumentVersionsCardProps) {
   const sorted = [...versions].sort(
     (a, b) => (b.versionNumber ?? b.version ?? 0) - (a.versionNumber ?? a.version ?? 0)
   );
@@ -65,16 +68,28 @@ export function DocumentVersionsCard({ versions, onDownload, canDownload }: Docu
                   <span>{formatDateTime(v.uploadedAt ?? v.createdAt ?? '')}</span>
                 </div>
               </div>
-              {canDownload && onDownload && (
-                <button
-                  onClick={() => onDownload()}
-                  className="shrink-0 p-1.5 rounded-lg transition-colors"
-                  style={{ color: 'var(--text-faint)' }}
-                  title="Download this version"
-                >
-                  <Download className="h-4 w-4" />
-                </button>
-              )}
+              <div className="flex items-center gap-1 shrink-0">
+                {canPreview && onPreview && (
+                  <button
+                    onClick={() => onPreview(docId, v)}
+                    className="p-1.5 rounded-lg transition-colors"
+                    style={{ color: 'var(--text-faint)' }}
+                    title="Preview this version"
+                  >
+                    <Eye className="h-4 w-4" />
+                  </button>
+                )}
+                {canDownload && onDownload && (
+                  <button
+                    onClick={() => onDownload()}
+                    className="p-1.5 rounded-lg transition-colors"
+                    style={{ color: 'var(--text-faint)' }}
+                    title="Download this version"
+                  >
+                    <Download className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
         </div>

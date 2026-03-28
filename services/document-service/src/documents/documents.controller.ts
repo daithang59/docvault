@@ -3,8 +3,10 @@ import {
   Controller,
   Get,
   HttpCode,
+  HttpStatus,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -105,5 +107,77 @@ export class DocumentsController {
     );
 
     return response.stream;
+  }
+
+  @Get(':docId/preview')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Stream a document for inline preview (supports Range requests)',
+  })
+  async preview(
+    @Param('docId') docId: string,
+    @Query('version') version: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    // Parse Range header (e.g. "bytes=0-1023")
+    const rangeHeader = req.headers['range'];
+    let range: { start: number; end: number } | undefined;
+    if (rangeHeader) {
+      const match = rangeHeader.match(/bytes=(\d+)-(\d+)/);
+      if (match) {
+        range = { start: Number(match[1]), end: Number(match[2]) };
+      }
+    }
+
+    const parsedVersion = version ? Number(version) : undefined;
+
+    const result = await this.documentsService.preview({
+      docId,
+      version: parsedVersion,
+      range,
+      context: buildRequestContext(req),
+    });
+
+    if (result.contentType) {
+      res.setHeader('Content-Type', result.contentType);
+    }
+    res.setHeader(
+      'Content-Disposition',
+      `inline; filename="${encodeURIComponent(result.filename)}"`,
+    );
+    res.setHeader('Accept-Ranges', 'bytes');
+
+    const sdkResponse = result.object as any;
+
+    if (range && sdkResponse.ContentRange) {
+      // 206 Partial Content
+      res.status(HttpStatus.PARTIAL_CONTENT);
+      res.setHeader('Content-Range', sdkResponse.ContentRange);
+      res.setHeader(
+        'Content-Length',
+        sdkResponse.ContentLength ?? range.end - range.start + 1,
+      );
+    } else {
+      // 200 OK
+      if (sdkResponse.ContentLength) {
+        res.setHeader('Content-Length', sdkResponse.ContentLength);
+      }
+    }
+
+    // Pipe MinIO stream directly to HTTP response (zero RAM)
+    const bodyStream = sdkResponse.Body as NodeJS.ReadableStream;
+
+    bodyStream.on('error', (err: Error) => {
+      if (!res.headersSent) {
+        res.status(500).json({ message: ['Preview stream failed'], detail: err.message });
+      } else {
+        res.destroy(err);
+      }
+    });
+
+    bodyStream.pipe(res);
+    return;
   }
 }

@@ -42,7 +42,10 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
       sub: string;
       username?: string;
       email?: string;
-      realm_access?: { roles?: string[] };
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      roles: string[];
     }>(`${env.API_BASE_URL}/me`, {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
@@ -63,6 +66,9 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
       username: data.username || extractUsername(newPayload!),
       preferred_username: data.username || extractUsername(newPayload!),
       email: data.email,
+      firstName: data.firstName,
+      lastName: data.lastName,
+      displayName: data.displayName,
       roles: extractRoles(newPayload!),
     };
 

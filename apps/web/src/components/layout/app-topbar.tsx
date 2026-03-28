@@ -10,10 +10,10 @@ import {
   Send,
   Archive,
   Inbox,
+  User,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useRouter, usePathname } from 'next/navigation';
-import { ROUTES } from '@/lib/constants/routes';
+import { useRouter } from 'next/navigation';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { UserRole } from '@/types/auth';
@@ -25,14 +25,6 @@ import {
   markAllNotificationsRead,
   NotificationRecord,
 } from '@/features/notifications/notifications.api';
-
-const pathLabels: Record<string, string> = {
-  '/dashboard': 'Dashboard',
-  '/documents': 'Documents',
-  '/documents/new': 'New Document',
-  '/approvals': 'Approvals',
-  '/audit': 'Audit',
-};
 
 const NOTIF_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
   SUBMITTED: { label: 'was submitted for review', Icon: Send, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
@@ -77,15 +69,11 @@ function NotificationItem({ notif }: { notif: NotificationRecord }) {
 export function AppTopbar() {
   const { session, logout } = useAuth();
   const router = useRouter();
-  const pathname = usePathname();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
-
-  const currentLabel =
-    Object.entries(pathLabels).find(([path]) => pathname.startsWith(path))?.[1] ?? 'DocVault';
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -132,7 +120,16 @@ export function AppTopbar() {
     });
   }
 
-  const avatarInitials = (session?.user.preferred_username ?? 'U').slice(0, 2).toUpperCase();
+  const avatarInitials =
+    session?.user.firstName && session?.user.lastName
+      ? `${session.user.firstName[0]}${session.user.lastName[0]}`.toUpperCase()
+      : (session?.user.preferred_username ?? 'U').slice(0, 2).toUpperCase();
+
+  const displayName =
+    session?.user.displayName ??
+    ([session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') ||
+      session?.user.preferred_username) ??
+    'User';
 
   return (
     <header
@@ -145,15 +142,14 @@ export function AppTopbar() {
         boxShadow: 'var(--surface-shadow-sm)',
       }}
     >
-      <div className="flex items-center gap-2">
-        <span className="text-sm font-medium text-[var(--text-muted)] lg:hidden">DocVault</span>
-        <span className="hidden text-sm font-semibold text-[var(--text-strong)] lg:block">{currentLabel}</span>
+      <div className="flex items-center gap-3">
+        {session?.user.roles[0] && (
+          <RoleBadge role={session.user.roles[0] as UserRole} />
+        )}
       </div>
 
       <div className="flex items-center gap-2">
         <ThemeToggle />
-
-        {session?.user.roles[0] && <RoleBadge role={session.user.roles[0] as UserRole} />}
 
         <div className="relative" ref={notifRef}>
           <button
@@ -209,7 +205,17 @@ export function AppTopbar() {
 
               <div className="max-h-80 overflow-y-auto">
                 {notifLoading ? (
-                  <div className="flex items-center justify-center py-8 text-sm text-[var(--text-muted)]">Loading…</div>
+                  <div className="flex flex-col gap-2.5 px-4 py-5">
+                    {[85, 60, 75].map((w, i) => (
+                      <div key={i} className="flex items-start gap-3">
+                        <div className="mt-0.5 h-7 w-7 shrink-0 rounded-lg bg-[var(--bg-muted)]" />
+                        <div className="flex-1 space-y-1.5 pt-0.5">
+                          <div className="h-3 w-full animate-pulse rounded bg-[var(--bg-muted)]" style={{ width: `${w}%` }} />
+                          <div className="h-2.5 w-1/3 animate-pulse rounded bg-[var(--bg-muted)]" />
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 ) : notifications.length === 0 ? (
                   <div className="flex flex-col items-center gap-2 py-10 text-[var(--text-muted)]">
                     <Inbox className="h-8 w-8 opacity-40" />
@@ -239,7 +245,7 @@ export function AppTopbar() {
                 <span className="text-[10px] font-bold uppercase tracking-tight text-blue-400">{avatarInitials}</span>
               </div>
             </div>
-            <span className="hidden text-sm font-medium md:block">{session?.user.preferred_username ?? 'User'}</span>
+            <span className="hidden text-sm font-medium md:block">{displayName}</span>
             <ChevronDown
               className={cn(
                 'h-3.5 w-3.5 text-[var(--text-muted)] transition-transform duration-200',
@@ -263,9 +269,19 @@ export function AppTopbar() {
               }}
             >
               <div className="border-b px-4 py-3.5" style={{ borderColor: 'var(--border-soft)' }}>
-                <p className="text-sm font-semibold text-[var(--text-strong)]">{session?.user.preferred_username}</p>
-                <p className="mt-0.5 text-xs text-[var(--text-muted)]">ID: {session?.user.sub?.slice(0, 8)}…</p>
+                <p className="text-sm font-semibold text-[var(--text-strong)]">{displayName}</p>
+                {session?.user.email && (
+                  <p className="mt-0.5 text-xs text-[var(--text-muted)]">{session.user.email}</p>
+                )}
+                <p className="mt-0.5 text-xs text-[var(--text-faint)]">ID: {session?.user.sub?.slice(0, 8)}…</p>
               </div>
+              <button
+                onClick={() => { setDropdownOpen(false); router.push('/profile'); }}
+                className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
+              >
+                <User className="h-4 w-4" />
+                View Profile
+              </button>
               <button
                 onClick={handleLogout}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-red-600 transition-colors hover:bg-red-50/80 dark:text-red-300 dark:hover:bg-red-950/35"

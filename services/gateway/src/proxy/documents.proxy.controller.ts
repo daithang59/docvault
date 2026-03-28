@@ -5,6 +5,7 @@ import {
   HttpCode,
   Param,
   Post,
+  Query,
   Req,
   Res,
   UploadedFile,
@@ -146,6 +147,66 @@ export class DocumentsProxyController {
         response.headers['content-disposition'] as string,
       );
     }
+
+    (response.data as NodeJS.ReadableStream).pipe(res);
+  }
+
+  /**
+   * Stream a document for inline preview (supports Range requests for PDF.js).
+   *
+   * Unlike streamVersion, this:
+   * - Allows compliance_officer
+   * - Does not apply watermarks
+   * - Uses Content-Disposition: inline
+   */
+  @Get(':docId/preview')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Stream document for inline preview',
+    description:
+      'Streams the document binary for browser-based preview. ' +
+      'Supports HTTP Range requests. Does not apply watermarks.',
+  })
+  async preview(
+    @Param('docId') docId: string,
+    @Query('version') version: string,
+    @Req() req: any,
+    @Res() res: Response,
+  ) {
+    const url = version
+      ? `${process.env.DOCUMENT_SERVICE_URL}/documents/${docId}/preview?version=${version}`
+      : `${process.env.DOCUMENT_SERVICE_URL}/documents/${docId}/preview`;
+
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url,
+      responseType: 'stream',
+    });
+
+      // Forward all relevant streaming headers
+      const headers = response.headers as Record<
+        string,
+        string | string[] | undefined
+      >;
+      if (headers['content-type']) {
+        res.setHeader('Content-Type', String(headers['content-type']));
+      }
+      if (headers['content-disposition']) {
+        res.setHeader(
+          'Content-Disposition',
+          String(headers['content-disposition']),
+        );
+      }
+      if (headers['accept-ranges']) {
+        res.setHeader('Accept-Ranges', String(headers['accept-ranges']));
+      }
+      if (headers['content-range']) {
+        res.setHeader('Content-Range', String(headers['content-range']));
+      }
+      if (headers['content-length']) {
+        res.setHeader('Content-Length', String(headers['content-length']));
+      }
 
     (response.data as NodeJS.ReadableStream).pipe(res);
   }

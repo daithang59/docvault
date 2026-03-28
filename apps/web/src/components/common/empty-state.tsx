@@ -1,12 +1,12 @@
 'use client';
 
-import { FolderOpen, Search, FileText, ClipboardList, AudioWaveform } from 'lucide-react';
+import { FolderOpen, Search, FileText, ClipboardList, AudioWaveform, Lock } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 interface EmptyStateProps {
   title: string;
   description?: string;
-  icon?: 'document' | 'folder' | 'search' | 'audit' | 'list';
+  icon?: 'document' | 'folder' | 'search' | 'audit' | 'list' | 'lock';
   action?: React.ReactNode;
   className?: string;
 }
@@ -17,6 +17,7 @@ const icons = {
   search: Search,
   audit: AudioWaveform,
   list: ClipboardList,
+  lock: Lock,
 };
 
 export function EmptyState({

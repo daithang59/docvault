@@ -38,9 +38,13 @@ export async function queryAuditLog(
   page?: number,
   pageSize?: number,
 ): Promise<PaginatedResponse<AuditLogEntry>> {
-  const res = await apiClient.get<AuditLogEntry[]>(apiEndpoints.audit.query, {
+  const res = await apiClient.get(apiEndpoints.audit.query, {
     params: toAuditQueryParams(filters, page, pageSize),
   });
 
-  return normalizePaginatedResponse(unwrap(res).map(normalizeAuditLogEntry));
+  const paginated = normalizePaginatedResponse<AuditLogEntry>(unwrap(res));
+  return {
+    ...paginated,
+    data: paginated.data.map(normalizeAuditLogEntry),
+  };
 }

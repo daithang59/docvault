@@ -13,6 +13,7 @@ import { ErrorState } from '@/components/common/error-state';
 import { DocumentListItem } from '@/types/document';
 import { canViewApprovals } from '@/lib/auth/guards';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { Shield } from 'lucide-react';
 
 export default function ApprovalsPage() {
   const { session } = useAuth();
@@ -38,9 +39,17 @@ export default function ApprovalsPage() {
 
   if (!hasAccess) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[var(--text-muted)]">You do not have permission to access approvals.</p>
-      </div>
+      <EmptyState
+        icon="lock"
+        title="Không có quyền truy cập"
+        description="Bạn cần vai trò Approver hoặc Admin để xem trang này."
+        action={
+          <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
+            <Shield size={13} />
+            <span>Vai trò hiện tại của bạn không đủ quyền.</span>
+          </div>
+        }
+      />
     );
   }
 
@@ -49,26 +58,30 @@ export default function ApprovalsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Approvals"
-        subtitle="Review pending submissions and publish approved documents."
-        badge={
-          pendingDocs.length > 0 ? (
-            <span className="rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: 'var(--status-pending-text)' }}>
-              {pendingDocs.length}
-            </span>
-          ) : null
-        }
-      />
+      <div className="animate-in delay-1">
+        <PageHeader
+          title="Approvals"
+          subtitle="Review pending submissions and publish approved documents."
+          badge={
+            pendingDocs.length > 0 ? (
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold text-white" style={{ background: 'var(--status-pending-text)' }}>
+                {pendingDocs.length}
+              </span>
+            ) : null
+          }
+        />
+      </div>
 
       {pendingDocs.length === 0 ? (
-        <EmptyState
-          title="No pending approvals"
-          description="All documents have been reviewed. Check back later."
-          icon="list"
-        />
+        <div className="animate-in delay-2">
+          <EmptyState
+            title="No pending approvals"
+            description="All documents have been reviewed. Check back later."
+            icon="list"
+          />
+        </div>
       ) : (
-        <>
+        <div className="animate-in delay-2">
           <ApprovalsTable
             data={paginated}
             onReview={(doc) => setSelectedDoc(doc)}
@@ -81,7 +94,7 @@ export default function ApprovalsPage() {
             onPageChange={(p) => setPage(p)}
             onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
           />
-        </>
+        </div>
       )}
 
       <ApprovalReviewDrawer

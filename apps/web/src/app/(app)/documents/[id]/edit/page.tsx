@@ -8,6 +8,7 @@ import { DocumentForm, DocumentFormValues } from '@/components/documents/documen
 import { PageHeader } from '@/components/common/page-header';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
+import { EmptyState } from '@/components/common/empty-state';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -35,12 +36,19 @@ export default function EditDocumentPage({ params }: Props) {
   const canEdit = canEditDocument(session, doc);
   if (!canEdit) {
     return (
-      <div className="py-16 text-center">
-        <p className="text-[var(--text-muted)]">You do not have permission to edit this document.</p>
-        <Link href={ROUTES.DOCUMENT_DETAIL(id)} className="mt-2 inline-block text-sm text-[var(--color-primary)] hover:underline">
-          Back to document
-        </Link>
-      </div>
+      <EmptyState
+        icon="lock"
+        title="Không có quyền chỉnh sửa"
+        description="Bạn không có quyền chỉnh sửa tài liệu này."
+        action={
+          <Link
+            href={ROUTES.DOCUMENT_DETAIL(id)}
+            className="mt-2 inline-flex items-center gap-1.5 text-sm text-[var(--color-primary)] hover:underline"
+          >
+            Quay lại tài liệu
+          </Link>
+        }
+      />
     );
   }
 
@@ -62,39 +70,46 @@ export default function EditDocumentPage({ params }: Props) {
   return (
     <div>
       <div className="mx-auto max-w-2xl">
-        <Link
-          href={ROUTES.DOCUMENT_DETAIL(id)}
-          className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-main)]"
-        >
-          <ArrowLeft className="h-4 w-4" />
-          Back to document
-        </Link>
-
-        <PageHeader
-          title="Edit Document"
-          subtitle="Update the metadata for this document."
-        />
-
-        <div className="rounded-2xl border bg-[var(--bg-card)] p-4 sm:p-6" style={{ borderColor: 'var(--border-soft)' }}>
-          <DocumentForm
-            defaultValues={{
-              title: doc.title,
-              description: doc.description ?? '',
-              classification: doc.classification,
-              tags: doc.tags,
-            }}
-            onSubmit={handleSubmit}
-            submitLabel="Save Changes"
-            isLoading={update.isPending}
+        <div className="animate-in delay-1">
+          <Link
+            href={ROUTES.DOCUMENT_DETAIL(id)}
+            className="mb-4 inline-flex items-center gap-1.5 text-sm text-[var(--text-muted)] transition hover:text-[var(--text-main)]"
           >
-            <Link
-              href={ROUTES.DOCUMENT_DETAIL(id)}
-              className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
-              style={{ borderColor: 'var(--border-strong)' }}
+            <ArrowLeft className="h-4 w-4" />
+            Back to document
+          </Link>
+
+          <PageHeader
+            title="Edit Document"
+            subtitle="Update the metadata for this document."
+          />
+        </div>
+
+        <div className="animate-in delay-2">
+          <div
+            className="rounded-2xl border bg-[var(--bg-card)] p-4 sm:p-6"
+            style={{ borderColor: 'var(--border-soft)' }}
+          >
+            <DocumentForm
+              defaultValues={{
+                title: doc.title,
+                description: doc.description ?? '',
+                classification: doc.classification,
+                tags: doc.tags,
+              }}
+              onSubmit={handleSubmit}
+              submitLabel="Save Changes"
+              isLoading={update.isPending}
             >
-              Cancel
-            </Link>
-          </DocumentForm>
+              <Link
+                href={ROUTES.DOCUMENT_DETAIL(id)}
+                className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
+                style={{ borderColor: 'var(--border-strong)' }}
+              >
+                Cancel
+              </Link>
+            </DocumentForm>
+          </div>
         </div>
       </div>
     </div>

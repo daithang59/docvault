@@ -19,24 +19,30 @@ const roleLabels: Record<UserRole, string> = {
   admin: 'Admin',
 };
 
+type BadgeSize = 'sm' | 'md';
+
 interface RoleBadgeProps {
   role: UserRole;
+  size?: BadgeSize;
   className?: string;
 }
 
-export function RoleBadge({ role, className }: RoleBadgeProps) {
+export function RoleBadge({ role, size = 'sm', className }: RoleBadgeProps) {
   if (!VALID_ROLES.has(role)) return null;
   return (
     <span
       className={cn(
-        'inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all hover:-translate-y-0.5',
+        'inline-flex items-center rounded-full font-semibold border transition-all',
+        size === 'sm' && 'px-2.5 py-0.5 text-xs',
+        size === 'md' && 'px-3 py-1 text-sm',
         className
       )}
       style={{
         backgroundColor: `var(--role-${role}-bg)`,
         color: `var(--role-${role}-text)`,
         borderColor: `var(--role-${role}-border)`,
-        boxShadow: `0 1px 2px rgba(0,0,0,0.06)`,
+        backdropFilter: 'blur(8px)',
+        WebkitBackdropFilter: 'blur(8px)',
       }}
     >
       {roleLabels[role]}

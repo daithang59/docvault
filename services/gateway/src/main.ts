@@ -108,8 +108,21 @@ async function bootstrap() {
         'x-user-id': actorId,
         'x-roles': roles.join(','),
       };
-      if (req.headers.authorization) {
-        headers.authorization = req.headers.authorization;
+
+      // Forward JWT — from Authorization header or dv_access_token cookie
+      let authHeader = req.headers.authorization;
+      if (!authHeader) {
+        const rawCookies = (req.headers.cookie ?? '') as string;
+        const cookieToken = rawCookies
+          .split(';')
+          .map((c: string) => c.trim().split('='))
+          .find(([k]: string[]) => k === 'dv_access_token')?.[1];
+        if (cookieToken) {
+          authHeader = `Bearer ${decodeURIComponent(cookieToken)}`;
+        }
+      }
+      if (authHeader) {
+        headers.authorization = authHeader;
       }
 
       const baseEvent = {

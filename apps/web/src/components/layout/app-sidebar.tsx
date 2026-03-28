@@ -8,19 +8,41 @@ import { NAV_ITEMS } from '@/lib/constants/nav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
 import { UserRole } from '@/types/auth';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 function SidebarNav({
   pathname,
   session,
   visibleItems,
   onLinkClick,
+  mounted,
 }: {
   pathname: string;
-  session: { user: { preferred_username?: string; username?: string; roles: string[] } } | null;
+  session: {
+    user: {
+      preferred_username?: string;
+      username?: string;
+      firstName?: string;
+      lastName?: string;
+      displayName?: string;
+      roles: string[];
+    };
+  } | null;
   visibleItems: typeof NAV_ITEMS;
   onLinkClick: () => void;
+  /** True once the component has mounted on the client — used to prevent hydration mismatches */
+  mounted?: boolean;
 }) {
-  const avatarInitials = (session?.user.preferred_username ?? session?.user.username ?? 'U').slice(0, 2).toUpperCase();
+  const avatarInitials =
+    session?.user.firstName && session?.user.lastName
+      ? `${session.user.firstName[0]}${session.user.lastName[0]}`.toUpperCase()
+      : (session?.user.preferred_username ?? session?.user.username ?? 'U').slice(0, 2).toUpperCase();
+
+  const displayName =
+    session?.user.displayName ??
+    ([session?.user.firstName, session?.user.lastName].filter(Boolean).join(' ') ||
+      session?.user.preferred_username) ??
+    'User';
 
   return (
     <div className="relative flex h-full flex-col overflow-hidden">
@@ -86,8 +108,8 @@ function SidebarNav({
         })}
       </nav>
 
-      {/* User info */}
-      {session && (
+      {/* User info — hidden until mounted to prevent hydration mismatch */}
+      {mounted && session && (
         <div className="relative px-4 py-4 border-t" style={{ borderColor: 'var(--sidebar-border)' }}>
           <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           <div className="mt-2 flex items-center gap-3">
@@ -101,7 +123,7 @@ function SidebarNav({
             </div>
             <div className="flex-1 min-w-0">
               <p className="truncate text-sm font-medium leading-tight text-[var(--sidebar-text-active)]">
-                {session.user.preferred_username}
+                {displayName}
               </p>
               <p className="mt-0.5 truncate text-[11px] capitalize text-[var(--sidebar-text)]">
                 {session.user.roles[0]?.replace('_', ' ')}
@@ -118,10 +140,14 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
+  const mounted = useMounted();
 
-  const visibleItems = NAV_ITEMS.filter((item) =>
-    session?.user.roles.some((r) => (item.roles as UserRole[]).includes(r))
-  );
+  // Prevent hydration mismatch: defer role-based filtering to client mount
+  const visibleItems = mounted
+    ? NAV_ITEMS.filter((item) =>
+        session?.user.roles.some((r) => (item.roles as UserRole[]).includes(r))
+      )
+    : NAV_ITEMS;
 
   return (
     <>
@@ -150,6 +176,7 @@ export function AppSidebar() {
             session={session}
             visibleItems={visibleItems}
             onLinkClick={() => setMobileOpen(false)}
+            mounted={mounted}
           />
         </div>
       </aside>
@@ -201,6 +228,7 @@ export function AppSidebar() {
               session={session}
               visibleItems={visibleItems}
               onLinkClick={() => setMobileOpen(false)}
+              mounted={mounted}
             />
           </aside>
         </div>
