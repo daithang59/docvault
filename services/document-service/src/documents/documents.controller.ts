@@ -84,18 +84,21 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'Stream a document version after metadata authorizes download',
+    summary: 'Stream a document version by grant token (already authorized, no metadata call)',
   })
   async streamVersion(
     @Param('docId') docId: string,
     @Param('version') version: string,
+    @Query('token') token: string,
     @Req() req: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const response = await this.documentsService.getStream(
+    const context = buildRequestContext(req);
+
+    const response = await this.documentsService.getStreamWithToken(
       docId,
-      Number(version),
-      buildRequestContext(req),
+      token,
+      context.actorId,
     );
 
     if (response.contentType) {

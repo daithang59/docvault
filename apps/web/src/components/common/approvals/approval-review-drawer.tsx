@@ -2,15 +2,17 @@
 
 import { useState } from 'react';
 import { DocumentListItem } from '@/types/document';
+import type { DocumentVersion } from '@/features/documents/documents.types';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
-import { CheckCircle, XCircle, X } from 'lucide-react';
+import { CheckCircle, XCircle, X, Eye } from 'lucide-react';
 import { useApproveDocument, useRejectDocument } from '@/lib/hooks/use-documents';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage } from '@/lib/api/errors';
@@ -23,6 +25,7 @@ interface ApprovalReviewDrawerProps {
 export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps) {
   const [confirmType, setConfirmType] = useState<'approve' | 'reject' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const [previewVersion, setPreviewVersion] = useState<DocumentVersion | null>(null);
 
   const { data: displayNames } = useOwnerDisplayNames(doc ? [doc.ownerId] : []);
   const ownerDisplay = doc
@@ -120,6 +123,28 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
 
         <div className="flex gap-2 border-t px-6 py-4" style={{ borderColor: 'var(--border-soft)' }}>
           <button
+            onClick={() => {
+              if (doc) {
+                setPreviewVersion({
+                  id: '',
+                  docId: doc.id,
+                  version: doc.currentVersion ?? 1,
+                  objectKey: '',
+                  checksum: '',
+                  size: 0,
+                  filename: doc.filename ?? doc.title,
+                  contentType: doc.mimeType ?? undefined,
+                  createdAt: doc.createdAt,
+                  createdBy: doc.ownerId,
+                });
+              }
+            }}
+            className="flex items-center justify-center gap-2 rounded-xl border border-[var(--input-border)] px-3 py-2.5 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
+          >
+            <Eye className="h-4 w-4 text-[var(--text-muted)]" />
+            Preview
+          </button>
+          <button
             onClick={() => setConfirmType('approve')}
             className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-[var(--status-published-border)] bg-[var(--status-published-bg)] py-2.5 text-sm font-medium text-[var(--status-published-text)] transition hover:brightness-95"
           >
@@ -161,6 +186,12 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)] outline-none transition focus:border-[var(--border-focus)]"
         />
       </ConfirmDialog>
+
+      <DocumentPreviewDialog
+        docId={doc?.id ?? ''}
+        version={previewVersion}
+        onClose={() => setPreviewVersion(null)}
+      />
     </>
   );
 }

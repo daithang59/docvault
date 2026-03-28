@@ -110,15 +110,23 @@ export class DocumentsService {
     context: RequestContext,
   ) {
     try {
-      const authorization = await this.metadataClient.authorizeDownload(
-        docId,
-        { version: dto.version },
-        context,
-      );
-      const grantPayload = verifyGrantToken(
-        authorization.grantToken,
-        context.actorId,
-      );
+      let grantPayload: ReturnType<typeof verifyGrantToken>;
+      let expiresInSeconds: number;
+
+      if (dto.grantToken) {
+        // grantToken provided — frontend already authorized, skip metadata call
+        grantPayload = verifyGrantToken(dto.grantToken, context.actorId);
+        expiresInSeconds = 300; // consistent default, not from metadata
+      } else {
+        // Fallback: re-authorize via metadata service
+        const authorization = await this.metadataClient.authorizeDownload(
+          docId,
+          { version: dto.version },
+          context,
+        );
+        grantPayload = verifyGrantToken(authorization.grantToken, context.actorId);
+        expiresInSeconds = authorization.expiresInSeconds;
+      }
 
       // SECURITY: CONFIDENTIAL/SECRET documents must go through the streaming
       // path so the watermark can be applied. Reject presigned URL for these.
@@ -127,8 +135,8 @@ export class DocumentsService {
           docId,
           version: grantPayload.version,
           filename: grantPayload.filename,
-          expiresAt: authorization.expiresAt,
-          expiresInSeconds: authorization.expiresInSeconds,
+          expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+          expiresInSeconds,
           url: null,
           watermarkRequired: true,
           streamingEndpoint: `/documents/${docId}/versions/${grantPayload.version}/stream`,
@@ -138,21 +146,58 @@ export class DocumentsService {
       const url = await this.storageService.createDownloadUrl({
         objectKey: grantPayload.objectKey,
         filename: grantPayload.filename,
-        expiresInSeconds: authorization.expiresInSeconds,
+        expiresInSeconds,
       });
 
       return {
         docId,
         version: grantPayload.version,
         filename: grantPayload.filename,
-        expiresAt: authorization.expiresAt,
-        expiresInSeconds: authorization.expiresInSeconds,
+        expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+        expiresInSeconds,
         url,
       };
     } catch (error) {
       await this.auditDownloadError(docId, context, error);
       throw error;
     }
+  }
+
+  /**
+   * Stream a document by verifying a grant token directly — no metadata service call.
+   * Used when the grant token was already obtained via authorizeDownload().
+   */
+  async getStreamWithToken(
+    docId: string,
+    grantToken: string,
+    actorId: string,
+  ): Promise<{
+    filename: string;
+    contentType?: string;
+    stream: StreamableFile;
+  }> {
+    const grantPayload = verifyGrantToken(grantToken, actorId);
+
+    const object = await this.storageService.getObjectStream(
+      grantPayload.objectKey,
+    );
+
+    const rawBuffer = await this.readStreamToBuffer(object.Body as any);
+
+    let finalBuffer = rawBuffer;
+    if (grantPayload.watermarkRequired) {
+      finalBuffer = this.watermarkService.applyWatermark(rawBuffer, {
+        username: actorId,
+        timestamp: new Date().toISOString(),
+        classification: grantPayload.classification,
+      });
+    }
+
+    return {
+      filename: grantPayload.filename,
+      contentType: grantPayload.contentType,
+      stream: new StreamableFile(finalBuffer),
+    };
   }
 
   async getStream(

@@ -151,10 +151,11 @@ export async function uploadDocumentFile(id: string, file: File): Promise<Upload
 export async function presignDownload(
   id: string,
   version?: number,
+  grantToken?: string,
 ): Promise<PresignedDownloadResult> {
   const res = await apiClient.post<PresignedDownloadResult>(
     apiEndpoints.documents.presignDownload(id),
-    version ? { version } : {},
+    { ...(version != null && { version }), ...(grantToken && { grantToken }) },
   );
   return unwrap(res);
 }

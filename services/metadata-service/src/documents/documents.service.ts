@@ -4,7 +4,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ClassificationLevel } from '../../generated/prisma';
+import { ClassificationLevel, Document } from '../../generated/prisma';
 import { AuditClient } from '../audit/audit.client';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -62,7 +62,10 @@ export class DocumentsService {
 
     if (isAdmin) {
       return this.prisma.document.findMany({
-        where: searchFilter,
+        where: {
+          ...searchFilter,
+          status: { not: 'DELETED' as const },
+        },
         orderBy: { createdAt: 'desc' },
       });
     }
@@ -72,6 +75,8 @@ export class DocumentsService {
         AND: [
           // Search filter (optional)
           ...(searchFilter ? [searchFilter] : []),
+          // Always exclude DELETED documents
+          { status: { not: 'DELETED' as const } },
           // Visibility filter (role + classification based)
           {
             OR: [
@@ -91,8 +96,20 @@ export class DocumentsService {
                 },
               ]
             : []),
+          // PENDING: approver sees all pending documents to review
+          ...(['approver', 'admin'].some((r) => roles.includes(r))
+            ? [
+                {
+                  status: 'PENDING' as const,
+                },
+              ]
+            : []),
+          // DRAFT: viewer sees their own drafts to preview/download
+          { ownerId: actorId, status: 'DRAFT' as const },
           // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
-          ...(roles.length > 0
+          ...(roles.some((r) =>
+            ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'].includes(r),
+          )
             ? [
                 {
                   status: 'PUBLISHED' as const,
@@ -100,8 +117,8 @@ export class DocumentsService {
                 },
               ]
             : []),
-          // INTERNAL: editor+ sees PUBLISHED + INTERNAL
-          ...(['editor', 'approver', 'admin'].some((r) =>
+          // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
+          ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
             roles.includes(r),
           )
             ? [
@@ -139,7 +156,7 @@ export class DocumentsService {
 
   async findOneOrThrow(id: string) {
     const document = await this.prisma.document.findUnique({
-      where: { id },
+      where: { id, status: { not: 'DELETED' as const } },
       include: {
         versions: { orderBy: { version: 'desc' } },
         aclEntries: true,
@@ -258,5 +275,19 @@ export class DocumentsService {
         'Only the owner editor or admin can mutate metadata',
       );
     }
+  }
+
+  /**
+   * Soft-delete a document by marking it as DELETED.
+   * Called exclusively by the workflow service after it has authorized the action.
+   */
+  async markDeleted(id: string): Promise<Document> {
+    return this.prisma.document.update({
+      where: { id, status: { not: 'DELETED' as const } },
+      data: {
+        status: 'DELETED' as any,
+        deletedAt: new Date(),
+      },
+    });
   }
 }

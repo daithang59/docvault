@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
@@ -60,6 +60,17 @@ export class WorkflowController {
   @ApiOperation({ summary: 'Archive a PUBLISHED document' })
   archive(@Param('docId') docId: string, @Req() req: any) {
     return this.workflowService.archive(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Delete(':docId')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Delete a DRAFT document (soft delete)' })
+  delete(@Param('docId') docId: string, @Req() req: any) {
+    return this.workflowService.delete(
       docId,
       req.user,
       buildRequestContext(req),

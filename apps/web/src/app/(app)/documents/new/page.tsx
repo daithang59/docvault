@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { DocumentForm, DocumentFormValues } from '@/components/documents/document-form';
 import { UploadDropzone } from '@/components/documents/upload-dropzone';
 import { PageHeader } from '@/components/common/page-header';
 import { ProtectedAction } from '@/components/common/protected-action';
 import { EmptyState } from '@/components/common/empty-state';
 import { useCreateDocument } from '@/lib/hooks/use-documents';
-import { uploadDocument } from '@/lib/api/documents';
+import { uploadDocumentFile } from '@/features/documents/documents.api';
+import { documentsKeys } from '@/features/documents/documents.keys';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
@@ -16,6 +18,7 @@ import { getErrorMessage } from '@/lib/api/errors';
 
 export default function NewDocumentPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -32,9 +35,13 @@ export default function NewDocumentPage() {
       toast.success(TOAST_MESSAGES.DOCUMENT_CREATED);
 
       if (file) {
+        setIsUploading(true);
         try {
-          setIsUploading(true);
-          await uploadDocument(doc.id, file);
+          await uploadDocumentFile(doc.id, file);
+          // Invalidate the detail query so the next page fetches fresh data
+          // that includes the newly created DocumentVersion row from PostgreSQL.
+          await qc.invalidateQueries({ queryKey: documentsKeys.detail(doc.id) });
+          await qc.invalidateQueries({ queryKey: documentsKeys.lists() });
           toast.success(TOAST_MESSAGES.VERSION_UPLOADED);
         } catch (uploadErr) {
           toast.error(

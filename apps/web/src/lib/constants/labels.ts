@@ -6,6 +6,7 @@ export const STATUS_LABELS: Record<DocumentStatus, string> = {
   PENDING: 'Pending',
   PUBLISHED: 'Published',
   ARCHIVED: 'Archived',
+  DELETED: 'Deleted',
 };
 
 export const CLASSIFICATION_LABELS: Record<ClassificationLevel, string> = {
@@ -28,6 +29,7 @@ export const WORKFLOW_ACTION_LABELS = {
   APPROVE: 'Approved',
   REJECT: 'Rejected',
   ARCHIVE: 'Archived',
+  DELETE: 'Deleted',
 } as const;
 
 export const TOAST_MESSAGES = {
@@ -46,6 +48,7 @@ export const TOAST_MESSAGES = {
   CONFLICT_APPROVE: 'Tài liệu không còn chờ duyệt.',
   CONFLICT_REJECT: 'Tài liệu không còn chờ duyệt.',
   CONFLICT_ARCHIVE: 'Tài liệu không thể lưu trữ ở trạng thái hiện tại.',
+  CONFLICT_DELETE: 'Chỉ tài liệu ở trạng thái DRAFT mới có thể xóa.',
   CONFLICT_UPLOAD: 'Không thể tải phiên bản mới lên tài liệu ở trạng thái này.',
   // Forbidden
   FORBIDDEN_DOWNLOAD: 'Bạn không có quyền tải tài liệu này.',

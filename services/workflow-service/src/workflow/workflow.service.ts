@@ -150,4 +150,42 @@ export class WorkflowService {
 
     return updated;
   }
+
+  async delete(docId: string, user: ServiceUser, context: RequestContext) {
+    const document = await this.metadataClient.getDocument(docId, context);
+    const actorId = buildActorId(user);
+    const roles = user.roles ?? [];
+
+    // Ownership / role guard: only owner or admin can delete
+    if (
+      document.ownerId !== actorId &&
+      !roles.includes('admin')
+    ) {
+      throw new ForbiddenException(
+        'Only the document owner or admin can delete a document',
+      );
+    }
+
+    // Status guard: only DRAFT documents can be deleted
+    if (document.status !== 'DRAFT') {
+      throw new ConflictException('Only DRAFT documents can be deleted');
+    }
+
+    // Transition: DRAFT → DELETED (handled by StatusService)
+    await this.metadataClient.updateStatus(
+      docId,
+      'DELETED',
+      'DELETE',
+      context,
+    );
+
+    // Notify stakeholders (fire-and-forget)
+    await this.notificationClient.notify(context, {
+      type: 'DELETED',
+      docId,
+      actorId,
+    });
+
+    return { success: true };
+  }
 }

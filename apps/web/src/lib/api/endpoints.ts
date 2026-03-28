@@ -30,6 +30,7 @@ export const apiEndpoints = {
     approve: (docId: string) => `/workflow/${docId}/approve`,
     reject: (docId: string) => `/workflow/${docId}/reject`,
     archive: (docId: string) => `/workflow/${docId}/archive`,
+    delete: (docId: string) => `/workflow/${docId}`,
   },
   audit: {
     query: '/audit/query',

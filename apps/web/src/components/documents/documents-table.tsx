@@ -11,7 +11,7 @@ import {
   SortingState,
   RowSelectionState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2 } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
@@ -19,7 +19,7 @@ import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd, formatOwnerName } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
-import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument } from '@/lib/auth/guards';
+import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 
 interface DocumentsTableProps {
@@ -29,6 +29,8 @@ interface DocumentsTableProps {
   onApprove?: (doc: DocumentListItem) => void;
   onReject?: (doc: DocumentListItem) => void;
   onArchive?: (doc: DocumentListItem) => void;
+  onDelete?: (doc: DocumentListItem) => void;
+  onBulkDelete?: (docs: DocumentListItem[]) => void;
   onDownload?: (doc: DocumentListItem) => void;
   onBulkSubmit?: (docs: DocumentListItem[]) => void;
   onBulkArchive?: (docs: DocumentListItem[]) => void;
@@ -42,6 +44,8 @@ export function DocumentsTable({
   onApprove,
   onReject,
   onArchive,
+  onDelete,
+  onBulkDelete,
   onDownload,
   onBulkSubmit,
   onBulkArchive,
@@ -79,6 +83,10 @@ export function DocumentsTable({
   );
   const bulkApprovable = useMemo(
     () => selectedDocs.filter((d) => canApproveDocument(session, d)),
+    [selectedDocs, session],
+  );
+  const bulkDeletable = useMemo(
+    () => selectedDocs.filter((d) => canDeleteDocument(session, d)),
     [selectedDocs, session],
   );
 
@@ -240,6 +248,9 @@ export function DocumentsTable({
                   {canDownloadDocument(session, doc) && onDownload && (
                     <ActionMenuItem icon={Download} label="Download" onClick={() => { setActiveMenu(null); onDownload(doc); }} />
                   )}
+                  {canDeleteDocument(session, doc) && onDelete && (
+                    <ActionMenuItem icon={Trash2} label="Delete" onClick={() => { setActiveMenu(null); onDelete(doc); }} />
+                  )}
                 </div>
               </>
             )}
@@ -306,6 +317,15 @@ export function DocumentsTable({
               >
                 <Archive className="h-3 w-3" />
                 Archive ({bulkArchivable.length})
+              </button>
+            )}
+            {bulkDeletable.length > 0 && onBulkDelete && (
+              <button
+                onClick={() => { onBulkDelete(bulkDeletable); setRowSelection({}); }}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-3 py-1.5 text-xs font-medium text-[var(--state-error-text)] transition-colors hover:brightness-95"
+              >
+                <Trash2 className="h-3 w-3" />
+                Delete ({bulkDeletable.length})
               </button>
             )}
           </div>

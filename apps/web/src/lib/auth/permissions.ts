@@ -14,6 +14,12 @@ interface DocumentContext {
   classification?: string;
 }
 
+// ownerId is stored as username (preferred_username) — not sub.
+// Use username for ownership checks, not sub (which may be undefined in the session).
+function isOwner(session: Session | null, ownerId: string | undefined): boolean {
+  return session?.user?.username === ownerId;
+}
+
 // ── Document list / creation ──────────────────────────────────────────────────
 
 export function canViewDocuments(session: Session | null): boolean {
@@ -39,7 +45,7 @@ export function canEditDocument(
   if (!session) return false;
   if (hasRole(session, 'admin')) return true;
   if (doc.status !== 'DRAFT') return false;
-  if (hasRole(session, 'editor') && doc.ownerId === session.user.sub) return true;
+  if (hasRole(session, 'editor') && isOwner(session, doc.ownerId)) return true;
   return false;
 }
 
@@ -52,7 +58,7 @@ export function canSubmitDocument(
   if (!session) return false;
   if (doc.status !== 'DRAFT') return false;
   if (hasRole(session, 'admin')) return true;
-  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
 }
 
 export function canApproveDocument(
@@ -80,7 +86,17 @@ export function canArchiveDocument(
   if (!session) return false;
   if (doc.status !== 'PUBLISHED') return false;
   if (hasRole(session, 'admin')) return true;
-  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
+}
+
+export function canDeleteDocument(
+  session: Session | null,
+  doc: DocumentContext,
+): boolean {
+  if (!session) return false;
+  if (doc.status !== 'DRAFT') return false;
+  if (hasRole(session, 'admin')) return true;
+  return isOwner(session, doc.ownerId);
 }
 
 // ── Download / ACL / Audit ────────────────────────────────────────────────────
@@ -115,7 +131,7 @@ export function canManageAcl(
 ): boolean {
   if (!session) return false;
   if (hasRole(session, 'admin')) return true;
-  if (hasRole(session, 'editor') && doc.ownerId === session.user.sub) return true;
+  if (hasRole(session, 'editor') && isOwner(session, doc.ownerId)) return true;
   return false;
 }
 

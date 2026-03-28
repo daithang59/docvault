@@ -123,6 +123,7 @@ export interface AddAclEntryDto {
 }
 
 export interface UploadVersionResponse {
+  id: string;
   docId: string;
   version: number;
   filename: string;
@@ -130,6 +131,8 @@ export interface UploadVersionResponse {
   checksum: string;
   objectKey: string;
   contentType?: string | null;
+  createdAt: string;
+  createdBy: string;
 }
 
 export type SubmitDocumentRequest = Record<string, never>;

@@ -1,9 +1,9 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument } from '@/lib/hooks/use-documents';
+import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
-import { submitDocument, approveDocument, archiveDocument } from '@/lib/api/workflow';
+import { submitDocument, approveDocument, archiveDocument, deleteDocument } from '@/lib/api/workflow';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -40,7 +40,7 @@ export default function MyDocumentsPage() {
 
   const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_FILTERS);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
-  const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | null>(null);
+  const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
@@ -49,6 +49,7 @@ export default function MyDocumentsPage() {
   const approve = useApproveDocument(targetDoc?.id ?? '');
   const reject = useRejectDocument(targetDoc?.id ?? '');
   const archive = useArchiveDocument(targetDoc?.id ?? '');
+  const deleteDoc = useDeleteDocument(targetDoc?.id ?? '');
   const { download } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
@@ -105,6 +106,10 @@ export default function MyDocumentsPage() {
         await archive.mutateAsync();
         toast.success(TOAST_MESSAGES.ARCHIVED);
       }
+      if (type === 'delete') {
+        await deleteDoc.mutateAsync();
+        toast.success('Document deleted.');
+      }
     } catch (e) {
       const err = parseApiError(e);
       let msg: string;
@@ -113,6 +118,7 @@ export default function MyDocumentsPage() {
         else if (type === 'approve') msg = TOAST_MESSAGES.CONFLICT_APPROVE;
         else if (type === 'reject') msg = TOAST_MESSAGES.CONFLICT_REJECT;
         else if (type === 'archive') msg = TOAST_MESSAGES.CONFLICT_ARCHIVE;
+        else if (type === 'delete') msg = TOAST_MESSAGES.CONFLICT_DELETE;
         else msg = err.message;
       } else if (err.statusCode === 403) {
         msg = TOAST_MESSAGES.FORBIDDEN_ACTION;
@@ -126,6 +132,23 @@ export default function MyDocumentsPage() {
       setTargetDoc(null); setActionType(null); setRejectReason('');
       setPage(1);
     }
+  }
+
+  async function handleBulkDelete(docs: DocumentListItem[]) {
+    let ok = 0;
+    let fail = 0;
+    for (const doc of docs) {
+      try {
+        await deleteDocument(doc.id);
+        ok++;
+      } catch {
+        fail++;
+      }
+    }
+    if (ok > 0) toast.success(`Deleted: ${ok} succeeded${fail > 0 ? `, ${fail} failed` : ''}`);
+    else toast.error(`Delete failed for all ${fail} documents`);
+    qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+    setPage(1);
   }
 
   async function handleBulkAction(
@@ -194,10 +217,12 @@ export default function MyDocumentsPage() {
               onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
               onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
               onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+              onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
               onDownload={(doc) => download(doc.id)}
               onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
               onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
               onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
+              onBulkDelete={handleBulkDelete}
             />
             <TablePagination
               page={page}
@@ -252,6 +277,15 @@ export default function MyDocumentsPage() {
         confirmLabel="Archive"
         variant="destructive"
         onConfirm={() => handleAction('archive')}
+      />
+      <ConfirmDialog
+        open={actionType === 'delete'}
+        onOpenChange={(o) => !o && setActionType(null)}
+        title="Delete Document"
+        description="This document will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={() => handleAction('delete')}
       />
     </div>
   );

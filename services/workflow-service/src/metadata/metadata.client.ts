@@ -30,7 +30,7 @@ export class MetadataClient {
 
   async updateStatus(
     docId: string,
-    status: 'PENDING' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED',
+    status: 'PENDING' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'DELETED',
     action: string,
     context: RequestContext,
     reason?: string,

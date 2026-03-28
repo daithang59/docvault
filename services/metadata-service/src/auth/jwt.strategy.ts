@@ -45,24 +45,12 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   }
 
   validate(payload: KeycloakAccessToken) {
-    console.log('[JwtStrategy] raw payload:', JSON.stringify({
-      sub: payload.sub,
-      exp: payload.exp,
-      preferred_username: payload.preferred_username,
-      realm_access: payload.realm_access,
-      resource_access: payload.resource_access,
-      aud: payload.aud,
-      azp: payload.azp,
-      iss: payload.iss,
-    }));
-
     // Manually validate expiry with generous clock tolerance (5 min) to handle
     // Keycloak Docker clock drift that causes valid tokens to appear expired.
     if (payload.exp) {
       const now = Math.floor(Date.now() / 1000);
       const CLOCK_DRIFT_TOLERANCE_SECONDS = 300;
       if (payload.exp + CLOCK_DRIFT_TOLERANCE_SECONDS < now) {
-        console.log('[JwtStrategy] ❌ Token expired:', { exp: payload.exp, now, diff: now - payload.exp });
         throw new UnauthorizedException('Token expired');
       }
     }
@@ -75,7 +63,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
           : [];
 
       if (!audiences.includes(this.audience) && payload.azp !== this.audience) {
-        console.log('[JwtStrategy] ❌ Audience mismatch:', { audiences, azp: payload.azp, expected: this.audience });
         throw new UnauthorizedException('Invalid token audience');
       }
     }
@@ -84,8 +71,6 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (roles.has('co')) {
       roles.add('compliance_officer');
     }
-
-    console.log('[JwtStrategy] ✅ validated user:', { sub: payload.sub, username: payload.preferred_username, roles: Array.from(roles) });
 
     return {
       sub: payload.sub,

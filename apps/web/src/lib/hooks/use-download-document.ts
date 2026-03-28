@@ -15,10 +15,23 @@ export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
   async function download(docId: string) {
     setIsDownloading(true);
     try {
+      // 1. Authorize — metadata-service checks ACL/classification/role
       const authorization = await authorizeDownload(docId);
-      const { url, filename } = await presignDownload(docId, authorization.version);
+      const filename = authorization.filename || `document-${docId}`;
 
-      triggerBrowserDownload(url, filename || authorization.filename || `document-${docId}`);
+      // 2. Presign URL — pass grantToken so document-service skips re-authorization
+      const result = await presignDownload(docId, authorization.version, authorization.grantToken);
+
+      if (result.url) {
+        // Non-watermark files: download directly from MinIO via presigned URL
+        triggerBrowserDownload(result.url, result.filename || filename);
+      } else {
+        // Watermark required: stream via grant token through gateway
+        const base = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
+        const token = encodeURIComponent(authorization.grantToken);
+        const url = `${base}/documents/${docId}/versions/${authorization.version}/stream?token=${token}`;
+        triggerBrowserDownload(url, result.filename || filename);
+      }
     } catch (err) {
       options?.onError?.(getErrorMessage(err));
     } finally {
