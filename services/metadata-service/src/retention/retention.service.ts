@@ -23,7 +23,9 @@ export class RetentionService {
     let archived = 0;
     let skipped = 0;
 
-    for (const [classification, retentionDays] of Object.entries(CLASSIFICATION_RETENTION_DAYS)) {
+    for (const [classification, retentionDays] of Object.entries(
+      CLASSIFICATION_RETENTION_DAYS,
+    )) {
       const cutoff = new Date(
         now.getTime() - retentionDays * 24 * 60 * 60 * 1000,
       );

@@ -13,6 +13,7 @@ import type {
   DownloadAuthorizationResult,
   PresignedDownloadResult,
   UploadVersionResponse,
+  PreviewAuthorizationResult,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
 
@@ -155,6 +156,17 @@ export async function presignDownload(
 ): Promise<PresignedDownloadResult> {
   const res = await apiClient.post<PresignedDownloadResult>(
     apiEndpoints.documents.presignDownload(id),
+    version ? { version } : {},
+  );
+  return unwrap(res);
+}
+
+export async function authorizePreview(
+  id: string,
+  version?: number,
+): Promise<PreviewAuthorizationResult> {
+  const res = await apiClient.post<PreviewAuthorizationResult>(
+    apiEndpoints.documents.previewAuthorize(id),
     version ? { version } : {},
   );
   return unwrap(res);

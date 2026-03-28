@@ -6,6 +6,7 @@ import { DocumentForm, DocumentFormValues } from '@/components/documents/documen
 import { UploadDropzone } from '@/components/documents/upload-dropzone';
 import { PageHeader } from '@/components/common/page-header';
 import { ProtectedAction } from '@/components/common/protected-action';
+import { EmptyState } from '@/components/common/empty-state';
 import { useCreateDocument } from '@/lib/hooks/use-documents';
 import { uploadDocument } from '@/lib/api/documents';
 import { ROUTES } from '@/lib/constants/routes';
@@ -57,13 +58,21 @@ export default function NewDocumentPage() {
   return (
     <ProtectedAction
       roles={['editor', 'admin']}
-      fallback={<div className="py-16 text-center text-[var(--text-muted)]">You do not have permission to create documents.</div>}
+      fallback={
+        <EmptyState
+          icon="lock"
+          title="Không có quyền truy cập"
+          description="Bạn cần vai trò Editor hoặc Admin để tạo tài liệu mới."
+        />
+      }
     >
-      <div className="mx-auto max-w-2xl">
+      <div className="animate-in delay-1 mx-auto max-w-2xl">
         <PageHeader
           title="New Document"
           subtitle="Create a new document entry and optionally upload the initial file."
         />
+      </div>
+      <div className="animate-in delay-2 mx-auto max-w-2xl">
         <div
           className="space-y-6 rounded-2xl border p-4 sm:p-6"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}

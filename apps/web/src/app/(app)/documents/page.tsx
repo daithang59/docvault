@@ -120,24 +120,29 @@ export default function DocumentsPage() {
 
   return (
     <div>
-      <PageHeader
-        title="Documents"
-        subtitle="Manage and review secure documents across their lifecycle."
-        actions={
-          <ProtectedAction roles={['editor', 'admin']}>
-            <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
-              <FilePlus className="h-4 w-4" />
-              New Document
-            </Link>
-          </ProtectedAction>
-        }
-      />
+      <div className="animate-in delay-1">
+        <PageHeader
+          title="Documents"
+          subtitle="Manage and review secure documents across their lifecycle."
+          actions={
+            <ProtectedAction roles={['editor', 'admin']}>
+              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
+                <FilePlus className="h-4 w-4" />
+                New Document
+              </Link>
+            </ProtectedAction>
+          }
+        />
+      </div>
 
-      <DocumentFilters filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
+      <div className="animate-in delay-2">
+        <DocumentFilters filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
+      </div>
 
       {filtered.length === 0 ? (
-        <EmptyState
-          title="No documents found"
+        <div className="animate-in delay-3">
+          <EmptyState
+            title="No documents found"
           description={filters.search || filters.status || filters.classification
             ? 'Try adjusting your filters.'
             : 'Create your first document to get started.'
@@ -150,25 +155,28 @@ export default function DocumentsPage() {
               </Link>
             </ProtectedAction>
           }
-        />
+          />
+        </div>
       ) : (
         <>
-          <DocumentsTable
-            data={paginated}
-            onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
-            onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
-            onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
-            onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
-            onDownload={(doc) => download(doc.id)}
-          />
-          <TablePagination
-            page={page}
-            pageSize={pageSize}
-            total={filtered.length}
-            totalPages={totalPages}
-            onPageChange={(p) => setPage(p)}
-            onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-          />
+          <div className="animate-in delay-3">
+            <DocumentsTable
+              data={paginated}
+              onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+              onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+              onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+              onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+              onDownload={(doc) => download(doc.id)}
+            />
+            <TablePagination
+              page={page}
+              pageSize={pageSize}
+              total={filtered.length}
+              totalPages={totalPages}
+              onPageChange={(p) => setPage(p)}
+              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+            />
+          </div>
         </>
       )}
 

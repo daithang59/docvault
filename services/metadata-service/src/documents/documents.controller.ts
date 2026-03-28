@@ -24,6 +24,7 @@ import { StatusService } from '../status/status.service';
 import { UpdateStatusDto } from '../status/dto/update-status.dto';
 import { PolicyService } from '../policy/policy.service';
 import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
+import { PreviewAuthorizeDto } from '../policy/dto/preview-authorize.dto';
 import { buildRequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -168,6 +169,27 @@ export class DocumentsController {
     @Req() req: any,
   ) {
     return this.policyService.authorizeDownload(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Post(':docId/preview-authorize')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary:
+      'Authorize a document preview using metadata status and ACL policy',
+  })
+  @HttpCode(200)
+  authorizePreview(
+    @Param('docId') docId: string,
+    @Body() body: PreviewAuthorizeDto,
+    @Req() req: any,
+  ) {
+    return this.policyService.authorizePreview(
       docId,
       body,
       req.user,

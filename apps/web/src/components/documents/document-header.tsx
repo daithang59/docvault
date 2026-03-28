@@ -4,6 +4,7 @@ import { DocumentDetail } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
+import { useOwnerDisplayName } from '@/features/approvals/approvals.hooks';
 import { User, Calendar, Tag } from 'lucide-react';
 
 interface DocumentHeaderProps {
@@ -11,6 +12,8 @@ interface DocumentHeaderProps {
 }
 
 export function DocumentHeader({ doc }: DocumentHeaderProps) {
+  const { data: ownerDisplay } = useOwnerDisplayName(doc.ownerId);
+
   return (
     <div className="mb-6 rounded-2xl border bg-[var(--bg-card)] p-6" style={{ borderColor: 'var(--border-soft)' }}>
       <div className="mb-3 flex flex-wrap items-start gap-3">
@@ -43,7 +46,7 @@ export function DocumentHeader({ doc }: DocumentHeaderProps) {
       )}
 
       <div className="grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4" style={{ borderColor: 'var(--border-soft)' }}>
-        <MetaItem label="Owner" icon={User} value={doc.ownerDisplay ?? `${doc.ownerId.slice(0, 8)}…`} mono={!doc.ownerDisplay} />
+        <MetaItem label="Owner" icon={User} value={ownerDisplay ?? '...'} />
         <MetaItem label="Created" icon={Calendar} value={formatDateTime(doc.createdAt)} />
         <MetaItem label="Updated" icon={Calendar} value={formatDateTime(doc.updatedAt)} />
         {doc.publishedAt && (
@@ -61,12 +64,10 @@ function MetaItem({
   label,
   value,
   icon: Icon,
-  mono,
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
-  mono?: boolean;
 }) {
   return (
     <div>
@@ -76,9 +77,7 @@ function MetaItem({
           {label}
         </span>
       </div>
-      <p className={`truncate text-[var(--text-main)] ${mono ? 'font-mono text-xs' : 'text-sm'}`}>
-        {value}
-      </p>
+      <p className="text-sm text-[var(--text-main)]">{value}</p>
     </div>
   );
 }

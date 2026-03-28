@@ -16,7 +16,7 @@ import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
-import { truncateEnd } from '@/lib/utils/format';
+import { truncateEnd, formatOwnerName } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -93,7 +93,7 @@ export function DocumentsTable({
                   {doc.description.length > 150 ? doc.description.slice(0, 150) + '…' : doc.description}
                 </p>
                 <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                  <span>Owner: <span className="font-mono">{doc.ownerId.slice(0, 8)}…</span></span>
+                  <span>Owner: <span className="font-mono">{doc.ownerId ? formatOwnerName(doc.ownerId) : 'Unknown'}</span></span>
                   <span>{formatDateTime(doc.updatedAt)}</span>
                 </div>
               </div>
@@ -123,8 +123,8 @@ export function DocumentsTable({
       accessorKey: 'ownerId',
       header: 'Owner',
       cell: ({ row }) => (
-        <span className="font-mono text-xs text-[var(--text-muted)]">
-          {row.original.ownerId.slice(0, 8)}…
+        <span className="text-xs text-[var(--text-muted)]">
+          {row.original.ownerId ? formatOwnerName(row.original.ownerId) : 'Unknown'}
         </span>
       ),
     },

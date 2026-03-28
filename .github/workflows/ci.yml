@@ -17,36 +17,29 @@ jobs:
   frontend:
     name: Frontend — Lint & Type Check
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          # Cache omitted temporarily until package-lock.json is committed
+          cache: pnpm
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          elif [ -f package.json ]; then
-            npm install
-          else
-            echo "Not initialized, skipping"
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Lint (ESLint)
-        run: if [ -f package.json ]; then npm run lint --if-present; fi
+        run: pnpm --filter web lint
 
       - name: Type check (tsc)
-        run: if [ -f package.json ]; then npm run type-check --if-present || true; fi
+        run: pnpm --filter web exec tsc --noEmit --if-present || true
 
       - name: Build
-        run: if [ -f package.json ]; then npm run build --if-present; fi
+        run: pnpm --filter web build
 
   # ─────────────────────────────────────────────
   # Gateway (Node/TS — adjust as needed)
@@ -54,33 +47,26 @@ jobs:
   gateway:
     name: Gateway — Lint & Test
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: services/gateway
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
           node-version: "20"
-          # Cache omitted temporarily until package-lock.json is committed
+          cache: pnpm
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          elif [ -f package.json ]; then
-            npm install
-          else
-            echo "Not initialized, skipping"
-          fi
+        run: pnpm install --frozen-lockfile
 
       - name: Lint
-        run: if [ -f package.json ]; then npm run lint --if-present; fi
+        run: pnpm --filter gateway lint
 
       - name: Test
-        run: if [ -f package.json ]; then npm test --if-present || true; fi
+        run: pnpm --filter gateway test --if-present || true
 
   # ─────────────────────────────────────────────
   # Python services (Ruff + pytest)

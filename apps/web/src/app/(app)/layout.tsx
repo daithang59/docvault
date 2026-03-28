@@ -6,25 +6,30 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { AppShell } from '@/components/layout/app-shell';
 import { ROUTES } from '@/lib/constants/routes';
 import { LoadingState } from '@/components/common/loading-state';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, session, hydrated } = useAuth();
   const router = useRouter();
+  const mounted = useMounted();
 
   useEffect(() => {
-    if (!hydrated) return; // Wait for session to be restored from localStorage
+    if (!hydrated) return;
     if (!isAuthenticated) {
       router.push(ROUTES.LOGIN);
     }
   }, [isAuthenticated, hydrated, router]);
 
-  if (!hydrated || !isAuthenticated || !session) {
-    return (
-      <div className="min-h-screen flex items-center justify-center bg-[var(--bg-app)]">
-        <LoadingState label="Signing you in..." />
-      </div>
-    );
-  }
-
-  return <AppShell>{children}</AppShell>;
+  // Render shell immediately on server; content is determined client-side after mount
+  return (
+    <AppShell>
+      {!mounted || !hydrated || !isAuthenticated || !session ? (
+        <div className="flex h-[100dvh] items-center justify-center">
+          <LoadingState label="Signing you in..." />
+        </div>
+      ) : (
+        children
+      )}
+    </AppShell>
+  );
 }

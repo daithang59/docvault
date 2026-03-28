@@ -1,7 +1,6 @@
 'use client';
 
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useState } from 'react';
 import { AuthProvider } from '@/lib/auth/auth-context';
 
 // Shared QueryClient instance — imported by auth-provider for cache clearing on logout.

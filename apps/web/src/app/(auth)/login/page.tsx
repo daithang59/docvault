@@ -4,7 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { ROUTES } from '@/lib/constants/routes';
-import { Shield } from 'lucide-react';
+import { Shield, Key, GitBranch, Zap, Lock } from 'lucide-react';
 
 function deleteCookie(name: string) {
   if (typeof document === 'undefined') return;
@@ -121,27 +121,27 @@ export default function LoginPage() {
           <div className="space-y-3">
             {[
               {
-                icon: '🛡️',
+                Icon: Key,
                 label: 'Role-based access control',
                 glow: 'rgba(59,130,246,0.4)',
               },
-              { icon: '🔗', label: 'Immutable audit trail', glow: 'rgba(124,58,237,0.4)' },
+              { Icon: GitBranch, label: 'Immutable audit trail', glow: 'rgba(124,58,237,0.4)' },
               {
-                icon: '⚡',
+                Icon: Zap,
                 label: 'Workflow state management',
                 glow: 'rgba(59,130,246,0.3)',
               },
-              { icon: '🔒', label: 'Secure file storage', glow: 'rgba(34,197,94,0.4)' },
+              { Icon: Lock, label: 'Secure file storage', glow: 'rgba(34,197,94,0.4)' },
             ].map((feat) => (
               <div key={feat.label} className="flex items-center gap-3 group">
                 <div
-                  className="h-7 w-7 rounded-lg flex items-center justify-center text-sm shrink-0 transition-transform group-hover:scale-110"
+                  className="h-8 w-8 rounded-xl flex items-center justify-center shrink-0 transition-transform group-hover:scale-105"
                   style={{
-                    background: `linear-gradient(135deg, ${feat.glow.replace('0.4', '0.15')}, ${feat.glow.replace('0.4', '0.05')})`,
-                    border: `1px solid ${feat.glow.replace('0.4', '0.3')}`,
+                    background: `linear-gradient(135deg, ${feat.glow.replace('0.4', '0.15').replace('0.3', '0.12')}, ${feat.glow.replace('0.4', '0.05').replace('0.3', '0.04')})`,
+                    border: `1px solid ${feat.glow.replace('0.4', '0.25').replace('0.3', '0.2')}`,
                   }}
                 >
-                  {feat.icon}
+                  <feat.Icon size={15} className="transition-colors" style={{ color: 'var(--login-hint)' }} />
                 </div>
                 <span className="text-sm transition-colors group-hover:text-white" style={{ color: 'var(--login-sub)' }}>
                   {feat.label}

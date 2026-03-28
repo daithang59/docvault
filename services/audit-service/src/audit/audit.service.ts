@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { createHash } from 'crypto';
+import { createHash, randomUUID } from 'crypto';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
@@ -16,6 +16,8 @@ export class AuditService {
   ) {}
 
   async create(dto: CreateAuditEventDto) {
+    const eventId = dto.eventId ?? randomUUID();
+
     // 1. Get hash of the most recent event for chain linking
     const lastEvent = await this.auditEvent
       .findOne({}, { hash: 1 })
@@ -26,7 +28,7 @@ export class AuditService {
 
     // 2. Build canonical payload for deterministic hashing
     const canonicalPayload = this.buildCanonicalPayload({
-      eventId: dto.eventId,
+      eventId,
       timestamp: dto.timestamp,
       actorId: dto.actorId,
       actorRoles: dto.actorRoles,
@@ -43,7 +45,7 @@ export class AuditService {
 
     // 3. Insert the event
     const saved = await this.auditEvent.create({
-      eventId: dto.eventId,
+      eventId,
       timestamp: dto.timestamp ? new Date(dto.timestamp) : new Date(),
       actorId: dto.actorId,
       actorRoles: dto.actorRoles,
@@ -76,11 +78,21 @@ export class AuditService {
       if (dto.to) filter.timestamp.$lte = new Date(dto.to);
     }
 
-    return this.auditEvent
-      .find(filter, { _id: 0 })
-      .sort({ timestamp: -1 })
-      .limit(dto.limit ?? 100)
-      .lean();
+    const page = dto.page ?? 1;
+    const pageSize = dto.pageSize ?? dto.limit ?? 20;
+    const skip = (page - 1) * pageSize;
+
+    const [data, total] = await Promise.all([
+      this.auditEvent
+        .find(filter, { _id: 0 })
+        .sort({ timestamp: -1 })
+        .skip(skip)
+        .limit(pageSize)
+        .lean(),
+      this.auditEvent.countDocuments(filter),
+    ]);
+
+    return { data, total, page, pageSize };
   }
 
   /**

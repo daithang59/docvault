@@ -1,0 +1,14 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell -Command \"Get-Process node -ErrorAction SilentlyContinue | Where-Object { $_Path -like ''*docvault*'' } | Stop-Process -Force -ErrorAction SilentlyContinue; Write-Host ''DocVault node processes killed''\")",
+      "Bash(findstr \":3001 :3002 :3003 :3004 :3005 :3000\")",
+      "Bash(powershell -Command \"Stop-Process -Id 14220 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed gateway on 3000''\")",
+      "Bash(findstr \":3000 :3001 :3002 :3003 :3004 :3005\")",
+      "Bash(curl -s \"http://localhost:8080/realms/docvault/protocol/openid-connect/token\" -X POST -H \"Content-Type: application/x-www-form-urlencoded\" -d \"grant_type=password&client_id=admin-cli&client_secret=&username=admin&password=adminpw\")",
+      "Read(//c//**)",
+      "Bash(Get-ChildItem -Path C:/ -ErrorAction SilentlyContinue)",
+      "Bash(Select-Object Name, Mode)"
+    ]
+  }
+}
