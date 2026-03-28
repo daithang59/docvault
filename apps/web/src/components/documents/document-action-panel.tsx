@@ -10,6 +10,7 @@ import {
   canRejectDocument,
   canArchiveDocument,
   canDownloadDocument,
+  canPreviewDocument,
   canUploadVersion,
   canManageAcl,
 } from '@/lib/auth/guards';
@@ -24,7 +25,7 @@ import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
 import {
-  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload
+  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
@@ -35,9 +36,10 @@ import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 interface DocumentActionPanelProps {
   doc: DocumentDetail;
   onActionComplete?: () => void;
+  onPreview?: () => void;
 }
 
-export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPanelProps) {
+export function DocumentActionPanel({ doc, onActionComplete, onPreview }: DocumentActionPanelProps) {
   const { session } = useAuth();
 
   const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | null>(null);
@@ -140,7 +142,8 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
     canApproveDocument(session, doc) ||
     canRejectDocument(session, doc) ||
     canArchiveDocument(session, doc) ||
-    canDownloadDocument(session, doc);
+    canDownloadDocument(session, doc) ||
+    canPreviewDocument(session, doc);
 
   if (!hasAnyAction) return null;
 
@@ -227,6 +230,16 @@ export function DocumentActionPanel({ doc, onActionComplete }: DocumentActionPan
           >
             <Archive className="h-4 w-4" />
             Archive Document
+          </button>
+        )}
+
+        {canPreviewDocument(session, doc) && onPreview && (
+          <button
+            onClick={onPreview}
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
+          >
+            <Eye className="h-4 w-4 text-[var(--text-muted)]" />
+            Preview
           </button>
         )}
 
