@@ -38,6 +38,9 @@ export class AuditEvent {
   @Prop()
   traceId?: string;
 
+  @Prop({ type: Object })
+  metadata?: Record<string, unknown>;
+
   @Prop()
   prevHash?: string;
 

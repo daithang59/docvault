@@ -5,10 +5,8 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { AuditClient } from '../audit/audit.client';
 import { CreateVersionDto } from './dto/create-version.dto';
 import {
-  RequestContext,
   ServiceUser,
   buildActorId,
 } from '../common/request-context';
@@ -17,14 +15,12 @@ import {
 export class VersionsService {
   constructor(
     private readonly prisma: PrismaService,
-    private readonly auditClient: AuditClient,
   ) {}
 
   async create(
     docId: string,
     dto: CreateVersionDto,
     user: ServiceUser,
-    context: RequestContext,
   ) {
     const document = await this.prisma.document.findUnique({
       where: { id: docId },
@@ -63,13 +59,6 @@ export class VersionsService {
       });
 
       return created;
-    });
-
-    await this.auditClient.emitEvent(context, {
-      action: 'DOCUMENT_VERSION_REGISTERED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
     });
 
     return versionRecord;

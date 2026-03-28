@@ -117,6 +117,18 @@ export class StatusService {
       resourceId: docId,
       result: 'SUCCESS',
       reason: dto.reason ?? `${document.status} -> ${transition.to}`,
+      metadata: {
+        docId,
+        title: document.title,
+        fromStatus: document.status,
+        toStatus: transition.to,
+        action: dto.action,
+        reason: dto.reason ?? null,
+        actorId,
+        publishedAt: updated.publishedAt ?? null,
+        archivedAt: updated.archivedAt ?? null,
+        triggeredAt: new Date().toISOString(),
+      },
     });
 
     return updated;

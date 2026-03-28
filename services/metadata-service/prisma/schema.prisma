@@ -122,12 +122,14 @@ model DocumentWorkflowHistory {
 }
 
 model DocumentComment {
-  id        String   @id @default(uuid())
-  docId     String
-  authorId  String
-  content   String
-  createdAt DateTime @default(now())
-  document  Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+  id          String   @id @default(uuid())
+  docId       String
+  authorId    String
+  authorRoles String[]
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  document    Document @relation(fields: [docId], references: [id], onDelete: Cascade)
 
   @@index([docId, createdAt])
   @@map("document_comments")

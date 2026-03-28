@@ -1,11 +1,13 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   Patch,
   Post,
+  Put,
   Query,
   Req,
   UseGuards,
@@ -114,6 +116,18 @@ export class DocumentsController {
     return this.aclService.list(docId);
   }
 
+  @Delete(':docId/acl/:aclId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Delete an ACL rule from a document' })
+  deleteAcl(
+    @Param('docId') docId: string,
+    @Param('aclId') aclId: string,
+    @Req() req: any,
+  ) {
+    return this.aclService.delete(docId, aclId, req.user, buildRequestContext(req));
+  }
+
   @Post(':docId/versions')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
@@ -127,7 +141,6 @@ export class DocumentsController {
       docId,
       body,
       req.user,
-      buildRequestContext(req),
     );
   }
 
@@ -217,6 +230,41 @@ export class DocumentsController {
     @Body() body: { content: string },
     @Req() req: any,
   ) {
-    return this.commentsService.create(docId, body.content, req.user);
+    return this.commentsService.create(
+      docId,
+      body.content,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Put(':docId/comments/:commentId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Update a comment' })
+  updateComment(
+    @Param('docId') docId: string,
+    @Param('commentId') commentId: string,
+    @Body() body: { content: string },
+    @Req() req: any,
+  ) {
+    return this.commentsService.update(
+      commentId,
+      body.content,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Delete(':docId/comments/:commentId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Delete a comment' })
+  deleteComment(
+    @Param('docId') docId: string,
+    @Param('commentId') commentId: string,
+    @Req() req: any,
+  ) {
+    return this.commentsService.delete(commentId, req.user, buildRequestContext(req));
   }
 }

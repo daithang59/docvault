@@ -92,6 +92,15 @@ export class RetentionService {
         resourceId: docId,
         result: 'SUCCESS',
         reason: 'Retention policy exceeded',
+        metadata: {
+          docId,
+          action: 'RETENTION',
+          fromStatus: 'PUBLISHED',
+          toStatus: 'ARCHIVED',
+          archivedAt: new Date().toISOString(),
+          triggeredBy: 'system:retention',
+          triggeredAt: new Date().toISOString(),
+        },
       },
     );
 

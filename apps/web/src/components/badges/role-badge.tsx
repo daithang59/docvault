@@ -31,6 +31,7 @@ export function RoleBadge({ role, size = 'sm', className }: RoleBadgeProps) {
   if (!VALID_ROLES.has(role)) return null;
   return (
     <span
+      suppressHydrationWarning
       className={cn(
         'inline-flex items-center rounded-full font-semibold border transition-all',
         size === 'sm' && 'px-2.5 py-0.5 text-xs',

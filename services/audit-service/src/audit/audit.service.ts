@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { createHash, randomUUID } from 'crypto';
@@ -8,8 +8,6 @@ import { QueryAuditDto } from './dto/query-audit.dto';
 
 @Injectable()
 export class AuditService {
-  private readonly logger = new Logger(AuditService.name);
-
   constructor(
     @InjectModel(AuditEvent.name)
     private readonly auditEvent: Model<AuditEventDocument>,
@@ -27,7 +25,7 @@ export class AuditService {
     const prevHash = lastEvent?.hash ?? null;
 
     // 2. Build canonical payload for deterministic hashing
-    const canonicalPayload = this.buildCanonicalPayload({
+    const canonicalFields: Record<string, any> = {
       eventId,
       timestamp: dto.timestamp,
       actorId: dto.actorId,
@@ -39,7 +37,12 @@ export class AuditService {
       reason: dto.reason,
       ip: dto.ip,
       traceId: dto.traceId,
-    });
+    };
+    const metadataStr = this.canonicalMetadata(dto.metadata);
+    if (metadataStr !== undefined) {
+      canonicalFields.metadata = metadataStr;
+    }
+    const canonicalPayload = this.buildCanonicalPayload(canonicalFields);
 
     const hash = this.computeHash(prevHash, canonicalPayload);
 
@@ -56,6 +59,7 @@ export class AuditService {
       reason: dto.reason,
       ip: dto.ip,
       traceId: dto.traceId,
+      metadata: dto.metadata,
       prevHash,
       hash,
     });
@@ -112,6 +116,19 @@ export class AuditService {
   }
 
   /**
+   * Normalize metadata for deterministic hashing:
+   * both undefined and {} → null, so they produce identical hashes.
+   */
+  private canonicalMetadata(
+    metadata: Record<string, unknown> | undefined,
+  ): string | undefined {
+    if (metadata === undefined || Object.keys(metadata).length === 0) {
+      return undefined;
+    }
+    return JSON.stringify(metadata);
+  }
+
+  /**
    * Compute SHA-256 hash from prevHash + canonical payload.
    * hash = SHA-256(prevHash + "|" + canonicalPayload)
    */
@@ -152,6 +169,9 @@ export class AuditService {
         reason: event.reason,
         ip: event.ip,
         traceId: event.traceId,
+        metadata: (event as any).metadata !== undefined
+          ? JSON.stringify((event as any).metadata)
+          : undefined,
       });
       const expectedHash = this.computeHash(
         i === 0 ? null : (events[i - 1] as any).hash,

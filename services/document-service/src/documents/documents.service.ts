@@ -59,6 +59,21 @@ export class DocumentsService {
       },
     });
 
+    // Emit audit FIRST — immediately after MinIO upload succeeds.
+    // If createVersion fails below, we still log the upload attempt.
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_UPLOADED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+      metadata: {
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        version: nextVersion,
+      },
+    });
+
     try {
       const versionRecord = await this.metadataClient.createVersion(
         docId,
@@ -72,13 +87,6 @@ export class DocumentsService {
         },
         context,
       );
-
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_UPLOADED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
-      });
 
       return {
         ...versionRecord,
@@ -115,13 +123,6 @@ export class DocumentsService {
       // SECURITY: CONFIDENTIAL/SECRET documents must go through the streaming
       // path so the watermark can be applied. Reject presigned URL for these.
       if (grantPayload.watermarkRequired) {
-        await this.auditClient.emitEvent(context, {
-          action: 'DOCUMENT_DOWNLOAD_URL_ISSUED',
-          resourceType: 'DOCUMENT',
-          resourceId: docId,
-          result: 'SUCCESS',
-          reason: 'Redirected to streaming endpoint due to classification',
-        });
         return {
           docId,
           version: grantPayload.version,
@@ -138,13 +139,6 @@ export class DocumentsService {
         objectKey: grantPayload.objectKey,
         filename: grantPayload.filename,
         expiresInSeconds: authorization.expiresInSeconds,
-      });
-
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_URL_ISSUED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
       });
 
       return {
@@ -200,17 +194,6 @@ export class DocumentsService {
         });
       }
 
-      const auditAction = grantPayload.watermarkRequired
-        ? 'DOCUMENT_DOWNLOADED_WATERMARKED'
-        : 'DOCUMENT_DOWNLOADED';
-
-      await this.auditClient.emitEvent(context, {
-        action: auditAction,
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
-      });
-
       return {
         filename: grantPayload.filename,
         contentType: grantPayload.contentType,
@@ -262,13 +245,6 @@ export class DocumentsService {
       grantPayload.objectKey,
       range,
     );
-
-    await this.auditClient.emitEvent(context, {
-      action: 'DOCUMENT_PREVIEWED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
-    });
 
     return {
       filename: grantPayload.filename,

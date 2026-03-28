@@ -249,13 +249,24 @@ components:
         timestamp: { type: string, format: date-time }
         actorId: { type: string }
         actorRoles: { type: array, items: { type: string } }
-        action: { type: string }
+        action:
+          type: string
+          description: |
+            Canonical audit action constants:
+            COMMENT_ADDED, COMMENT_UPDATED, COMMENT_DELETED,
+            COMMENT_UPDATE_DENIED, COMMENT_DELETE_DENIED,
+            DOCUMENT_CREATED, DOCUMENT_METADATA_UPDATED,
+            DOCUMENT_ACL_UPDATED, DOCUMENT_ACL_DELETED,
+            DOCUMENT_SUBMIT, DOCUMENT_APPROVE, DOCUMENT_REJECT, DOCUMENT_ARCHIVE,
+            AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
+            REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
         resourceType: { type: string }
         resourceId: { type: string, nullable: true }
         result: { $ref: '#/components/schemas/AuditEventResult' }
         reason: { type: string, nullable: true }
         ip: { type: string, nullable: true }
         traceId: { type: string, nullable: true }
+        metadata: { type: object, nullable: true, description: 'Structured payload describing the event details (e.g. old/new values, comment content, change diff)' }
         prevHash: { type: string, nullable: true }
         hash: { type: string }
 

@@ -1,12 +1,16 @@
+// dotenv MUST be loaded before any NestJS modules are imported, because
+// JwtStrategy is constructed during AuthModule initialization — which happens
+// before bootstrap() runs. Without this, KEYCLOAK_BASE_URL and KEYCLOAK_REALM
+// are undefined when the strategy reads them, causing every JWT to be rejected.
+import * as dotenv from 'dotenv';
+dotenv.config();
+
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
 import { AppModule } from './app.module';
 import { DocumentBuilder, SwaggerModule } from '@nestjs/swagger';
 import { randomUUID } from 'crypto';
-import * as dotenv from 'dotenv';
 import { HttpExceptionFilter } from './common/http-exception.filter';
-
-dotenv.config();
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
@@ -96,82 +100,6 @@ async function bootstrap() {
           latencyMs: Date.now() - startedAt,
         }),
       );
-
-      const auditServiceUrl = process.env.AUDIT_SERVICE_URL;
-      if (!auditServiceUrl) {
-        return;
-      }
-
-      const headers: Record<string, string> = {
-        'content-type': 'application/json',
-        'x-request-id': traceId,
-        'x-user-id': actorId,
-        'x-roles': roles.join(','),
-      };
-
-      // Forward JWT — from Authorization header or dv_access_token cookie
-      let authHeader = req.headers.authorization;
-      if (!authHeader) {
-        const rawCookies = (req.headers.cookie ?? '') as string;
-        const cookieToken = rawCookies
-          .split(';')
-          .map((c: string) => c.trim().split('='))
-          .find(([k]: string[]) => k === 'dv_access_token')?.[1];
-        if (cookieToken) {
-          authHeader = `Bearer ${decodeURIComponent(cookieToken)}`;
-        }
-      }
-      if (authHeader) {
-        headers.authorization = authHeader;
-      }
-
-      const baseEvent = {
-        actorId,
-        actorRoles: roles,
-        resourceType: 'HTTP_ROUTE',
-        resourceId: req.originalUrl,
-        ip: req.ip,
-        traceId,
-      };
-
-      try {
-        await fetch(`${auditServiceUrl}/audit/events`, {
-          method: 'POST',
-          headers,
-          body: JSON.stringify({
-            ...baseEvent,
-            action: 'REQUEST_RECEIVED',
-            result: 'SUCCESS',
-            timestamp: new Date().toISOString(),
-          }),
-        });
-        if (res.statusCode < 400) {
-          await fetch(`${auditServiceUrl}/audit/events`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              ...baseEvent,
-              action: 'REQUEST_OK',
-              result: 'SUCCESS',
-              timestamp: new Date().toISOString(),
-            }),
-          });
-        } else if (res.statusCode === 401 || res.statusCode === 403) {
-          await fetch(`${auditServiceUrl}/audit/events`, {
-            method: 'POST',
-            headers,
-            body: JSON.stringify({
-              ...baseEvent,
-              action: 'REQUEST_DENIED',
-              result: 'DENY',
-              reason: `HTTP ${res.statusCode}`,
-              timestamp: new Date().toISOString(),
-            }),
-          });
-        }
-      } catch {
-        // swallow audit wrapper failures to avoid blocking the gateway response
-      }
     });
     next();
   });

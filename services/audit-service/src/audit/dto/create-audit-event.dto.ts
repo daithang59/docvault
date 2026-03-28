@@ -3,6 +3,7 @@ import {
   IsISO8601,
   IsOptional,
   IsString,
+  IsObject,
   MaxLength,
 } from 'class-validator';
 
@@ -48,4 +49,8 @@ export class CreateAuditEventDto {
   @IsOptional()
   @IsString()
   traceId?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }

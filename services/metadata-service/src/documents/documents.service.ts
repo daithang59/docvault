@@ -173,6 +173,14 @@ export class DocumentsService {
       resourceType: 'DOCUMENT',
       resourceId: created.id,
       result: 'SUCCESS',
+      metadata: {
+        docId: created.id,
+        title: created.title,
+        classification: created.classification,
+        tags: created.tags,
+        ownerId: created.ownerId,
+        createdAt: created.createdAt,
+      },
     });
 
     return created;
@@ -195,11 +203,24 @@ export class DocumentsService {
     this.assertCanManage(document.ownerId, user);
 
     const data: Record<string, any> = {};
-    if (dto.title !== undefined) data.title = dto.title;
-    if (dto.description !== undefined) data.description = dto.description;
-    if (dto.classification !== undefined)
+    const changes: Record<string, { old: unknown; new: unknown }> = {};
+    if (dto.title !== undefined) {
+      changes.title = { old: document.title, new: dto.title };
+      data.title = dto.title;
+    }
+    if (dto.description !== undefined) {
+      changes.description = { old: document.description, new: dto.description };
+      data.description = dto.description;
+    }
+    if (dto.classification !== undefined) {
+      changes.classification = { old: document.classification, new: dto.classification };
       data.classification = dto.classification;
-    if (dto.tags !== undefined) data.tags = this.sanitizeTags(dto.tags);
+    }
+    if (dto.tags !== undefined) {
+      const newTags = this.sanitizeTags(dto.tags);
+      changes.tags = { old: document.tags, new: newTags };
+      data.tags = newTags;
+    }
 
     const updated = await this.prisma.document.update({
       where: { id },
@@ -211,6 +232,11 @@ export class DocumentsService {
       resourceType: 'DOCUMENT',
       resourceId: id,
       result: 'SUCCESS',
+      metadata: {
+        docId: id,
+        changes,
+        updatedAt: updated.updatedAt,
+      },
     });
 
     return updated;
