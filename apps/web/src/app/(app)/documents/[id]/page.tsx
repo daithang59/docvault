@@ -80,6 +80,11 @@ export default function DocumentDetailPage({ params }: Props) {
             <DocumentActionPanel
               doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
               onActionComplete={handleActionComplete}
+              onPreview={() => {
+                const versions = doc.versions ?? [];
+                const latest = versions.length > 0 ? versions[0] : null;
+                if (latest) setPreviewVersion(latest);
+              }}
             />
           </div>
           {canShowAcl && (

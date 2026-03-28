@@ -102,7 +102,7 @@ export function canPreviewDocument(
   doc: DocumentContext,
 ): boolean {
   if (!session) return false;
-  return doc.status === 'PUBLISHED';
+  return doc.status === 'PUBLISHED' || doc.status === 'ARCHIVED';
 }
 
 export function canManageAcl(
