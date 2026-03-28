@@ -42,6 +42,7 @@ export function DocumentPreviewDialog({
   const [viewerState, setViewerState] = useState<ViewerState>('loading');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
+  const [pdfPages, setPdfPages] = useState<string[]>([]);
 
   const { getImageUrl, getPdfData } = useDocumentPreview({
     onError: (msg) => toast.error(msg),
@@ -77,6 +78,7 @@ export function DocumentPreviewDialog({
     async function loadPreview() {
       setViewerState('loading');
       setErrorMessage('');
+      setPdfPages([]);
 
       const contentType = selectedVersion.mimeType ?? selectedVersion.contentType;
       const isPdf = contentType === PDF_TYPE;
@@ -89,9 +91,32 @@ export function DocumentPreviewDialog({
           );
           if (cancelled) return;
 
-          const blob = new Blob([data], { type: 'application/pdf' });
-          const blobUrl = URL.createObjectURL(blob);
-          setPreviewUrl(blobUrl);
+          // Render PDF pages to canvas using pdf.js
+          const pdfjs = await import('pdfjs-dist');
+          pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
+
+          const pdf = await pdfjs.getDocument({ data, isEvalSupported: false }).promise;
+          if (cancelled) return;
+
+          const pages: string[] = [];
+          for (let i = 1; i <= pdf.numPages; i++) {
+            const page = await pdf.getPage(i);
+            const scale = 2; // High-res rendering
+            const viewport = page.getViewport({ scale });
+
+            const canvas = document.createElement('canvas');
+            canvas.width = viewport.width;
+            canvas.height = viewport.height;
+            const ctx = canvas.getContext('2d')!;
+
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any -- pdf.js RenderParameters type strictness
+            await page.render({ canvasContext: ctx, viewport } as any).promise;
+            pages.push(canvas.toDataURL('image/png'));
+
+            if (cancelled) return;
+          }
+
+          setPdfPages(pages);
           setViewerState('pdf');
           return;
         }
@@ -123,7 +148,9 @@ export function DocumentPreviewDialog({
     return () => {
       cancelled = true;
     };
-  }, [version, docId, getImageUrl, getPdfData]);
+    // NOTE: intentionally exclude hook function identities to avoid refetch loop.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [version, docId]);
 
   // IMPORTANT: unmount popup completely when no selected version.
   if (!version) {
@@ -181,6 +208,7 @@ export function DocumentPreviewDialog({
         <div
           className="flex-1 overflow-hidden flex items-center justify-center"
           style={{ background: 'var(--bg-base)' }}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {viewerState === 'loading' && (
             <div className="flex flex-col items-center gap-3">
@@ -222,15 +250,29 @@ export function DocumentPreviewDialog({
               src={previewUrl}
               alt={filename}
               className="max-w-full max-h-full object-contain"
+              draggable={false}
             />
           )}
 
-          {viewerState === 'pdf' && previewUrl && (
-            <iframe
-              src={previewUrl}
-              title={filename}
-              className="w-full h-full border-0"
-            />
+          {viewerState === 'pdf' && pdfPages.length > 0 && (
+            <div
+              className="w-full h-full overflow-auto"
+              style={{ userSelect: 'none' }}
+            >
+              <div className="flex flex-col items-center gap-4 py-4 px-4">
+                {pdfPages.map((dataUrl, i) => (
+                  // eslint-disable-next-line @next/next/no-img-element -- canvas data URL, not external
+                  <img
+                    key={i}
+                    src={dataUrl}
+                    alt={`Page ${i + 1}`}
+                    className="max-w-full shadow-lg rounded"
+                    style={{ background: 'white' }}
+                    draggable={false}
+                  />
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
