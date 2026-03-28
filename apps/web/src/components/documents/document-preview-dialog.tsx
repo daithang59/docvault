@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { X, FileText } from 'lucide-react';
+import { X, FileText, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
 import { DocumentVersion } from '@/features/documents/documents.types';
 import { useDocumentPreview } from '@/lib/hooks/use-document-preview';
 import { toast } from 'sonner';
@@ -43,6 +43,15 @@ export function DocumentPreviewDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [zoom, setZoom] = useState(100);
+
+  const ZOOM_MIN = 25;
+  const ZOOM_MAX = 300;
+  const ZOOM_STEP = 25;
+
+  function zoomIn() { setZoom((z) => Math.min(z + ZOOM_STEP, ZOOM_MAX)); }
+  function zoomOut() { setZoom((z) => Math.max(z - ZOOM_STEP, ZOOM_MIN)); }
+  function zoomReset() { setZoom(100); }
 
   const { getImageUrl, getPdfData } = useDocumentPreview({
     onError: (msg) => toast.error(msg),
@@ -79,6 +88,7 @@ export function DocumentPreviewDialog({
       setViewerState('loading');
       setErrorMessage('');
       setPdfPages([]);
+      setZoom(100);
 
       const contentType = selectedVersion.mimeType ?? selectedVersion.contentType;
       const isPdf = contentType === PDF_TYPE;
@@ -194,6 +204,39 @@ export function DocumentPreviewDialog({
               v{version.versionNumber ?? version.version}
             </span>
           </div>
+
+          {/* Zoom controls — only show for PDF/image */}
+          {(viewerState === 'pdf' || viewerState === 'image') && (
+            <div className="flex items-center gap-1 shrink-0">
+              <button
+                onClick={zoomOut}
+                disabled={zoom <= ZOOM_MIN}
+                className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
+                style={{ color: 'var(--text-muted)' }}
+                title="Zoom out"
+              >
+                <ZoomOut className="h-4 w-4" />
+              </button>
+              <button
+                onClick={zoomReset}
+                className="min-w-[3.5rem] px-2 py-1 rounded-lg text-xs font-medium transition-colors"
+                style={{ color: 'var(--text-main)' }}
+                title="Reset zoom"
+              >
+                {zoom}%
+              </button>
+              <button
+                onClick={zoomIn}
+                disabled={zoom >= ZOOM_MAX}
+                className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
+                style={{ color: 'var(--text-muted)' }}
+                title="Zoom in"
+              >
+                <ZoomIn className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <button
             onClick={onClose}
             className="p-2 rounded-lg transition-colors shrink-0"
@@ -209,6 +252,13 @@ export function DocumentPreviewDialog({
           className="flex-1 overflow-hidden flex items-center justify-center"
           style={{ background: 'var(--bg-base)' }}
           onContextMenu={(e) => e.preventDefault()}
+          onWheel={(e) => {
+            if (e.ctrlKey || e.metaKey) {
+              e.preventDefault();
+              if (e.deltaY < 0) zoomIn();
+              else zoomOut();
+            }
+          }}
         >
           {viewerState === 'loading' && (
             <div className="flex flex-col items-center gap-3">
@@ -266,8 +316,13 @@ export function DocumentPreviewDialog({
                     key={i}
                     src={dataUrl}
                     alt={`Page ${i + 1}`}
-                    className="max-w-full shadow-lg rounded"
-                    style={{ background: 'white' }}
+                    className="shadow-lg rounded"
+                    style={{
+                      background: 'white',
+                      width: `${zoom}%`,
+                      maxWidth: 'none',
+                      transition: 'width 0.15s ease',
+                    }}
                     draggable={false}
                   />
                 ))}
