@@ -224,6 +224,19 @@ components:
         watermarkRequired: { type: boolean, default: false }
         streamingEndpoint: { type: string, nullable: true, description: Path to the streaming endpoint for watermarked downloads. Present when url is null. }
 
+    PreviewAuthorize:
+      type: object
+      properties:
+        version: { type: integer, description: Specific version to authorize }
+        grantToken: { type: string, description: HMAC-signed preview grant token }
+        docId: { type: string }
+        version: { type: integer }
+        filename: { type: string }
+        contentType: { type: string }
+        expiresInSeconds: { type: integer }
+        expiresAt: { type: string, format: date-time }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+
     # ─── Audit ────────────────────────────────────────────────────────────────
     AuditEventResult:
       type: string
@@ -640,6 +653,43 @@ paths:
         '404':
           description: Document or version not found
 
+  /metadata/documents/{docId}/preview-authorize:
+    post:
+      summary: Authorize a document preview (issues HMAC preview grant token)
+      description: |
+        Authorization for inline preview. Unlike download-authorize, this endpoint:
+        - Allows compliance_officer role
+        - Requires only READ permission (not DOWNLOAD)
+        - Does not apply watermarks
+      operationId: authorizePreview
+      security:
+        - bearerAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                version: { type: integer }
+      responses:
+        '200':
+          description: Authorization granted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PreviewAuthorize'
+        '403':
+          description: |
+            Forbidden. May be caused by:
+            - Document not in PUBLISHED status
+            - ACL denies READ access
+            - Classification level insufficient
+        '404':
+          description: Document or version not found
+
   /metadata/documents/{docId}/workflow-history:
     get:
       summary: Get workflow history for a document
@@ -746,6 +796,45 @@ paths:
       responses:
         '200':
           description: Binary file stream (watermarked for CONFIDENTIAL/SECRET)
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '403':
+          description: Forbidden
+        '404':
+          description: Document or version not found
+
+  /documents/{docId}/preview:
+    get:
+      summary: Stream a document for inline preview (supports HTTP Range requests)
+      description: |
+        Streams the raw document binary for inline display in a browser.
+        No watermark is applied. Supports HTTP Range requests for PDF.js lazy loading.
+      operationId: previewDocument
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+        - name: version
+          in: query
+          required: false
+          schema:
+            type: integer
+          description: Specific version to preview (defaults to current version)
+      responses:
+        '200':
+          description: Binary file stream (inline, no watermark)
+          content:
+            '*/*':
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: Partial content (Range request)
           content:
             '*/*':
               schema:

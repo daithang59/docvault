@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
 
     const data = await response.json();
     return NextResponse.json(data);
-  } catch (err) {
+  } catch {
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
 }

@@ -162,3 +162,13 @@ export interface PresignedDownloadResult {
   expiresAt?: string;
   expiresInSeconds?: number;
 }
+
+export interface PreviewAuthorizationResult {
+  docId: string;
+  version: number;
+  filename: string;
+  contentType?: string | null;
+  expiresInSeconds: number;
+  expiresAt: string;
+  grantToken: string;
+}

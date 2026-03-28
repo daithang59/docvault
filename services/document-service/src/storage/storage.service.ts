@@ -14,7 +14,8 @@ export class StorageService {
    * Internal endpoint used for SDK operations (server-to-server).
    * Default: http://localhost:9000
    */
-  private readonly endpoint = process.env.S3_ENDPOINT ?? 'http://localhost:9000';
+  private readonly endpoint =
+    process.env.S3_ENDPOINT ?? 'http://localhost:9000';
   /**
    * Public-facing URL used when generating presigned URLs.
    * Set this to your LAN IP or public domain when deploying.
@@ -85,7 +86,10 @@ export class StorageService {
     return signedUrl;
   }
 
-  async getObjectStream(objectKey: string) {
+  async getObjectStream(
+    objectKey: string,
+    range?: { start: number; end: number },
+  ) {
     if (!objectKey) {
       throw new NotFoundException('Object key not found');
     }
@@ -94,6 +98,7 @@ export class StorageService {
       new GetObjectCommand({
         Bucket: this.bucket,
         Key: objectKey,
+        Range: range ? `bytes=${range.start}-${range.end}` : undefined,
       }),
     );
   }

@@ -1,20 +1,17 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '@/lib/auth/auth-context';
 import { AppShell } from '@/components/layout/app-shell';
 import { ROUTES } from '@/lib/constants/routes';
 import { LoadingState } from '@/components/common/loading-state';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 export default function AppLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, session, hydrated } = useAuth();
   const router = useRouter();
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   useEffect(() => {
     if (!hydrated) return;

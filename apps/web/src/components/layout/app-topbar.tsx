@@ -14,7 +14,6 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useRouter } from 'next/navigation';
-import { ROUTES } from '@/lib/constants/routes';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { UserRole } from '@/types/auth';

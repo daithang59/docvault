@@ -89,7 +89,7 @@ export default function ProfilePage() {
         if (res.ok) {
           setProfile(await res.json());
         }
-      } catch (err) {
+      } catch {
         setKeycloakError('Không thể kết nối Keycloak. Thông tin có thể không đầy đủ.');
       } finally {
         setLoading(false);

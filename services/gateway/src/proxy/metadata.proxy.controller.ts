@@ -200,6 +200,29 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/preview-authorize')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Authorize document preview',
+    description:
+      'Issues a preview grant token. Unlike download-authorize, this allows compliance_officer ' +
+      'and only requires READ permission (not DOWNLOAD).',
+  })
+  @HttpCode(200)
+  async authorizePreview(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/preview-authorize`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Get('documents/:docId/workflow-history')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')

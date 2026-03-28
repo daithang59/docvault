@@ -93,6 +93,18 @@ export function canDownloadDocument(
   return doc.status === 'PUBLISHED';
 }
 
+/**
+ * Whether the current user can preview a document.
+ * Unlike download, compliance_officer IS allowed to preview.
+ */
+export function canPreviewDocument(
+  session: Session | null,
+  doc: DocumentContext,
+): boolean {
+  if (!session) return false;
+  return doc.status === 'PUBLISHED';
+}
+
 export function canManageAcl(
   session: Session | null,
   doc: DocumentContext,

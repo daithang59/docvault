@@ -6,6 +6,7 @@ import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { CheckCircle, XCircle, X } from 'lucide-react';
 import { useApproveDocument, useRejectDocument } from '@/lib/hooks/use-documents';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
@@ -22,6 +23,11 @@ interface ApprovalReviewDrawerProps {
 export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps) {
   const [confirmType, setConfirmType] = useState<'approve' | 'reject' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+
+  const { data: displayNames } = useOwnerDisplayNames(doc ? [doc.ownerId] : []);
+  const ownerDisplay = doc
+    ? (displayNames?.[doc.ownerId]?.displayName ?? doc.ownerDisplay ?? doc.ownerId ?? 'Unknown')
+    : '';
 
   const approve = useApproveDocument(doc?.id ?? '');
   const reject = useRejectDocument(doc?.id ?? '');
@@ -77,7 +83,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           </div>
 
           <div className="grid grid-cols-2 gap-4 rounded-xl bg-[var(--bg-subtle)] p-4">
-            <InfoItem label="Owner" value={doc.ownerId.slice(0, 12) + '…'} mono />
+            <InfoItem label="Owner" value={ownerDisplay} />
             <InfoItem label="Version" value={`v${doc.currentVersion}`} />
             <InfoItem label="Updated" value={formatDateTime(doc.updatedAt)} />
             <InfoItem label="Created" value={formatDateTime(doc.createdAt)} />
@@ -159,11 +165,11 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
   );
 }
 
-function InfoItem({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function InfoItem({ label, value }: { label: string; value: string }) {
   return (
     <div>
       <p className="mb-0.5 text-[11px] uppercase tracking-wide text-[var(--text-faint)]">{label}</p>
-      <p className={`text-[var(--text-main)] ${mono ? 'font-mono text-xs' : 'text-sm'}`}>{value}</p>
+      <p className="text-sm text-[var(--text-main)]">{value}</p>
     </div>
   );
 }

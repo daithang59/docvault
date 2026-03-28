@@ -68,7 +68,12 @@ export class DocumentsService {
             : []),
           // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
           ...(roles.length > 0
-            ? [{ status: 'PUBLISHED' as const, classification: 'PUBLIC' as const }]
+            ? [
+                {
+                  status: 'PUBLISHED' as const,
+                  classification: 'PUBLIC' as const,
+                },
+              ]
             : []),
           // INTERNAL: viewer+ sees PUBLISHED + INTERNAL
           ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
@@ -82,9 +87,7 @@ export class DocumentsService {
               ]
             : []),
           // CONFIDENTIAL: editor+ sees PUBLISHED + CONFIDENTIAL (owner or ACL)
-          ...(['editor', 'approver', 'admin'].some((r) =>
-            roles.includes(r),
-          )
+          ...(['editor', 'approver', 'admin'].some((r) => roles.includes(r))
             ? [
                 {
                   status: 'PUBLISHED' as const,
