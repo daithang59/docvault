@@ -3,17 +3,19 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { Shield, X, Menu } from 'lucide-react';
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { NAV_ITEMS } from '@/lib/constants/nav';
 import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
 import { UserRole } from '@/types/auth';
+import { useMounted } from '@/lib/hooks/use-mounted';
 
 function SidebarNav({
   pathname,
   session,
   visibleItems,
   onLinkClick,
+  mounted,
 }: {
   pathname: string;
   session: {
@@ -28,6 +30,8 @@ function SidebarNav({
   } | null;
   visibleItems: typeof NAV_ITEMS;
   onLinkClick: () => void;
+  /** True once the component has mounted on the client — used to prevent hydration mismatches */
+  mounted?: boolean;
 }) {
   const avatarInitials =
     session?.user.firstName && session?.user.lastName
@@ -104,8 +108,8 @@ function SidebarNav({
         })}
       </nav>
 
-      {/* User info */}
-      {session && (
+      {/* User info — hidden until mounted to prevent hydration mismatch */}
+      {mounted && session && (
         <div className="relative px-4 py-4 border-t" style={{ borderColor: 'var(--sidebar-border)' }}>
           <div className="absolute inset-x-4 top-0 h-px bg-gradient-to-r from-transparent via-white/10 to-transparent" />
           <div className="mt-2 flex items-center gap-3">
@@ -136,11 +140,7 @@ export function AppSidebar() {
   const pathname = usePathname();
   const { session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [mounted, setMounted] = useState(false);
-
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const mounted = useMounted();
 
   // Prevent hydration mismatch: defer role-based filtering to client mount
   const visibleItems = mounted
@@ -176,6 +176,7 @@ export function AppSidebar() {
             session={session}
             visibleItems={visibleItems}
             onLinkClick={() => setMobileOpen(false)}
+            mounted={mounted}
           />
         </div>
       </aside>
@@ -227,6 +228,7 @@ export function AppSidebar() {
               session={session}
               visibleItems={visibleItems}
               onLinkClick={() => setMobileOpen(false)}
+              mounted={mounted}
             />
           </aside>
         </div>

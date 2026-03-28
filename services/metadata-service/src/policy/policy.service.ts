@@ -13,6 +13,7 @@ import { createHmac } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
 import { DownloadAuthorizeDto } from './dto/download-authorize.dto';
+import { PreviewAuthorizeDto } from './dto/preview-authorize.dto';
 import {
   RequestContext,
   ServiceUser,
@@ -140,7 +141,10 @@ export class PolicyService {
       expiresInSeconds: this.expiresInSeconds,
       expiresAt: expiresAt.toISOString(),
       classification: document.classification,
-      watermarkRequired: CLASSIFICATION_WATERMARK_LEVELS[document.classification as ClassificationLevel],
+      watermarkRequired:
+        CLASSIFICATION_WATERMARK_LEVELS[
+          document.classification as ClassificationLevel
+        ],
       grantToken: this.createGrantToken({
         actorId,
         docId,
@@ -150,7 +154,141 @@ export class PolicyService {
         contentType: versionRecord.contentType ?? undefined,
         expiresAt: expiresAt.toISOString(),
         classification: document.classification,
-        watermarkRequired: CLASSIFICATION_WATERMARK_LEVELS[document.classification as ClassificationLevel],
+        watermarkRequired:
+          CLASSIFICATION_WATERMARK_LEVELS[
+            document.classification as ClassificationLevel
+          ],
+      }),
+    };
+  }
+
+  async authorizePreview(
+    docId: string,
+    dto: PreviewAuthorizeDto,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: docId },
+      include: { aclEntries: true },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const actorId = buildActorId(user);
+    const roles = user.roles ?? [];
+    const requestedVersion = dto.version ?? document.currentVersion;
+
+    if (!requestedVersion || requestedVersion < 1) {
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason: 'Document has no uploaded version',
+      });
+      throw new ForbiddenException('Document has no uploaded version');
+    }
+
+    const versionRecord = await this.prisma.documentVersion.findUnique({
+      where: {
+        docId_version: {
+          docId,
+          version: requestedVersion,
+        },
+      },
+    });
+
+    if (!versionRecord) {
+      throw new NotFoundException('Document version not found');
+    }
+
+    // NOTE: compliance_officer is allowed here — preview is not download
+    const statusDeniedReason = this.getPreviewDeniedReason(document.status);
+    if (statusDeniedReason) {
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason: statusDeniedReason,
+      });
+      throw new ForbiddenException(statusDeniedReason);
+    }
+
+    if (
+      this.matchesPreviewAcl(
+        document.aclEntries,
+        actorId,
+        roles,
+        AclEffect.DENY,
+      )
+    ) {
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason: 'Preview denied by ACL',
+      });
+      throw new ForbiddenException('Preview denied by ACL');
+    }
+
+    const hasExplicitAllow = this.matchesPreviewAcl(
+      document.aclEntries,
+      actorId,
+      roles,
+      AclEffect.ALLOW,
+    );
+
+    const classificationReason = this.getPreviewClassificationDeniedReason(
+      document.classification as ClassificationLevel,
+      roles,
+      actorId,
+      document.ownerId,
+      hasExplicitAllow,
+    );
+
+    if (classificationReason) {
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason: classificationReason,
+      });
+      throw new ForbiddenException(classificationReason);
+    }
+
+    const expiresAt = new Date(Date.now() + this.expiresInSeconds * 1000);
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+    });
+
+    return {
+      docId,
+      version: versionRecord.version,
+      objectKey: versionRecord.objectKey,
+      filename: versionRecord.filename,
+      contentType: versionRecord.contentType,
+      expiresInSeconds: this.expiresInSeconds,
+      expiresAt: expiresAt.toISOString(),
+      classification: document.classification,
+      grantToken: this.createPreviewGrantToken({
+        actorId,
+        docId,
+        version: versionRecord.version,
+        objectKey: versionRecord.objectKey,
+        filename: versionRecord.filename,
+        contentType: versionRecord.contentType ?? undefined,
+        expiresAt: expiresAt.toISOString(),
+        classification: document.classification,
       }),
     };
   }
@@ -163,6 +301,107 @@ export class PolicyService {
       return 'Only published documents can be downloaded';
     }
     return null;
+  }
+
+  private getPreviewDeniedReason(_status: string): string | null {
+    // Preview is allowed across workflow states as long as ACL/classification checks pass.
+    return null;
+  }
+
+  private matchesPreviewAcl(
+    aclEntries: Array<{
+      subjectType: AclSubjectType;
+      subjectId: string | null;
+      permission: DocumentPermission;
+      effect: AclEffect;
+    }>,
+    actorId: string,
+    roles: string[],
+    effect: AclEffect,
+  ) {
+    return aclEntries.some((entry) => {
+      if (entry.permission !== DocumentPermission.READ) {
+        return false;
+      }
+      if (entry.effect !== effect) {
+        return false;
+      }
+      if (entry.subjectType === AclSubjectType.ALL) {
+        return true;
+      }
+      if (entry.subjectType === AclSubjectType.USER) {
+        return entry.subjectId === actorId;
+      }
+      if (entry.subjectType === AclSubjectType.ROLE) {
+        return entry.subjectId ? roles.includes(entry.subjectId) : false;
+      }
+      return false;
+    });
+  }
+
+  private createPreviewGrantToken(payload: {
+    actorId: string;
+    docId: string;
+    version: number;
+    objectKey: string;
+    filename: string;
+    contentType?: string;
+    expiresAt: string;
+    classification: string;
+  }) {
+    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
+    const signature = createHmac(
+      'sha256',
+      process.env.PREVIEW_GRANT_SECRET ??
+        process.env.DOWNLOAD_GRANT_SECRET ??
+        'docvault-download-grant-secret',
+    )
+      .update(encoded)
+      .digest('base64url');
+
+    return `${encoded}.${signature}`;
+  }
+
+  private getPreviewClassificationDeniedReason(
+    classification: ClassificationLevel,
+    roles: string[],
+    actorId: string,
+    ownerId: string,
+    hasExplicitAllow: boolean,
+  ): string | null {
+    // Preview-specific rule: admin can always preview when route-level auth passed.
+    if (roles.includes('admin')) {
+      return null;
+    }
+
+    return this.getClassificationDeniedReason(
+      classification,
+      roles,
+      actorId,
+      ownerId,
+      hasExplicitAllow,
+    );
+  }
+
+  private getPreviewClassificationDeniedReason(
+    classification: ClassificationLevel,
+    roles: string[],
+    actorId: string,
+    ownerId: string,
+    hasExplicitAllow: boolean,
+  ): string | null {
+    // Preview-specific rule: admin can always preview when route-level auth passed.
+    if (roles.includes('admin')) {
+      return null;
+    }
+
+    return this.getClassificationDeniedReason(
+      classification,
+      roles,
+      actorId,
+      ownerId,
+      hasExplicitAllow,
+    );
   }
 
   private getClassificationDeniedReason(
@@ -187,11 +426,7 @@ export class PolicyService {
         return null;
 
       case 'CONFIDENTIAL':
-        if (
-          !roles.some((r) =>
-            ['editor', 'approver', 'admin'].includes(r),
-          )
-        ) {
+        if (!roles.some((r) => ['editor', 'approver', 'admin'].includes(r))) {
           return 'CONFIDENTIAL documents require at least the editor role';
         }
         if (actorId !== ownerId && !hasExplicitAllow) {
@@ -200,9 +435,7 @@ export class PolicyService {
         return null;
 
       case 'SECRET':
-        if (
-          !roles.some((r) => ['approver', 'admin'].includes(r))
-        ) {
+        if (!roles.some((r) => ['approver', 'admin'].includes(r))) {
           return 'SECRET documents require at least the approver role';
         }
         if (actorId !== ownerId && !hasExplicitAllow) {

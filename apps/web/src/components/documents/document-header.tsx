@@ -4,38 +4,15 @@ import { DocumentDetail } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
-import { useAuth } from '@/lib/auth/auth-context';
+import { useOwnerDisplayName } from '@/features/approvals/approvals.hooks';
 import { User, Calendar, Tag } from 'lucide-react';
 
 interface DocumentHeaderProps {
   doc: DocumentDetail;
 }
 
-/** Derive display name for an owner. Priority:
- * 1. ownerDisplay from backend (Keycloak name)
- * 2. Current user's own displayName (if owner === current user)
- * 3. ownerId (username) as-is
- */
-function resolveOwnerDisplay(doc: DocumentDetail, currentUser: { sub?: string; username?: string; preferred_username?: string; displayName?: string; firstName?: string; lastName?: string } | null): string {
-  if (doc.ownerDisplay) return doc.ownerDisplay;
-
-  // ownerId is stored as username (see buildActorId: username ?? sub)
-  const currentUsername = currentUser?.username ?? currentUser?.preferred_username;
-  if (currentUsername && doc.ownerId === currentUsername) {
-    const ownName =
-      currentUser?.displayName ??
-      [currentUser?.firstName, currentUser?.lastName].filter(Boolean).join(' ') ??
-      currentUsername;
-    return ownName;
-  }
-
-  return doc.ownerId;
-}
-
 export function DocumentHeader({ doc }: DocumentHeaderProps) {
-  const { session } = useAuth();
-
-  const ownerDisplay = resolveOwnerDisplay(doc, session?.user ?? null);
+  const { data: ownerDisplay } = useOwnerDisplayName(doc.ownerId);
 
   return (
     <div className="mb-6 rounded-2xl border bg-[var(--bg-card)] p-6" style={{ borderColor: 'var(--border-soft)' }}>
@@ -69,7 +46,7 @@ export function DocumentHeader({ doc }: DocumentHeaderProps) {
       )}
 
       <div className="grid grid-cols-2 gap-4 border-t pt-4 sm:grid-cols-4" style={{ borderColor: 'var(--border-soft)' }}>
-        <MetaItem label="Owner" icon={User} value={ownerDisplay} mono={false} truncate={false} />
+        <MetaItem label="Owner" icon={User} value={ownerDisplay ?? '...'} />
         <MetaItem label="Created" icon={Calendar} value={formatDateTime(doc.createdAt)} />
         <MetaItem label="Updated" icon={Calendar} value={formatDateTime(doc.updatedAt)} />
         {doc.publishedAt && (
@@ -87,14 +64,10 @@ function MetaItem({
   label,
   value,
   icon: Icon,
-  mono,
-  truncate,
 }: {
   label: string;
   value: string;
   icon: React.ComponentType<{ className?: string }>;
-  mono?: boolean;
-  truncate?: boolean;
 }) {
   return (
     <div>
@@ -104,9 +77,7 @@ function MetaItem({
           {label}
         </span>
       </div>
-      <p className={`${truncate ? 'truncate' : ''} text-[var(--text-main)] ${mono ? 'font-mono text-xs' : 'text-sm'}`}>
-        {value}
-      </p>
+      <p className="text-sm text-[var(--text-main)]">{value}</p>
     </div>
   );
 }

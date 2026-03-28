@@ -18,6 +18,7 @@ export {
   canRejectDocument,
   canArchiveDocument,
   canDownloadDocument,
+  canPreviewDocument,
   canReadAcl,
   canViewAudit,
   canViewApprovals,
