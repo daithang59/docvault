@@ -37,9 +37,11 @@ export class MetadataProxyController {
       'Results can be filtered by `status`, `ownerId`, `classification`, `tags`, and `q` (full-text search).',
   })
   async list(@Req() req: any) {
+    // Forward query params (e.g. ?q=keyword) to the downstream service
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
-      url: `${process.env.METADATA_SERVICE_URL}/documents`,
+      url: `${process.env.METADATA_SERVICE_URL}/documents${queryString}`,
     });
     return response.data;
   }
@@ -231,6 +233,35 @@ export class MetadataProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/workflow-history`,
+    });
+    return response.data;
+  }
+
+  @Get('documents/:docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List comments for a document' })
+  async listComments(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/comments`,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Add a comment to a document' })
+  async addComment(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/comments`,
+      data: body,
     });
     return response.data;
   }

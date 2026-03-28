@@ -107,10 +107,10 @@ Sau khi login với `editor1`:
 | Role | Quick Actions thấy được |
 |---|---|
 | `viewer` | Browse Documents |
-| `editor` | Browse Documents + Create Document |
+| `editor` | Browse Documents + Create Document + My Documents |
 | `approver` | Browse Documents + Review Approvals (+ badge số pending) |
 | `compliance_officer` | Browse Documents + Audit Logs |
-| `admin` | Tất cả 4 action |
+| `admin` | Tất cả action (bao gồm My Documents) |
 
 #### ✅ Test 4: Role Badge trên header
 
@@ -251,6 +251,8 @@ Title, description, classification badge, status badge, tags, owner info, create
 | PENDING | editor | Không có action |
 | PUBLISHED | viewer/editor | Download, Archive |
 | ARCHIVED | (tất cả) | Chỉ xem |
+| PUBLISHED/ARCHIVED | viewer/editor/approver/admin | Preview (nếu `canPreview=true`) |
+| PUBLISHED/ARCHIVED | co (chỉ PUBLIC classification) | Preview |
 
 #### ✅ Test 6: Submit document (DRAFT → PENDING)
 
@@ -394,13 +396,168 @@ Title, description, classification badge, status badge, tags, owner info, create
 
 ---
 
-### 3.9 — Settings Page (`/settings`)
+### 3.9 — My Documents Page (`/my-documents`)
 
-#### ✅ Test 1: Hiển thị session info
+> Chỉ `editor` và `admin` nhìn thấy trong sidebar.
 
-- Username, sub, loại phiên
-- Các role badges hiện tại
-- API Gateway URL từ env
+#### ✅ Test 1: RBAC — Sidebar nav
+
+1. Đăng nhập `editor1` → sidebar hiển thị mục **"My Documents"**
+2. Đăng nhập `viewer1` → sidebar **KHÔNG** hiển thị "My Documents"
+3. Đăng nhập `admin` → sidebar hiển thị "My Documents"
+
+#### ✅ Test 2: Chỉ hiển thị documents của mình
+
+1. Đăng nhập `editor1`
+2. Vào `/my-documents`
+3. **Kỳ vọng:** Chỉ hiển thị docs mà `ownerId` trùng với username của `editor1`
+4. Docs của `admin` hoặc user khác → **KHÔNG xuất hiện**
+
+#### ✅ Test 3: Filter & Search hoạt động
+
+- Tìm kiếm theo title → đúng kết quả
+- Filter theo status (DRAFT, PENDING, PUBLISHED, ARCHIVED) → đúng
+- Filter theo classification → đúng
+- Sort theo `updatedAt` desc mặc định
+
+#### ✅ Test 4: Inline workflow actions
+
+- Trên row: Submit (DRAFT), Approve (PENDING nếu là approver/admin), Archive (PUBLISHED)
+- Download hoạt động (gọi presigned URL)
+- Confirm dialog hiển thị đúng
+
+#### ✅ Test 5: Pagination
+
+- Khi có nhiều docs → pagination hiển thị ở cuối table
+- Thay đổi page size hoạt động
+- Chuyển page giữ filter
+
+#### ✅ Test 6: Empty state
+
+- Khi chưa tạo doc nào → hiển thị: **"You haven't created any documents yet."** + nút **"Create Document"**
+- Khi có docs nhưng filter không khớp → hiển thị: **"Try adjusting your filters."**
+
+#### ✅ Test 7: Nút "New Document" trên header
+
+- Luôn hiển thị nút **"New Document"** trên PageHeader → click → sang `/documents/new`
+
+---
+
+### 3.10 — Document Preview (`/documents/[id]`)
+
+> Tính năng preview tài liệu trực tiếp không cần download, sử dụng pdf.js.
+
+#### ✅ Test 1: Nút Preview hiển thị đúng quyền
+
+- Document **PUBLISHED** hoặc **ARCHIVED** → nút **"Preview"** hiển thị (nếu `canPreview=true`)
+- Document **DRAFT** hoặc **PENDING** → nút **"Preview"** **KHÔNG** hiển thị
+- `compliance_officer` chỉ thấy Preview cho classification **PUBLIC** ⚠️
+
+| Role | PUBLISHED (PUBLIC) | PUBLISHED (CONFIDENTIAL) | ARCHIVED |
+|---|---|---|---|
+| viewer | ✅ Preview | ✅ Preview | ✅ Preview |
+| editor | ✅ Preview | ✅ Preview | ✅ Preview |
+| approver | ✅ Preview | ✅ Preview | ✅ Preview |
+| compliance_officer | ✅ Preview | ❌ Không thấy | ❌ Không thấy |
+| admin | ✅ Preview | ✅ Preview | ✅ Preview |
+
+#### ✅ Test 2: Preview file PDF
+
+1. Vào document có file PDF → nhấn **"Preview"** trên version card
+2. **Kỳ vọng:**
+   - Dialog mở ra, hiển thị loading spinner "Đang tải preview..."
+   - PDF render thành ảnh (từng trang) bằng pdf.js
+   - Hiển thị tên file + version number trên header dialog
+   - Không có nút download trong dialog → **chỉ xem, không tải** ✅
+
+#### ✅ Test 3: Preview file ảnh (PNG/JPEG/GIF/WebP)
+
+1. Upload 1 version file ảnh → nhấn Preview
+2. **Kỳ vọng:** Ảnh hiển thị trong dialog, fit trong viewport
+
+#### ✅ Test 4: Zoom controls
+
+- Nút **Zoom In (+)** → phóng to (bước 25%), tối đa 300%
+- Nút **Zoom Out (−)** → thu nhỏ (bước 25%), tối thiểu 25%
+- Nút **Reset** (hiển thị %) → quay về 100%
+- **Ctrl + Scroll** (hoặc Cmd + Scroll trên Mac) → zoom in/out
+- Zoom controls chỉ hiển thị khi đang ở trạng thái `pdf` hoặc `image`
+
+#### ✅ Test 5: Đóng dialog
+
+- Nhấn nút **X** → dialog đóng
+- Nhấn phím **Escape** → dialog đóng
+
+#### ✅ Test 6: File không hỗ trợ preview
+
+1. Upload file `.docx` hoặc `.xlsx` → nhấn Preview
+2. **Kỳ vọng:** Hiển thị: **"Preview không khả dụng cho loại file này"**
+
+#### ✅ Test 7: Preview timeout / lỗi
+
+1. Mô phỏng network chậm (DevTools → throttle **"Slow 3G"**) → nhấn Preview
+2. Nếu quá 20s → **Kỳ vọng:** Hiển thị lỗi: **"Preview request timeout"**
+
+#### ✅ Test 8: Chống click-chuột-phải download
+
+- Trong dialog preview → click chuột phải → **context menu bị chặn** (`onContextMenu preventDefault`)
+
+---
+
+### 3.11 — Profile Page (`/profile`)
+
+> Thay thế trang Settings cũ (`/settings`). Hiển thị thông tin cá nhân từ Keycloak.
+
+#### ✅ Test 1: Hiển thị thông tin user
+
+1. Đăng nhập bất kỳ account → vào `/profile`
+2. **Kỳ vọng:**
+   - **Hero Card**: Avatar initials (2 chữ đầu), tên hiển thị, username, role badges, status "Active"
+   - **Thông tin tài khoản**: Username, Email, User ID, Xác thực = "Keycloak SSO"
+   - **Vai trò & quyền hạn**: Các role badges hiện tại
+
+#### ✅ Test 2: Loading state
+
+- Khi đang fetch profile từ Keycloak → avatar hiển thị spinner, info hiển thị skeleton
+
+#### ✅ Test 3: Keycloak fallback
+
+- Nếu API `/api/users/profile` lỗi → fallback về thông tin từ session
+- Hiển thị warning: **"Không thể kết nối Keycloak. Thông tin có thể không đầy đủ."**
+
+#### ✅ Test 4: Thông báo Read-only
+
+- Cuối trang hiển thị card "Quản lý tài khoản trên Keycloak" với badge **"Read-only"**
+- Hướng dẫn user đổi thông tin cá nhân trên Keycloak Admin Console
+
+#### ✅ Test 5: Kiểm tra từng role
+
+| Login | DisplayName | Username | Roles |
+|---|---|---|---|
+| `viewer1` | (tên từ Keycloak) | viewer1 | `VIEWER` |
+| `editor1` | (tên từ Keycloak) | editor1 | `EDITOR` |
+| `approver1` | (tên từ Keycloak) | approver1 | `APPROVER` |
+| `co1` | (tên từ Keycloak) | co1 | `COMPLIANCE_OFFICER` |
+| `admin` | (tên từ Keycloak) | admin | `ADMIN` |
+
+---
+
+### 3.12 — Notifications (API module)
+
+> Module notifications đã được scaffold. Kiểm tra API integration cơ bản.
+
+#### ✅ Test 1: API endpoint `/notify` phản hồi
+
+1. Đăng nhập → mở DevTools **Network tab**
+2. Kiểm tra request `GET /api/notify` được gửi
+3. **Kỳ vọng:** Response 200 với mảng notifications hoặc mảng rỗng `[]`
+
+#### ✅ Test 2: Mark all read
+
+1. Nếu có notifications chưa đọc → gọi `POST /api/notify/mark-read`
+2. **Kỳ vọng:** Response `{ "ok": true }`
+
+> **Lưu ý:** UI notification bell/panel có thể chưa hoàn thiện, test tập trung vào API response.
 
 ---
 
@@ -494,15 +651,33 @@ Title, description, classification badge, status badge, tags, owner info, create
 | 27 | Audit page: events list | co | ✅ Hiển thị | ⬜ |
 | 28 | Audit: filter hoạt động | co | ✅ Lọc đúng | ⬜ |
 | 29 | Viewer vào /audit | viewer | ✅ Inline error | ⬜ |
-| 30 | Settings page: session info | all | ✅ Hiển thị user | ⬜ |
-| 31 | Download presigned URL | viewer | ✅ File tải về | ⬜ |
-| 32 | Upload file > 20MB | editor | ✅ 413 toast | ⬜ |
-| 33 | 409 Conflict handling | editor | ✅ Đúng message | ⬜ |
-| 34 | 403 Forbidden handling | viewer | ✅ Toast hiển thị | ⬜ |
-| 35 | Session hết hạn | any | ✅ Redirect /login | ⬜ |
-| 36 | Network offline | any | ✅ ErrorState + Retry | ⬜ |
-| 37 | Document không tồn tại | any | ✅ ErrorState | ⬜ |
-| 38 | Mobile responsive | all | ✅ Layout OK | ⬜ |
+| 30 | Download presigned URL | viewer | ✅ File tải về | ⬜ |
+| 31 | Upload file > 20MB | editor | ✅ 413 toast | ⬜ |
+| 32 | 409 Conflict handling | editor | ✅ Đúng message | ⬜ |
+| 33 | 403 Forbidden handling | viewer | ✅ Toast hiển thị | ⬜ |
+| 34 | Session hết hạn | any | ✅ Redirect /login | ⬜ |
+| 35 | Network offline | any | ✅ ErrorState + Retry | ⬜ |
+| 36 | Document không tồn tại | any | ✅ ErrorState | ⬜ |
+| 37 | Mobile responsive | all | ✅ Layout OK | ⬜ |
+| | **— My Documents —** | | | |
+| 38 | My Documents: sidebar nav RBAC | editor/admin | ✅ Hiển thị | ⬜ |
+| 39 | My Documents: chỉ docs của mình | editor | ✅ Filter đúng owner | ⬜ |
+| 40 | My Documents: filter & search | editor | ✅ Kết quả đúng | ⬜ |
+| 41 | My Documents: pagination | editor | ✅ Chuyển trang OK | ⬜ |
+| 42 | My Documents: empty state | editor | ✅ Message đúng | ⬜ |
+| 43 | My Documents: inline actions | editor | ✅ Submit/Archive OK | ⬜ |
+| | **— Document Preview —** | | | |
+| 44 | Preview PDF: render pages | editor | ✅ Pages hiển thị | ⬜ |
+| 45 | Preview Image: hiển thị ảnh | editor | ✅ Ảnh hiển thị | ⬜ |
+| 46 | Preview: zoom controls | any | ✅ Zoom in/out/reset | ⬜ |
+| 47 | Preview: CO chỉ PUBLIC | co | ✅ Non-PUBLIC bị ẩn | ⬜ |
+| 48 | Preview: file không hỗ trợ | any | ✅ Unsupported msg | ⬜ |
+| 49 | Preview: chống chuột phải | any | ✅ Context menu chặn | ⬜ |
+| 50 | Preview: close (X / Escape) | any | ✅ Dialog đóng | ⬜ |
+| | **— Profile —** | | | |
+| 51 | Profile: hiển thị user info | all | ✅ Avatar + info | ⬜ |
+| 52 | Profile: Keycloak fallback | all | ✅ Warning hiển thị | ⬜ |
+| 53 | Profile: role badges đúng | all | ✅ Badges đúng role | ⬜ |
 
 ---
 

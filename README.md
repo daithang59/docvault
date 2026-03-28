@@ -99,6 +99,7 @@ flowchart LR
         UC10["Tải file đã xuất bản"]
         UC11["Xem audit log"]
         UC12["Preview tài liệu\nPUBLISHED / ARCHIVED"]
+        UC13["My Documents\nXem tài liệu mình sở hữu"]
     end
 
     V --> UC1
@@ -115,6 +116,7 @@ flowchart LR
     E --> UC9
     E --> UC10
     E --> UC12
+    E --> UC13
 
     A --> UC1
     A --> UC2
@@ -140,6 +142,7 @@ flowchart LR
     ADM --> UC10
     ADM --> UC11
     ADM --> UC12
+    ADM --> UC13
 ```
 
 > ⚠️ **Lưu ý:** Compliance Officer **không thể tải file** dù có bất kỳ quyền ACL nào — luật này được enforce ở tầng `metadata-service`. CO **có thể preview chỉ tài liệu PUBLIC** đã xuất bản/lưu trữ, nhưng vẫn thấy metadata (chi tiết) tất cả tài liệu PUBLISHED và ARCHIVED để phục vụ kiểm toán.
@@ -436,6 +439,48 @@ docvault/
 
 - `audit_events` — sự kiện audit với **hash chain SHA-256** chống giả mạo
 
+### Database `docvault_metadata` — Document Comments
+
+- `document_comments` — ghi chú/comment trên tài liệu (authorId, content, timestamp)
+
+---
+
+## Tính năng nâng cao
+
+### Bulk Actions
+
+Chọn nhiều tài liệu trong bảng và thực hiện hành động hàng loạt:
+
+- **Bulk Submit**: Chọn nhiều DRAFT → Submit tất cả cùng lúc
+- **Bulk Approve**: Approver chọn nhiều PENDING → Approve hàng loạt
+- **Bulk Archive**: Chọn nhiều PUBLISHED → Archive cùng lúc
+
+> Kết quả hiển thị qua toast: `"Bulk Submit: 3 succeeded, 1 failed"`.
+
+### Document Comments
+
+Tất cả user có quyền xem tài liệu đều có thể để lại comment/ghi chú:
+
+- Hiển thị trên trang chi tiết tài liệu (cột phải)
+- Hỗ trợ tất cả roles: viewer, editor, approver, CO, admin
+- API: `GET/POST /api/metadata/documents/:docId/comments`
+
+### Full-text Search (Server-side)
+
+Tìm kiếm tài liệu qua tiêu đề, mô tả, và tags:
+
+- Search được xử lý tại server (PostgreSQL ILIKE) → hiệu quả với dataset lớn
+- API: `GET /api/metadata/documents?q=keyword`
+- Frontend tự động gửi query tới server khi nhập vào ô tìm kiếm
+
+### My Documents
+
+Editor/Admin có trang riêng `/my-documents` hiển thị chỉ tài liệu mình sở hữu:
+
+- Menu sidebar: **My Documents** (FolderOpen icon)
+- Auto-filter theo `ownerId` — dễ quản lý tài liệu cá nhân
+- Hỗ trợ đầy đủ: bulk actions, filters, submit/archive
+
 ---
 
 ## Ghi chú quan trọng
@@ -445,5 +490,7 @@ docvault/
 - **Preview** hỗ trợ tài liệu `PUBLISHED` và `ARCHIVED`. PDF được render bằng `pdf.js` (canvas) — không có nút tải, không có right-click save.
 - **Archive** chỉ dành cho editor sở hữu tài liệu hoặc admin (không phải approver). Tài liệu ARCHIVED **chỉ có thể preview**, không download.
 - **Classification Visibility**: PUBLIC (tất cả) → INTERNAL (editor+) → CONFIDENTIAL (approver+) → SECRET (approver+). CO thấy tất cả PUBLISHED (metadata only).
+- **Bulk Actions** hỗ trợ Submit, Approve, Archive hàng loạt — mỗi doc được gọi API tuần tự.
+- **Document Comments** lưu trong table `document_comments` — không giới hạn số comment.
 - Gateway tự động ghi audit cho mọi request nhận được.
 - Trạng thái tài liệu: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.

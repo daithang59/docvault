@@ -28,7 +28,7 @@ export class DocumentsService {
    * or a RequestContext (when called via gateway proxy, where req.user is
    * stripped and user info is carried in x-user-id / x-roles headers).
    */
-  findAll(userOrContext?: ServiceUser | RequestContext) {
+  findAll(userOrContext?: ServiceUser | RequestContext, searchQuery?: string) {
     let actorId: string;
     let roles: string[];
     let isAdmin: boolean;
@@ -49,15 +49,32 @@ export class DocumentsService {
 
     isAdmin = roles.includes('admin');
 
+    // Build optional text search filter
+    const searchFilter = searchQuery
+      ? {
+          OR: [
+            { title: { contains: searchQuery, mode: 'insensitive' as const } },
+            { description: { contains: searchQuery, mode: 'insensitive' as const } },
+            { tags: { has: searchQuery } },
+          ],
+        }
+      : undefined;
+
     if (isAdmin) {
       return this.prisma.document.findMany({
+        where: searchFilter,
         orderBy: { createdAt: 'desc' },
       });
     }
 
     return this.prisma.document.findMany({
       where: {
-        OR: [
+        AND: [
+          // Search filter (optional)
+          ...(searchFilter ? [searchFilter] : []),
+          // Visibility filter (role + classification based)
+          {
+            OR: [
           // Documents the user owns (always visible regardless of classification)
           { ownerId: actorId },
           // Documents where user has explicit ACL entry (DOWNLOAD permission)
@@ -112,6 +129,8 @@ export class DocumentsService {
                 },
               ]
             : []),
+            ],
+          },
         ],
       },
       orderBy: { createdAt: 'desc' },

@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,6 +26,7 @@ import { UpdateStatusDto } from '../status/dto/update-status.dto';
 import { PolicyService } from '../policy/policy.service';
 import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from '../policy/dto/preview-authorize.dto';
+import { CommentsService } from '../comments/comments.service';
 import { buildRequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,6 +40,7 @@ export class DocumentsController {
     private readonly versionsService: VersionsService,
     private readonly statusService: StatusService,
     private readonly policyService: PolicyService,
+    private readonly commentsService: CommentsService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -45,8 +48,8 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List document metadata records (ACL-filtered)' })
-  findAll(@Req() req: any) {
-    return this.documentsService.findAll(buildRequestContext(req));
+  findAll(@Req() req: any, @Query('q') q?: string) {
+    return this.documentsService.findAll(buildRequestContext(req), q);
   }
 
   @Get(':docId')
@@ -195,5 +198,25 @@ export class DocumentsController {
       req.user,
       buildRequestContext(req),
     );
+  }
+
+  @Get(':docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List comments for a document' })
+  listComments(@Param('docId') docId: string) {
+    return this.commentsService.findByDoc(docId);
+  }
+
+  @Post(':docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Add a comment to a document' })
+  addComment(
+    @Param('docId') docId: string,
+    @Body() body: { content: string },
+    @Req() req: any,
+  ) {
+    return this.commentsService.create(docId, body.content, req.user);
   }
 }

@@ -65,6 +65,7 @@ model Document {
   versions        DocumentVersion[]
   aclEntries      DocumentAcl[]
   workflowHistory DocumentWorkflowHistory[]
+  comments        DocumentComment[]
 
   @@index([ownerId])
   @@index([status])
@@ -118,4 +119,16 @@ model DocumentWorkflowHistory {
 
   @@index([docId, createdAt])
   @@map("document_workflow_history")
+}
+
+model DocumentComment {
+  id        String   @id @default(uuid())
+  docId     String
+  authorId  String
+  content   String
+  createdAt DateTime @default(now())
+  document  Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, createdAt])
+  @@map("document_comments")
 }

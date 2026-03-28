@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback } from 'react';
+import { useState, useRef, useCallback, useMemo } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -9,6 +9,7 @@ import {
   flexRender,
   ColumnDef,
   SortingState,
+  RowSelectionState,
 } from '@tanstack/react-table';
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download } from 'lucide-react';
 import Link from 'next/link';
@@ -23,23 +24,32 @@ import { ROUTES } from '@/lib/constants/routes';
 
 interface DocumentsTableProps {
   data: DocumentListItem[];
+  enableSelection?: boolean;
   onSubmit?: (doc: DocumentListItem) => void;
   onApprove?: (doc: DocumentListItem) => void;
   onReject?: (doc: DocumentListItem) => void;
   onArchive?: (doc: DocumentListItem) => void;
   onDownload?: (doc: DocumentListItem) => void;
+  onBulkSubmit?: (docs: DocumentListItem[]) => void;
+  onBulkArchive?: (docs: DocumentListItem[]) => void;
+  onBulkApprove?: (docs: DocumentListItem[]) => void;
 }
 
 export function DocumentsTable({
   data,
+  enableSelection = false,
   onSubmit,
   onApprove,
   onReject,
   onArchive,
   onDownload,
+  onBulkSubmit,
+  onBulkArchive,
+  onBulkApprove,
 }: DocumentsTableProps) {
   const { session } = useAuth();
   const [sorting, setSorting] = useState<SortingState>([]);
+  const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -52,7 +62,54 @@ export function DocumentsTable({
     setHoveredRow(null);
   }, []);
 
+  const selectedDocs = useMemo(() => {
+    return Object.keys(rowSelection)
+      .filter((key) => rowSelection[key])
+      .map((key) => data[parseInt(key)])
+      .filter(Boolean);
+  }, [rowSelection, data]);
+
+  const bulkSubmittable = useMemo(
+    () => selectedDocs.filter((d) => canSubmitDocument(session, d)),
+    [selectedDocs, session],
+  );
+  const bulkArchivable = useMemo(
+    () => selectedDocs.filter((d) => canArchiveDocument(session, d)),
+    [selectedDocs, session],
+  );
+  const bulkApprovable = useMemo(
+    () => selectedDocs.filter((d) => canApproveDocument(session, d)),
+    [selectedDocs, session],
+  );
+
   const columns: ColumnDef<DocumentListItem>[] = [
+    // Checkbox column (only when selection enabled)
+    ...(enableSelection
+      ? [
+          {
+            id: 'select',
+            header: ({ table }: any) => (
+              <input
+                type="checkbox"
+                checked={table.getIsAllPageRowsSelected()}
+                onChange={table.getToggleAllPageRowsSelectedHandler()}
+                className="h-4 w-4 rounded border-[var(--input-border)] accent-[var(--color-primary)] cursor-pointer"
+                aria-label="Select all"
+              />
+            ),
+            cell: ({ row }: any) => (
+              <input
+                type="checkbox"
+                checked={row.getIsSelected()}
+                onChange={row.getToggleSelectedHandler()}
+                className="h-4 w-4 rounded border-[var(--input-border)] accent-[var(--color-primary)] cursor-pointer"
+                aria-label="Select row"
+              />
+            ),
+            size: 40,
+          } as ColumnDef<DocumentListItem>,
+        ]
+      : []),
     {
       accessorKey: 'title',
       header: ({ column }) => (
@@ -195,8 +252,10 @@ export function DocumentsTable({
   const table = useReactTable({
     data,
     columns,
-    state: { sorting },
+    state: { sorting, rowSelection },
     onSortingChange: setSorting,
+    onRowSelectionChange: setRowSelection,
+    enableRowSelection: enableSelection,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -212,6 +271,53 @@ export function DocumentsTable({
         boxShadow: 'var(--table-surface-shadow)',
       }}
     >
+      {/* Bulk action bar */}
+      {enableSelection && selectedDocs.length > 0 && (
+        <div
+          className="flex items-center gap-3 border-b px-4 py-2.5 animate-fade"
+          style={{ background: 'var(--color-primary-bg)', borderColor: 'var(--border-soft)' }}
+        >
+          <span className="text-sm font-medium text-[var(--color-primary)]">
+            {selectedDocs.length} selected
+          </span>
+          <div className="flex items-center gap-2">
+            {bulkSubmittable.length > 0 && onBulkSubmit && (
+              <button
+                onClick={() => { onBulkSubmit(bulkSubmittable); setRowSelection({}); }}
+                className="flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition-colors btn-primary text-white"
+              >
+                <Send className="h-3 w-3" />
+                Submit ({bulkSubmittable.length})
+              </button>
+            )}
+            {bulkApprovable.length > 0 && onBulkApprove && (
+              <button
+                onClick={() => { onBulkApprove(bulkApprovable); setRowSelection({}); }}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--status-published-border)] bg-[var(--status-published-bg)] px-3 py-1.5 text-xs font-medium text-[var(--status-published-text)] transition-colors hover:brightness-95"
+              >
+                <CheckCircle className="h-3 w-3" />
+                Approve ({bulkApprovable.length})
+              </button>
+            )}
+            {bulkArchivable.length > 0 && onBulkArchive && (
+              <button
+                onClick={() => { onBulkArchive(bulkArchivable); setRowSelection({}); }}
+                className="flex items-center gap-1.5 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-1.5 text-xs font-medium text-[var(--text-muted)] transition-colors hover:bg-[var(--bg-muted)]"
+              >
+                <Archive className="h-3 w-3" />
+                Archive ({bulkArchivable.length})
+              </button>
+            )}
+          </div>
+          <button
+            onClick={() => setRowSelection({})}
+            className="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+          >
+            Clear
+          </button>
+        </div>
+      )}
+
       <div className="overflow-x-auto">
         <table className="w-full text-left">
           <thead style={{ background: 'var(--table-header-bg)', borderBottom: '1px solid var(--table-header-border)' }}>
@@ -221,7 +327,7 @@ export function DocumentsTable({
                   <th
                     key={header.id}
                     className="whitespace-nowrap px-4 py-3 text-xs font-semibold uppercase tracking-wider"
-                    style={{ color: 'var(--table-header-text)' }}
+                    style={{ color: 'var(--table-header-text)', ...(header.id === 'select' ? { width: 40 } : {}) }}
                   >
                     {header.isPlaceholder ? null : flexRender(header.column.columnDef.header, header.getContext())}
                   </th>
@@ -233,10 +339,14 @@ export function DocumentsTable({
             {table.getRowModel().rows.map((row, rowIndex) => (
               <tr
                 key={row.id}
-                className="group border-b last:border-0 transition-all duration-150"
+                className={`group border-b last:border-0 transition-all duration-150 ${row.getIsSelected() ? 'ring-1 ring-inset ring-[var(--color-primary)]/20' : ''}`}
                 style={{
                   borderColor: 'var(--table-row-border)',
-                  background: rowIndex % 2 === 0 ? 'transparent' : 'var(--table-row-alt-bg)',
+                  background: row.getIsSelected()
+                    ? 'var(--color-primary-bg)'
+                    : rowIndex % 2 === 0
+                      ? 'transparent'
+                      : 'var(--table-row-alt-bg)',
                 }}
                 onMouseEnter={() => handleRowEnter(row.original.id)}
                 onMouseLeave={handleRowLeave}
@@ -254,6 +364,9 @@ export function DocumentsTable({
       <div className="flex items-center justify-between border-t px-4 py-3" style={{ borderColor: 'var(--table-row-border)', background: 'var(--table-header-bg)' }}>
         <p className="text-xs text-[var(--text-muted)]">
           {table.getRowModel().rows.length} document{table.getRowModel().rows.length !== 1 ? 's' : ''}
+          {enableSelection && selectedDocs.length > 0 && (
+            <span className="text-[var(--color-primary)]"> · {selectedDocs.length} selected</span>
+          )}
         </p>
       </div>
     </div>

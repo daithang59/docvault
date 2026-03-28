@@ -1,18 +1,18 @@
 'use client';
 
-import { useState, useMemo, useCallback } from 'react';
+import { useState, useMemo } from 'react';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { submitDocument, approveDocument, archiveDocument } from '@/lib/api/workflow';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
+import { useAuth } from '@/lib/auth/auth-context';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters, DocumentFiltersState } from '@/components/documents/document-filters';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { ProtectedAction } from '@/components/common/protected-action';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { TablePagination } from '@/components/data-table/table-pagination';
 import { DocumentListItem } from '@/types/document';
@@ -33,7 +33,8 @@ const DEFAULT_FILTERS: DocumentFiltersState = {
   sortDir: 'desc',
 };
 
-export default function DocumentsPage() {
+export default function MyDocumentsPage() {
+  const { session } = useAuth();
   const qc = useQueryClient();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
@@ -52,9 +53,14 @@ export default function DocumentsPage() {
     onError: (msg) => toast.error(msg),
   });
 
+  // Backend stores ownerId as username (via buildActorId = username ?? sub)
+  const currentUserId = session?.user?.username ?? session?.user?.preferred_username ?? session?.user?.sub ?? '';
+
   const filtered = useMemo(() => {
     if (!docs) return [];
-    let result = [...docs.data];
+    // Filter to only show documents owned by the current user
+    let result = docs.data.filter((d) => d.ownerId === currentUserId);
+
     if (filters.search) {
       const q = filters.search.toLowerCase();
       result = result.filter(
@@ -72,7 +78,7 @@ export default function DocumentsPage() {
       return filters.sortDir === 'asc' ? cmp : -cmp;
     });
     return result;
-  }, [docs, filters]);
+  }, [docs, filters, currentUserId]);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
@@ -82,7 +88,7 @@ export default function DocumentsPage() {
 
   if (isLoading) return (
     <div>
-      <PageHeader title="Documents" subtitle="Manage and review secure documents across their lifecycle." />
+      <PageHeader title="My Documents" subtitle="Documents you created and own." />
       <TableSkeleton rows={6} />
     </div>
   );
@@ -147,15 +153,13 @@ export default function DocumentsPage() {
     <div>
       <div className="animate-in delay-1">
         <PageHeader
-          title="Documents"
-          subtitle="Manage and review secure documents across their lifecycle."
+          title="My Documents"
+          subtitle="Documents you created and own."
           actions={
-            <ProtectedAction roles={['editor', 'admin']}>
-              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
-                <FilePlus className="h-4 w-4" />
-                New Document
-              </Link>
-            </ProtectedAction>
+            <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
+              <FilePlus className="h-4 w-4" />
+              New Document
+            </Link>
           }
         />
       </div>
@@ -168,18 +172,16 @@ export default function DocumentsPage() {
         <div className="animate-in delay-3">
           <EmptyState
             title="No documents found"
-          description={filters.search || filters.status || filters.classification
-            ? 'Try adjusting your filters.'
-            : 'Create your first document to get started.'
-          }
-          icon="document"
-          action={
-            <ProtectedAction roles={['editor', 'admin']}>
+            description={filters.search || filters.status || filters.classification
+              ? 'Try adjusting your filters.'
+              : 'You haven\'t created any documents yet.'
+            }
+            icon="document"
+            action={
               <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
                 Create Document
               </Link>
-            </ProtectedAction>
-          }
+            }
           />
         </div>
       ) : (

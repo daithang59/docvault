@@ -40,10 +40,13 @@ pnpm --filter metadata-service prisma:studio
 pnpm --filter audit-service migrate:to-mongo
 
 # E2E verification script (chạy khi tất cả services + infra đã chạy)
-node scripts/e2e-check.mjs
+pnpm test:e2e
 
 # Format code (Prettier)
 pnpm format
+
+# One-command sequential startup (requires Docker infra already running)
+pnpm start:sequential
 ```
 
 ## Kiến trúc tổng quan
@@ -134,11 +137,19 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
 
 ## Thứ tự khởi động
 
-**Quan trọng**: Gateway phải khởi động **sau cùng**, sau khi tất cả backend services đã ready:
+**Quan trọng**: Gateway phải khởi động **sau cùng**, sau khi tất cả backend services đã ready. Dùng `pnpm start:sequential` (recommended) hoặc thủ công:
 
+### Dùng `pnpm start:sequential`
+```bash
+pnpm start:sequential                    # fast — skips migrations
+RUN_PRISMA_DEPLOY=1 pnpm start:sequential  # with Prisma migrations
+```
+
+### Thủ công
 1. Docker infra (PostgreSQL, MinIO, Keycloak, MongoDB)
-2. `prisma:deploy` cho metadata-service
-3. metadata-service → document-service → workflow-service → notification-service → audit-service (MongoDB không cần migration)
-4. Chạy `migrate:to-mongo` để migrate audit logs cũ (nếu có)
+2. `pnpm --filter metadata-service prisma:deploy` (MongoDB không cần migration)
+3. Backend services: metadata → document → workflow → notification → audit
 4. Gateway
-5. Frontend (`apps/web/`)
+5. Frontend (`apps/web/` — Next.js trên port 3010)
+
+> `migrate:to-mongo` là one-time migration từ PostgreSQL → MongoDB cho audit logs cũ; chạy khi audit-service **đang stop**.
