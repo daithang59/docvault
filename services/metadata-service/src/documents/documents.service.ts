@@ -66,6 +66,14 @@ export class DocumentsService {
           ...(roles.length > 0
             ? [{ aclEntries: { some: { subjectId: { in: roles } } } }]
             : []),
+          // compliance_officer sees ALL published + archived documents (any classification) for audit
+          ...(roles.includes('compliance_officer')
+            ? [
+                {
+                  status: { in: ['PUBLISHED' as const, 'ARCHIVED' as const] },
+                },
+              ]
+            : []),
           // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
           ...(roles.length > 0
             ? [
@@ -75,8 +83,8 @@ export class DocumentsService {
                 },
               ]
             : []),
-          // INTERNAL: viewer+ sees PUBLISHED + INTERNAL
-          ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
+          // INTERNAL: editor+ sees PUBLISHED + INTERNAL
+          ...(['editor', 'approver', 'admin'].some((r) =>
             roles.includes(r),
           )
             ? [
@@ -86,26 +94,22 @@ export class DocumentsService {
                 },
               ]
             : []),
-          // CONFIDENTIAL: editor+ sees PUBLISHED + CONFIDENTIAL (owner or ACL)
-          ...(['editor', 'approver', 'admin'].some((r) => roles.includes(r))
+          // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
+          ...(['approver', 'admin'].some((r) => roles.includes(r))
             ? [
                 {
                   status: 'PUBLISHED' as const,
                   classification: 'CONFIDENTIAL' as const,
                 },
-                { ownerId: actorId },
-                { aclEntries: { some: { subjectId: actorId } } },
               ]
             : []),
-          // SECRET: approver+ sees PUBLISHED + SECRET (owner or ACL)
+          // SECRET: approver+ sees PUBLISHED + SECRET
           ...(['approver', 'admin'].some((r) => roles.includes(r))
             ? [
                 {
                   status: 'PUBLISHED' as const,
                   classification: 'SECRET' as const,
                 },
-                { ownerId: actorId },
-                { aclEntries: { some: { subjectId: actorId } } },
               ]
             : []),
         ],

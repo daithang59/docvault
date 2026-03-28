@@ -374,6 +374,11 @@ export class PolicyService {
       return null;
     }
 
+    // Approver can preview ALL classifications (highest non-admin authority)
+    if (roles.includes('approver')) {
+      return null;
+    }
+
     return this.getClassificationDeniedReason(
       classification,
       roles,

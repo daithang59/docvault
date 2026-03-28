@@ -11,6 +11,7 @@ import { hasAnyRole, hasRole } from './roles';
 interface DocumentContext {
   status: DocumentStatus;
   ownerId?: string;
+  classification?: string;
 }
 
 // ── Document list / creation ──────────────────────────────────────────────────
@@ -95,14 +96,17 @@ export function canDownloadDocument(
 
 /**
  * Whether the current user can preview a document.
- * Unlike download, compliance_officer IS allowed to preview.
+ * CO can only preview PUBLIC documents; approver+ can preview all.
  */
 export function canPreviewDocument(
   session: Session | null,
   doc: DocumentContext,
 ): boolean {
   if (!session) return false;
-  return doc.status === 'PUBLISHED' || doc.status === 'ARCHIVED';
+  if (!(doc.status === 'PUBLISHED' || doc.status === 'ARCHIVED')) return false;
+  // CO can only preview PUBLIC classification
+  if (hasRole(session, 'compliance_officer') && doc.classification !== 'PUBLIC') return false;
+  return true;
 }
 
 export function canManageAcl(

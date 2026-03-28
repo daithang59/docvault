@@ -98,11 +98,13 @@ flowchart LR
         UC9["Lưu trữ tài liệu\nPUBLISHED → ARCHIVED"]
         UC10["Tải file đã xuất bản"]
         UC11["Xem audit log"]
+        UC12["Preview tài liệu\nPUBLISHED / ARCHIVED"]
     end
 
     V --> UC1
     V --> UC2
     V --> UC10
+    V --> UC12
 
     E --> UC1
     E --> UC2
@@ -112,16 +114,19 @@ flowchart LR
     E --> UC6
     E --> UC9
     E --> UC10
+    E --> UC12
 
     A --> UC1
     A --> UC2
     A --> UC7
     A --> UC8
     A --> UC10
+    A --> UC12
 
     CO --> UC1
     CO --> UC2
     CO --> UC11
+    CO -.->|"chỉ PUBLIC"| UC12
 
     ADM --> UC1
     ADM --> UC2
@@ -134,19 +139,44 @@ flowchart LR
     ADM --> UC9
     ADM --> UC10
     ADM --> UC11
+    ADM --> UC12
 ```
 
-> ⚠️ **Lưu ý:** Compliance Officer **không thể tải file** dù có bất kỳ quyền ACL nào — luật này được enforce ở tầng `metadata-service`.
+> ⚠️ **Lưu ý:** Compliance Officer **không thể tải file** dù có bất kỳ quyền ACL nào — luật này được enforce ở tầng `metadata-service`. CO **có thể preview chỉ tài liệu PUBLIC** đã xuất bản/lưu trữ, nhưng vẫn thấy metadata (chi tiết) tất cả tài liệu PUBLISHED và ARCHIVED để phục vụ kiểm toán.
 
 ### Vai trò người dùng
 
 | Vai trò | Quyền chính |
 |---------|-------------|
-| `viewer` | Xem danh sách, xem chi tiết, tải file đã xuất bản |
+| `viewer` | Xem danh sách (PUBLIC), preview, tải file đã xuất bản |
 | `editor` | Tạo tài liệu, upload file, submit duyệt, lưu trữ (tài liệu của mình) |
-| `approver` | Duyệt / từ chối tài liệu đang chờ |
-| `compliance_officer` | Xem audit log — **không được tải file** |
+| `approver` | Duyệt / từ chối tài liệu, preview **tất cả** classification |
+| `compliance_officer` | Xem metadata tất cả tài liệu PUBLISHED + ARCHIVED, xem audit log, preview **chỉ PUBLIC** — **không được tải file** |
 | `admin` | Toàn quyền |
+
+### Ma trận Classification × Role
+
+#### Xem danh sách (Document Visibility)
+
+| Classification | viewer | editor | approver | CO | admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `INTERNAL` | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `CONFIDENTIAL` | ❌ | ❌ | ✅ | ✅ | ✅ |
+| `SECRET` | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+#### Preview tài liệu
+
+| Classification | viewer | editor | approver | CO | admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `INTERNAL` | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `CONFIDENTIAL` | ❌ | ✅¹ | ✅ | ❌ | ✅ |
+| `SECRET` | ❌ | ❌ | ✅ | ❌ | ✅ |
+
+> ¹ Cần explicit ACL hoặc là owner
+
+> Ngoài ma trận trên, user luôn thấy tài liệu mình **sở hữu** hoặc có **ACL entry** cho mình — bất kể classification level.
 
 ---
 
@@ -410,7 +440,10 @@ docvault/
 
 ## Ghi chú quan trọng
 
-- **Compliance Officer** luôn bị từ chối tải file, kể cả khi ACL cho phép (logic trong `metadata-service/policy.service.ts`).
-- **Archive** chỉ dành cho editor sở hữu tài liệu hoặc admin (không phải approver).
+- **Compliance Officer** luôn bị từ chối tải file, kể cả khi ACL cho phép (logic trong `metadata-service/policy.service.ts`). CO **chỉ preview được tài liệu PUBLIC**, nhưng thấy metadata (chi tiết) tất cả tài liệu PUBLISHED và ARCHIVED để phục vụ kiểm toán.
+- **Approver** là quyền cao nhất (non-admin) — có thể preview tài liệu ở **tất cả** classification levels.
+- **Preview** hỗ trợ tài liệu `PUBLISHED` và `ARCHIVED`. PDF được render bằng `pdf.js` (canvas) — không có nút tải, không có right-click save.
+- **Archive** chỉ dành cho editor sở hữu tài liệu hoặc admin (không phải approver). Tài liệu ARCHIVED **chỉ có thể preview**, không download.
+- **Classification Visibility**: PUBLIC (tất cả) → INTERNAL (editor+) → CONFIDENTIAL (approver+) → SECRET (approver+). CO thấy tất cả PUBLISHED (metadata only).
 - Gateway tự động ghi audit cho mọi request nhận được.
 - Trạng thái tài liệu: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.
