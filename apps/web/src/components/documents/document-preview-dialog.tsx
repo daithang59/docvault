@@ -97,7 +97,9 @@ export function DocumentPreviewDialog({
         }
 
         if (isImage) {
-          const url = await withTimeout(getImageUrl(docId, version.version));
+          const url = await withTimeout(
+            getImageUrl(docId, selectedVersion.version),
+          );
           if (cancelled) return;
           setPreviewUrl(url);
           setViewerState('image');
