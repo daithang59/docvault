@@ -119,7 +119,7 @@ export class DocumentsController {
     @Param('docId') docId: string,
     @Query('version') version: string,
     @Req() req: any,
-    @Res({ passthrough: true }) res: Response,
+    @Res() res: Response,
   ) {
     // Parse Range header (e.g. "bytes=0-1023")
     const rangeHeader = req.headers['range'];
@@ -166,10 +166,18 @@ export class DocumentsController {
       }
     }
 
-    // Passthrough: pipe MinIO stream directly to HTTP response (zero RAM)
-    (sdkResponse.Body as any).pipe(res);
+    // Pipe MinIO stream directly to HTTP response (zero RAM)
+    const bodyStream = sdkResponse.Body as NodeJS.ReadableStream;
 
-    // Return null so NestJS doesn't interfere with the piped response
-    return null;
+    bodyStream.on('error', (err: Error) => {
+      if (!res.headersSent) {
+        res.status(500).json({ message: ['Preview stream failed'], detail: err.message });
+      } else {
+        res.destroy(err);
+      }
+    });
+
+    bodyStream.pipe(res);
+    return;
   }
 }
