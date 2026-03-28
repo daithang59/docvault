@@ -48,8 +48,8 @@ web_modules/
 *.tsbuildinfo
 services/*/generated/
 
-# Optional npm cache directory
-.npm
+# Lockfiles — use pnpm for this monorepo
+package-lock.json
 
 # Optional eslint cache
 .eslintcache

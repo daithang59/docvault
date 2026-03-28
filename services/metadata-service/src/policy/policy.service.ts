@@ -383,27 +383,6 @@ export class PolicyService {
     );
   }
 
-  private getPreviewClassificationDeniedReason(
-    classification: ClassificationLevel,
-    roles: string[],
-    actorId: string,
-    ownerId: string,
-    hasExplicitAllow: boolean,
-  ): string | null {
-    // Preview-specific rule: admin can always preview when route-level auth passed.
-    if (roles.includes('admin')) {
-      return null;
-    }
-
-    return this.getClassificationDeniedReason(
-      classification,
-      roles,
-      actorId,
-      ownerId,
-      hasExplicitAllow,
-    );
-  }
-
   private getClassificationDeniedReason(
     classification: ClassificationLevel,
     roles: string[],
