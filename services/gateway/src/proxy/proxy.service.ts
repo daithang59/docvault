@@ -3,6 +3,32 @@ import { HttpException, Injectable } from '@nestjs/common';
 import { AxiosRequestConfig } from 'axios';
 import { firstValueFrom } from 'rxjs';
 
+function parseCookies(raw: string): Record<string, string> {
+  return Object.fromEntries(
+    raw
+      .split(';')
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .map((c) => {
+        const [k, ...v] = c.split('=');
+        return [k, decodeURIComponent(v.join('='))];
+      }),
+  );
+}
+
+function buildAuthorizationHeader(req: any): string | undefined {
+  if (req.headers.authorization) {
+    return req.headers.authorization;
+  }
+
+  // Fallback: when browser uses cookie-auth (dv_access_token),
+  // gateway can authenticate but downstream services still need Bearer header.
+  const rawCookies = req.headers.cookie ?? '';
+  const cookies = parseCookies(rawCookies);
+  const token = cookies['dv_access_token'];
+  return token ? `Bearer ${token}` : undefined;
+}
+
 @Injectable()
 export class ProxyService {
   constructor(private readonly http: HttpService) {}
@@ -20,7 +46,7 @@ export class ProxyService {
           ...config,
           headers: {
             ...config.headers,
-            authorization: req.headers.authorization,
+            authorization: buildAuthorizationHeader(req),
             'x-request-id': req.traceId ?? req.headers['x-request-id'],
             'x-user-id': req.user?.username ?? req.user?.sub ?? '',
             'x-roles': (req.user?.roles ?? []).join(','),

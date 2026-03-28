@@ -4,6 +4,7 @@ export const apiEndpoints = {
   },
   users: {
     profile: '/users/profile',
+    batch: '/users/batch',
   },
   metadata: {
     documents: {
@@ -20,6 +21,8 @@ export const apiEndpoints = {
     upload: (docId: string) => `/documents/${docId}/upload`,
     presignDownload: (docId: string) => `/documents/${docId}/presign-download`,
     streamDownload: (docId: string, version: number) => `/documents/${docId}/versions/${version}/stream`,
+    preview: (docId: string) => `/documents/${docId}/preview`,
+    previewAuthorize: (docId: string) => `/metadata/documents/${docId}/preview-authorize`,
   },
   workflow: {
     submit: (docId: string) => `/workflow/${docId}/submit`,

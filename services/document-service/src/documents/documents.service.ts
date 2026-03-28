@@ -16,6 +16,7 @@ import { StorageService } from '../storage/storage.service';
 import { sha256Hex } from '../storage/checksum.helper';
 import { PresignDownloadDto } from './dto/presign-download.dto';
 import { verifyGrantToken } from './download-grant.util';
+import { verifyPreviewGrantToken } from './preview-grant.util';
 import { WatermarkService } from '../watermark/watermark.service';
 
 @Injectable()
@@ -219,6 +220,62 @@ export class DocumentsService {
       await this.auditDownloadError(docId, context, error);
       throw error;
     }
+  }
+
+  /**
+   * Stream a document for inline preview (no watermark, passthrough from MinIO).
+   * Returns the raw MinIO response object so the controller can pipe it directly.
+   */
+  async preview(params: {
+    docId: string;
+    version?: number;
+    range?: { start: number; end: number };
+    context: RequestContext;
+  }): Promise<{
+    filename: string;
+    contentType?: string;
+    fileSize?: number;
+    object: ReturnType<StorageService['getObjectStream']> extends Promise<
+      infer T
+    >
+      ? T
+      : never;
+  }> {
+    const { docId, version, range, context } = params;
+
+    const authorization = await this.metadataClient.authorizePreview(
+      docId,
+      { version },
+      context,
+    );
+
+    const grantPayload = verifyPreviewGrantToken(
+      authorization.grantToken,
+      context.actorId,
+    );
+
+    if (version !== undefined && grantPayload.version !== version) {
+      throw new ForbiddenException('Requested version is not authorized');
+    }
+
+    const object = await this.storageService.getObjectStream(
+      grantPayload.objectKey,
+      range,
+    );
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_PREVIEWED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+    });
+
+    return {
+      filename: grantPayload.filename,
+      contentType: grantPayload.contentType,
+      fileSize: (object as any).ContentLength,
+      object,
+    };
   }
 
   private assertCanUpload(ownerId: string, user: ServiceUser) {

@@ -60,6 +60,24 @@ export class MetadataClient {
     );
   }
 
+  async authorizePreview(
+    docId: string,
+    body: Record<string, unknown>,
+    context: RequestContext,
+  ) {
+    return this.request(() =>
+      firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/documents/${docId}/preview-authorize`,
+          body,
+          {
+            headers: this.buildHeaders(context),
+          },
+        ),
+      ),
+    );
+  }
+
   private async request<T>(execute: () => Promise<{ data: T }>): Promise<T> {
     try {
       const response = await execute();
