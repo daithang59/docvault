@@ -26,8 +26,9 @@ export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
         // Non-watermark files: download directly from MinIO via presigned URL
         triggerBrowserDownload(result.url, result.filename || filename);
       } else {
-        // Watermark required: stream via grant token through gateway
-        const base = process.env.NEXT_PUBLIC_API_BASE_URL?.replace('/api', '') || 'http://localhost:3000';
+        // Watermark required: stream via gateway using the API base URL (must include /api)
+        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
+        const base = apiBase.replace(/\/$/, '');
         const token = encodeURIComponent(authorization.grantToken);
         const url = `${base}/documents/${docId}/versions/${authorization.version}/stream?token=${token}`;
         triggerBrowserDownload(url, result.filename || filename);
