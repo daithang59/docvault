@@ -11,35 +11,35 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Commands
 
 ```bash
-# Tất cả services cùng lúc (không chạy đủ thứ tự — xem bên dưới)
+# Start all services simultaneously (does not enforce startup order — see below)
 pnpm dev
 
-# Build tất cả (theo dependency order của turbo)
+# Build all (follows turbo dependency order)
 pnpm build
 
-# Lint tất cả
+# Lint all
 pnpm lint
 
-# Test tất cả
+# Test all
 pnpm test
 
-# Chạy một service cụ thể
+# Run a specific service
 pnpm --filter <service-name> start:dev
-# Ví dụ: pnpm --filter gateway start:dev
+# Example: pnpm --filter gateway start:dev
 
-# Chạy một test file cụ thể trong service
+# Run a specific test file in a service
 pnpm --filter <service-name> test -- --testPathPattern=foo.spec.ts
 
-# Prisma migration (chạy sau khi Docker infra đã healthy)
+# Prisma migration (run after Docker infra is healthy)
 pnpm --filter metadata-service prisma:deploy
 
-# Prisma Studio — GUI xem data PostgreSQL (chạy khi Docker infra đã chạy)
+# Prisma Studio — GUI for PostgreSQL data (run when Docker infra is running)
 pnpm --filter metadata-service prisma:studio
 
-# Migrate audit logs từ PostgreSQL → MongoDB (chạy KHI audit-service đang STOP)
+# Migrate audit logs from PostgreSQL → MongoDB (run while audit-service is STOPPED)
 pnpm --filter audit-service migrate:to-mongo
 
-# E2E verification script (chạy khi tất cả services + infra đã chạy)
+# E2E verification script (run when all services + infra are running)
 pnpm test:e2e
 
 # Format code (Prettier)
@@ -49,9 +49,9 @@ pnpm format
 pnpm start:sequential
 ```
 
-## Kiến trúc tổng quan
+## Architecture Overview
 
-### Luồng request
+### Request Flow
 
 ```
 Client → Gateway (:3000) → Backend Services (:3001–:3005)
@@ -63,93 +63,93 @@ Client → Gateway (:3000) → Backend Services (:3001–:3005)
 
 ### Gateway (`services/gateway/`)
 
-- **Entry point duy nhất** cho toàn bộ client. Xác thực JWT tại đây rồi proxy sang các service.
-- `src/proxy/` — Mỗi backend service có một proxy controller tương ứng:
+- **Single entry point** for all clients. JWT authentication happens here before proxying to services.
+- `src/proxy/` — Each backend service has a corresponding proxy controller:
   - `metadata.proxy.controller.ts` → `:3001/api`
   - `documents.proxy.controller.ts` → `:3002/api`
   - `workflow.proxy.controller.ts` → `:3003/api`
   - `audit.proxy.controller.ts` → `:3004/api`
   - `notify.proxy.controller.ts` → `:3005/api`
-- `src/auth/` — JWT strategy, roles guard, roles decorator dùng chung cho toàn gateway.
-- **Không có logic nghiệp vụ** — chỉ routing, auth, và audit wrapper.
+- `src/auth/` — JWT strategy, roles guard, roles decorator shared across the entire gateway.
+- **No business logic here** — only routing, auth, and audit wrapper.
 
 ### Backend Services (NestJS)
 
-| Service | Port | Vai trò chính | Database |
+| Service | Port | Primary Role | Database |
 |---|---|---|---|
-| `metadata-service` | 3001 | Metadata, ACL, trạng thái, lịch sử | PostgreSQL (Prisma) |
-| `document-service` | 3002 | Upload/download file, MinIO S3 | — |
+| `metadata-service` | 3001 | Metadata, ACL, status, history | PostgreSQL (Prisma) |
+| `document-service` | 3002 | File upload/download, MinIO S3 | — |
 | `workflow-service` | 3003 | State machine DRAFT→PENDING→PUBLISHED→ARCHIVED | — |
-| `audit-service` | 3004 | Audit log với hash-chain SHA-256 | MongoDB (Mongoose) |
-| `notification-service` | 3005 | Thông báo | — |
+| `audit-service` | 3004 | Audit log with SHA-256 hash chain | MongoDB (Mongoose) |
+| `notification-service` | 3005 | Notifications | — |
 
-### Auth flow (quan trọng)
+### Auth Flow (important)
 
-Mỗi service đều có `@nestjs/passport` + `passport-jwt` + `jwks-rsa` để tự xác thực JWT trực tiếp với Keycloak. Gateway **không** truyền token xuống backend services — mỗi service tự verify. Các role: `viewer`, `editor`, `approver`, `compliance_officer`, `admin`.
+Every service uses `@nestjs/passport` + `passport-jwt` + `jwks-rsa` to self-verify JWTs directly with Keycloak. Gateway does **not** pass tokens down to backend services — each service verifies independently. Roles: `viewer`, `editor`, `approver`, `compliance_officer`, `admin`.
 
-### Enforcing quyền truy cập
+### Enforcing Access
 
-- **ACL metadata** được kiểm tra trong `metadata-service/src/acl/`
-- **Download file** được kiểm tra trong `metadata-service/src/policy/policy.service.ts`
-  - **Quy tắc đặc biệt**: `compliance_officer` **luôn bị từ chối** tải file, bất kể ACL — logic nằm trong `policy.service.ts`, không phải ở gateway hay document-service.
-- **Archive** chỉ cho phép editor sở hữu document hoặc admin.
+- **ACL metadata** is checked in `metadata-service/src/acl/`
+- **File download** is checked in `metadata-service/src/policy/policy.service.ts`
+  - **Special rule**: `compliance_officer` is **always denied** file downloads regardless of ACL — logic lives in `policy.service.ts`, not at the gateway or document-service.
+- **Archive** is only allowed for editors who own the document or admins.
 
-### Document lifecycle
+### Document Lifecycle
 
 ```
 DRAFT → PENDING → PUBLISHED → ARCHIVED
 ```
 
-- Editor submit → `workflow-service` gọi `metadata-service` đổi status, rồi gọi `notification-service`.
-- Approver approve/reject → `workflow-service` cập nhật status.
-- Services giao tiếp bằng **Axios HTTP** (không dùng message queue).
+- Editor submits → `workflow-service` calls `metadata-service` to change status, then calls `notification-service`.
+- Approver approves/rejects → `workflow-service` updates status.
+- Services communicate via **Axios HTTP** (no message queue).
 
-### Prisma schema
+### Prisma Schema
 
-- `metadata-service/prisma/schema.prisma` — 4 bảng: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
-- Generated client nằm trong `generated/prisma/` — **không chỉnh sửa tay**.
+- `metadata-service/prisma/schema.prisma` — 4 tables: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
+- Generated client lives in `generated/prisma/` — **do not edit manually**.
 
-### MongoDB schema
+### MongoDB Schema
 
-- `audit-service/src/mongo/audit-event.schema.ts` — Mongoose schema cho `audit_events` collection. Hash chain SHA-256 được tính lại hoàn toàn tại runtime.
+- `audit-service/src/mongo/audit-event.schema.ts` — Mongoose schema for `audit_events` collection. SHA-256 hash chain is fully recalculated at runtime.
 
 ### libs/contracts
 
-- `libs/contracts/openapi/gateway.yaml` — OpenAPI 3.0 spec đầy đủ cho tất cả endpoints (metadata, documents, workflow, audit, notify).
-- `libs/contracts/events/` — Thư mục đặt event schema (hiện trống).
+- `libs/contracts/openapi/gateway.yaml` — Full OpenAPI 3.0 spec for all endpoints (metadata, documents, workflow, audit, notify).
+- `libs/contracts/events/` — Directory for event schemas (currently empty).
 
 ### libs/auth
 
-- `libs/auth/` — Shared auth primitives cho tất cả services:
+- `libs/auth/` — Shared auth primitives for all services:
   - `JwtStrategy` — Passport strategy Keycloak JWKS + RS256
   - `RolesGuard` + `Roles()` — Role-based access control
   - `AuthModule` — NestJS module re-export
   - `ServiceUser`, `RequestContext`, `buildActorId()`, `buildRequestContext()` — Shared types & helpers
   - `ROLES`, `READER_ROLES` — Canonical role constants
-- **Migration**: 6 services hiện vẫn có inline auth files; nên migrate sang dùng `@docvault/auth`.
+- **Migration**: All 6 services still have inline auth files; should migrate to use `@docvault/auth`.
 
 ## Infrastructure
 
 - Docker Compose: `infra/docker-compose.dev.yml` — PostgreSQL, MinIO, Keycloak.
-- Keycloak realm seed: `infra/keycloak/` — định nghĩa realm và seed users.
+- Keycloak realm seed: `infra/keycloak/` — realm definitions and seed users.
 - MinIO: endpoint `:9000`, console `:9001`.
 - Keycloak: `:8080`, realm `docvault`, client `docvault-gateway`.
 
-## Thứ tự khởi động
+## Startup Order
 
-**Quan trọng**: Gateway phải khởi động **sau cùng**, sau khi tất cả backend services đã ready. Dùng `pnpm start:sequential` (recommended) hoặc thủ công:
+**Important**: Gateway must start **last**, after all backend services are ready. Use `pnpm start:sequential` (recommended) or do it manually:
 
-### Dùng `pnpm start:sequential`
+### Using `pnpm start:sequential`
 ```bash
 pnpm start:sequential                    # fast — skips migrations
 RUN_PRISMA_DEPLOY=1 pnpm start:sequential  # with Prisma migrations
 ```
 
-### Thủ công
+### Manual
 1. Docker infra (PostgreSQL, MinIO, Keycloak, MongoDB)
-2. `pnpm --filter metadata-service prisma:deploy` (MongoDB không cần migration)
+2. `pnpm --filter metadata-service prisma:deploy` (MongoDB does not need migration)
 3. Backend services: metadata → document → workflow → notification → audit
 4. Gateway
-5. Frontend (`apps/web/` — Next.js trên port 3010)
+5. Frontend (`apps/web/` — Next.js on port 3010)
 
-> `migrate:to-mongo` là one-time migration từ PostgreSQL → MongoDB cho audit logs cũ; chạy khi audit-service **đang stop**.
+> `migrate:to-mongo` is a one-time migration from PostgreSQL → MongoDB for old audit logs; run while audit-service is **stopped**.

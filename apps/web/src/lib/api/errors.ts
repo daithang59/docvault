@@ -92,7 +92,7 @@ export function parseApiError(error: unknown): ApiError {
     if (axiosError.code === 'ERR_NETWORK') {
       return new ApiError({
         statusCode: 0,
-        message: 'Không thể kết nối máy chủ.',
+        message: 'Unable to connect to the server.',
         code: axiosError.code,
       });
     }
@@ -125,29 +125,29 @@ export function getUserFriendlyErrorMessage(error: unknown): string {
   const apiError = parseApiError(error);
 
   if (apiError.statusCode === 0) {
-    return 'Không thể kết nối máy chủ.';
+    return 'Unable to connect to the server.';
   }
 
   if (apiError.statusCode === 401) {
-    return 'Phiên đăng nhập đã hết hạn.';
+    return 'Your session has expired.';
   }
 
   if (apiError.statusCode === 403) {
     const rawMessage = apiError.message.toLowerCase();
 
     if (rawMessage.includes('published documents')) {
-      return 'Tài liệu chưa ở trạng thái cho phép tải xuống.';
+      return 'Document is not available for download in its current state.';
     }
 
     if (rawMessage.includes('compliance officers')) {
-      return 'Bạn không có quyền tải tài liệu này.';
+      return 'You do not have permission to download this document.';
     }
 
-    return 'Bạn không có quyền thực hiện thao tác này.';
+    return 'You do not have permission to perform this action.';
   }
 
   if (apiError.statusCode === 404) {
-    return 'Không tìm thấy dữ liệu được yêu cầu.';
+    return 'The requested data was not found.';
   }
 
   if (apiError.statusCode === 409) {
@@ -155,7 +155,7 @@ export function getUserFriendlyErrorMessage(error: unknown): string {
   }
 
   if (apiError.statusCode >= 500) {
-    return 'Máy chủ gặp lỗi khi xử lý yêu cầu.';
+    return 'The server encountered an error while processing the request.';
   }
 
   return apiError.message;

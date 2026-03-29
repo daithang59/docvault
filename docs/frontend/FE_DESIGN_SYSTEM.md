@@ -2,42 +2,42 @@
 
 Updated: 2026-03-15
 
-## 1) Mục tiêu thiết kế
+## 1) Design Goals
 
-Thiết kế FE cho DocVault phải thể hiện được 3 tính chất cùng lúc:
-- **Bảo mật và tin cậy**: giao diện phải tạo cảm giác hệ thống quản lý tài liệu nội bộ, không phải app chia sẻ file giải trí.
-- **Rõ trạng thái nghiệp vụ**: người dùng nhìn vào là biết tài liệu đang ở `DRAFT`, `PENDING`, `PUBLISHED`, hay `ARCHIVED`.
-- **Hiệu quả thao tác**: luồng chính phải nhanh, ít click, phù hợp demo MVP.
+FE design for DocVault must simultaneously convey 3 qualities:
+- **Secure and trustworthy**: UI must feel like an internal document management system, not a casual file-sharing app.
+- **Clear business status**: users glance at a document and immediately know if it is `DRAFT`, `PENDING`, `PUBLISHED`, or `ARCHIVED`.
+- **Operational efficiency**: main flows must be fast, few clicks, suitable for MVP demo.
 
-Phong cách đề xuất:
+Recommended style:
 - Modern enterprise UI
 - Clean, spacious, low-noise
-- Dùng nền sáng để dễ đọc dữ liệu, nhấn bằng xanh navy/slate
-- Trạng thái và classification dùng màu riêng nhưng tiết chế
+- Light backgrounds for readability, highlighted with navy/slate blue
+- Status and classification use distinct colors but are restrained
 
 ---
 
-## 2) Định hướng visual tổng thể
+## 2) Overall Visual Direction
 
-### Brand feeling
-- Từ khóa: **Secure, Professional, Calm, Structured, Trustworthy**
-- Tránh kiểu quá rực, gradient nặng, glassmorphism, hoặc card quá bóng
-- Nên dùng bo góc vừa phải (`12px`–`16px`), shadow nhẹ, border rõ
+### Brand Feeling
+- Keywords: **Secure, Professional, Calm, Structured, Trustworthy**
+- Avoid: overly flashy, heavy gradients, glassmorphism, or overly glossy cards
+- Use: moderate border radius (`12px`–`16px`), light shadows, clear borders
 
-### Layout principles
-- App shell 3 phần:
-  - **Sidebar trái**: điều hướng chính
+### Layout Principles
+- App shell 3 parts:
+  - **Left sidebar**: main navigation
   - **Topbar**: search, role badge, user menu
   - **Content area**: page header + content body
-- Dùng grid/card/list tùy màn, nhưng ưu tiên consistency hơn đa dạng
-- Khoảng trắng rộng vừa phải, tạo cảm giác “premium enterprise”
+- Use grid/card/list as appropriate, prioritize consistency over diversity
+- Moderate whitespace to convey a "premium enterprise" feel
 
-### Typography principles
-- Heading rõ cấp bậc, sans-serif hiện đại
-- Gợi ý font:
-  - `Inter` cho text chính
+### Typography Principles
+- Clear heading hierarchy, modern sans-serif
+- Recommended fonts:
+  - `Inter` for main text
   - fallback: `ui-sans-serif, system-ui, sans-serif`
-- Kích thước tham chiếu:
+- Reference sizes:
   - Page title: 28/32 semibold
   - Section title: 20/28 semibold
   - Card title: 16/24 semibold
@@ -46,12 +46,12 @@ Phong cách đề xuất:
 
 ---
 
-## 3) Sitemap FE MVP
+## 3) FE MVP Sitemap
 
 ## Public/Auth
 - `/login`
 
-## App authenticated
+## App (authenticated)
 - `/dashboard`
 - `/documents`
 - `/documents/new`
@@ -59,73 +59,73 @@ Phong cách đề xuất:
 - `/documents/[id]/edit`
 - `/approvals`
 - `/audit`
-- `/profile` (tuỳ chọn nhẹ)
+- `/profile` (lightweight optional)
 
 ---
 
-## 4) Điều hướng theo role
+## 4) Navigation by Role
 
 ### Viewer
-Thấy:
+Sees:
 - Dashboard
 - Documents
 - Document Detail
 
-Không thấy:
+Does not see:
 - New Document
 - Approvals
 - Audit
 - ACL management
 
 ### Editor
-Thấy:
+Sees:
 - Dashboard
 - Documents
 - New Document
 - Document Detail
 - Edit Document
 
-Có thể:
-- tạo metadata
-- upload file
-- sửa metadata khi là owner
+Can:
+- create metadata
+- upload files
+- edit metadata when owner
 - submit workflow
-- quản lý ACL cơ bản nếu owner
+- manage basic ACL if owner
 
 ### Approver
-Thấy:
+Sees:
 - Dashboard
 - Documents
 - Approvals
 - Document Detail
 
-Có thể:
+Can:
 - approve / reject
 - archive published doc
 
 ### Compliance Officer
-Thấy:
+Sees:
 - Dashboard
 - Documents
 - Document Detail
 - Audit
 
-Không có nút download dù đọc metadata được.
+Does not have a download button despite being able to read metadata.
 
 ### Admin
-Thấy tất cả.
+Sees everything.
 
 ---
 
-## 5) Màn hình chi tiết
+## 5) Screen Details
 
 ## 5.1 Dashboard
 
-### Mục tiêu
-Cho user nhìn nhanh tình hình hệ thống theo role.
+### Goal
+Let the user quickly see the system status by role.
 
-### Thành phần
-- Hero header nhỏ: “Welcome back” + role badge
+### Components
+- Small hero header: "Welcome back" + role badge
 - 4 stat cards:
   - Total Documents
   - Draft
@@ -135,38 +135,38 @@ Cho user nhìn nhanh tình hình hệ thống theo role.
 - Recent documents table/list
 - Quick actions
 
-### Quick actions theo role
+### Quick actions by role
 - Viewer: View documents
 - Editor: New document, Continue drafts
 - Approver: Review pending approvals
 - Compliance Officer: Open audit logs
 
 ### UI notes
-- Dashboard không nên quá nhiều chart
-- 1 mini trend chart là đủ, hoặc bỏ hẳn chart nếu dữ liệu MVP ít
-- Tập trung vào cards + recent items + actions
+- Dashboard should not have too many charts
+- 1 mini trend chart is enough, or skip charts entirely if MVP data is minimal
+- Focus on cards + recent items + actions
 
 ---
 
 ## 5.2 Documents List
 
-### Mục tiêu
-Màn quan trọng nhất. Phải cho cảm giác “document control center”.
+### Goal
+Most important screen. Must give the "document control center" feel.
 
 ### Header
 - Title: `Documents`
-- Subtitle ngắn: quản lý và tra cứu tài liệu
-- CTA phải: `New Document` (editor/admin only)
+- Short subtitle: manage and search documents
+- Right CTA: `New Document` (editor/admin only)
 
 ### Toolbar
-- Search input theo title/tag/owner (nếu backend chưa có search thật thì mock UI trước)
+- Search input by title/tag/owner (if backend doesn't have real search yet, mock UI first)
 - Filter chips / selects:
   - Status
   - Classification
   - Tag
-  - Ownership scope (Mine / All) nếu cần
+  - Ownership scope (Mine / All) if needed
 - Sort dropdown
-- View toggle: table / card (tuỳ chọn, table là mặc định)
+- View toggle: table / card (optional, table is default)
 
 ### Table columns
 - Title
@@ -178,26 +178,26 @@ Màn quan trọng nhất. Phải cho cảm giác “document control center”.
 - Updated At
 - Actions
 
-### Row action gợi ý
+### Suggested row actions
 - View
 - Edit (owner/editor/admin)
-- Download (khi allowed)
+- Download (when allowed)
 - Submit (editor owner, status DRAFT)
-- Approve/Reject (ở approvals ưu tiên hơn, nhưng có thể hiện nhẹ ở detail)
-- Archive (approver/admin khi published)
+- Approve/Reject (at approvals page preferably, but can show lightly in detail)
+- Archive (approver/admin when published)
 
 ### UX notes
-- Status badge phải rất rõ
-- Classification badge nhỏ hơn status badge
-- Tags không nên chiếm quá nhiều chiều ngang
-- Với empty state: icon folder-lock + CTA rõ ràng
+- Status badge must be very clear
+- Classification badge smaller than status badge
+- Tags should not take up too much horizontal space
+- Empty state: folder-lock icon + clear CTA
 
 ---
 
 ## 5.3 Create New Document
 
-### Mục tiêu
-Tạo tài liệu mới nhanh, ít friction.
+### Goal
+Create a new document quickly with minimal friction.
 
 ### Form sections
 1. Basic Info
@@ -212,32 +212,32 @@ Tạo tài liệu mới nhanh, ít friction.
 - Drag & drop zone
 - File name / size / content type preview
 
-4. Access Control (optional for MVP, có thể tách bước sau)
-- ACL entries cơ bản
+4. Access Control (optional for MVP, can be split into a later step)
+- Basic ACL entries
 
-### CTA cuối form
+### Form CTAs
 - Save Draft
 - Save and Upload
 - Cancel
 
 ### UX notes
-- Nên dùng step feel nhẹ nhưng vẫn cùng 1 page
-- Không cần wizard nhiều bước cứng nhắc cho MVP
-- Upload zone nên rất rõ và đẹp vì đây là thao tác trung tâm
+- Light step feel is fine but still one page
+- No rigid multi-step wizard needed for MVP
+- Upload zone should be very clear and prominent since it's a central operation
 
 ---
 
 ## 5.4 Document Detail
 
-### Mục tiêu
-Đây là màn trung tâm nghiệp vụ.
+### Goal
+This is the central business screen.
 
-### Bố cục đề xuất
-Trang chia 2 cột:
-- **Cột trái (main)**: metadata + versions + workflow history
-- **Cột phải (side panel)**: status card + actions card + ACL summary
+### Recommended layout
+Two-column page:
+- **Left column (main)**: metadata + versions + workflow history
+- **Right column (side panel)**: status card + actions card + ACL summary
 
-### Khối chính
+### Main content
 1. Document header
 - Title
 - Description
@@ -247,12 +247,12 @@ Trang chia 2 cột:
 - Owner / createdAt / updatedAt
 
 2. Version history
-- Danh sách version theo timeline hoặc list card
-- Mỗi version có filename, size, checksum rút gọn, uploaded by, createdAt
-- Action download ở current version nếu allowed
+- Version list as timeline or card list
+- Each version has filename, size, truncated checksum, uploaded by, createdAt
+- Download action on current version if allowed
 
 3. Workflow history
-- Timeline dọc
+- Vertical timeline
 - fromStatus → toStatus
 - action, actorId, reason, createdAt
 
@@ -263,31 +263,31 @@ Trang chia 2 cột:
 - Current version
 
 2. Actions card
-Theo role và status:
+By role and status:
 - DRAFT + owner/editor: Edit, Upload new file, Submit
 - PENDING + approver: Approve, Reject
 - PUBLISHED + allowed: Download
 - PUBLISHED + approver/admin: Archive
-- Compliance officer: không hiện Download
+- Compliance officer: Download button not shown
 
 3. ACL summary card
-- Số rule
-- Preview 3 rule đầu
-- Button manage ACL nếu role phù hợp
+- Number of rules
+- Preview of first 3 rules
+- Manage ACL button if role permits
 
 ### UX notes
-- Tất cả action nguy hiểm phải có confirm modal
-- Reject cần modal nhập reason
-- Archive cần modal confirm ngắn
+- All dangerous actions must have a confirm modal
+- Reject requires a modal for entering reason
+- Archive requires a brief confirm modal
 
 ---
 
 ## 5.5 Approvals
 
-### Mục tiêu
-Màn làm việc cho approver.
+### Goal
+Working screen for approvers.
 
-### Cấu trúc
+### Structure
 - Title + subtitle
 - Filter bar: classification, owner, updatedAt
 - Pending queue list/table
@@ -296,7 +296,7 @@ Màn làm việc cho approver.
 - Title
 - Owner
 - Classification
-- Submitted At (nếu chưa có field riêng thì dùng updatedAt tạm)
+- Submitted At (use updatedAt temporarily if no separate field)
 - Current Version
 - Actions
 
@@ -306,29 +306,29 @@ Màn làm việc cho approver.
 - Reject
 
 ### Review drawer/modal
-Có thể dùng side drawer để xem nhanh:
+A side drawer for quick review is recommended:
 - metadata
 - version summary
-- workflow history ngắn
-- nút approve/reject ngay tại drawer
+- short workflow history
+- approve/reject buttons right in the drawer
 
 ---
 
 ## 5.6 Audit
 
-### Mục tiêu
-Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng tin.
+### Goal
+Let compliance officers easily search readable, trustworthy operation history.
 
 ### Header
 - Title: `Audit Logs`
-- Subtitle: truy vấn hoạt động hệ thống
+- Subtitle: query system activity
 
 ### Filters
 - Date range
 - Actor/User
 - Action
 - Result
-- Resource type/id (nếu mở rộng)
+- Resource type/id (if expanded)
 
 ### Result table
 - Timestamp
@@ -336,51 +336,51 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 - Action
 - Resource
 - Result
-- IP / metadata nhẹ
-- Hash indicator (tuỳ chọn hiển thị icon integrity)
+- IP / light metadata
+- Hash indicator (optional: show integrity icon)
 
 ### UX notes
-- Thiết kế thiên về bảng dữ liệu sạch, nghiêm túc
-- Không nên làm quá “security dashboard” với quá nhiều chart giả lập
-- Có thể thêm badge “Tamper-evident logs” ở góc phải để tăng cảm giác tin cậy
+- Design leans toward clean, serious data table
+- Avoid overdoing "security dashboard" with too many mock charts
+- Can add a "Tamper-evident logs" badge in the top-right to increase trustworthiness
 
 ---
 
 ## 5.7 Login
 
-### Mục tiêu
-Đơn giản, đẹp, đúng chất enterprise.
+### Goal
+Simple, attractive, properly enterprise.
 
 ### Layout
-- Trái: brand panel với mô tả ngắn về DocVault
-- Phải: card login
+- Left: brand panel with short DocVault description
+- Right: login card
 
-### Nội dung
-- Logo / tên sản phẩm
+### Content
+- Logo / product name
 - Headline: `Secure document control for internal teams`
-- Form username/password hoặc button SSO nếu đi qua Keycloak redirect
+- Username/password form or SSO button if going through Keycloak redirect
 
 ### Visual notes
-- Nền sáng + abstract pattern rất nhẹ
-- Không dùng minh họa quá vui tươi
+- Light background + very subtle abstract pattern
+- No overly playful illustrations
 
 ---
 
-## 6) Badge system
+## 6) Badge System
 
-## Status badges
+## Status Badges
 - `DRAFT`: neutral / slate
 - `PENDING`: amber
 - `PUBLISHED`: green
 - `ARCHIVED`: gray
 
-## Classification badges
-- `PUBLIC`: blue-gray nhạt
+## Classification Badges
+- `PUBLIC`: light blue-gray
 - `INTERNAL`: blue
 - `CONFIDENTIAL`: orange
 - `SECRET`: red
 
-## Role badges
+## Role Badges
 - `viewer`: neutral
 - `editor`: blue
 - `approver`: violet
@@ -389,16 +389,16 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 
 ---
 
-## 7) Component inventory
+## 7) Component Inventory
 
-## Core layout
+## Core Layout
 - AppShell
 - SidebarNav
 - Topbar
 - Breadcrumbs
 - PageHeader
 
-## Data display
+## Data Display
 - StatCard
 - DataTable
 - EmptyState
@@ -424,7 +424,7 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 - Skeleton loaders
 - PermissionDeniedState
 
-## Domain components
+## Domain Components
 - DocumentListTable
 - DocumentSummaryCard
 - VersionList
@@ -435,12 +435,12 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 
 ---
 
-## 8) Trạng thái tương tác quan trọng
+## 8) Key Interaction States
 
 ### Loading
 - List page: skeleton rows
 - Detail page: skeleton header + side card
-- Buttons có loading state riêng
+- Buttons have their own loading state
 
 ### Empty
 - Documents empty
@@ -449,11 +449,11 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 
 ### Error
 - 401: session expired → redirect login
-- 403: show permission message lịch sự, không quá kỹ thuật
+- 403: show a polite permission message, not too technical
 - 404: document not found
 - 500: generic retry state
 
-### Success messaging
+### Success Messaging
 - `Document created successfully`
 - `File uploaded successfully`
 - `Submitted for approval`
@@ -463,7 +463,7 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 
 ---
 
-## 9) RBAC UI matrix
+## 9) RBAC UI Matrix
 
 ## Documents List
 - Viewer: view, maybe download when published
@@ -473,43 +473,42 @@ Cho compliance officer tra cứu lịch sử thao tác dễ đọc và đáng ti
 - Admin: all
 
 ## Detail
-- Download button chỉ hiện nếu role + policy cho phép
-- Approve/Reject chỉ hiện ở `PENDING` với approver/admin
-- Submit chỉ hiện ở `DRAFT` với owner/editor/admin
-- Archive chỉ hiện ở `PUBLISHED` với approver/admin
+- Download button only shown if role + policy allow
+- Approve/Reject only shown at `PENDING` for approver/admin
+- Submit only shown at `DRAFT` for owner/editor/admin
+- Archive only shown at `PUBLISHED` for approver/admin
 
 ## Audit
-- Chỉ compliance_officer/admin
+- Compliance_officer/admin only
 
 ## ACL
 - Editor owner/admin
 
 ---
 
-## 10) Đề xuất tech UI
+## 10) Recommended UI Tech Stack
 
 - Next.js App Router
 - TypeScript
 - Tailwind CSS
-- shadcn/ui cho primitive components
+- shadcn/ui for primitive components
 - Lucide icons
-- TanStack Table cho bảng
-- React Hook Form + Zod cho form
-- Zustand hoặc TanStack Query + local state tuỳ phong cách project
+- TanStack Table for tables
+- React Hook Form + Zod for forms
+- Zustand or TanStack Query + local state per project style
 
 ---
 
-## 11) Nguyên tắc màu trong UI
+## 11) Color Principles in UI
 
-- 70–80% UI dùng neutral palette
-- Brand color chỉ dùng cho CTA chính, link, active nav, focus ring
-- Màu trạng thái chỉ dùng cho badge, alert, action emphasis
-- Background nên có nhiều layer sáng nhẹ thay vì đậm
-- Tránh dùng đỏ quá nhiều, chỉ dùng cho `SECRET`, destructive, compliance accent
+- 70–80% of UI uses neutral palette
+- Brand color only used for primary CTA, links, active nav, focus ring
+- Status colors only used for badges, alerts, action emphasis
+- Background should have many light layers instead of dark ones
+- Avoid using red too much — only for `SECRET`, destructive, compliance accent
 
 ---
 
-## 12) Prompt ngắn cho AI Agent dựng UI
+## 12) Short Prompt for AI Agent Building UI
 
-Hãy xây dựng FE cho DocVault theo phong cách modern enterprise dashboard, clean, spacious, secure-by-design. Tông màu chủ đạo là navy/slate trên nền sáng, với badges trạng thái và phân loại tài liệu rõ ràng. Sidebar trái, topbar gọn, content area rộng. Ưu tiên readability, card/table rõ ràng, bo góc vừa phải, shadow nhẹ, typography Inter. Các trang cần có: Dashboard, Documents List, New Document, Document Detail, Approvals, Audit Logs, Login. UI phải phản ánh đúng RBAC và workflow thực tế: `DRAFT -> PENDING -> PUBLISHED -> ARCHIVED`, reject quay về `DRAFT`, compliance officer xem audit/metadata nhưng không có download.
-
+Build the FE for DocVault in a modern enterprise dashboard style, clean, spacious, secure-by-design. Main color tone is navy/slate on a light background, with clear status and document classification badges. Left sidebar, compact topbar, wide content area. Prioritize readability, clear cards/tables, moderate border radius, light shadows, Inter typography. Required pages: Dashboard, Documents List, New Document, Document Detail, Approvals, Audit Logs, Login. UI must correctly reflect RBAC and actual workflow: `DRAFT -> PENDING -> PUBLISHED -> ARCHIVED`, reject returns to `DRAFT`, compliance officer views audit/metadata but has no download.

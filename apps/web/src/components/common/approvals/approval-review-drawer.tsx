@@ -292,7 +292,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
         <textarea
           value={rejectReason}
           onChange={(e) => setRejectReason(e.target.value)}
-          placeholder="Lý do từ chối (tùy chọn)..."
+          placeholder="Rejection reason (optional)..."
           rows={3}
           className="w-full resize-none rounded-xl border px-3 py-2 text-sm outline-none transition"
           style={{

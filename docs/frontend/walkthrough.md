@@ -2,7 +2,7 @@
 
 ## 🎉 E2E Verification: ALL PASSED
 
-Chạy `node scripts/e2e-check.mjs` với full stack (2026-03-18):
+Ran `node scripts/e2e-check.mjs` with full stack (2026-03-18):
 
 ```
 Getting access tokens
@@ -28,7 +28,7 @@ All required E2E checks passed.
 
 ---
 
-## Stack đã boot thành công
+## Stack Successfully Booted
 
 | Service | Port | Status |
 |---------|------|--------|
@@ -43,12 +43,12 @@ All required E2E checks passed.
 | notification-service | 3005 | ✅ Running |
 | FE (Next.js) | 3010 | ✅ Dev server (run manually) |
 
-**Lệnh boot toàn bộ stack:**
+**Command to boot full stack:**
 ```powershell
 # Boot infra
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
 
-# Boot tất cả services (each in separate terminal)
+# Boot all services (each in separate terminal)
 powershell -File start-all.ps1
 
 # Boot FE
@@ -61,9 +61,9 @@ cd apps/web && npx next dev -p 3010
 
 | # | Bug | Severity | File |
 |---|-----|----------|------|
-| 1 | Gateway archive `@Roles('approver')` sai — phải là `editor` | 🔴 Critical | [services/gateway/src/proxy/workflow.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/workflow.proxy.controller.ts) |
-| 2 | Gateway thiếu `GET workflow-history` endpoint | 🔴 Critical | [services/gateway/src/proxy/metadata.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/metadata.proxy.controller.ts) |
-| 3 | Approvals query không invalidate sau workflow mutations | 🟡 Medium | [apps/web/src/lib/hooks/use-documents.ts](file:///c:/NT114/docvault/apps/web/src/lib/hooks/use-documents.ts) |
+| 1 | Gateway archive `@Roles('approver')` wrong — must be `editor` | 🔴 Critical | [services/gateway/src/proxy/workflow.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/workflow.proxy.controller.ts) |
+| 2 | Gateway missing `GET workflow-history` endpoint | 🔴 Critical | [services/gateway/src/proxy/metadata.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/metadata.proxy.controller.ts) |
+| 3 | Approvals query not invalidated after workflow mutations | 🟡 Medium | [apps/web/src/lib/hooks/use-documents.ts](file:///c:/NT114/docvault/apps/web/src/lib/hooks/use-documents.ts) |
 
 ---
 
@@ -71,7 +71,7 @@ cd apps/web && npx next dev -p 3010
 
 | Item | Status |
 |------|--------|
-| [README.md](file:///c:/NT114/docvault/README.md) — FE section thêm vào | ✅ |
+| [README.md](file:///c:/NT114/docvault/README.md) — FE section added | ✅ |
 | [apps/web/.env.example](file:///c:/NT114/docvault/apps/web/.env.example) — updated | ✅ |
 | [docs/demo-users.md](file:///c:/NT114/docvault/docs/demo-users.md) | ✅ |
 | [docs/demo-flow.md](file:///c:/NT114/docvault/docs/demo-flow.md) | ✅ |
@@ -118,4 +118,4 @@ cd apps/web && npx next dev -p 3010
 | Logout | ✅ |
 | ownerDisplay fallback | ✅ |
 
-> Browser FE demo: FE trên port 3010 chỉ có thể verify qua local browser (xem [docs/demo-flow.md](file:///c:/NT114/docvault/docs/demo-flow.md)). Dùng `npm run dev -- --port 3010` hoặc chạy [start-all.ps1](file:///c:/NT114/docvault/start-all.ps1) để boot lại.
+> Browser FE demo: FE on port 3010 can only be verified via local browser (see [docs/demo-flow.md](file:///c:/NT114/docvault/docs/demo-flow.md)). Use `npm run dev -- --port 3010` or run [start-all.ps1](file:///c:/NT114/docvault/start-all.ps1) to boot.

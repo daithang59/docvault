@@ -13,7 +13,15 @@ interface DocumentPreviewDialogProps {
   onClose: () => void;
 }
 
-type ViewerState = 'loading' | 'pdf' | 'image' | 'text' | 'unsupported' | 'error';
+type ViewerState =
+  | 'loading'
+  | 'pdf'
+  | 'image'
+  | 'text'
+  | 'docx'
+  | 'markdown'
+  | 'unsupported'
+  | 'error';
 
 const IMAGE_TYPES = new Set([
   'image/png',
@@ -39,6 +47,28 @@ const BROWSER_PREVIEW_TYPES = new Set([
   'image/svg+xml',
 ]);
 
+const DOCX_TYPES = new Set([
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/msword',
+]);
+
+const MARKDOWN_TYPES = new Set(['text/markdown', 'text/x-markdown']);
+
+function resolveContentType(
+  filename: string | undefined,
+  mimeType: string | null | undefined,
+): string {
+  const ext = (filename?.split('.').pop() ?? '').toLowerCase();
+  const EXT_MAP: Record<string, string> = {
+    docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    doc:  'application/msword',
+    md:   'text/markdown',
+  };
+  if (ext && EXT_MAP[ext]) return EXT_MAP[ext]!;
+  if (!mimeType || mimeType === 'application/octet-stream') return '';
+  return mimeType;
+}
+
 function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
   return Promise.race([
     promise,
@@ -57,6 +87,7 @@ export function DocumentPreviewDialog({
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [errorMessage, setErrorMessage] = useState<string>('');
   const [pdfPages, setPdfPages] = useState<string[]>([]);
+  const [renderedHtml, setRenderedHtml] = useState<string>('');
   const [zoom, setZoom] = useState(100);
 
   // Track the current blob URL so we can revoke it on cleanup
@@ -78,6 +109,28 @@ export function DocumentPreviewDialog({
   function handleDownload() {
     if (!version) return;
     download.download(docId);
+  }
+
+  async function renderDocx(data: ArrayBuffer): Promise<string> {
+    const { convertToHtml } = await import('mammoth');
+    const result = await convertToHtml({ arrayBuffer: data }, {
+      styleMap: [
+        "p[style-name='Heading 1'] => h1:fresh",
+        "p[style-name='Heading 2'] => h2:fresh",
+        "p[style-name='Heading 3'] => h3:fresh",
+      ],
+    });
+    return result.value;
+  }
+
+  async function renderMarkdown(data: ArrayBuffer): Promise<string> {
+    const [{ marked }, { default: DOMPurify }] = await Promise.all([
+      import('marked'),
+      import('dompurify'),
+    ]);
+    const text = new TextDecoder('utf-8').decode(data);
+    const rawHtml = await marked(text);
+    return DOMPurify.sanitize(rawHtml);
   }
 
   // Close on Escape
@@ -109,6 +162,7 @@ export function DocumentPreviewDialog({
       setViewerState('loading');
       setErrorMessage('');
       setPdfPages([]);
+      setRenderedHtml('');
       setZoom(100);
 
       // Revoke previous blob URL if any
@@ -118,7 +172,8 @@ export function DocumentPreviewDialog({
       }
       setPreviewUrl(null);
 
-      const contentType = selectedVersion.mimeType ?? selectedVersion.contentType;
+      const rawMimeType = selectedVersion.mimeType ?? selectedVersion.contentType;
+      const contentType = resolveContentType(selectedVersion.filename, rawMimeType);
       const isPdf = contentType === PDF_TYPE;
       const isImage = contentType ? IMAGE_TYPES.has(contentType) : false;
       const isBrowserPreviewable = contentType ? BROWSER_PREVIEW_TYPES.has(contentType) : false;
@@ -187,6 +242,45 @@ export function DocumentPreviewDialog({
           return;
         }
 
+        const isDocx =
+          DOCX_TYPES.has(contentType) ||
+          (selectedVersion.filename ?? '').toLowerCase().endsWith('.docx') ||
+          (selectedVersion.filename ?? '').toLowerCase().endsWith('.doc');
+        if (isDocx) {
+          const { data } = await withTimeout(
+            getPdfData(docId, selectedVersion.version),
+          );
+          if (cancelled) return;
+          if (data.byteLength > 10 * 1024 * 1024) {
+            setViewerState('unsupported');
+            return;
+          }
+          const html = await renderDocx(data);
+          if (cancelled) return;
+          setRenderedHtml(html);
+          setViewerState('docx');
+          return;
+        }
+
+        const isMarkdown =
+          MARKDOWN_TYPES.has(contentType) ||
+          (selectedVersion.filename ?? '').toLowerCase().endsWith('.md');
+        if (isMarkdown) {
+          const { data } = await withTimeout(
+            getPdfData(docId, selectedVersion.version),
+          );
+          if (cancelled) return;
+          if (data.byteLength > 2 * 1024 * 1024) {
+            setViewerState('unsupported');
+            return;
+          }
+          const html = await renderMarkdown(data);
+          if (cancelled) return;
+          setRenderedHtml(html);
+          setViewerState('markdown');
+          return;
+        }
+
         setViewerState('unsupported');
       } catch (err) {
         if (cancelled) return;
@@ -194,7 +288,7 @@ export function DocumentPreviewDialog({
         setErrorMessage(
           err instanceof Error
             ? err.message
-            : 'Không thể tải preview. Vui lòng thử lại.',
+            : 'Unable to load preview. Please try again.',
         );
       }
     }
@@ -249,15 +343,14 @@ export function DocumentPreviewDialog({
             </span>
           </div>
 
-          {/* Zoom controls */}
-          {(viewerState === 'pdf' || viewerState === 'image' || viewerState === 'text') && (
+          {(viewerState === 'pdf' || viewerState === 'image' || viewerState === 'text' || viewerState === 'docx' || viewerState === 'markdown') && (
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={zoomOut}
                 disabled={zoom <= ZOOM_MIN}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
                 style={{ color: 'var(--text-muted)' }}
-                title="Thu nhỏ"
+                title="Zoom out"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
@@ -265,7 +358,7 @@ export function DocumentPreviewDialog({
                 onClick={zoomReset}
                 className="min-w-[3.5rem] px-2 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{ color: 'var(--text-main)' }}
-                title="Đặt lại"
+                title="Reset"
               >
                 {zoom}%
               </button>
@@ -274,7 +367,7 @@ export function DocumentPreviewDialog({
                 disabled={zoom >= ZOOM_MAX}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
                 style={{ color: 'var(--text-muted)' }}
-                title="Phóng to"
+                title="Zoom in"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
@@ -285,7 +378,7 @@ export function DocumentPreviewDialog({
             onClick={onClose}
             className="p-2 rounded-lg transition-colors shrink-0"
             style={{ color: 'var(--text-muted)' }}
-            title="Đóng"
+            title="Close"
           >
             <X className="h-5 w-5" />
           </button>
@@ -314,7 +407,7 @@ export function DocumentPreviewDialog({
                 }}
               />
               <span className="text-sm" style={{ color: 'var(--text-muted)' }}>
-                Đang tải preview...
+                Loading preview...
               </span>
             </div>
           )}
@@ -329,10 +422,10 @@ export function DocumentPreviewDialog({
               </div>
               <div className="space-y-1">
                 <p className="text-base font-semibold" style={{ color: 'var(--text-strong)' }}>
-                  Đã xảy ra lỗi khi tải preview
+                  An error occurred while loading the preview
                 </p>
                 <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
-                  {errorMessage || 'Vui lòng thử lại hoặc tải file về máy.'}
+                  {errorMessage || 'Please try again or download the file.'}
                 </p>
               </div>
               <div className="flex gap-3 pt-1">
@@ -340,7 +433,7 @@ export function DocumentPreviewDialog({
                   onClick={onClose}
                   className="flex items-center gap-2 rounded-xl border border-[var(--input-border)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
                 >
-                  Đóng
+                  Close
                 </button>
                 <button
                   onClick={handleDownload}
@@ -349,7 +442,7 @@ export function DocumentPreviewDialog({
                   style={{ background: 'var(--color-primary)' }}
                 >
                   <Download className="h-4 w-4" />
-                  {download.isDownloading ? 'Đang tải...' : 'Tải file về'}
+                  {download.isDownloading ? 'Downloading...' : 'Download file'}
                 </button>
               </div>
             </div>
@@ -365,10 +458,10 @@ export function DocumentPreviewDialog({
               </div>
               <div className="space-y-1">
                 <p className="text-base font-semibold" style={{ color: 'var(--text-strong)' }}>
-                  Không thể xem trước file này
+                  This file cannot be previewed
                 </p>
                 <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
-                  Định dạng <code className="text-xs bg-[var(--bg-muted)] px-1 py-0.5 rounded">{version?.contentType ?? version?.mimeType ?? 'không xác định'}</code> không được hỗ trợ xem trực tiếp.
+                  The format <code className="text-xs bg-[var(--bg-muted)] px-1 py-0.5 rounded">{version?.contentType ?? version?.mimeType ?? 'unknown'}</code> does not support direct preview.
                 </p>
               </div>
               <div className="flex gap-3 pt-1">
@@ -376,7 +469,7 @@ export function DocumentPreviewDialog({
                   onClick={onClose}
                   className="flex items-center gap-2 rounded-xl border border-[var(--input-border)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
                 >
-                  Đóng
+                  Close
                 </button>
                 <button
                   onClick={handleDownload}
@@ -385,7 +478,7 @@ export function DocumentPreviewDialog({
                   style={{ background: 'var(--color-primary)' }}
                 >
                   <Download className="h-4 w-4" />
-                  {download.isDownloading ? 'Đang tải...' : 'Tải file về'}
+                  {download.isDownloading ? 'Downloading...' : 'Download file'}
                 </button>
               </div>
             </div>
@@ -434,7 +527,7 @@ export function DocumentPreviewDialog({
                 <img
                   key={i}
                   src={dataUrl}
-                  alt={`Trang ${i + 1}`}
+                  alt={`Page ${i + 1}`}
                   className="shadow-lg rounded"
                   style={{
                     background: 'white',
@@ -445,6 +538,54 @@ export function DocumentPreviewDialog({
                   draggable={false}
                 />
               ))}
+            </div>
+          )}
+
+          {/* DOCX viewer */}
+          {viewerState === 'docx' && renderedHtml && (
+            <div
+              className="flex-1 overflow-auto p-6"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}
+            >
+              <style>{`
+                .docx-preview h1 { font-size: 1.5em; font-weight: 700; margin: 0 0 0.5em; }
+                .docx-preview h2 { font-size: 1.25em; font-weight: 600; margin: 0.75em 0 0.5em; }
+                .docx-preview h3 { font-size: 1.1em; font-weight: 600; margin: 0.75em 0 0.5em; }
+                .docx-preview p  { margin: 0 0 0.75em; line-height: 1.6; }
+                .docx-preview table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+                .docx-preview td, .docx-preview th { border: 1px solid var(--border-soft); padding: 6px 10px; }
+                .docx-preview th { background: var(--bg-muted); font-weight: 600; }
+                .docx-preview ul, .docx-preview ol { padding-left: 1.5em; margin-bottom: 0.75em; }
+                .docx-preview img { max-width: 100%; height: auto; }
+              `}</style>
+              {/* eslint-disable-next-line react/no-danger */}
+              <div className="docx-preview" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
+            </div>
+          )}
+
+          {/* Markdown viewer */}
+          {viewerState === 'markdown' && renderedHtml && (
+            <div
+              className="flex-1 overflow-auto p-6 max-w-3xl mx-auto"
+              style={{ background: 'var(--bg-card)', color: 'var(--text-main)' }}
+            >
+              <style>{`
+                .md-preview h1 { font-size: 1.5em; font-weight: 700; margin: 0 0 0.5em; border-bottom: 1px solid var(--border-soft); padding-bottom: 0.3em; }
+                .md-preview h2 { font-size: 1.25em; font-weight: 600; margin: 1em 0 0.5em; }
+                .md-preview h3 { font-size: 1.1em; font-weight: 600; margin: 1em 0 0.5em; }
+                .md-preview p  { margin: 0 0 0.75em; line-height: 1.7; }
+                .md-preview code { background: var(--bg-muted); padding: 0.15em 0.4em; border-radius: 4px; font-size: 0.9em; }
+                .md-preview pre  { background: var(--bg-muted); padding: 1em; border-radius: 8px; overflow-x: auto; margin-bottom: 1em; }
+                .md-preview pre code { background: none; padding: 0; }
+                .md-preview blockquote { border-left: 4px solid var(--color-primary); padding-left: 1em; margin: 0.75em 0; color: var(--text-muted); }
+                .md-preview table { border-collapse: collapse; width: 100%; margin-bottom: 1em; }
+                .md-preview td, .md-preview th { border: 1px solid var(--border-soft); padding: 6px 10px; }
+                .md-preview th { background: var(--bg-muted); font-weight: 600; }
+                .md-preview ul, .md-preview ol { padding-left: 1.5em; margin-bottom: 0.75em; }
+                .md-preview a { color: var(--color-primary); text-decoration: underline; }
+              `}</style>
+              {/* eslint-disable-next-line react/no-danger */}
+              <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             </div>
           )}
         </div>

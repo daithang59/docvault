@@ -14,7 +14,7 @@ export class RetentionService {
     private readonly auditClient: AuditClient,
   ) {}
 
-  /** Chạy lúc 01:00 mỗi ngày (giờ server local) */
+  /** Runs at 01:00 every day (server local time) */
   @Cron('0 1 * * *', { name: 'retention-auto-archive' })
   async handleRetention() {
     this.logger.log('Starting retention auto-archive job...');
@@ -59,7 +59,7 @@ export class RetentionService {
   }
 
   private async archiveDocument(docId: string) {
-    // Ghi trực tiếp — không qua StatusService vì system job không có JWT
+    // Write directly — bypass StatusService since system jobs have no JWT
     await this.prisma.$transaction(async (tx) => {
       await tx.document.update({
         where: { id: docId },

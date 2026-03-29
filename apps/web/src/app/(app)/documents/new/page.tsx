@@ -68,8 +68,8 @@ export default function NewDocumentPage() {
       fallback={
         <EmptyState
           icon="lock"
-          title="Không có quyền truy cập"
-          description="Bạn cần vai trò Editor hoặc Admin để tạo tài liệu mới."
+          title="Access Denied"
+          description="You need the Editor or Admin role to create a new document."
         />
       }
     >

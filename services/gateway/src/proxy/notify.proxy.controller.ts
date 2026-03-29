@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Param, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -53,6 +53,30 @@ export class NotifyProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.NOTIFICATION_SERVICE_URL}/notify/mark-read`,
+    });
+    return response.data;
+  }
+
+  /** Lightweight unread count — used by frontend for polling. */
+  @Get('notify/unread-count')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Get unread notification count' })
+  async unreadCount(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.NOTIFICATION_SERVICE_URL}/notify/unread-count`,
+    });
+    return response.data;
+  }
+
+  /** Mark a single notification as read. */
+  @Post('notify/:id/read')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({ summary: 'Mark a single notification as read' })
+  async markAsRead(@Req() req: any, @Param('id') id: string) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.NOTIFICATION_SERVICE_URL}/notify/${id}/read`,
     });
     return response.data;
   }

@@ -13,8 +13,8 @@ export type WatermarkContext = {
  * Most binary formats ignore leading bytes they don't understand;
  * text-based formats will see the header as a comment block.
  *
- * Phase 2 (mở rộng): dùng pdf-lib cho PDF, sharp cho image
- * để embed watermark trực tiếp lên nội dung file.
+ * Phase 2 (future): use pdf-lib for PDF, sharp for images
+ * to embed watermark directly into file content.
  */
 @Injectable()
 export class WatermarkService {

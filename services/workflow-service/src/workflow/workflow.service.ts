@@ -43,10 +43,13 @@ export class WorkflowService {
       context,
     );
 
+    // SUBMITTED → notify every approver and admin
+    const { userIds: approverIds } = await this.metadataClient.getApprovers(context);
     await this.notificationClient.notify(context, {
-      type: 'SUBMITTED',
+      type:         'SUBMITTED',
       docId,
-      actorId,
+      recipientIds: approverIds,
+      docTitle:     document.title,
     });
 
     return updated;
@@ -73,9 +76,10 @@ export class WorkflowService {
     );
 
     await this.notificationClient.notify(context, {
-      type: 'APPROVED',
+      type:        'APPROVED',
       docId,
-      actorId,
+      recipientId: document.ownerId,
+      docTitle:    document.title,
     });
 
     return updated;
@@ -108,9 +112,10 @@ export class WorkflowService {
     );
 
     await this.notificationClient.notify(context, {
-      type: 'REJECTED',
+      type:        'REJECTED',
       docId,
-      actorId,
+      recipientId: document.ownerId,
+      docTitle:    document.title,
       reason,
     });
 
@@ -143,9 +148,10 @@ export class WorkflowService {
     );
 
     await this.notificationClient.notify(context, {
-      type: 'ARCHIVED',
+      type:        'ARCHIVED',
       docId,
-      actorId,
+      recipientId: document.ownerId,
+      docTitle:    document.title,
     });
 
     return updated;
@@ -181,9 +187,10 @@ export class WorkflowService {
 
     // Notify stakeholders (fire-and-forget)
     await this.notificationClient.notify(context, {
-      type: 'DELETED',
+      type:        'DELETED',
       docId,
-      actorId,
+      recipientId: document.ownerId,
+      docTitle:    document.title,
     });
 
     return { success: true };

@@ -108,20 +108,20 @@ async function bootstrap() {
     .setTitle('DocVault Gateway')
     .setVersion('0.1.0')
     .setDescription(
-      'API Gateway cho hệ thống DocVault.\n\n' +
+      'API Gateway for the DocVault document management system.\n\n' +
         '## Authentication\n\n' +
-        '**Development (localhost):** Sử dụng **Cookie Auth** — JWT được set qua cookie `dv_access_token` ' +
-        'sau khi đăng nhập qua `/api/auth/login`.\n\n' +
-        '**Production:** Sử dụng **Bearer Token** — JWT từ Keycloak, gửi kèm header:\n' +
+        '**Development (localhost):** Use **Cookie Auth** — JWT is set via the `dv_access_token` ' +
+        'cookie after logging in through `/api/auth/login`.\n\n' +
+        '**Production:** Use **Bearer Token** — JWT from Keycloak, sent with the header:\n' +
         '`Authorization: Bearer <token>`\n\n' +
         '## Roles\n\n' +
-        '| Role | Mô tả |\n' +
-        '|------|--------|\n' +
-        '| `viewer` | Xem danh sách, tải file đã xuất bản |\n' +
-        '| `editor` | Tạo, upload, submit, archive tài liệu |\n' +
-        '| `approver` | Duyệt / từ chối tài liệu |\n' +
-        '| `compliance_officer` | Xem audit log |\n' +
-        '| `admin` | Toàn quyền |\n\n' +
+        '| Role | Description |\n' +
+        '|------|------------|\n' +
+        '| `viewer` | View document list, download published files |\n' +
+        '| `editor` | Create, upload, submit, archive documents |\n' +
+        '| `approver` | Approve / reject documents |\n' +
+        '| `compliance_officer` | View audit log |\n' +
+        '| `admin` | Full access |\n\n' +
         '## Document Lifecycle\n\n' +
         '`DRAFT → PENDING → PUBLISHED → ARCHIVED`',
     )

@@ -2,25 +2,25 @@
 
 Updated: 2026-03-15
 
-## 1) Tinh thần màu sắc
+## 1) Color Philosophy
 
-Palette của DocVault phải tạo cảm giác:
-- bảo mật
-- chuyên nghiệp
-- hiện đại
-- dễ đọc dữ liệu
+DocVault's palette must convey:
+- security
+- professional
+- modern
+- easy data readability
 
-Hướng màu chính:
-- **Navy / Slate** làm brand foundation
-- **Off-white / Cool gray** làm background
-- **Green / Amber / Red / Gray** cho trạng thái
-- **Blue family** cho interactive controls
+Main color direction:
+- **Navy / Slate** as brand foundation
+- **Off-white / Cool gray** for backgrounds
+- **Green / Amber / Red / Gray** for statuses
+- **Blue family** for interactive controls
 
-Không dùng neon, không dùng gradient nặng, không dùng saturation quá cao.
+Do not use neon, heavy gradients, or overly saturated colors.
 
 ---
 
-## 2) Brand palette
+## 2) Brand Palette
 
 ### Primary / Brand
 - `brand-950: #0B1220`
@@ -42,7 +42,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 3) Neutral palette
+## 3) Neutral Palette
 
 ### Background / Surface / Border / Text
 - `bg-app: #F8FAFC`
@@ -65,9 +65,9 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 4) Status palette
+## 4) Status Palette
 
-### Workflow status
+### Workflow Status
 #### Draft
 - background: `#F1F5F9`
 - text: `#334155`
@@ -90,7 +90,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 5) Classification palette
+## 5) Classification Palette
 
 ### Public
 - background: `#EFF6FF`
@@ -114,7 +114,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 6) Semantic palette
+## 6) Semantic Palette
 
 ### Success
 - `success-50: #ECFDF5`
@@ -138,7 +138,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 7) Role badge palette
+## 7) Role Badge Palette
 
 ### Viewer
 - background: `#F8FAFC`
@@ -162,32 +162,32 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 8) Button mapping
+## 8) Button Mapping
 
-### Primary button
+### Primary Button
 - bg: `#2563EB`
 - hover: `#1D4ED8`
 - text: `#FFFFFF`
 
-### Secondary button
+### Secondary Button
 - bg: `#FFFFFF`
 - border: `#CBD5E1`
 - text: `#1E293B`
 - hover bg: `#F8FAFC`
 
-### Ghost button
+### Ghost Button
 - bg: `transparent`
 - text: `#334155`
 - hover bg: `#F1F5F9`
 
-### Destructive button
+### Destructive Button
 - bg: `#DC2626`
 - hover: `#B91C1C`
 - text: `#FFFFFF`
 
 ---
 
-## 9) Sidebar mapping
+## 9) Sidebar Mapping
 
 - sidebar bg: `#0F172A`
 - sidebar text: `#CBD5E1`
@@ -198,7 +198,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 10) Suggested CSS variables
+## 10) Suggested CSS Variables
 
 ```css
 :root {
@@ -230,7 +230,7 @@ Không dùng neon, không dùng gradient nặng, không dùng saturation quá ca
 
 ---
 
-## 11) Tailwind theme hint
+## 11) Tailwind Theme Hint
 
 ```ts
 colors: {
@@ -249,7 +249,6 @@ colors: {
 
 ---
 
-## 12) Prompt cho AI Agent
+## 12) Prompt for AI Agent
 
-Hãy dùng palette enterprise sáng, nền `#F8FAFC`, card trắng, text navy/slate, primary xanh `#2563EB`, sidebar tối `#0F172A`. Status badge: Draft = slate, Pending = amber, Published = green, Archived = gray. Classification badge: Public = blue, Internal = sky, Confidential = orange, Secret = red. Tổng thể phải sạch, hiện đại, bảo mật, nhiều khoảng trắng, không sặc sỡ.
-
+Use a bright enterprise palette, background `#F8FAFC`, white cards, navy/slate text, primary blue `#2563EB`, dark sidebar `#0F172A`. Status badge: Draft = slate, Pending = amber, Published = green, Archived = gray. Classification badge: Public = blue, Internal = sky, Confidential = orange, Secret = red. Overall must be clean, modern, secure, spacious, not flashy.

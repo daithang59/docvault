@@ -2,13 +2,13 @@
 
 Updated: 2026-03-17
 
-Tài liệu này phản ánh trạng thái hiện tại của repo dựa trên code runtime trong `apps/web`, `services/*`, `infra/*`, `libs/*` và `scripts/e2e-check.mjs`, không chỉ dựa trên các file markdown cũ.
+This document reflects the current state of the repo based on runtime code in `apps/web`, `services/*`, `infra/*`, `libs/*`, and `scripts/e2e-check.mjs`, not just based on old markdown files.
 
-## Tóm tắt dự án
+## Project Summary
 
-DocVault hiện là một monorepo `pnpm` + `turbo` cho bài toán quản lý tài liệu an toàn theo vai trò.
+DocVault is currently a `pnpm` + `turbo` monorepo for secure, role-based document management.
 
-Backend đã được tách thành các microservice NestJS chạy thật:
+The backend has been split into real running NestJS microservices:
 
 - `gateway`
 - `metadata-service`
@@ -17,28 +17,28 @@ Backend đã được tách thành các microservice NestJS chạy thật:
 - `audit-service`
 - `notification-service`
 
-Frontend là một ứng dụng Next.js chạy thật, không còn là scaffold rỗng. Ứng dụng web hiện đã có các màn hình đăng nhập, dashboard, danh sách tài liệu, chi tiết tài liệu, tạo/sửa tài liệu, duyệt tài liệu, xem audit và phần settings.
+The frontend is a real running Next.js application, no longer an empty scaffold. The web app now has login, dashboard, document list, document detail, create/edit documents, approvals, audit view, and settings screens.
 
-Đánh giá nhanh trạng thái hiện tại:
+Quick assessment of current status:
 
-- Luồng MVP chính đã được hiện thực ở backend.
-- Frontend đã bao phủ phần lớn user flow quan trọng.
-- Hạ tầng local development đã có đủ Postgres, MinIO, Keycloak.
-- Tầng thư viện dùng chung và contract còn mỏng.
-- Vẫn còn một số điểm lệch giữa tài liệu, UI và runtime cần dọn tiếp.
+- Core MVP flows are implemented in the backend.
+- Frontend covers most important user flows.
+- Local development infrastructure has Postgres, MinIO, Keycloak.
+- Shared library and contract layer is still thin.
+- There are still some inconsistencies between documentation, UI, and runtime to clean up.
 
-## Dự án đang giải quyết bài toán gì
+## Problem Being Solved
 
-DocVault là hệ thống quản lý tài liệu có kiểm soát, tập trung vào các mục tiêu:
+DocVault is a controlled document management system focused on:
 
-- quản lý metadata của tài liệu
-- upload và version file tài liệu
-- điều phối vòng đời tài liệu bằng workflow
-- kiểm soát việc tải file bằng policy ở backend
-- lưu vết audit
-- hỗ trợ compliance review nhưng không cho compliance officer tải file
+- managing document metadata
+- uploading and versioning document files
+- orchestrating document lifecycle via workflow
+- controlling file downloads via backend policy
+- audit trail
+- supporting compliance review while denying compliance officers the ability to download files
 
-Các vai trò đang được dùng trong code:
+Roles currently used in code:
 
 - `viewer`
 - `editor`
@@ -46,34 +46,34 @@ Các vai trò đang được dùng trong code:
 - `compliance_officer`
 - `admin`
 
-Role cũ `co` từ Keycloak được normalize thành `compliance_officer` ở cả backend lẫn frontend.
+The legacy Keycloak role `co` is normalized to `compliance_officer` in both backend and frontend.
 
-## Cấu trúc monorepo
+## Monorepo Structure
 
 - `apps/web`
-  - frontend Next.js 16 + React 19
+  - Next.js 16 + React 19 frontend
 - `services/gateway`
-  - API gateway, xác thực JWT, routing, truyền header ngữ cảnh
+  - API gateway, JWT authentication, routing, context header forwarding
 - `services/metadata-service`
-  - metadata tài liệu, ACL, version pointer, workflow history, download authorization
+  - document metadata, ACL, version pointer, workflow history, download authorization
 - `services/document-service`
-  - upload/download file qua MinIO/S3
+  - file upload/download via MinIO/S3
 - `services/workflow-service`
-  - validate transition workflow và orchestration với metadata/audit/notification
+  - validate workflow transitions and orchestration with metadata/audit/notification
 - `services/audit-service`
-  - ghi và truy vấn audit log
+  - write and query audit logs
 - `services/notification-service`
-  - notification sink cho môi trường dev
+  - notification sink for dev environment
 - `infra`
-  - Docker Compose cho Postgres, MongoDB, MinIO, Keycloak
+  - Docker Compose for Postgres, MongoDB, MinIO, Keycloak
 - `libs`
-  - vùng để shared auth/contracts; hiện mới ở mức khung
+  - area for shared auth/contracts; currently at framework level only
 
-## Kiến trúc runtime hiện tại
+## Current Runtime Architecture
 
 ### 1. Frontend
 
-`apps/web` là ứng dụng Next.js dùng các thành phần chính sau:
+`apps/web` is a Next.js application using the following key components:
 
 - App Router
 - Axios
@@ -83,7 +83,7 @@ Role cũ `co` từ Keycloak được normalize thành `compliance_officer` ở c
 - Tailwind CSS 4
 - Radix UI
 
-Các màn hình đã có:
+Existing screens:
 
 - login
 - dashboard
@@ -95,31 +95,31 @@ Các màn hình đã có:
 - audit
 - settings
 
-Frontend gọi gateway qua biến:
+Frontend calls the gateway via the environment variable:
 
 - `NEXT_PUBLIC_API_BASE_URL`
-- mặc định là `http://localhost:3000/api`
+- defaults to `http://localhost:3000/api`
 
-Trang login hiện hỗ trợ 2 chế độ:
+The login page currently supports 2 modes:
 
-- demo login theo role
-- login bằng JWT token
+- demo login by role
+- JWT token login
 
 ### 2. Gateway
 
-`services/gateway` là entry point ở biên hệ thống. Service này hiện đang:
+`services/gateway` is the entry point at the system boundary. This service currently:
 
-- xác thực JWT từ Keycloak bằng JWKS
-- kiểm tra role ở mức route
-- expose `/health` và `/me`
-- proxy request xuống các service phía sau
-- forward các header:
+- authenticates JWT from Keycloak via JWKS
+- checks roles at route level
+- exposes `/health` and `/me`
+- proxies requests to downstream services
+- forwards the following headers:
   - `authorization`
   - `x-request-id`
   - `x-user-id`
   - `x-roles`
 
-Các nhóm route đang được proxy:
+Route groups currently being proxied:
 
 - `/metadata/*`
 - `/documents/*`
@@ -129,16 +129,16 @@ Các nhóm route đang được proxy:
 
 ### 3. Metadata Service
 
-`services/metadata-service` hiện là nguồn sự thật cho metadata và policy. Service này đang sở hữu:
+`services/metadata-service` is currently the source of truth for metadata and policy. This service owns:
 
 - document record
-- classification và tags
+- classification and tags
 - `currentVersion`
 - ACL entries
 - workflow history
-- logic authorize download
+- download authorization logic
 
-Các endpoint hiện có:
+Current endpoints:
 
 - `GET /documents`
 - `GET /documents/:docId`
@@ -153,18 +153,18 @@ Các endpoint hiện có:
 
 ### 4. Document Service
 
-`services/document-service` đang sở hữu phần xử lý blob file. Service này hiện:
+`services/document-service` currently owns blob file handling. This service:
 
-- nhận upload file
-- tính checksum SHA-256
-- sinh object key theo format `doc/{docId}/v{n}/{filename}`
-- upload file lên MinIO/S3
-- gọi metadata-service để đăng ký version mới
-- gọi metadata-service để authorize download
-- verify grant token đã ký trước khi phát quyền tải
-- hỗ trợ cả presigned URL và stream download
+- receives file uploads
+- computes SHA-256 checksum
+- generates object keys in format `doc/{docId}/v{n}/{filename}`
+- uploads files to MinIO/S3
+- calls metadata-service to register new version
+- calls metadata-service to authorize download
+- verifies grant token before issuing download permission
+- supports both presigned URL and stream download
 
-Các endpoint hiện có:
+Current endpoints:
 
 - `POST /documents/:docId/upload`
 - `POST /documents/:docId/presign-download`
@@ -172,15 +172,15 @@ Các endpoint hiện có:
 
 ### 5. Workflow Service
 
-`services/workflow-service` sở hữu logic chuyển trạng thái workflow. Service này hiện:
+`services/workflow-service` owns workflow status transition logic. This service:
 
-- đọc trạng thái hiện tại từ metadata-service
-- validate workflow transition
-- cập nhật trạng thái thông qua metadata-service
-- phát audit event
-- gọi notification-service
+- reads current status from metadata-service
+- validates workflow transition
+- updates status through metadata-service
+- emits audit event
+- calls notification-service
 
-Các endpoint hiện có:
+Current endpoints:
 
 - `POST /workflow/:docId/submit`
 - `POST /workflow/:docId/approve`
@@ -189,107 +189,107 @@ Các endpoint hiện có:
 
 ### 6. Audit Service
 
-`services/audit-service` lưu audit event trong Postgres. Service này hiện:
+`services/audit-service` stores audit events in Postgres. This service:
 
-- append audit record
-- hỗ trợ query theo actor/action/resource/result/time
-- tạo hash chain để tăng tính tamper-evident
+- appends audit record
+- supports query by actor/action/resource/result/time
+- creates hash chain for tamper-evident audit
 
-Các endpoint hiện có:
+Current endpoints:
 
 - `POST /audit/events`
 - `GET /audit/query`
 
-`GET /audit/query` hiện chỉ cho `compliance_officer`.
+`GET /audit/query` is currently only accessible to `compliance_officer`.
 
 ### 7. Notification Service
 
-`services/notification-service` hiện vẫn là sink đơn giản. Service này:
+`services/notification-service` is currently a simple sink. This service:
 
-- nhận `POST /notify`
-- log payload notification
-- trả về `{ accepted: true }`
+- receives `POST /notify`
+- logs notification payload
+- returns `{ accepted: true }`
 
-Nó chưa phải một hệ thống email/SMS/push hoàn chỉnh.
+It is not yet a full email/SMS/push system.
 
-## Luật nghiệp vụ đang có trong code
+## Business Rules Currently in Code
 
-### Truy cập metadata
+### Metadata Access
 
-Tất cả business role đã xác thực đều có thể đọc metadata:
+All authenticated business roles can read metadata:
 
 - list documents
 - get document detail
 
-Điều này có nghĩa là ACL hiện chưa phải lớp kiểm soát chính cho việc đọc metadata. ACL hiện được dùng mạnh nhất ở download authorization.
+This means ACL is not currently the primary control layer for metadata reads. ACL is most strongly used in download authorization.
 
 ### Ownership
 
-Với create/update/upload/version/ACL management, hệ thống hiện kỳ vọng:
+For create/update/upload/version/ACL management, the system currently expects:
 
-- `editor` là owner, hoặc
+- `editor` to be the owner, or
 - `admin`
 
-Identity owner ở backend hiện được build theo công thức:
+Backend owner identity is currently built with the formula:
 
 - `username ?? sub`
 
 ### Workflow
 
-Map transition hiện đang được enforce:
+Transition map currently being enforced:
 
 - `SUBMIT`: `DRAFT -> PENDING`
 - `APPROVE`: `PENDING -> PUBLISHED`
 - `REJECT`: `PENDING -> DRAFT`
 - `ARCHIVE`: `PUBLISHED -> ARCHIVED`
 
-Các tác động đang có:
+Current side effects:
 
-- `APPROVE` set `publishedAt`
-- `ARCHIVE` set `archivedAt`
-- mỗi transition ghi thêm một dòng vào `document_workflow_history`
-- workflow action đồng thời phát audit event
+- `APPROVE` sets `publishedAt`
+- `ARCHIVE` sets `archivedAt`
+- each transition writes a row to `document_workflow_history`
+- workflow action simultaneously emits an audit event
 
-### Download authorization
+### Download Authorization
 
-Luồng download hiện là luồng hai bước:
+Current download flow is a two-step process:
 
-1. metadata-service authorize request và ký grant token có thời hạn ngắn
-2. document-service verify token rồi trả presigned URL hoặc stream
+1. metadata-service authorizes request and signs a short-lived grant token
+2. document-service verifies token then returns presigned URL or stream
 
-Các rule hiện có trong code:
+Current rules in code:
 
-- chỉ tài liệu `PUBLISHED` mới được tải
-- `compliance_officer` luôn bị chặn tải
-- ACL `DENY` cho quyền `DOWNLOAD` sẽ chặn tải
-- ACL `ALLOW` có thể cho phép tải
-- owner của document có thể tải
-- user có role `viewer`, `editor`, `approver`, `admin` hiện được xem là có default role access ngay cả khi không có ACL `ALLOW`
+- only `PUBLISHED` documents can be downloaded
+- `compliance_officer` is always blocked from downloading
+- ACL `DENY` for `DOWNLOAD` permission blocks download
+- ACL `ALLOW` can permit download
+- document owner can download
+- users with roles `viewer`, `editor`, `approver`, `admin` are currently considered to have default role access even without ACL `ALLOW`
 
-Hệ quả quan trọng:
+Important consequence:
 
-- ACL hiện đang hoạt động gần giống lớp deny/override cho download, chưa phải allow-list chặt cho mọi business role
+- ACL is currently functioning more like a deny/override layer for download, not a strict allow-list for all business roles
 
 ### Audit
 
-Audit event đang được hash-linked theo công thức:
+Audit events are currently hash-linked using the formula:
 
 - `hash = SHA-256(prevHash + "|" + canonicalPayload)`
 
-Điều này giúp tăng khả năng phát hiện chỉnh sửa trái phép, nhưng chưa phải bất biến tuyệt đối kiểu blockchain.
+This helps detect unauthorized modifications, but is not absolute immutability like a blockchain.
 
-## Trạng thái mô hình dữ liệu
+## Data Model Status
 
 ### Metadata DB
 
-Các model Prisma đang dùng ở runtime:
+Prisma models currently used at runtime:
 
 - `Document`
 - `DocumentVersion`
 - `DocumentAcl`
 - `DocumentWorkflowHistory`
 
-Các trường quan trọng đã có:
+Important fields already present:
 
 - `classification`
 - `tags`
@@ -298,14 +298,14 @@ Các trường quan trọng đã có:
 - `publishedAt`
 - `archivedAt`
 
-Schema ACL hỗ trợ các subject type:
+ACL schema supports subject types:
 
 - `USER`
 - `ROLE`
 - `GROUP`
 - `ALL`
 
-Schema ACL hỗ trợ các permission:
+ACL schema supports permissions:
 
 - `READ`
 - `DOWNLOAD`
@@ -314,11 +314,11 @@ Schema ACL hỗ trợ các permission:
 
 ### Audit DB
 
-Model runtime:
+Runtime model:
 
 - `AuditEvent`
 
-Các trường quan trọng:
+Important fields:
 
 - actor info
 - action
@@ -329,34 +329,34 @@ Các trường quan trọng:
 - `prevHash`
 - `hash`
 
-## Trạng thái frontend
+## Frontend Status
 
-Frontend hiện không còn ở mức demo UI đơn giản mà đã bám khá sát MVP backend.
+The frontend is no longer at the level of a simple demo UI — it is now fairly tightly aligned with the MVP backend.
 
-Các hành vi đã hiện thực:
+Implemented behaviors:
 
-- login bằng demo role hoặc JWT
-- dashboard tổng hợp trạng thái tài liệu
-- danh sách tài liệu có filter/search/sort phía client
-- tạo tài liệu và upload file đầu tiên
-- trang chi tiết tài liệu với:
+- login via demo role or JWT
+- dashboard aggregating document status
+- document list with client-side filter/search/sort
+- create document and upload first file
+- document detail page with:
   - versions card
   - workflow timeline
   - ACL panel
   - action panel
-- trang approvals cho tài liệu đang `PENDING`
-- trang audit cho compliance user
+- approvals page for `PENDING` documents
+- audit page for compliance users
 
-Frontend permission helpers hiện cũng đã mô hình hóa:
+Frontend permission helpers also model:
 
-- create/edit/submit/archive cho owner editor hoặc admin
-- approve/reject cho approver hoặc admin
-- download chỉ khi tài liệu đã publish và không cho compliance role
-- ACL management cho owner editor hoặc admin
+- create/edit/submit/archive for owner editor or admin
+- approve/reject for approver or admin
+- download only if document is published and not for compliance role
+- ACL management for owner editor or admin
 
-## Trạng thái hạ tầng local
+## Local Infrastructure Status
 
-`infra/docker-compose.dev.yml` hiện cung cấp:
+`infra/docker-compose.dev.yml` currently provides:
 
 - Postgres
 - MongoDB
@@ -364,21 +364,21 @@ Frontend permission helpers hiện cũng đã mô hình hóa:
 - MinIO bucket init
 - Keycloak
 
-Ghi chú:
+Notes:
 
-- MongoDB vẫn còn trong compose nhưng có vẻ không còn được dùng ở runtime MVP hiện tại
-- Postgres đang được metadata-service và audit-service dùng
-- MinIO đang được document-service dùng
-- Keycloak dùng cho JWT validation và seed user local
+- MongoDB is still in the compose but appears to no longer be used at current MVP runtime
+- Postgres is used by metadata-service and audit-service
+- MinIO is used by document-service
+- Keycloak is used for JWT validation and local user seeding
 
-## Trạng thái build và chạy
+## Build and Run Status
 
-Tooling ở root:
+Tooling at root:
 
 - package manager: `pnpm`
 - task runner: `turbo`
 
-Các script quan trọng ở root:
+Important scripts at root:
 
 - `pnpm dev`
 - `pnpm build`
@@ -386,148 +386,148 @@ Các script quan trọng ở root:
 - `pnpm test`
 - `pnpm test:e2e`
 
-Các service hiện đều có script cho:
+All services currently have scripts for:
 
 - `build`
 - `start:dev`
 - `test`
 
-Prisma deploy script hiện có ở:
+Prisma deploy script currently exists at:
 
 - `metadata-service`
 - `audit-service`
 
-## Trạng thái test và verification
+## Test and Verification Status
 
-Repo hiện có script smoke test đáng tin cậy ở `scripts/e2e-check.mjs`.
+The repo has a reliable smoke test script at `scripts/e2e-check.mjs`.
 
-Script này đang cover các luồng chính:
+This script covers the following main flows:
 
-- request không có token bị chặn
-- token hết hạn giả lập bị chặn
-- viewer không thể create
-- editor có thể create
-- editor có thể upload
-- viewer không thể tải khi document còn draft
-- editor có thể submit
-- approver có thể approve
-- approve lần hai bị conflict
-- viewer có thể tải document đã publish
-- compliance officer có thể đọc metadata
-- compliance officer không thể tải file
-- compliance officer có thể query audit
-- viewer không thể query audit
+- requests without token are blocked
+- expired token simulation is blocked
+- viewer cannot create
+- editor can create
+- editor can upload
+- viewer cannot download when document is draft
+- editor can submit
+- approver can approve
+- double approve gets conflict
+- viewer can download published document
+- compliance officer can read metadata
+- compliance officer cannot download files
+- compliance officer can query audit
+- viewer cannot query audit
 
-Ngoài ra repo còn có một số unit test theo service, ví dụ:
+Additionally, the repo has some unit tests per service, for example:
 
-- test transition trong metadata status service
-- test hash-chain trong audit service
+- transition tests in metadata status service
+- hash-chain tests in audit service
 
-## Trạng thái thư viện dùng chung và contract
+## Shared Library and Contract Status
 
-`libs/` hiện vẫn ở giai đoạn sớm.
+`libs/` is still in an early stage.
 
-Tình trạng hiện tại:
+Current state:
 
-- `libs/auth` chủ yếu mới là README mô tả ý định
-- `libs/contracts/openapi/gateway.yaml` đã có nhưng còn rất tối thiểu
-- `libs/contracts/events` mới có cấu trúc thư mục, chưa có schema rõ ràng
+- `libs/auth` is mostly just a README describing intent
+- `libs/contracts/openapi/gateway.yaml` exists but is very minimal
+- `libs/contracts/events` has directory structure only, no clear schema yet
 
-Kết luận ngắn:
+Short conclusion:
 
-- ranh giới service đã tương đối rõ ở runtime
-- nhưng shared contracts và shared auth chưa trưởng thành thành package dùng chung thực thụ
+- service boundaries are relatively clear at runtime
+- but shared contracts and shared auth have not matured into a true shared package
 
-## Các điểm lệch và khoảng trống hiện tại
+## Current Gaps and Misalignments
 
-### 1. Workflow history có ở metadata-service nhưng chưa được gateway proxy
+### 1. Workflow history exists in metadata-service but gateway proxy is missing
 
-Trạng thái quan sát được:
+Observed state:
 
-- frontend gọi `/metadata/documents/:docId/workflow-history`
-- metadata-service có `GET /documents/:docId/workflow-history`
-- gateway hiện chưa có route proxy tương ứng
+- frontend calls `/metadata/documents/:docId/workflow-history`
+- metadata-service has `GET /documents/:docId/workflow-history`
+- gateway currently does not have the corresponding proxy route
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- workflow timeline trên web có thể lỗi khi đi qua gateway
+- workflow timeline on the web may fail when going through gateway
 
-### 2. ACL `GROUP` có trong schema và UI nhưng policy download chưa evaluate
+### 2. ACL `GROUP` exists in schema and UI but policy download evaluation is missing
 
-Trạng thái quan sát được:
+Observed state:
 
-- Prisma schema hỗ trợ `GROUP`
-- form ACL trên frontend cho chọn `GROUP`
-- DTO cho phép `GROUP`
-- `PolicyService.matchesAcl()` hiện chỉ xử lý:
+- Prisma schema supports `GROUP`
+- ACL form on frontend allows selecting `GROUP`
+- DTO allows `GROUP`
+- `PolicyService.matchesAcl()` currently only handles:
   - `ALL`
   - `USER`
   - `ROLE`
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- rule download theo group có thể tạo được nhưng không có tác dụng khi authorize
+- group-based download rules can be created but have no effect during authorization
 
-### 3. Kiểm tra owner ở frontend đang lệch với cách backend lưu owner
+### 3. Frontend owner check is misaligned with how backend stores owner
 
-Trạng thái quan sát được:
+Observed state:
 
-- backend lưu owner/actor theo `username ?? sub`
-- frontend so `doc.ownerId` với `session.user.sub`
+- backend stores owner/actor as `username ?? sub`
+- frontend compares `doc.ownerId` with `session.user.sub`
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- các action chỉ dành cho owner như edit, upload, submit, archive, quản lý ACL có thể bị ẩn sai trên UI với user Keycloak thật
+- actions exclusive to owner like edit, upload, submit, archive, ACL management may be incorrectly hidden on UI with real Keycloak users
 
-### 4. Quyền archive đang không nhất quán giữa các layer
+### 4. Archive permission is inconsistent between layers
 
-Trạng thái quan sát được:
+Observed state:
 
-- gateway `POST /workflow/:docId/archive` cho `approver` và `admin`
-- workflow-service controller lại cho `editor` và `admin`
-- workflow-service business logic thực tế chỉ cho owner editor hoặc admin
+- gateway `POST /workflow/:docId/archive` allows `approver` and `admin`
+- workflow-service controller allows `editor` and `admin`
+- workflow-service business logic actually only allows owner editor or admin
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- approver có thể qua được lớp role ở gateway nhưng vẫn bị từ chối ở downstream
-- hành vi runtime và tài liệu dễ bị lệch nhau
+- approver may get past the gateway role layer but still be denied downstream
+- runtime behavior and documentation can easily diverge
 
-### 5. Tài liệu hiện chưa theo kịp runtime code
+### 5. Documentation has not kept pace with runtime code
 
-Trạng thái quan sát được:
+Observed state:
 
-- `docs/PROJECT_STATUS.md` trước đó là snapshot cũ
-- `apps/web/README.md` vẫn là README mặc định của Next.js
-- một số markdown mô tả hành vi khác với runtime hiện tại
+- `docs/PROJECT_STATUS.md` was a previous old snapshot
+- `apps/web/README.md` is still the default Next.js README
+- some markdown describes behavior different from current runtime
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- source code đang là nguồn sự thật đáng tin hơn tài liệu ở một số phần
+- source code is currently a more reliable source of truth than documentation in some areas
 
-### 6. ACL chưa phải mô hình kiểm soát đọc metadata chặt chẽ
+### 6. ACL is not yet a strict metadata-read control model
 
-Trạng thái quan sát được:
+Observed state:
 
-- mọi business role đã xác thực đều có thể list/read metadata
-- ACL chủ yếu được áp vào download authorization
+- all authenticated business roles can list/read metadata
+- ACL is primarily applied to download authorization
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- hệ thống hiện gần với mô hình "metadata đọc được, file thì bị kiểm soát" hơn là "mọi thứ đều bị ACL-gate"
+- the system is currently closer to "metadata readable, files controlled" model than "everything ACL-gated"
 
-### 7. Tầng shared contract còn non
+### 7. Shared contract layer is still immature
 
-Trạng thái quan sát được:
+Observed state:
 
-- thư mục shared đã có
-- nhưng phần lớn logic auth/contract vẫn còn lặp ở từng service thay vì đi qua `libs`
+- shared directory exists
+- but most auth/contract logic is still duplicated across services instead of going through `libs`
 
-Hệ quả có thể xảy ra:
+Potential consequence:
 
-- boundary microservice đã tách rõ, nhưng code reuse và contract hygiene còn chưa tốt
+- microservice boundaries are separated, but code reuse and contract hygiene are still not good
 
-## Kết luận thực tế
+## Practical Conclusion
 
-Nếu mô tả ngắn gọn trong một câu:
+A one-sentence summary:
 
-DocVault hiện là một MVP microservice hoạt động được cho bài toán quản lý vòng đời tài liệu an toàn, có frontend usable và backend đã tách boundary khá rõ, nhưng vẫn còn một số bất nhất về contract, policy, ownership và tài liệu cần xử lý trước khi xem là đủ chín cho production.
+DocVault is currently a working MVP microservice for secure document lifecycle management, with a usable frontend and a backend with fairly clear boundary separation, but there are still several inconsistencies in contract, policy, ownership, and documentation to address before it can be considered production-ready.
