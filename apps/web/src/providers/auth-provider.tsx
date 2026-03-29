@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
 import type { Session } from '@/features/auth/auth.types';
 import type { AuthContextValue } from '@/features/auth/auth.types';
 import type { UserRole } from '@/types/enums';
@@ -11,11 +11,17 @@ import { queryClient } from '@/providers/query-provider';
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
-  const [session, setSession] = useState<Session | null>(() => {
-    if (typeof window === 'undefined') return null;
-    return loadSession() as Session | null;
-  });
-  const [hydrated] = useState(true);
+  const [session, setSession] = useState<Session | null>(null);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Load session AFTER hydration to prevent SSR/client mismatch.
+  // SSR: session=null, hydrated=false → same on both sides.
+  // Client first render: session=null, hydrated=false → identical to SSR.
+  // Client after useEffect: session=loaded, hydrated=true → auth reflects real state.
+  useEffect(() => {
+    setSession(loadSession() as Session | null);
+    setHydrated(true);
+  }, []);
 
   const login = useCallback((newSession: Session) => {
     saveSession(newSession as Parameters<typeof saveSession>[0]);
