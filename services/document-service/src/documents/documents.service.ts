@@ -59,6 +59,21 @@ export class DocumentsService {
       },
     });
 
+    // Emit audit FIRST — immediately after MinIO upload succeeds.
+    // If createVersion fails below, we still log the upload attempt.
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_UPLOADED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+      metadata: {
+        fileName: file.originalname,
+        mimeType: file.mimetype,
+        size: file.size,
+        version: nextVersion,
+      },
+    });
+
     try {
       const versionRecord = await this.metadataClient.createVersion(
         docId,
@@ -72,13 +87,6 @@ export class DocumentsService {
         },
         context,
       );
-
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_UPLOADED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
-      });
 
       return {
         ...versionRecord,
@@ -102,32 +110,33 @@ export class DocumentsService {
     context: RequestContext,
   ) {
     try {
-      const authorization = await this.metadataClient.authorizeDownload(
-        docId,
-        { version: dto.version },
-        context,
-      );
-      const grantPayload = verifyGrantToken(
-        authorization.grantToken,
-        context.actorId,
-      );
+      let grantPayload: ReturnType<typeof verifyGrantToken>;
+      let expiresInSeconds: number;
+
+      if (dto.grantToken) {
+        // grantToken provided — frontend already authorized, skip metadata call
+        grantPayload = verifyGrantToken(dto.grantToken, context.actorId);
+        expiresInSeconds = 300; // consistent default, not from metadata
+      } else {
+        // Fallback: re-authorize via metadata service
+        const authorization = await this.metadataClient.authorizeDownload(
+          docId,
+          { version: dto.version },
+          context,
+        );
+        grantPayload = verifyGrantToken(authorization.grantToken, context.actorId);
+        expiresInSeconds = authorization.expiresInSeconds;
+      }
 
       // SECURITY: CONFIDENTIAL/SECRET documents must go through the streaming
       // path so the watermark can be applied. Reject presigned URL for these.
       if (grantPayload.watermarkRequired) {
-        await this.auditClient.emitEvent(context, {
-          action: 'DOCUMENT_DOWNLOAD_URL_ISSUED',
-          resourceType: 'DOCUMENT',
-          resourceId: docId,
-          result: 'SUCCESS',
-          reason: 'Redirected to streaming endpoint due to classification',
-        });
         return {
           docId,
           version: grantPayload.version,
           filename: grantPayload.filename,
-          expiresAt: authorization.expiresAt,
-          expiresInSeconds: authorization.expiresInSeconds,
+          expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+          expiresInSeconds,
           url: null,
           watermarkRequired: true,
           streamingEndpoint: `/documents/${docId}/versions/${grantPayload.version}/stream`,
@@ -137,28 +146,62 @@ export class DocumentsService {
       const url = await this.storageService.createDownloadUrl({
         objectKey: grantPayload.objectKey,
         filename: grantPayload.filename,
-        expiresInSeconds: authorization.expiresInSeconds,
-      });
-
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_URL_ISSUED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
+        expiresInSeconds,
       });
 
       return {
         docId,
         version: grantPayload.version,
         filename: grantPayload.filename,
-        expiresAt: authorization.expiresAt,
-        expiresInSeconds: authorization.expiresInSeconds,
+        expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+        expiresInSeconds,
         url,
       };
     } catch (error) {
       await this.auditDownloadError(docId, context, error);
       throw error;
     }
+  }
+
+  /**
+   * Stream a document by verifying a grant token directly — no metadata service call.
+   * Used when the grant token was already obtained via authorizeDownload().
+   */
+  async getStreamWithToken(
+    docId: string,
+    grantToken: string,
+    actorId: string,
+  ): Promise<{
+    filename: string;
+    contentType?: string;
+    stream: StreamableFile;
+  }> {
+    const grantPayload = verifyGrantToken(grantToken, actorId);
+
+    const object = await this.storageService.getObjectStream(
+      grantPayload.objectKey,
+    );
+
+    const rawBuffer = await this.readStreamToBuffer(object.Body as any);
+
+    let finalBuffer = rawBuffer;
+    if (grantPayload.watermarkRequired) {
+      finalBuffer = await this.watermarkService.applyWatermark(
+        rawBuffer,
+        {
+          username: actorId,
+          timestamp: new Date().toISOString(),
+          classification: grantPayload.classification,
+        },
+        grantPayload.contentType,
+      );
+    }
+
+    return {
+      filename: grantPayload.filename,
+      contentType: grantPayload.contentType,
+      stream: new StreamableFile(finalBuffer),
+    };
   }
 
   async getStream(
@@ -193,23 +236,16 @@ export class DocumentsService {
 
       let finalBuffer = rawBuffer;
       if (grantPayload.watermarkRequired) {
-        finalBuffer = this.watermarkService.applyWatermark(rawBuffer, {
-          username: context.actorId,
-          timestamp: new Date().toISOString(),
-          classification: grantPayload.classification,
-        });
+        finalBuffer = await this.watermarkService.applyWatermark(
+          rawBuffer,
+          {
+            username: context.actorId,
+            timestamp: new Date().toISOString(),
+            classification: grantPayload.classification,
+          },
+          grantPayload.contentType,
+        );
       }
-
-      const auditAction = grantPayload.watermarkRequired
-        ? 'DOCUMENT_DOWNLOADED_WATERMARKED'
-        : 'DOCUMENT_DOWNLOADED';
-
-      await this.auditClient.emitEvent(context, {
-        action: auditAction,
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'SUCCESS',
-      });
 
       return {
         filename: grantPayload.filename,
@@ -262,13 +298,6 @@ export class DocumentsService {
       grantPayload.objectKey,
       range,
     );
-
-    await this.auditClient.emitEvent(context, {
-      action: 'DOCUMENT_PREVIEWED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
-    });
 
     return {
       filename: grantPayload.filename,

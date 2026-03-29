@@ -132,9 +132,11 @@ export class DocumentsProxyController {
     @Req() req: any,
     @Res() res: Response,
   ) {
+    // Forward query params (e.g. ?token=grantToken for token-verified streaming)
+    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
-      url: `${process.env.DOCUMENT_SERVICE_URL}/documents/${docId}/versions/${version}/stream`,
+      url: `${process.env.DOCUMENT_SERVICE_URL}/documents/${docId}/versions/${version}/stream${queryString}`,
       responseType: 'stream',
     });
 

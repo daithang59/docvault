@@ -50,6 +50,14 @@ export class AclService {
       resourceType: 'DOCUMENT',
       resourceId: docId,
       result: 'SUCCESS',
+      metadata: {
+        docId,
+        aclId: aclEntry.id,
+        subjectType: dto.subjectType,
+        subjectId: dto.subjectId,
+        permission: dto.permission,
+        effect: dto.effect,
+      },
     });
 
     return aclEntry;
@@ -59,6 +67,49 @@ export class AclService {
     return this.prisma.documentAcl.findMany({
       where: { docId },
       orderBy: { id: 'asc' },
+    });
+  }
+
+  async delete(
+    docId: string,
+    aclId: string,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: docId },
+    });
+
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    this.assertCanManage(document.ownerId, user);
+
+    const aclEntry = await this.prisma.documentAcl.findUnique({
+      where: { id: aclId },
+    });
+
+    if (!aclEntry || aclEntry.docId !== docId) {
+      throw new NotFoundException('ACL entry not found');
+    }
+
+    await this.prisma.documentAcl.delete({ where: { id: aclId } });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_ACL_DELETED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+      metadata: {
+        docId,
+        removedAclId: aclId,
+        removedSubjectId: aclEntry.subjectId,
+        removedSubjectType: aclEntry.subjectType,
+        removedPermission: aclEntry.permission,
+        removedEffect: aclEntry.effect,
+        removedBy: buildActorId(user),
+      },
     });
   }
 

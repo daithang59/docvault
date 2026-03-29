@@ -59,7 +59,14 @@ function normalizeDocumentDetail(document: DocumentDetail): DocumentDetail {
 export async function getDocuments(
   filters?: DocumentListFilters,
 ): Promise<PaginatedResponse<DocumentListItem>> {
-  const res = await apiClient.get<DocumentListItem[]>(apiEndpoints.metadata.documents.list);
+  // Pass search query to server for efficient full-text search
+  const params = new URLSearchParams();
+  if (filters?.q) params.set('q', filters.q);
+  const url = params.toString()
+    ? `${apiEndpoints.metadata.documents.list}?${params}`
+    : apiEndpoints.metadata.documents.list;
+
+  const res = await apiClient.get<DocumentListItem[]>(url);
   const normalized = unwrap(res).map(normalizeDocumentSummary);
 
   return normalizePaginatedResponse(
@@ -69,15 +76,6 @@ export async function getDocuments(
       if (filters?.classification && document.classification !== filters.classification) return false;
       if (filters?.classificationLevel && document.classification !== filters.classificationLevel) return false;
       if (filters?.tags?.length && !filters.tags.every((tag) => document.tags.includes(tag))) return false;
-      if (filters?.q) {
-        const query = filters.q.toLowerCase();
-        const matchesText =
-          document.title.toLowerCase().includes(query) ||
-          (document.description ?? '').toLowerCase().includes(query) ||
-          document.tags.some((tag) => tag.toLowerCase().includes(query));
-
-        if (!matchesText) return false;
-      }
 
       return true;
     }),
@@ -153,10 +151,11 @@ export async function uploadDocumentFile(id: string, file: File): Promise<Upload
 export async function presignDownload(
   id: string,
   version?: number,
+  grantToken?: string,
 ): Promise<PresignedDownloadResult> {
   const res = await apiClient.post<PresignedDownloadResult>(
     apiEndpoints.documents.presignDownload(id),
-    version ? { version } : {},
+    { ...(version != null && { version }), ...(grantToken && { grantToken }) },
   );
   return unwrap(res);
 }

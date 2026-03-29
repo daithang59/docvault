@@ -2,7 +2,7 @@
 
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
-import { submitDocument, approveDocument, rejectDocument, archiveDocument } from './workflow.api';
+import { submitDocument, approveDocument, rejectDocument, archiveDocument, deleteDocument } from './workflow.api';
 import type { WorkflowActionDto } from './workflow.api';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { approvalsKeys } from '@/features/approvals/approvals.keys';
@@ -43,4 +43,18 @@ export function useRejectDocument(docId: string) {
 
 export function useArchiveDocument(docId: string) {
   return useWorkflowMutation(docId, archiveDocument, 'Document archived');
+}
+
+export function useDeleteDocument(docId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => deleteDocument(docId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(docId) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(docId) });
+      toast.success('Document deleted.');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
 }

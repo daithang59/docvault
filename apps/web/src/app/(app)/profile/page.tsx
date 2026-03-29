@@ -90,7 +90,7 @@ export default function ProfilePage() {
           setProfile(await res.json());
         }
       } catch {
-        setKeycloakError('Không thể kết nối Keycloak. Thông tin có thể không đầy đủ.');
+        setKeycloakError('Unable to connect to Keycloak. Information may be incomplete.');
       } finally {
         setLoading(false);
       }
@@ -116,8 +116,8 @@ export default function ProfilePage() {
 
   return (
     <PageShell
-      title="Hồ sơ cá nhân"
-      description="Thông tin tài khoản của bạn — được quản lý bởi Keycloak"
+      title="Personal Profile"
+      description="Your account information — managed by Keycloak"
     >
       {/* ── Hero Card ───────────────────────────────────────── */}
       <div
@@ -164,7 +164,7 @@ export default function ProfilePage() {
                 borderColor: 'var(--bg-card)',
               }}
             >
-              <span className="sr-only">Đang hoạt động</span>
+              <span className="sr-only">Active</span>
             </div>
           </div>
 
@@ -211,7 +211,7 @@ export default function ProfilePage() {
 
       {/* ── Account Info ────────────────────────────────────── */}
       <div className="animate-in delay-2">
-        <SectionLabel>Thông tin tài khoản</SectionLabel>
+        <SectionLabel>Account Information</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2">
         <InfoCard
           icon={<AtSign size={15} className="text-[var(--color-primary)]" />}
@@ -233,7 +233,7 @@ export default function ProfilePage() {
         />
         <InfoCard
           icon={<KeyRound size={15} className="text-[var(--color-primary)]" />}
-          label="Xác thực"
+          label="Authentication"
           value="Keycloak SSO"
         />
       </div>
@@ -241,7 +241,7 @@ export default function ProfilePage() {
 
       {/* ── Roles ───────────────────────────────────────────── */}
       <div className="animate-in delay-3">
-        <SectionLabel>Vai trò &amp; quyền hạn</SectionLabel>
+        <SectionLabel>Roles &amp; Permissions</SectionLabel>
         <div
           className="relative overflow-hidden rounded-xl border p-5"
           style={{
@@ -260,7 +260,7 @@ export default function ProfilePage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-muted)]">Không có vai trò nào được gán.</p>
+              <p className="text-sm text-[var(--text-muted)]">No roles have been assigned.</p>
             )}
           </div>
         </div>
@@ -290,7 +290,7 @@ export default function ProfilePage() {
           <div className="flex-1 min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h3 className="text-sm font-semibold text-[var(--text-strong)]">
-                Quản lý tài khoản trên Keycloak
+                Manage account on Keycloak
               </h3>
               <span
                 className="rounded-full px-2.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide"
@@ -304,7 +304,7 @@ export default function ProfilePage() {
               </span>
             </div>
             <p className="mt-1.5 text-sm leading-relaxed text-[var(--text-muted)]">
-              Để thay đổi thông tin cá nhân (họ tên, email, mật khẩu), vui lòng truy cập{' '}
+              To update personal information (name, email, password), please visit{' '}
               <span className="font-medium text-[var(--text-main)]">Keycloak Admin Console</span>.
             </p>
             {keycloakError && (

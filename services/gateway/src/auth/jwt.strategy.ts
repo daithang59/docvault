@@ -47,7 +47,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
     const opts: StrategyOptions = {
       jwtFromRequest: extractToken as any,
-      ignoreExpiration: false,
+      // Keycloak in Docker may have clock drift causing tokens to appear expired
+      // minutes after issuance. Signature is still verified by JWKS, so we bypass
+      // automatic expiry check and validate manually with a generous tolerance below.
+      ignoreExpiration: true,
       algorithms: ['RS256'],
       issuer,
       secretOrKeyProvider: jwksRsa.passportJwtSecret({
@@ -94,6 +97,15 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
 
   /** Called by passport-jwt after verifying the JWT. */
   validate(payload: TokenPayload | any) {
+    // Manually validate expiry with generous clock tolerance (5 min) to handle
+    // Keycloak Docker clock drift that causes valid tokens to appear expired.
+    if (payload.exp) {
+      const now = Math.floor(Date.now() / 1000);
+      const CLOCK_DRIFT_TOLERANCE_SECONDS = 300;
+      if (payload.exp + CLOCK_DRIFT_TOLERANCE_SECONDS < now) {
+        throw new UnauthorizedException('Token expired');
+      }
+    }
     return this.normalizePayload(payload);
   }
 }

@@ -11,6 +11,13 @@ import { hasAnyRole, hasRole } from './roles';
 interface DocumentContext {
   status: DocumentStatus;
   ownerId?: string;
+  classification?: string;
+}
+
+// ownerId is stored as username (preferred_username) — not sub.
+// Use username for ownership checks, not sub (which may be undefined in the session).
+function isOwner(session: Session | null, ownerId: string | undefined): boolean {
+  return session?.user?.username === ownerId;
 }
 
 // ── Document list / creation ──────────────────────────────────────────────────
@@ -38,7 +45,7 @@ export function canEditDocument(
   if (!session) return false;
   if (hasRole(session, 'admin')) return true;
   if (doc.status !== 'DRAFT') return false;
-  if (hasRole(session, 'editor') && doc.ownerId === session.user.sub) return true;
+  if (hasRole(session, 'editor') && isOwner(session, doc.ownerId)) return true;
   return false;
 }
 
@@ -51,7 +58,7 @@ export function canSubmitDocument(
   if (!session) return false;
   if (doc.status !== 'DRAFT') return false;
   if (hasRole(session, 'admin')) return true;
-  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
 }
 
 export function canApproveDocument(
@@ -79,7 +86,17 @@ export function canArchiveDocument(
   if (!session) return false;
   if (doc.status !== 'PUBLISHED') return false;
   if (hasRole(session, 'admin')) return true;
-  return hasRole(session, 'editor') && doc.ownerId === session.user.sub;
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
+}
+
+export function canDeleteDocument(
+  session: Session | null,
+  doc: DocumentContext,
+): boolean {
+  if (!session) return false;
+  if (doc.status !== 'DRAFT') return false;
+  if (hasRole(session, 'admin')) return true;
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
 }
 
 // ── Download / ACL / Audit ────────────────────────────────────────────────────
@@ -95,14 +112,19 @@ export function canDownloadDocument(
 
 /**
  * Whether the current user can preview a document.
- * Unlike download, compliance_officer IS allowed to preview.
+ * CO can only preview PUBLIC documents; approver+ can preview all.
  */
 export function canPreviewDocument(
   session: Session | null,
   doc: DocumentContext,
 ): boolean {
   if (!session) return false;
-  return doc.status === 'PUBLISHED' || doc.status === 'ARCHIVED';
+  // Allow preview for all non-deleted statuses: owner reviewing DRAFT,
+  // approver reviewing PENDING, anyone with access to PUBLISHED/ARCHIVED.
+  if (doc.status === 'DELETED') return false;
+  // CO can only preview PUBLIC classification
+  if (hasRole(session, 'compliance_officer') && doc.classification !== 'PUBLIC') return false;
+  return true;
 }
 
 export function canManageAcl(
@@ -111,7 +133,7 @@ export function canManageAcl(
 ): boolean {
   if (!session) return false;
   if (hasRole(session, 'admin')) return true;
-  if (hasRole(session, 'editor') && doc.ownerId === session.user.sub) return true;
+  if (hasRole(session, 'editor') && isOwner(session, doc.ownerId)) return true;
   return false;
 }
 

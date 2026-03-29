@@ -58,3 +58,10 @@ export async function archiveDocument(
   );
   return unwrap(response);
 }
+
+export async function deleteDocument(id: string): Promise<{ success: boolean }> {
+  const response = await apiClient.delete<{ success: boolean }>(
+    apiEndpoints.workflow.delete(id),
+  );
+  return unwrap(response);
+}

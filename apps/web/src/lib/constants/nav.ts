@@ -1,6 +1,7 @@
 import {
   LayoutDashboard,
   FileText,
+  FolderOpen,
   FilePlus,
   CheckSquare,
   Shield,
@@ -28,6 +29,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.DOCUMENTS,
     icon: FileText,
     roles: ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'],
+  },
+  {
+    label: 'My Documents',
+    href: ROUTES.MY_DOCUMENTS,
+    icon: FolderOpen,
+    roles: ['editor', 'admin'],
   },
   {
     label: 'New Document',

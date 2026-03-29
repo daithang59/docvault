@@ -1,11 +1,14 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   Patch,
   Post,
+  Put,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,6 +28,7 @@ import { UpdateStatusDto } from '../status/dto/update-status.dto';
 import { PolicyService } from '../policy/policy.service';
 import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from '../policy/dto/preview-authorize.dto';
+import { CommentsService } from '../comments/comments.service';
 import { buildRequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
 
@@ -38,6 +42,7 @@ export class DocumentsController {
     private readonly versionsService: VersionsService,
     private readonly statusService: StatusService,
     private readonly policyService: PolicyService,
+    private readonly commentsService: CommentsService,
     private readonly prisma: PrismaService,
   ) {}
 
@@ -45,8 +50,8 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List document metadata records (ACL-filtered)' })
-  findAll(@Req() req: any) {
-    return this.documentsService.findAll(buildRequestContext(req));
+  findAll(@Req() req: any, @Query('q') q?: string) {
+    return this.documentsService.findAll(buildRequestContext(req), q);
   }
 
   @Get(':docId')
@@ -111,6 +116,18 @@ export class DocumentsController {
     return this.aclService.list(docId);
   }
 
+  @Delete(':docId/acl/:aclId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Delete an ACL rule from a document' })
+  deleteAcl(
+    @Param('docId') docId: string,
+    @Param('aclId') aclId: string,
+    @Req() req: any,
+  ) {
+    return this.aclService.delete(docId, aclId, req.user, buildRequestContext(req));
+  }
+
   @Post(':docId/versions')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
@@ -124,7 +141,6 @@ export class DocumentsController {
       docId,
       body,
       req.user,
-      buildRequestContext(req),
     );
   }
 
@@ -154,6 +170,19 @@ export class DocumentsController {
       where: { docId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  @Get(':docId/approvers')
+  @ApiOperation({
+    summary: 'Get approver+admin user IDs for notification routing',
+    description:
+      'Returns the IDs of all users who have approver or admin role. ' +
+      'Used internally by the workflow service to route SUBMITTED notifications. ' +
+      'No auth required — returns only user IDs, no sensitive data.',
+  })
+  getApprovers(@Param('docId') _docId: string) {
+    // docId is required by REST convention; the result is global role membership.
+    return this.documentsService.getApprovers();
   }
 
   @Post(':docId/download-authorize')
@@ -195,5 +224,60 @@ export class DocumentsController {
       req.user,
       buildRequestContext(req),
     );
+  }
+
+  @Get(':docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List comments for a document' })
+  listComments(@Param('docId') docId: string) {
+    return this.commentsService.findByDoc(docId);
+  }
+
+  @Post(':docId/comments')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Add a comment to a document' })
+  addComment(
+    @Param('docId') docId: string,
+    @Body() body: { content: string },
+    @Req() req: any,
+  ) {
+    return this.commentsService.create(
+      docId,
+      body.content,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Put(':docId/comments/:commentId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Update a comment' })
+  updateComment(
+    @Param('docId') docId: string,
+    @Param('commentId') commentId: string,
+    @Body() body: { content: string },
+    @Req() req: any,
+  ) {
+    return this.commentsService.update(
+      commentId,
+      body.content,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Delete(':docId/comments/:commentId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Delete a comment' })
+  deleteComment(
+    @Param('docId') docId: string,
+    @Param('commentId') commentId: string,
+    @Req() req: any,
+  ) {
+    return this.commentsService.delete(commentId, req.user, buildRequestContext(req));
   }
 }

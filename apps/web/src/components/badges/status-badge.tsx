@@ -8,6 +8,7 @@ const statusLabels: Record<DocumentStatus, string> = {
   PENDING: 'Pending',
   PUBLISHED: 'Published',
   ARCHIVED: 'Archived',
+  DELETED: 'Deleted',
 };
 
 interface StatusBadgeProps {

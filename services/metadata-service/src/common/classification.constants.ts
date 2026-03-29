@@ -1,17 +1,17 @@
 import { ClassificationLevel } from '../../generated/prisma';
 
-/** Số ngày giữ lại sau khi publish, theo classification */
+/** Number of days to retain after publish, by classification */
 export const CLASSIFICATION_RETENTION_DAYS: Record<
   ClassificationLevel,
   number
 > = {
-  PUBLIC: 730, // 2 năm
-  INTERNAL: 365, // 1 năm
-  CONFIDENTIAL: 180, // 6 tháng
-  SECRET: 30, // 1 tháng
+  PUBLIC: 730, // 2 years
+  INTERNAL: 365, // 1 year
+  CONFIDENTIAL: 180, // 6 months
+  SECRET: 30, // 1 month
 };
 
-/** Classification nào cần watermark khi download */
+/** Which classification levels require watermark on download */
 export const CLASSIFICATION_WATERMARK_LEVELS: Record<
   ClassificationLevel,
   boolean

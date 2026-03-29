@@ -84,29 +84,37 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'Stream a document version after metadata authorizes download',
+    summary: 'Stream a document version by grant token (already authorized, no metadata call)',
   })
   async streamVersion(
     @Param('docId') docId: string,
     @Param('version') version: string,
+    @Query('token') token: string,
     @Req() req: any,
     @Res({ passthrough: true }) res: Response,
   ) {
-    const response = await this.documentsService.getStream(
-      docId,
-      Number(version),
-      buildRequestContext(req),
-    );
+    const context = buildRequestContext(req);
 
-    if (response.contentType) {
-      res.setHeader('Content-Type', response.contentType);
+    try {
+      const response = await this.documentsService.getStreamWithToken(
+        docId,
+        token,
+        context.actorId,
+      );
+
+      if (response.contentType) {
+        res.setHeader('Content-Type', response.contentType);
+      }
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(response.filename)}"`,
+      );
+
+      return response.stream;
+    } catch (err) {
+      console.error('[StreamVersion] Error streaming document:', (err as Error).message, (err as Error).stack);
+      throw err;
     }
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(response.filename)}"`,
-    );
-
-    return response.stream;
   }
 
   @Get(':docId/preview')
