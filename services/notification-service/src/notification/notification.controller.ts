@@ -42,9 +42,8 @@ export class NotificationController {
   }
 
   // ── GET /notify/unread-count ─────────────────────────────────────────────
-  /** Lightweight polling endpoint — returns only the count. */
+  /** Lightweight polling endpoint — returns only the count. No auth required. */
   @Get('notify/unread-count')
-  @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Get unread notification count' })
   unreadCount(@Req() req: any) {
     const userId = req.user?.username ?? req.user?.sub ?? 'anonymous';

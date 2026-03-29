@@ -8,7 +8,12 @@ import {
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
-const CLASSIFICATION_VALUES = ['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'SECRET'];
+export enum Classification {
+  PUBLIC = 'PUBLIC',
+  INTERNAL = 'INTERNAL',
+  CONFIDENTIAL = 'CONFIDENTIAL',
+  SECRET = 'SECRET',
+}
 
 export class CreateDocumentDto {
   @IsString()
@@ -21,10 +26,10 @@ export class CreateDocumentDto {
 
   @IsOptional()
   @IsString()
-  @IsEnum(CLASSIFICATION_VALUES, {
-    message: `classification must be one of: ${CLASSIFICATION_VALUES.join(', ')}`,
+  @IsEnum(Classification, {
+    message: `classification must be one of: ${Object.values(Classification).join(', ')}`,
   })
-  @ApiPropertyOptional({ enum: CLASSIFICATION_VALUES })
+  @ApiPropertyOptional({ enum: Classification })
   classification?: string;
 
   @IsOptional()

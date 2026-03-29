@@ -45,6 +45,23 @@ pnpm --filter metadata-service prisma:deploy
 pnpm --filter audit-service prisma:deploy
 ```
 
+### 1.4b. Tạo dữ liệu mẫu (lần đầu)
+
+Bước này tạo sẵn 4 tài liệu mẫu để có thể dùng ngay mà không cần tạo thủ công:
+
+```bash
+pnpm --filter metadata-service db:seed
+```
+
+Các tài liệu được tạo:
+
+| Tài liệu | Phân loại | Trạng thái |
+|---|---|---|
+| Q1 Financial Report 2026 | CONFIDENTIAL | PUBLISHED |
+| Employee Handbook v3 | INTERNAL | PUBLISHED |
+| Product Roadmap 2026 | CONFIDENTIAL | DRAFT |
+| Meeting Notes — All Hands Feb | PUBLIC | PUBLISHED |
+
 ### 1.5. Khởi động backend
 
 **Cách nhanh** — một lệnh duy nhất (chạy tất cả service theo đúng thứ tự):

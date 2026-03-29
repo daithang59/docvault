@@ -199,6 +199,8 @@ flowchart LR
 ### Quick Start — Single Command
 
 ```bash
+pnpm install
+pnpm --filter metadata-service db:seed
 pnpm start:sequential
 ```
 
@@ -261,6 +263,20 @@ pnpm --filter metadata-service prisma:deploy
 # audit-service (PostgreSQL)
 pnpm --filter audit-service prisma:deploy
 ```
+
+#### Step 3b — Seed Sample Data (first-time setup)
+
+Populates the database with sample documents, ACL entries, and workflow history so the system is ready to use immediately.
+
+```bash
+pnpm --filter metadata-service db:seed
+```
+
+Sample data created:
+- **Q1 Financial Report 2026** (CONFIDENTIAL, PUBLISHED)
+- **Employee Handbook v3** (INTERNAL, PUBLISHED)
+- **Product Roadmap 2026** (CONFIDENTIAL, DRAFT)
+- **Meeting Notes — All Hands Feb** (PUBLIC, PUBLISHED)
 
 #### Step 4 — Start Backend Services
 
