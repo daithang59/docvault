@@ -73,35 +73,38 @@ export default function NewDocumentPage() {
         />
       }
     >
-      <div className="animate-in delay-1 mx-auto max-w-2xl">
+      <div className="animate-in delay-1 mx-auto">
         <PageHeader
           title="New Document"
           subtitle="Create a new document entry and optionally upload the initial file."
         />
       </div>
-      <div className="animate-in delay-2 mx-auto max-w-2xl">
+      <div className="animate-in delay-2 mx-auto">
         <div
-          className="space-y-6 rounded-2xl border p-4 sm:p-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4 rounded-2xl border p-4 sm:p-6"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
         >
-          <DocumentForm
-            submitLabel="Save Draft"
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-          >
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
-              style={{ borderColor: 'var(--border-strong)' }}
-              disabled={isLoading}
+          {/* Left: form */}
+          <div className="min-w-0">
+            <DocumentForm
+              submitLabel="Save Draft"
+              onSubmit={handleSubmit}
+              isLoading={isLoading}
             >
-              Cancel
-            </button>
-          </DocumentForm>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
+                style={{ borderColor: 'var(--border-strong)' }}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+            </DocumentForm>
+          </div>
 
-          {/* File upload section */}
-          <div className="border-t pt-5" style={{ borderColor: 'var(--border-soft)' }}>
+          {/* Right: file upload */}
+          <div className="min-w-0 flex flex-col justify-start gap-3">
             <h3 className="mb-1 text-sm font-semibold text-[var(--text-strong)]">Initial File (optional)</h3>
             <p className="mb-4 text-xs text-[var(--text-muted)]">
               Attach a file to this document. You can also upload later from the document detail page.

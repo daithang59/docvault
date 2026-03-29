@@ -31,7 +31,9 @@ export class NotificationController {
     @Query('page')  page?: string,
     @Query('limit') limit?: string,
   ) {
-    const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
+    // Prefer username (preferred_username from Keycloak) over sub (UUID).
+    // Notifications are stored by the same username that buildActorId() uses.
+    const userId = req.user?.username ?? req.user?.sub ?? 'anonymous';
     return this.ns.getForUser(
       userId,
       page  ? parseInt(page,  10) : 1,
@@ -45,7 +47,7 @@ export class NotificationController {
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Get unread notification count' })
   unreadCount(@Req() req: any) {
-    const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
+    const userId = req.user?.username ?? req.user?.sub ?? 'anonymous';
     return { count: this.ns.getUnreadCount(userId) };
   }
 

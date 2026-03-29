@@ -1,6 +1,7 @@
 import {
   ForbiddenException,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
@@ -16,6 +17,8 @@ import {
 
 @Injectable()
 export class DocumentsService {
+  private readonly logger = new Logger(DocumentsService.name);
+
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
@@ -289,5 +292,94 @@ export class DocumentsService {
         deletedAt: new Date(),
       },
     });
+  }
+
+  // ── Approvers ────────────────────────────────────────────────────────────
+
+  private approverCache: { ids: string[]; expiresAt: number } | null = null;
+  private static readonly APPROVER_CACHE_TTL_MS = 60_000;
+
+  /**
+   * Returns user IDs for all users who have 'approver' or 'admin' role.
+   *
+   * Uses admin credentials (admin-cli client with password grant) to query
+   * the Keycloak Admin REST API. Falls back gracefully if credentials are absent.
+   *
+   * Required env vars (already set in docker-compose infra):
+   *   KEYCLOAK_BASE_URL   — e.g. http://localhost:8080
+   *   KEYCLOAK_REALM      — e.g. docvault
+   *   KEYCLOAK_ADMIN      — admin username (e.g. admin)
+   *   KEYCLOAK_ADMIN_PASSWORD — admin password
+   *
+   * Cache: 60 seconds. If credentials are absent → { userIds: [] } (silent no-op).
+   */
+  async getApprovers(): Promise<{ userIds: string[] }> {
+    const now = Date.now();
+
+    if (this.approverCache && this.approverCache.expiresAt > now) {
+      return { userIds: this.approverCache.ids };
+    }
+
+    const baseUrl    = process.env.KEYCLOAK_BASE_URL;
+    const realm      = process.env.KEYCLOAK_REALM;
+    const adminUser  = process.env.KEYCLOAK_ADMIN;
+    const adminPass  = process.env.KEYCLOAK_ADMIN_PASSWORD;
+
+    if (!baseUrl || !realm || !adminUser || !adminPass) {
+      // Credentials not configured — silent no-op, don't block workflow
+      this.approverCache = { ids: [], expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
+      return { userIds: [] };
+    }
+
+    try {
+      // 1. Obtain admin access token from the master realm (admin-cli always lives there)
+      const tokenRes = await fetch(
+        `${baseUrl}/realms/master/protocol/openid-connect/token`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            grant_type: 'password',
+            client_id:  'admin-cli',
+            username:   adminUser,
+            password:   adminPass,
+          }),
+        },
+      );
+
+      if (!tokenRes.ok) throw new Error(`Token fetch failed: ${tokenRes.status}`);
+      const { access_token } = await tokenRes.json() as { access_token: string };
+
+      // 2. Fetch users by role in the docvault realm — parallel requests
+      const [approverRes, adminRes] = await Promise.all([
+        fetch(`${baseUrl}/admin/realms/${realm}/roles/approver/users?max=1000`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        }),
+        fetch(`${baseUrl}/admin/realms/${realm}/roles/admin/users?max=1000`, {
+          headers: { Authorization: `Bearer ${access_token}` },
+        }),
+      ]);
+
+      if (!approverRes.ok || !adminRes.ok) throw new Error(`Role query failed`);
+
+      const approverUsers: Array<{ id: string }> = await approverRes.json();
+      const adminUsers:    Array<{ id: string }> = await adminRes.json();
+
+      const ids = [
+        ...new Set([
+          ...approverUsers.map((u) => u.id),
+          ...adminUsers.map((u) => u.id),
+        ]),
+      ];
+
+      this.approverCache = { ids, expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
+      return { userIds: ids };
+    } catch (err) {
+      this.logger.warn(
+        `getApprovers() failed: ${(err as Error).message} — returning empty list`,
+      );
+      this.approverCache = { ids: [], expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
+      return { userIds: [] };
+    }
   }
 }

@@ -6,8 +6,9 @@ const DOCUMENT_STATUS_VALUES = [
   'PENDING',
   'PUBLISHED',
   'ARCHIVED',
+  'DELETED',
 ] as const;
-const WORKFLOW_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'ARCHIVE'] as const;
+const WORKFLOW_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'ARCHIVE', 'DELETE'] as const;
 
 export class UpdateStatusDto {
   @IsEnum(DOCUMENT_STATUS_VALUES, {

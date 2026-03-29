@@ -9,7 +9,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { CheckCircle, XCircle, X, Eye, Clock, User, Tag, ArrowRight } from 'lucide-react';
-import { useApproveDocument, useRejectDocument } from '@/lib/hooks/use-documents';
+import { useApproveDocument, useRejectDocument } from '@/features/workflow/workflow.hooks';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { toast } from 'sonner';
@@ -38,7 +38,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
   async function handleApprove() {
     if (!doc) return;
     try {
-      await approve.mutateAsync();
+      await approve.mutateAsync(undefined);
       toast.success(TOAST_MESSAGES.APPROVED);
       onClose();
     } catch (e) {
@@ -49,7 +49,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
   async function handleReject() {
     if (!doc) return;
     try {
-      await reject.mutateAsync(rejectReason || undefined);
+      await reject.mutateAsync(rejectReason ? { reason: rejectReason } : undefined);
       toast.success(TOAST_MESSAGES.REJECTED);
       setRejectReason('');
       onClose();
