@@ -153,3 +153,25 @@ RUN_PRISMA_DEPLOY=1 pnpm start:sequential  # with Prisma migrations
 5. Frontend (`apps/web/` — Next.js on port 3010)
 
 > `migrate:to-mongo` is a one-time migration from PostgreSQL → MongoDB for old audit logs; run while audit-service is **stopped**.
+
+## First-time Setup (after clone)
+
+```bash
+# 1. Copy environment files (not tracked by git)
+cp .env.example .env
+
+# 2. Install dependencies
+pnpm install
+
+# 3. Generate Prisma client
+pnpm --filter metadata-service prisma:generate
+
+# 4. Apply database migrations
+pnpm --filter metadata-service prisma:deploy
+
+# 5. Seed sample data
+pnpm --filter metadata-service db:seed
+
+# 6. Start all services
+pnpm start:sequential
+```

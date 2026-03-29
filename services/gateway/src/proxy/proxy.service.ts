@@ -46,7 +46,7 @@ export class ProxyService {
           ...config,
           headers: {
             ...config.headers,
-            authorization: buildAuthorizationHeader(req),
+            Authorization: buildAuthorizationHeader(req),
             'x-request-id': req.traceId ?? req.headers['x-request-id'],
             'x-user-id': req.user?.username ?? req.user?.sub ?? '',
             'x-roles': (req.user?.roles ?? []).join(','),

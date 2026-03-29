@@ -1,26 +1,33 @@
 import { IsEnum, IsOptional, IsString } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-const DOCUMENT_STATUS_VALUES = [
-  'DRAFT',
-  'PENDING',
-  'PUBLISHED',
-  'ARCHIVED',
-  'DELETED',
-] as const;
-const WORKFLOW_ACTIONS = ['SUBMIT', 'APPROVE', 'REJECT', 'ARCHIVE', 'DELETE'] as const;
+export enum DocumentStatus {
+  DRAFT = 'DRAFT',
+  PENDING = 'PENDING',
+  PUBLISHED = 'PUBLISHED',
+  ARCHIVED = 'ARCHIVED',
+  DELETED = 'DELETED',
+}
+
+export enum WorkflowAction {
+  SUBMIT = 'SUBMIT',
+  APPROVE = 'APPROVE',
+  REJECT = 'REJECT',
+  ARCHIVE = 'ARCHIVE',
+  DELETE = 'DELETE',
+}
 
 export class UpdateStatusDto {
-  @IsEnum(DOCUMENT_STATUS_VALUES, {
-    message: `status must be one of: ${DOCUMENT_STATUS_VALUES.join(', ')}`,
+  @IsEnum(DocumentStatus, {
+    message: `status must be one of: ${Object.values(DocumentStatus).join(', ')}`,
   })
-  @ApiProperty({ enum: DOCUMENT_STATUS_VALUES })
+  @ApiProperty({ enum: DocumentStatus })
   status!: string;
 
-  @IsEnum(WORKFLOW_ACTIONS, {
-    message: `action must be one of: ${WORKFLOW_ACTIONS.join(', ')}`,
+  @IsEnum(WorkflowAction, {
+    message: `action must be one of: ${Object.values(WorkflowAction).join(', ')}`,
   })
-  @ApiProperty({ enum: WORKFLOW_ACTIONS })
+  @ApiProperty({ enum: WorkflowAction })
   action!: string;
 
   @IsOptional()
