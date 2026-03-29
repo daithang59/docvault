@@ -1,9 +1,10 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { X, FileText, ZoomIn, ZoomOut, RotateCcw } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { X, FileText, ZoomIn, ZoomOut, Download, AlertCircle } from 'lucide-react';
 import { DocumentVersion } from '@/features/documents/documents.types';
 import { useDocumentPreview } from '@/lib/hooks/use-document-preview';
+import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { toast } from 'sonner';
 
 interface DocumentPreviewDialogProps {
@@ -12,7 +13,7 @@ interface DocumentPreviewDialogProps {
   onClose: () => void;
 }
 
-type ViewerState = 'loading' | 'pdf' | 'image' | 'unsupported' | 'error';
+type ViewerState = 'loading' | 'pdf' | 'image' | 'text' | 'unsupported' | 'error';
 
 const IMAGE_TYPES = new Set([
   'image/png',
@@ -24,6 +25,19 @@ const IMAGE_TYPES = new Set([
 ]);
 
 const PDF_TYPE = 'application/pdf';
+
+// File types that can be displayed natively by the browser
+const BROWSER_PREVIEW_TYPES = new Set([
+  'text/plain',
+  'text/html',
+  'text/css',
+  'text/javascript',
+  'application/javascript',
+  'application/json',
+  'application/xml',
+  'text/xml',
+  'image/svg+xml',
+]);
 
 function withTimeout<T>(promise: Promise<T>, ms = 20000): Promise<T> {
   return Promise.race([
@@ -45,6 +59,9 @@ export function DocumentPreviewDialog({
   const [pdfPages, setPdfPages] = useState<string[]>([]);
   const [zoom, setZoom] = useState(100);
 
+  // Track the current blob URL so we can revoke it on cleanup
+  const blobUrlRef = useRef<string | null>(null);
+
   const ZOOM_MIN = 25;
   const ZOOM_MAX = 300;
   const ZOOM_STEP = 25;
@@ -56,27 +73,31 @@ export function DocumentPreviewDialog({
   const { getImageUrl, getPdfData } = useDocumentPreview({
     onError: (msg) => toast.error(msg),
   });
+  const download = useDownloadDocument();
+
+  function handleDownload() {
+    if (!version) return;
+    download.download(docId);
+  }
 
   // Close on Escape
   useEffect(() => {
     if (!version) return;
     const onKeyDown = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') {
-        onClose();
-      }
+      if (e.key === 'Escape') onClose();
     };
     window.addEventListener('keydown', onKeyDown);
     return () => window.removeEventListener('keydown', onKeyDown);
   }, [version, onClose]);
 
-  // Cleanup blob URL when preview changes/unmounts
+  // Revoke blob URL on unmount
   useEffect(() => {
     return () => {
-      if (previewUrl?.startsWith('blob:')) {
-        URL.revokeObjectURL(previewUrl);
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
       }
     };
-  }, [previewUrl]);
+  }, []);
 
   useEffect(() => {
     if (!version) return;
@@ -90,18 +111,41 @@ export function DocumentPreviewDialog({
       setPdfPages([]);
       setZoom(100);
 
+      // Revoke previous blob URL if any
+      if (blobUrlRef.current) {
+        URL.revokeObjectURL(blobUrlRef.current);
+        blobUrlRef.current = null;
+      }
+      setPreviewUrl(null);
+
       const contentType = selectedVersion.mimeType ?? selectedVersion.contentType;
       const isPdf = contentType === PDF_TYPE;
       const isImage = contentType ? IMAGE_TYPES.has(contentType) : false;
+      const isBrowserPreviewable = contentType ? BROWSER_PREVIEW_TYPES.has(contentType) : false;
 
       try {
+        if (isBrowserPreviewable) {
+          const { data } = await withTimeout(
+            getPdfData(docId, selectedVersion.version),
+          );
+          if (cancelled) return;
+
+          const blob = new Blob([data], { type: contentType ?? undefined });
+          const url = URL.createObjectURL(blob);
+          if (cancelled) { URL.revokeObjectURL(url); return; }
+
+          blobUrlRef.current = url;
+          setPreviewUrl(url);
+          setViewerState('text');
+          return;
+        }
+
         if (isPdf) {
           const { data } = await withTimeout(
             getPdfData(docId, selectedVersion.version),
           );
           if (cancelled) return;
 
-          // Render PDF pages to canvas using pdf.js
           const pdfjs = await import('pdfjs-dist');
           pdfjs.GlobalWorkerOptions.workerSrc = '/pdf.worker.min.mjs';
 
@@ -111,7 +155,7 @@ export function DocumentPreviewDialog({
           const pages: string[] = [];
           for (let i = 1; i <= pdf.numPages; i++) {
             const page = await pdf.getPage(i);
-            const scale = 2; // High-res rendering
+            const scale = 2;
             const viewport = page.getViewport({ scale });
 
             const canvas = document.createElement('canvas');
@@ -136,6 +180,8 @@ export function DocumentPreviewDialog({
             getImageUrl(docId, selectedVersion.version),
           );
           if (cancelled) return;
+
+          blobUrlRef.current = url;
           setPreviewUrl(url);
           setViewerState('image');
           return;
@@ -163,9 +209,7 @@ export function DocumentPreviewDialog({
   }, [version, docId]);
 
   // IMPORTANT: unmount popup completely when no selected version.
-  if (!version) {
-    return null;
-  }
+  if (!version) return null;
 
   const filename = version.filename ?? 'Document';
 
@@ -205,15 +249,15 @@ export function DocumentPreviewDialog({
             </span>
           </div>
 
-          {/* Zoom controls — only show for PDF/image */}
-          {(viewerState === 'pdf' || viewerState === 'image') && (
+          {/* Zoom controls */}
+          {(viewerState === 'pdf' || viewerState === 'image' || viewerState === 'text') && (
             <div className="flex items-center gap-1 shrink-0">
               <button
                 onClick={zoomOut}
                 disabled={zoom <= ZOOM_MIN}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
                 style={{ color: 'var(--text-muted)' }}
-                title="Zoom out"
+                title="Thu nhỏ"
               >
                 <ZoomOut className="h-4 w-4" />
               </button>
@@ -221,7 +265,7 @@ export function DocumentPreviewDialog({
                 onClick={zoomReset}
                 className="min-w-[3.5rem] px-2 py-1 rounded-lg text-xs font-medium transition-colors"
                 style={{ color: 'var(--text-main)' }}
-                title="Reset zoom"
+                title="Đặt lại"
               >
                 {zoom}%
               </button>
@@ -230,7 +274,7 @@ export function DocumentPreviewDialog({
                 disabled={zoom >= ZOOM_MAX}
                 className="p-1.5 rounded-lg transition-colors disabled:opacity-30"
                 style={{ color: 'var(--text-muted)' }}
-                title="Zoom in"
+                title="Phóng to"
               >
                 <ZoomIn className="h-4 w-4" />
               </button>
@@ -247,9 +291,9 @@ export function DocumentPreviewDialog({
           </button>
         </div>
 
-        {/* Content */}
+        {/* Content area */}
         <div
-          className="flex-1 overflow-hidden flex items-center justify-center"
+          className="flex-1 overflow-auto flex items-start justify-center"
           style={{ background: 'var(--bg-base)' }}
           onContextMenu={(e) => e.preventDefault()}
           onWheel={(e) => {
@@ -261,7 +305,7 @@ export function DocumentPreviewDialog({
           }}
         >
           {viewerState === 'loading' && (
-            <div className="flex flex-col items-center gap-3">
+            <div className="flex flex-col items-center gap-3 mt-[30vh]">
               <div
                 className="h-8 w-8 rounded-full border-2 border-t-transparent animate-spin"
                 style={{
@@ -275,58 +319,132 @@ export function DocumentPreviewDialog({
             </div>
           )}
 
-          {(viewerState === 'error' || viewerState === 'unsupported') && (
-            <div className="flex flex-col items-center gap-3 text-center px-8">
+          {viewerState === 'error' && (
+            <div className="flex flex-col items-center gap-4 text-center px-8 py-6 mt-[20vh]">
               <div
-                className="h-14 w-14 rounded-2xl flex items-center justify-center"
-                style={{ background: 'var(--state-info-bg)' }}
+                className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ background: 'var(--state-error-bg)' }}
               >
-                <FileText
-                  className="h-7 w-7"
-                  style={{ color: 'var(--color-primary)' }}
-                />
+                <AlertCircle className="h-7 w-7" style={{ color: 'var(--state-error-text)' }} />
               </div>
-              <p className="text-base font-medium" style={{ color: 'var(--text-strong)' }}>
-                {viewerState === 'unsupported'
-                  ? 'Preview không khả dụng cho loại file này'
-                  : errorMessage || 'Đã xảy ra lỗi khi tải preview'}
-              </p>
+              <div className="space-y-1">
+                <p className="text-base font-semibold" style={{ color: 'var(--text-strong)' }}>
+                  Đã xảy ra lỗi khi tải preview
+                </p>
+                <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                  {errorMessage || 'Vui lòng thử lại hoặc tải file về máy.'}
+                </p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={onClose}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--input-border)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={download.isDownloading}
+                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  <Download className="h-4 w-4" />
+                  {download.isDownloading ? 'Đang tải...' : 'Tải file về'}
+                </button>
+              </div>
             </div>
           )}
 
-          {viewerState === 'image' && previewUrl && (
-            // eslint-disable-next-line @next/next/no-img-element -- blob URL from internal API, next/image requires domain config
-            <img
-              src={previewUrl}
-              alt={filename}
-              className="max-w-full max-h-full object-contain"
-              draggable={false}
-            />
+          {viewerState === 'unsupported' && (
+            <div className="flex flex-col items-center gap-4 text-center px-8 py-6 mt-[20vh]">
+              <div
+                className="h-14 w-14 rounded-2xl flex items-center justify-center shrink-0"
+                style={{ background: 'var(--state-info-bg)' }}
+              >
+                <FileText className="h-7 w-7" style={{ color: 'var(--color-primary)' }} />
+              </div>
+              <div className="space-y-1">
+                <p className="text-base font-semibold" style={{ color: 'var(--text-strong)' }}>
+                  Không thể xem trước file này
+                </p>
+                <p className="text-sm max-w-sm" style={{ color: 'var(--text-muted)' }}>
+                  Định dạng <code className="text-xs bg-[var(--bg-muted)] px-1 py-0.5 rounded">{version?.contentType ?? version?.mimeType ?? 'không xác định'}</code> không được hỗ trợ xem trực tiếp.
+                </p>
+              </div>
+              <div className="flex gap-3 pt-1">
+                <button
+                  onClick={onClose}
+                  className="flex items-center gap-2 rounded-xl border border-[var(--input-border)] px-4 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
+                >
+                  Đóng
+                </button>
+                <button
+                  onClick={handleDownload}
+                  disabled={download.isDownloading}
+                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
+                  style={{ background: 'var(--color-primary)' }}
+                >
+                  <Download className="h-4 w-4" />
+                  {download.isDownloading ? 'Đang tải...' : 'Tải file về'}
+                </button>
+              </div>
+            </div>
           )}
 
+          {/* Image viewer — width drives zoom, no max-w/max-h to override it */}
+          {viewerState === 'image' && previewUrl && (
+            <div className="flex items-center justify-center min-h-full py-6 px-4">
+              {/* eslint-disable-next-line @next/next/no-img-element -- blob URL from internal API */}
+              <img
+                src={previewUrl}
+                alt={filename}
+                style={{
+                  maxWidth: '100%',
+                  height: 'auto',
+                  width: `${zoom}%`,
+                  transition: 'width 0.15s ease',
+                  display: 'block',
+                }}
+                draggable={false}
+              />
+            </div>
+          )}
+
+          {/* Text/HTML/JSON/... viewer — iframe fills container */}
+          {viewerState === 'text' && previewUrl && (
+            <div className="w-full h-full min-h-0 flex">
+              <iframe
+                src={previewUrl}
+                title={filename}
+                className="border-0 flex-1"
+                style={{ minHeight: '500px' }}
+                sandbox="allow-same-origin"
+              />
+            </div>
+          )}
+
+          {/* PDF viewer */}
           {viewerState === 'pdf' && pdfPages.length > 0 && (
             <div
-              className="w-full h-full overflow-auto"
+              className="w-full flex flex-col items-center gap-4 py-6 px-4"
               style={{ userSelect: 'none' }}
             >
-              <div className="flex flex-col items-center gap-4 py-4 px-4">
-                {pdfPages.map((dataUrl, i) => (
-                  // eslint-disable-next-line @next/next/no-img-element -- canvas data URL, not external
-                  <img
-                    key={i}
-                    src={dataUrl}
-                    alt={`Page ${i + 1}`}
-                    className="shadow-lg rounded"
-                    style={{
-                      background: 'white',
-                      width: `${zoom}%`,
-                      maxWidth: 'none',
-                      transition: 'width 0.15s ease',
-                    }}
-                    draggable={false}
-                  />
-                ))}
-              </div>
+              {pdfPages.map((dataUrl, i) => (
+                // eslint-disable-next-line @next/next/no-img-element -- canvas data URL
+                <img
+                  key={i}
+                  src={dataUrl}
+                  alt={`Trang ${i + 1}`}
+                  className="shadow-lg rounded"
+                  style={{
+                    background: 'white',
+                    width: `${zoom}%`,
+                    maxWidth: 'none',
+                    transition: 'width 0.15s ease',
+                  }}
+                  draggable={false}
+                />
+              ))}
             </div>
           )}
         </div>

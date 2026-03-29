@@ -13,9 +13,8 @@ export function useDocumentPreview(options?: UseDocumentPreviewOptions) {
   const [isLoading, setIsLoading] = useState(false);
 
   /**
-   * Returns the preview URL for a document version.
-   * The backend validates JWT + ACL internally via the gateway.
-   * URL is used for image preview (img tag handles auth via browser cookies).
+   * Fetches image binary via axios (with auth token) and returns a blob URL.
+   * Ensures the browser receives the actual binary image data, not a redirect HTML page.
    */
   async function getImageUrl(
     docId: string,
@@ -25,13 +24,23 @@ export function useDocumentPreview(options?: UseDocumentPreviewOptions) {
     try {
       const endpoint = apiEndpoints.documents.preview(docId);
       const base = apiClient.getUri().replace(/\/$/, '');
-      const url = new URL(
-        `${base}${endpoint}${version !== undefined ? `?version=${version}` : ''}`,
-      );
-      return url.toString();
+      const url = `${base}${endpoint}${version !== undefined ? `?version=${version}` : ''}`;
+
+      const response = await apiClient.get(url, {
+        responseType: 'arraybuffer',
+      });
+
+      // Determine content type from response headers or fall back to image/png
+      const contentType = (response.headers['content-type'] as string | undefined)
+        ?.split(';')[0]
+        ?.trim()
+        ?? 'image/png';
+
+      const blob = new Blob([response.data as ArrayBuffer], { type: contentType });
+      return URL.createObjectURL(blob);
     } catch (err) {
       options?.onError?.(
-        err instanceof Error ? err.message : 'Failed to build preview URL',
+        err instanceof Error ? err.message : 'Failed to load preview image',
       );
       throw err;
     } finally {

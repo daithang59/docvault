@@ -119,7 +119,9 @@ export function canPreviewDocument(
   doc: DocumentContext,
 ): boolean {
   if (!session) return false;
-  if (!(doc.status === 'PUBLISHED' || doc.status === 'ARCHIVED')) return false;
+  // Allow preview for all non-deleted statuses: owner reviewing DRAFT,
+  // approver reviewing PENDING, anyone with access to PUBLISHED/ARCHIVED.
+  if (doc.status === 'DELETED') return false;
   // CO can only preview PUBLIC classification
   if (hasRole(session, 'compliance_officer') && doc.classification !== 'PUBLIC') return false;
   return true;
