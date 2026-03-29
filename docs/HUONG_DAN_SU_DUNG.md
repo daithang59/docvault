@@ -1,881 +1,393 @@
-# 📦 Hướng dẫn sử dụng — Hệ thống DocVault
-
-> **DocVault** là hệ thống quản lý tài liệu doanh nghiệp được xây dựng trên kiến trúc **microservices** sử dụng NestJS (backend) và Next.js (frontend). Hệ thống hỗ trợ toàn bộ vòng đời tài liệu: **Tạo → Tải lên → Duyệt → Xuất bản → Lưu trữ**, với phân quyền theo vai trò (RBAC), phân loại bảo mật, và nhật ký kiểm toán chống giả mạo (tamper-evident audit log).
+# Hướng dẫn chạy và sử dụng hệ thống DocVault
 
 ---
 
-## 📑 Mục lục
+## Phần 1 — Chạy hệ thống
 
-- [Tổng quan kiến trúc](#-tổng-quan-kiến-trúc)
-- [Yêu cầu cài đặt](#-yêu-cầu-cài-đặt)
-- [Hướng dẫn chạy dự án](#-hướng-dẫn-chạy-dự-án)
-- [Tài khoản demo](#-tài-khoản-demo)
-- [Vai trò & Phân quyền](#-vai-trò--phân-quyền)
-- [Vòng đời tài liệu](#-vòng-đời-tài-liệu)
-- [Luồng nghiệp vụ chính](#-luồng-nghiệp-vụ-chính)
-- [Giao diện Frontend](#-giao-diện-frontend)
-- [API Reference](#-api-reference)
-- [Mô hình dữ liệu](#-mô-hình-dữ-liệu)
-- [Tính năng nâng cao](#-tính-năng-nâng-cao)
-- [Kiểm thử](#-kiểm-thử)
-- [Xử lý sự cố](#-xử-lý-sự-cố)
-- [Cấu trúc thư mục](#-cấu-trúc-thư-mục)
-- [Lưu ý quan trọng](#-lưu-ý-quan-trọng)
+### 1.1. Yêu cầu trước khi chạy
 
----
+Cài sẵn trên máy:
 
-## 🏗 Tổng quan kiến trúc
+- **Node.js** phiên bản 18 trở lên
+- **pnpm** phiên bản 9 trở lên
+- **Docker Desktop** phiên bản 24 trở lên
 
-### Sơ đồ tổng thể
+Đảm bảo các port sau chưa bị chiếm: `3000`, `3001`, `3002`, `3003`, `3004`, `3005`, `3010`, `5432`, `8080`, `9000`, `9001`.
 
-```mermaid
-flowchart TB
-    subgraph CLIENT["Client"]
-        FE["Frontend Next.js\n:3010"]
-    end
+### 1.2. Cài đặt dependencies
 
-    subgraph GATEWAY["API Gateway — :3000"]
-        GW["gateway\nJWT Auth · RBAC · Routing · Audit wrapper"]
-    end
-
-    subgraph SERVICES["Microservices"]
-        direction LR
-        META["metadata-service\n:3001\nMetadata · ACL · Status · History"]
-        DOC["document-service\n:3002\nUpload · Download · MinIO"]
-        WF["workflow-service\n:3003\nState machine · Submit · Approve"]
-        AUDIT["audit-service\n:3004\nHash-chain audit log"]
-        NOTIF["notification-service\n:3005\nNotifications"]
-    end
-
-    subgraph INFRA["Docker Infrastructure"]
-        direction LR
-        KC["Keycloak\n:8080\nAuth & Users"]
-        PG["PostgreSQL\n:5432\nDatabase"]
-        MINIO["MinIO\n:9000\nObject Storage"]
-    end
-
-    FE -->|"Bearer JWT"| GW
-
-    GW -->|"/api/metadata"| META
-    GW -->|"/api/documents"| DOC
-    GW -->|"/api/workflow"| WF
-    GW -->|"/api/audit"| AUDIT
-    GW -->|"/api/notify"| NOTIF
-
-    DOC -.->|"register version"| META
-    WF -.->|"update status"| META
-    WF -.->|"notify"| NOTIF
-
-    GW -.->|"audit events"| AUDIT
-    META -.->|"audit events"| AUDIT
-    DOC -.->|"audit events"| AUDIT
-    WF -.->|"audit events"| AUDIT
-
-    GW -.->|"verify token"| KC
-    META -.->|"read/write"| PG
-    AUDIT -.->|"read/write"| PG
-    DOC -.->|"store files"| MINIO
-```
-
-### Thành phần hệ thống
-
-| Thành phần | Port | Công nghệ | Vai trò |
-|---|:---:|---|---|
-| **Frontend** | 3010 | Next.js 15, React 19, TanStack Query, Tailwind CSS 4 | Giao diện người dùng |
-| **Gateway** | 3000 | NestJS | Điểm vào duy nhất, xác thực JWT, phân quyền, proxy routing |
-| **metadata-service** | 3001 | NestJS + Prisma | Quản lý metadata tài liệu, ACL, trạng thái, lịch sử |
-| **document-service** | 3002 | NestJS + AWS S3 SDK | Tải lên/tải xuống file qua MinIO |
-| **workflow-service** | 3003 | NestJS | Máy trạng thái duyệt tài liệu |
-| **audit-service** | 3004 | NestJS + Prisma | Nhật ký kiểm toán với chuỗi hash SHA-256 |
-| **notification-service** | 3005 | NestJS | Thông báo (hiện tại là sink đơn giản) |
-| **PostgreSQL** | 5432 | PostgreSQL | Cơ sở dữ liệu chính |
-| **MinIO** | 9000 | MinIO (S3-compatible) | Lưu trữ file tài liệu |
-| **Keycloak** | 8080 | Keycloak | Quản lý danh tính & xác thực |
-
-### Luồng xử lý request
-
-```
-Client → Gateway (:3000) → Backend Services (:3001–:3005)
-                      ↓
-            JWT verification (Keycloak JWKS)
-            Role-based routing
-            Audit event emission
-```
-
-- Gateway **không chứa business logic** — chỉ routing, xác thực và ghi audit.
-- Mỗi service tự verify JWT trực tiếp với Keycloak qua JWKS.
-- Các service giao tiếp nội bộ qua **HTTP (Axios)**, không sử dụng message queue.
-
----
-
-## 💻 Yêu cầu cài đặt
-
-| Công cụ | Phiên bản tối thiểu |
-|---|---|
-| **Node.js** | 18+ (khuyến nghị 20+) |
-| **pnpm** | 9+ |
-| **Docker Desktop** | 24+ |
-| **Git** | Bất kỳ |
-
-### Các port cần để trống
-
-| Port | Dùng cho |
-|:---:|---|
-| 3000 | Gateway |
-| 3001 | metadata-service |
-| 3002 | document-service |
-| 3003 | workflow-service |
-| 3004 | audit-service |
-| 3005 | notification-service |
-| 3010 | Frontend |
-| 5432 | PostgreSQL |
-| 8080 | Keycloak |
-| 9000 | MinIO API |
-| 9001 | MinIO Console |
-
----
-
-## 🚀 Hướng dẫn chạy dự án
-
-### Cách 1 — Chạy nhanh bằng một lệnh (khuyến nghị)
-
-> ⚠️ Cần khởi động Docker Infrastructure trước (Bước 2 trong hướng dẫn chi tiết).
-
-```bash
-pnpm start:sequential
-```
-
-Script này tự động khởi động **tất cả backend services theo đúng thứ tự**, kiểm tra health endpoint trước khi chạy service tiếp theo:
-
-```
-metadata-service (:3001) → document-service (:3002) → workflow-service (:3003)
-  → notification-service (:3005) → audit-service (:3004) → gateway (:3000)
-```
-
-**Tùy chọn bổ sung:**
-
-```bash
-# Chạy kèm Prisma migration (lần đầu hoặc khi thay đổi schema)
-RUN_PRISMA_DEPLOY=1 pnpm start:sequential
-
-# Tùy chỉnh timeout health-check
-SERVICE_HEALTH_TIMEOUT_MS=180000 pnpm start:sequential
-```
-
-Sau khi backend chạy xong, khởi động frontend riêng:
-
-```bash
-pnpm --filter web dev -- --port 3010
-```
-
-### Cách 2 — Chạy bằng PowerShell script (Windows)
-
-```powershell
-# Khởi động tất cả services (mỗi service mở trong cửa sổ riêng)
-.\start-all.ps1
-
-# Dừng tất cả services
-.\start-all.ps1 -StopAll
-```
-
-### Cách 3 — Hướng dẫn chi tiết từng bước
-
-#### Bước 1 — Cài đặt dependencies
+Mở terminal tại thư mục gốc của dự án, chạy:
 
 ```bash
 pnpm install
 ```
 
-#### Bước 2 — Khởi động hạ tầng Docker
+### 1.3. Khởi động hạ tầng Docker
 
-Lệnh này khởi động: **PostgreSQL**, **MinIO**, **Keycloak** (kèm realm seed & tài khoản mẫu).
+Lệnh này khởi động PostgreSQL, MinIO (lưu trữ file) và Keycloak (quản lý đăng nhập):
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
 ```
 
-Đợi tất cả container **healthy** (khoảng 30–60 giây):
+Đợi khoảng 30–60 giây cho tất cả container lên xong. Kiểm tra bằng:
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml ps
 ```
 
-> **Sau khi khởi động:**
-> - PostgreSQL: `localhost:5432`
-> - MinIO Console: [http://localhost:9001](http://localhost:9001) — đăng nhập: `minioadmin` / `minioadminpw`
-> - Keycloak Admin: [http://localhost:8080](http://localhost:8080) — đăng nhập: `admin` / `adminpw`
+Tất cả container phải ở trạng thái **healthy** hoặc **running**.
 
-#### Bước 3 — Chạy Database Migrations
+### 1.4. Chạy database migration (chỉ lần đầu)
 
 ```bash
-# metadata-service (PostgreSQL)
 pnpm --filter metadata-service prisma:deploy
-
-# audit-service (PostgreSQL)
 pnpm --filter audit-service prisma:deploy
 ```
 
-#### Bước 4 — Khởi động Backend Services
+### 1.5. Khởi động backend
 
-Mỗi service chạy trong một terminal riêng, **theo đúng thứ tự**:
+**Cách nhanh** — một lệnh duy nhất (chạy tất cả service theo đúng thứ tự):
 
 ```bash
-# Terminal 1 — metadata-service (port 3001)
-pnpm --filter metadata-service start:dev
-
-# Terminal 2 — document-service (port 3002)
-pnpm --filter document-service start:dev
-
-# Terminal 3 — workflow-service (port 3003)
-pnpm --filter workflow-service start:dev
-
-# Terminal 4 — audit-service (port 3004)
-pnpm --filter audit-service start:dev
-
-# Terminal 5 — notification-service (port 3005)
-pnpm --filter notification-service start:dev
-
-# Terminal 6 — gateway (port 3000) — KHỞI ĐỘNG SAU CÙNG
-pnpm --filter gateway start:dev
+pnpm start:sequential
 ```
 
-> ⚠️ **Lưu ý:** Gateway phải khởi động **sau** khi tất cả service khác đã sẵn sàng.
+Lần đầu chạy nên kèm migration:
 
-**Kiểm tra health:**
-
-```
-http://localhost:3000/health   ← Gateway
-http://localhost:3001/health   ← metadata-service
-http://localhost:3002/health   ← document-service
-http://localhost:3003/health   ← workflow-service
-http://localhost:3004/health   ← audit-service
-http://localhost:3005/health   ← notification-service
+```bash
+RUN_PRISMA_DEPLOY=1 pnpm start:sequential
 ```
 
-#### Bước 5 — Khởi động Frontend
+**Cách thủ công** — mỗi service mở trong một terminal riêng:
+
+```bash
+pnpm --filter metadata-service start:dev       # Terminal 1 — port 3001
+pnpm --filter document-service start:dev       # Terminal 2 — port 3002
+pnpm --filter workflow-service start:dev       # Terminal 3 — port 3003
+pnpm --filter audit-service start:dev          # Terminal 4 — port 3004
+pnpm --filter notification-service start:dev   # Terminal 5 — port 3005
+pnpm --filter gateway start:dev                # Terminal 6 — port 3000 (chạy SAU CÙNG)
+```
+
+> ⚠️ **Gateway phải chạy sau cùng**, sau khi tất cả service khác đã sẵn sàng.
+
+**Trên Windows**, có thể dùng PowerShell script thay thế:
+
+```powershell
+.\start-all.ps1          # Khởi động tất cả
+.\start-all.ps1 -StopAll # Dừng tất cả
+```
+
+### 1.6. Khởi động frontend
 
 ```bash
 pnpm --filter web dev -- --port 3010
 ```
 
-Mở trình duyệt: [http://localhost:3010](http://localhost:3010)
+### 1.7. Mở ứng dụng
+
+Mở trình duyệt, truy cập: **http://localhost:3010**
 
 ---
 
-## 👥 Tài khoản demo
+## Phần 2 — Tài khoản demo
 
-Tất cả tài khoản đều đã được tạo sẵn (seed) trong Keycloak.
+Hệ thống đã có sẵn 5 tài khoản mẫu với các vai trò khác nhau. Mật khẩu chung cho tất cả: **`Passw0rd!`**
 
-**Mật khẩu chung:** `Passw0rd!`
-
-| Tài khoản | Vai trò | Mô tả |
+| Tài khoản | Vai trò | Họ làm được gì |
 |---|---|---|
-| `viewer1` | Viewer | Xem danh sách, xem trước & tải xuống tài liệu đã xuất bản |
-| `editor1` | Editor | Tạo, tải file lên, gửi duyệt, lưu trữ tài liệu |
-| `approver1` | Approver | Phê duyệt / từ chối tài liệu |
-| `co1` | Compliance Officer | Xem audit log, **không thể tải xuống file** |
+| `viewer1` | Viewer | Xem danh sách, xem trước và tải xuống tài liệu đã xuất bản |
+| `editor1` | Editor | Tạo tài liệu, tải file lên, gửi duyệt, lưu trữ |
+| `approver1` | Approver | Phê duyệt hoặc từ chối tài liệu |
+| `co1` | Compliance Officer | Xem audit log, kiểm tra tuân thủ (không được tải file) |
 | `admin1` | Admin | Toàn quyền |
 
-### Đăng nhập
+---
 
-Frontend hỗ trợ 2 chế độ đăng nhập:
+## Phần 3 — Đăng nhập
 
-1. **Đăng nhập qua Keycloak** — chuyển hướng đến trang đăng nhập Keycloak, sử dụng tài khoản ở trên
-2. **Nhập JWT Token** — dán token thủ công (dùng cho testing API)
+1. Truy cập **http://localhost:3010** → trang Login hiện ra.
+2. Nhấn nút **"Sign in with SSO"** → trình duyệt chuyển sang trang Keycloak.
+3. Nhập tài khoản demo (ví dụ: `editor1` / `Passw0rd!`) → đăng nhập.
+4. Hệ thống tự chuyển về trang **Dashboard**.
 
-### Lấy JWT Token từ Keycloak (CLI)
+> Trên trang đăng nhập cũng hiển thị sẵn danh sách các tài khoản demo để tiện sử dụng.
+
+---
+
+## Phần 4 — Sử dụng hệ thống (theo vai trò)
+
+### 4.1. Dashboard — Tổng quan
+
+Sau khi đăng nhập, bạn được đưa đến trang **Dashboard** gồm:
+
+- **Thẻ thống kê**: Tổng số tài liệu, số DRAFT, PENDING, PUBLISHED.
+- **Tài liệu gần đây**: 5 tài liệu cập nhật gần nhất, nhấn vào để xem chi tiết.
+- **Quick Actions**: Các hành động nhanh tùy theo vai trò:
+  - Editor/Admin: nút "Create Document"
+  - Approver/Admin: nút "Review Approvals" (kèm badge số lượng chờ duyệt)
+  - Compliance Officer: nút "Audit Logs"
+
+---
+
+### 4.2. Editor — Tạo và quản lý tài liệu
+
+#### Bước 1: Tạo tài liệu mới
+
+1. Vào menu **Documents** ở thanh bên trái, hoặc nhấn **"New Document"** trên Dashboard.
+2. Điền thông tin:
+   - **Title** (bắt buộc): Tên tài liệu
+   - **Description** (tùy chọn): Mô tả ngắn
+   - **Classification**: Chọn mức phân loại bảo mật (`PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `SECRET`)
+   - **Tags** (tùy chọn): Gắn nhãn phân loại
+3. Nhấn **"Create"** → tài liệu được tạo ở trạng thái **DRAFT**.
+
+#### Bước 2: Tải file lên
+
+1. Sau khi tạo, hệ thống chuyển đến trang chi tiết tài liệu.
+2. Trong phần **Versions**, nhấn nút **Upload** để chọn file từ máy tính.
+3. File được lưu vào MinIO, hệ thống tự tính checksum SHA-256 và tạo bản ghi version.
+
+#### Bước 3: Gửi duyệt
+
+1. Trên trang chi tiết tài liệu, ở panel bên phải tìm nút **"Submit"**.
+2. Xác nhận → trạng thái chuyển từ **DRAFT → PENDING**.
+3. Người Approver sẽ nhận được thông báo.
+
+#### Bước 4: Lưu trữ (Archive)
+
+- Khi tài liệu đã ở trạng thái **PUBLISHED**, Editor (chủ sở hữu) có thể nhấn **"Archive"**.
+- Tài liệu chuyển sang **ARCHIVED** → chỉ cho xem trước, không cho tải xuống nữa.
+
+#### Xem tài liệu của tôi
+
+- Vào menu **My Documents** ở thanh bên trái → chỉ hiển thị tài liệu do mình tạo.
+- Hỗ trợ bộ lọc, tìm kiếm và thao tác hàng loạt.
+
+---
+
+### 4.3. Approver — Phê duyệt tài liệu
+
+#### Xem danh sách chờ duyệt
+
+1. Vào menu **Approvals** ở thanh bên trái.
+2. Trang hiển thị bảng các tài liệu đang ở trạng thái **PENDING**, kèm badge số lượng.
+
+#### Phê duyệt
+
+1. Nhấn **"Review"** ở dòng tài liệu cần duyệt → mở drawer chi tiết.
+2. Xem thông tin tài liệu, file đính kèm.
+3. Nhấn **"Approve"** → trạng thái chuyển sang **PUBLISHED**, tài liệu sẵn sàng để tải xuống.
+
+#### Từ chối
+
+1. Nhấn **"Reject"** trong drawer.
+2. Nhập lý do từ chối (tùy chọn nhưng khuyến nghị có).
+3. Xác nhận → trạng thái trở về **DRAFT**, Editor có thể sửa và gửi lại.
+
+---
+
+### 4.4. Viewer — Xem và tải tài liệu
+
+#### Xem danh sách
+
+- Vào menu **Documents** → bảng danh sách tài liệu.
+- Sử dụng thanh **tìm kiếm** (search) để tìm theo tên, tag.
+- Sử dụng **bộ lọc** (filter) theo trạng thái hoặc mức phân loại.
+
+#### Xem trước tài liệu (Preview)
+
+1. Nhấn vào tên tài liệu để mở trang chi tiết.
+2. Trong phần **Versions**, nhấn nút **Preview** ở phiên bản muốn xem.
+3. Hệ thống hiển thị PDF trực tiếp trên trang (render bằng pdf.js, không có nút download, không right-click save).
+
+> Preview chỉ khả dụng cho tài liệu ở trạng thái **PUBLISHED** hoặc **ARCHIVED**.
+
+#### Tải xuống file (Download)
+
+1. Trên trang chi tiết, nhấn nút **"Download"** trong panel hành động.
+2. Hệ thống kiểm tra quyền, sau đó tải file về máy.
+
+> **Lưu ý**: File PDF với phân loại **CONFIDENTIAL** hoặc **SECRET** sẽ tự động được đóng **watermark** (gồm tên người tải, thời gian, mức phân loại) khi tải xuống.
+
+---
+
+### 4.5. Compliance Officer — Kiểm tra tuân thủ
+
+#### Xem audit log
+
+1. Đăng nhập bằng tài khoản `co1`.
+2. Vào menu **Audit** ở thanh bên trái.
+3. Trang hiển thị bảng nhật ký kiểm toán ghi lại mọi hành động trong hệ thống.
+
+#### Bộ lọc audit log
+
+Sử dụng các bộ lọc phía trên bảng để thu hẹp kết quả:
+
+| Bộ lọc | Ý nghĩa |
+|---|---|
+| **actorId** | Lọc theo người thực hiện |
+| **action** | Lọc theo hành động (ví dụ: `DOCUMENT_SUBMIT`, `DOCUMENT_APPROVE`) |
+| **result** | Lọc theo kết quả: `SUCCESS` hoặc `DENY` |
+| **from / to** | Lọc theo khoảng thời gian |
+
+#### Quy tắc đặc biệt cho Compliance Officer
+
+- **Được xem** metadata (chi tiết) của tất cả tài liệu PUBLISHED và ARCHIVED.
+- **Được xem trước** (preview) tài liệu phân loại **PUBLIC** — không xem được INTERNAL, CONFIDENTIAL, SECRET.
+- **Không được tải xuống** bất kỳ file nào, dù ACL cho phép. Đây là quy tắc cứng trong hệ thống.
+
+---
+
+### 4.6. Admin — Quản trị toàn diện
+
+Admin có **toàn quyền** trên hệ thống — có thể thực hiện tất cả thao tác của các vai trò khác:
+- Tạo, sửa, upload, submit, approve, reject, archive tài liệu
+- Quản lý ACL (quyền truy cập từng tài liệu)
+- Xem audit log
+- Tải xuống file
+
+---
+
+## Phần 5 — Các tính năng chung
+
+### 5.1. Tìm kiếm tài liệu
+
+- Nhập từ khóa vào ô **Search** trên trang Documents.
+- Hệ thống tìm kiếm theo tiêu đề, mô tả và tags (xử lý phía server, hiệu quả với dữ liệu lớn).
+
+### 5.2. Bộ lọc
+
+Trên trang Documents, sử dụng các dropdown bộ lọc:
+
+| Bộ lọc | Tùy chọn |
+|---|---|
+| **Status** | DRAFT, PENDING, PUBLISHED, ARCHIVED |
+| **Classification** | PUBLIC, INTERNAL, CONFIDENTIAL, SECRET |
+| **Sort** | Sắp xếp theo tên, ngày tạo, ngày cập nhật... |
+
+### 5.3. Thao tác hàng loạt (Bulk Actions)
+
+1. Trên trang Documents, tích chọn nhiều tài liệu bằng checkbox.
+2. Thanh bulk action hiện ra với các nút:
+   - **Bulk Submit**: Gửi duyệt nhiều DRAFT cùng lúc
+   - **Bulk Approve**: Phê duyệt nhiều PENDING (chỉ Approver/Admin)
+   - **Bulk Archive**: Lưu trữ nhiều PUBLISHED
+3. Kết quả hiển thị qua thông báo toast: `"Bulk Submit: 3 thành công, 1 thất bại"`.
+
+### 5.4. Bình luận (Comments)
+
+1. Mở trang chi tiết tài liệu.
+2. Ở cột bên phải, phần **Comments** hiển thị các bình luận đã có.
+3. Nhập nội dung vào ô text và gửi → bình luận được thêm.
+4. Tất cả vai trò có quyền xem tài liệu đều có thể bình luận.
+
+### 5.5. Quản lý ACL (Quyền truy cập)
+
+ACL cho phép kiểm soát quyền truy cập chi tiết trên từng tài liệu. Chỉ **Editor (chủ sở hữu)** và **Admin** mới quản lý được ACL.
+
+1. Mở trang chi tiết tài liệu.
+2. Ở cột phải, phần **Access Control** hiển thị các rule hiện tại.
+3. Nhấn thêm rule mới:
+   - **Subject**: Chọn USER / ROLE / GROUP / ALL
+   - **Permission**: READ / DOWNLOAD / WRITE / APPROVE
+   - **Effect**: ALLOW hoặc DENY
+
+> **Lưu ý**: Nếu cùng một tài liệu có cả ALLOW và DENY, **DENY luôn ưu tiên hơn**.
+
+### 5.6. Giao diện tối (Dark Mode)
+
+Hệ thống hỗ trợ giao diện tối. Vào **Settings** (menu thanh bên) để chuyển đổi.
+
+---
+
+## Phần 6 — Vòng đời tài liệu tóm tắt
+
+```
+📝 DRAFT  ──(Editor gửi duyệt)──►  ⏳ PENDING  ──(Approver phê duyệt)──►  ✅ PUBLISHED  ──(Editor lưu trữ)──►  📁 ARCHIVED
+                                         │
+                                         └──(Approver từ chối)──► 📝 DRAFT (sửa lại)
+```
+
+| Trạng thái | Ý nghĩa | Ai thao tác tiếp |
+|---|---|---|
+| **DRAFT** | Mới tạo hoặc bị từ chối | Editor: sửa, upload, gửi duyệt |
+| **PENDING** | Đang chờ duyệt | Approver: phê duyệt hoặc từ chối |
+| **PUBLISHED** | Đã duyệt, cho phép tải | Viewer/Editor: xem, tải; Editor: lưu trữ |
+| **ARCHIVED** | Đã lưu trữ | Chỉ cho xem trước, không tải |
+
+---
+
+## Phần 7 — Xử lý sự cố thường gặp
+
+### Không đăng nhập được
+
+- Đảm bảo Keycloak đang chạy: mở `http://localhost:8080` xem có hiện trang admin không.
+- Kiểm tra mật khẩu: tất cả tài khoản demo dùng `Passw0rd!` (chữ P viết hoa, số 0 thay chữ o, kết thúc dấu !).
+
+### Trang web báo lỗi khi tải dữ liệu
+
+- Kiểm tra Gateway đang chạy: mở `http://localhost:3000/health` xem có trả về OK không.
+- Kiểm tra file `.env.local` trong `apps/web/` có dòng: `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api`
+- Đảm bảo frontend chạy trên port **3010**, không trùng với Gateway (3000).
+
+### Service không khởi động được (port bị chiếm)
 
 ```bash
-curl -s -X POST \
-  http://localhost:8080/realms/docvault/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_id=docvault-gateway&client_secret=dev-gateway-secret&grant_type=password&username=editor1&password=Passw0rd!" \
-  | jq -r '.access_token'
+# Trên Windows, kiểm tra port đang bị chiếm bởi ai
+netstat -ano | findstr :3000
 ```
 
-Thay `editor1` bằng username khác để lấy token cho vai trò tương ứng.
+Dừng process đang chiếm hoặc dùng lệnh `.\start-all.ps1 -StopAll` để dừng tất cả.
+
+### Lỗi prisma:deploy
+
+- Chắc chắn container PostgreSQL đã healthy.
+- Nếu bị lỗi schema cũ, xóa Docker volume rồi tạo lại:
+
+```bash
+docker compose -f infra/docker-compose.dev.yml down -v
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
+# Đợi 30–60s rồi chạy lại migration
+pnpm --filter metadata-service prisma:deploy
+pnpm --filter audit-service prisma:deploy
+```
 
 ---
 
-## 🔐 Vai trò & Phân quyền
+## Phần 8 — Kiểm tra hệ thống (tùy chọn)
 
-### Ma trận quyền theo vai trò
+### Chạy E2E test tự động
 
-| Chức năng | Viewer | Editor | Approver | CO | Admin |
-|---|:---:|:---:|:---:|:---:|:---:|
-| Xem danh sách tài liệu | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Xem chi tiết tài liệu | ✅ | ✅ | ✅ | ✅ | ✅ |
-| Tạo tài liệu mới | ❌ | ✅ | ❌ | ❌ | ✅ |
-| Tải file lên | ❌ | ✅ | ❌ | ❌ | ✅ |
-| Quản lý ACL | ❌ | ✅¹ | ❌ | ❌ | ✅ |
-| Gửi duyệt (Submit) | ❌ | ✅¹ | ❌ | ❌ | ✅ |
-| Phê duyệt (Approve) | ❌ | ❌ | ✅ | ❌ | ✅ |
-| Từ chối (Reject) | ❌ | ❌ | ✅ | ❌ | ✅ |
-| Lưu trữ (Archive) | ❌ | ✅¹ | ❌ | ❌ | ✅ |
-| Tải xuống file | ✅ | ✅ | ✅ | ❌ | ✅ |
-| Xem trước tài liệu | ✅ | ✅ | ✅ | ✅² | ✅ |
-| Xem audit log | ❌ | ❌ | ❌ | ✅ | ✅ |
-| Trang "Tài liệu của tôi" | ❌ | ✅ | ❌ | ❌ | ✅ |
-
-> ¹ Chỉ cho tài liệu mà Editor là chủ sở hữu (owner).
-> ² CO chỉ xem trước được tài liệu phân loại **PUBLIC**.
-
-### Phân loại bảo mật × Hiển thị
-
-Hệ thống hỗ trợ 4 mức phân loại bảo mật:
-
-| Phân loại | Mô tả | Ai thấy trong danh sách? |
-|---|---|---|
-| `PUBLIC` | Công khai | Tất cả vai trò |
-| `INTERNAL` | Nội bộ | Editor, Approver, CO, Admin |
-| `CONFIDENTIAL` | Bảo mật | Approver, CO, Admin |
-| `SECRET` | Tuyệt mật | Approver, CO, Admin |
-
-> **Ngoại lệ:** Người dùng luôn thấy tài liệu mà mình **sở hữu** hoặc có **ACL entry**, bất kể mức phân loại.
-
-### Quy tắc xem trước (Preview)
-
-| Phân loại | Viewer | Editor | Approver | CO | Admin |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `INTERNAL` | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `CONFIDENTIAL` | ❌ | ✅¹ | ✅ | ❌ | ✅ |
-| `SECRET` | ❌ | ❌ | ✅ | ❌ | ✅ |
-
-> ¹ Yêu cầu ACL rõ ràng hoặc là chủ sở hữu.
-
----
-
-## 🔄 Vòng đời tài liệu
-
-```mermaid
-flowchart LR
-    DRAFT(["📝 DRAFT"])
-    PENDING(["⏳ PENDING"])
-    PUBLISHED(["✅ PUBLISHED"])
-    ARCHIVED(["📁 ARCHIVED"])
-
-    DRAFT -->|"Editor gửi duyệt"| PENDING
-    PENDING -->|"Approver phê duyệt"| PUBLISHED
-    PENDING -->|"Approver từ chối"| DRAFT
-    PUBLISHED -->|"Editor lưu trữ"| ARCHIVED
-```
-
-| Chuyển trạng thái | Hành động | Ai thực hiện | Ghi chú |
-|---|---|---|---|
-| DRAFT → PENDING | `SUBMIT` | Editor (chủ sở hữu), Admin | Gửi tài liệu duyệt |
-| PENDING → PUBLISHED | `APPROVE` | Approver, Admin | Tự động set `publishedAt` |
-| PENDING → DRAFT | `REJECT` | Approver, Admin | Cần ghi lý do (reason) |
-| PUBLISHED → ARCHIVED | `ARCHIVE` | Editor (chủ sở hữu), Admin | Tự động set `archivedAt` |
-
-**Sau mỗi chuyển trạng thái:**
-- Ghi một bản ghi vào `document_workflow_history`
-- Phát một audit event
-- Gửi thông báo (nếu có)
-
----
-
-## 💼 Luồng nghiệp vụ chính
-
-### 1. Tạo & Xuất bản tài liệu
-
-```
-Editor                       Gateway              Services
-  │                             │                    │
-  ├─ POST /api/metadata/documents ──────────────► │ Tạo metadata (DRAFT)
-  ├─ POST /api/documents/:id/upload ────────────► │ Upload file lên MinIO
-  ├─ POST /api/workflow/:id/submit ─────────────► │ DRAFT → PENDING
-  │                                                │
-Approver                                           │
-  ├─ POST /api/workflow/:id/approve ────────────► │ PENDING → PUBLISHED
-  │                                                │
-Viewer                                             │
-  └─ POST /api/documents/:id/presign-download ──► │ Lấy URL tải xuống
-```
-
-**Chi tiết từng bước:**
-
-1. **Editor** tạo tài liệu mới (`POST /api/metadata/documents`) → trạng thái `DRAFT`
-2. **Editor** tải file lên (`POST /api/documents/:id/upload`) → file lưu vào MinIO, tạo bản ghi version
-3. **Editor** gửi duyệt (`POST /api/workflow/:id/submit`) → trạng thái chuyển sang `PENDING`
-4. **Approver** phê duyệt (`POST /api/workflow/:id/approve`) → trạng thái chuyển sang `PUBLISHED`
-5. **Viewer/Editor** có thể tải xuống file đã xuất bản
-
-### 2. Tải xuống file (Download Flow)
-
-Quy trình tải xuống gồm **2 bước** để đảm bảo an toàn:
-
-```
-1. metadata-service kiểm tra quyền → ký grant token (short-lived)
-2. document-service xác minh token → trả file (presigned URL hoặc stream)
-```
-
-**Quy tắc tải xuống:**
-- Chỉ tài liệu `PUBLISHED` mới cho tải xuống
-- `compliance_officer` **luôn bị chặn** tải xuống, bất kể ACL
-- ACL `DENY` cho quyền `DOWNLOAD` sẽ chặn tải
-- Chủ sở hữu tài liệu luôn có thể tải
-
-### 3. Luồng Compliance Officer
-
-```
-Compliance Officer   Gateway         metadata-service
-  │                    │                    │
-  ├─ GET /api/metadata/documents ──────────► │ Xem danh sách → 200 ✅
-  ├─ GET /api/audit/query ─────────────────► │ Xem audit log → 200 ✅
-  └─ POST /api/documents/:id/presign-download │ Tải file → 403 ❌ (luôn bị chặn)
-```
-
-### 4. Hệ thống Watermark khi tải xuống
-
-Tài liệu có phân loại **CONFIDENTIAL** hoặc **SECRET** khi tải xuống dưới dạng PDF sẽ tự động được đóng watermark bao gồm:
-- Tên người tải
-- Thời gian tải
-- Mức phân loại bảo mật
-
----
-
-## 🖥 Giao diện Frontend
-
-### Các màn hình chính
-
-| Màn hình | URL | Mô tả |
-|---|---|---|
-| **Đăng nhập** | `/login` | Đăng nhập qua Keycloak hoặc JWT Token |
-| **Dashboard** | `/dashboard` | Tổng quan trạng thái tài liệu, thống kê nhanh |
-| **Danh sách tài liệu** | `/documents` | Bảng tài liệu với bộ lọc, tìm kiếm, sắp xếp |
-| **Chi tiết tài liệu** | `/documents/:id` | Metadata, versions, workflow timeline, ACL, comments |
-| **Tạo tài liệu mới** | `/documents/new` | Form tạo tài liệu với upload file |
-| **Phê duyệt** | `/approvals` | Danh sách tài liệu PENDING chờ duyệt (Approver/Admin) |
-| **Audit Log** | `/audit` | Nhật ký kiểm toán (Compliance Officer/Admin) |
-| **Tài liệu của tôi** | `/my-documents` | Tài liệu do mình tạo (Editor/Admin) |
-| **Cài đặt** | `/settings` | Cài đặt người dùng |
-| **Hồ sơ** | `/profile` | Thông tin cá nhân |
-
-### Tính năng giao diện
-
-- 🌙 **Dark mode** — hỗ trợ giao diện tối với hệ thống design token nhất quán
-- 🔍 **Tìm kiếm server-side** — tìm theo title, description, tags (PostgreSQL ILIKE)
-- 📋 **Bulk Actions** — chọn nhiều tài liệu và thao tác hàng loạt
-- 💬 **Comments** — bình luận/ghi chú trên tài liệu
-- 👁 **Preview** — xem trước PDF bằng pdf.js (canvas, không có nút download)
-- ⚡ **Micro-animations** — hiệu ứng chuyển động mượt mà
-- 📱 **Responsive** — tương thích đa thiết bị
-
----
-
-## 📡 API Reference
-
-> Base URL: `http://localhost:3000/api`
-> Header bắt buộc: `Authorization: Bearer <keycloak_jwt>`
-
-### Bảng tổng hợp API
-
-| Method | Endpoint | Vai trò | Mô tả |
-|---|---|---|---|
-| GET | `/metadata/documents` | Tất cả | Danh sách tài liệu |
-| GET | `/metadata/documents?q=keyword` | Tất cả | Tìm kiếm tài liệu |
-| POST | `/metadata/documents` | Editor, Admin | Tạo tài liệu mới |
-| GET | `/metadata/documents/:docId` | Tất cả | Chi tiết tài liệu (kèm versions, ACL) |
-| PATCH | `/metadata/documents/:docId` | Editor¹, Admin | Cập nhật metadata |
-| GET | `/metadata/documents/:docId/workflow-history` | Tất cả | Lịch sử workflow |
-| POST | `/metadata/documents/:docId/acl` | Editor, Admin | Thêm/cập nhật ACL |
-| GET | `/metadata/documents/:docId/acl` | Editor, Approver, CO, Admin | Xem danh sách ACL |
-| POST | `/metadata/documents/:docId/download-authorize` | Tất cả (CO bị chặn) | Yêu cầu grant token tải xuống |
-| GET | `/metadata/documents/:docId/comments` | Tất cả | Xem bình luận |
-| POST | `/metadata/documents/:docId/comments` | Tất cả | Thêm bình luận |
-| POST | `/documents/:docId/upload` | Editor, Admin | Upload file (multipart/form-data) |
-| POST | `/documents/:docId/presign-download` | Viewer, Editor, Approver, Admin | Lấy presigned URL |
-| GET | `/documents/:docId/versions/:version/stream` | Viewer, Editor, Approver, Admin | Stream file trực tiếp |
-| POST | `/workflow/:docId/submit` | Editor, Admin | Gửi duyệt (DRAFT → PENDING) |
-| POST | `/workflow/:docId/approve` | Approver, Admin | Phê duyệt (PENDING → PUBLISHED) |
-| POST | `/workflow/:docId/reject` | Approver, Admin | Từ chối (PENDING → DRAFT) |
-| POST | `/workflow/:docId/archive` | Editor¹, Admin | Lưu trữ (PUBLISHED → ARCHIVED) |
-| GET | `/audit/query` | CO, Admin | Truy vấn audit log |
-
-> ¹ Chỉ chủ sở hữu (owner) tài liệu.
-
-### Swagger UI
-
-Khi services đang chạy, truy cập Swagger UI để xem chi tiết API:
-
-| Service | URL |
-|---|---|
-| Gateway | [http://localhost:3000/docs](http://localhost:3000/docs) |
-| metadata-service | [http://localhost:3001/docs](http://localhost:3001/docs) |
-| document-service | [http://localhost:3002/docs](http://localhost:3002/docs) |
-| workflow-service | [http://localhost:3003/docs](http://localhost:3003/docs) |
-| audit-service | [http://localhost:3004/docs](http://localhost:3004/docs) |
-| notification-service | [http://localhost:3005/docs](http://localhost:3005/docs) |
-
-### Mã lỗi phổ biến
-
-| HTTP Code | Ý nghĩa |
-|:---:|---|
-| 400 | Request body không hợp lệ |
-| 401 | Thiếu / sai / hết hạn JWT token |
-| 403 | Không đủ quyền (sai vai trò hoặc ACL bị chặn) |
-| 404 | Tài liệu không tồn tại |
-| 409 | Xung đột (ví dụ: duyệt tài liệu đã được duyệt) |
-
----
-
-## 🗄 Mô hình dữ liệu
-
-### Tổng quan databases
-
-| Database | Service sở hữu | Nội dung |
-|---|---|---|
-| `docvault_metadata` (PostgreSQL) | metadata-service | documents, document_versions, document_acl, document_workflow_history, document_comments |
-| `docvault_audit` (PostgreSQL) | audit-service | audit_events (append-only, tamper-evident) |
-| MinIO (S3) | document-service | File blob thực tế |
-
-### ER Diagram
-
-```mermaid
-erDiagram
-    documents ||--o{ document_versions : "has versions"
-    documents ||--o{ document_acl : "has ACL"
-    documents ||--o{ document_workflow_history : "has workflow history"
-    documents ||--o{ document_comments : "has comments"
-
-    documents {
-        uuid id PK
-        string title
-        string description
-        string ownerId
-        enum classification
-        string_array tags
-        enum status
-        int currentVersion
-        datetime createdAt
-        datetime updatedAt
-        datetime publishedAt
-        datetime archivedAt
-    }
-
-    document_versions {
-        uuid id PK
-        uuid docId FK
-        int version
-        string objectKey
-        string checksum
-        int size
-        string filename
-        string contentType
-        datetime createdAt
-        string createdBy
-    }
-
-    document_acl {
-        uuid id PK
-        uuid docId FK
-        enum subjectType
-        string subjectId
-        enum permission
-        enum effect
-        datetime createdAt
-    }
-
-    document_workflow_history {
-        uuid id PK
-        uuid docId FK
-        enum fromStatus
-        enum toStatus
-        enum action
-        string actorId
-        string reason
-        datetime createdAt
-    }
-
-    document_comments {
-        uuid id PK
-        uuid docId FK
-        string authorId
-        string content
-        datetime createdAt
-    }
-```
-
-### Audit Events & Hash Chain
-
-Bảng `audit_events` sử dụng **chuỗi hash SHA-256** để chống giả mạo:
-
-```
-hash = SHA-256(prevHash + "|" + canonicalPayload)
-```
-
-- Mỗi event mới liên kết với hash của event trước đó
-- Nếu bất kỳ bản ghi nào bị sửa đổi, chuỗi hash sẽ bị phá vỡ → phát hiện được
-- Bảng này là **append-only** — không cho phép UPDATE hoặc DELETE
-
-### Enums
-
-| Enum | Giá trị | Sử dụng ở |
-|---|---|---|
-| `DocumentStatus` | `DRAFT`, `PENDING`, `PUBLISHED`, `ARCHIVED` | documents.status |
-| `ClassificationLevel` | `PUBLIC`, `INTERNAL`, `CONFIDENTIAL`, `SECRET` | documents.classification |
-| `AclSubjectType` | `USER`, `ROLE`, `GROUP`, `ALL` | document_acl.subjectType |
-| `DocumentPermission` | `READ`, `DOWNLOAD`, `WRITE`, `APPROVE` | document_acl.permission |
-| `AclEffect` | `ALLOW`, `DENY` | document_acl.effect |
-| `WorkflowAction` | `SUBMIT`, `APPROVE`, `REJECT`, `ARCHIVE` | document_workflow_history.action |
-
----
-
-## ⚙ Tính năng nâng cao
-
-### Bulk Actions (Thao tác hàng loạt)
-
-Chọn nhiều tài liệu trong bảng và thao tác đồng thời:
-
-| Hành động | Mô tả |
-|---|---|
-| **Bulk Submit** | Chọn nhiều DRAFT → Gửi duyệt tất cả |
-| **Bulk Approve** | Chọn nhiều PENDING → Phê duyệt hàng loạt |
-| **Bulk Archive** | Chọn nhiều PUBLISHED → Lưu trữ đồng thời |
-
-> Kết quả hiển thị qua toast: `"Bulk Submit: 3 thành công, 1 thất bại"`.
-
-### Document Comments (Bình luận)
-
-- Tất cả vai trò có quyền xem tài liệu đều có thể bình luận
-- Hiển thị ở cột phải trên trang chi tiết tài liệu
-- API: `GET/POST /api/metadata/documents/:docId/comments`
-
-### Full-text Search (Tìm kiếm server-side)
-
-- Tìm theo tiêu đề, mô tả và tags
-- Xử lý phía server (PostgreSQL ILIKE) → hiệu quả với tập dữ liệu lớn
-- API: `GET /api/metadata/documents?q=keyword`
-- Frontend tự động gửi truy vấn khi gõ vào ô tìm kiếm
-
-### My Documents (Tài liệu của tôi)
-
-- Trang riêng `/my-documents` dành cho Editor/Admin
-- Tự động lọc theo `ownerId` — chỉ hiện tài liệu mình tạo
-- Hỗ trợ đầy đủ: bulk actions, bộ lọc, submit/archive
-
-### ACL (Access Control List)
-
-Hệ thống ACL hỗ trợ kiểm soát truy cập chi tiết:
-
-| Subject Type | Mô tả |
-|---|---|
-| `USER` | Một người dùng cụ thể |
-| `ROLE` | Một vai trò (tất cả user có vai trò đó) |
-| `GROUP` | Một nhóm Keycloak |
-| `ALL` | Tất cả |
-
-| Permission | Mô tả |
-|---|---|
-| `READ` | Xem metadata + nội dung |
-| `DOWNLOAD` | Tải file xuống |
-| `WRITE` | Sửa metadata, upload version mới |
-| `APPROVE` | Phê duyệt tài liệu |
-
-| Effect | Mô tả |
-|---|---|
-| `ALLOW` | Cho phép |
-| `DENY` | Từ chối (**ưu tiên hơn ALLOW**) |
-
-### Document Preview (Xem trước tài liệu)
-
-- Hỗ trợ xem trước tài liệu ở trạng thái `PUBLISHED` và `ARCHIVED`
-- PDF được render bằng **pdf.js** (canvas) — không có nút download, không right-click save
-- Tài liệu ARCHIVED chỉ cho xem trước, **không cho tải xuống**
-
----
-
-## 🧪 Kiểm thử
-
-### E2E Smoke Test
-
-Chạy kiểm thử tự động toàn bộ luồng backend:
+Sau khi tất cả service đang chạy:
 
 ```bash
 pnpm test:e2e
 ```
 
-**Các kịch bản kiểm thử:**
+Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log...
 
-| # | Kịch bản | Kết quả mong đợi |
-|:---:|---|---|
-| 1 | Request không có token | 401 Unauthorized |
-| 2 | Token hết hạn | 401 Unauthorized |
-| 3 | Viewer tạo tài liệu | 403 Forbidden |
-| 4 | Editor tạo + upload | 201 Created ✅ |
-| 5 | Viewer tải draft | 403 Forbidden |
-| 6 | Editor gửi duyệt | PENDING ✅ |
-| 7 | Approver phê duyệt | PUBLISHED ✅ |
-| 8 | Phê duyệt lần 2 | 409 Conflict |
-| 9 | Viewer tải file PUBLISHED | 200 OK ✅ |
-| 10 | CO tải file | 403 Forbidden |
-| 11 | CO xem audit log | 200 OK ✅ |
-| 12 | Viewer xem audit log | 403 Forbidden |
+### Mở Swagger UI (tài liệu API)
 
-### Unit Tests
-
-```bash
-# Chạy tất cả unit tests
-pnpm test
-
-# Chạy test một service cụ thể
-pnpm --filter metadata-service test
-
-# Chạy một file test cụ thể
-pnpm --filter metadata-service test -- --testPathPattern=foo.spec.ts
-```
-
-### Xem dữ liệu (GUI Tools)
-
-| Công cụ | URL | Đăng nhập |
-|---|---|---|
-| **Prisma Studio** (PostgreSQL) | [http://localhost:5555](http://localhost:5555) | — |
-| **MinIO Console** | [http://localhost:9001](http://localhost:9001) | `minioadmin` / `minioadminpw` |
-| **Keycloak Admin** | [http://localhost:8080](http://localhost:8080) | `admin` / `adminpw` |
-
-Mở Prisma Studio:
-
-```bash
-pnpm --filter metadata-service prisma:studio
-```
-
----
-
-## 🔧 Xử lý sự cố
-
-### ❌ Lỗi Postgres Migration
-
-**Triệu chứng:** `prisma:deploy` báo lỗi.
-
-**Kiểm tra:**
-- Container Postgres đã healthy chưa
-- Database `docvault_metadata` và `docvault_audit` đã được tạo
-- Nếu có volume cũ từ lần chạy trước, xóa volume và tạo lại
-
-```bash
-docker compose -f infra/docker-compose.dev.yml down -v
-docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
-```
-
-### ❌ Frontend không gọi được API
-
-**Triệu chứng:** Giao diện hiện lỗi khi tải dữ liệu.
-
-**Kiểm tra:**
-- File `apps/web/.env.local` có cấu hình đúng: `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api`
-- Gateway đang chạy trên port 3000
-- Frontend chạy trên port khác (3010), **không phải** 3000
-
-### ❌ Không lấy được token Keycloak
-
-**Triệu chứng:** Curl trả về lỗi khi lấy JWT token.
-
-**Kiểm tra:**
-- Keycloak đang chạy tại `http://localhost:8080`
-- Realm `docvault` đã được import (seed tự động)
-- Client secret trong `.env` khớp với seed hiện tại (`dev-gateway-secret`)
-
-### ❌ Port bị conflict
-
-**Triệu chứng:** Service không khởi động được, báo port already in use.
-
-**Xử lý:**
-- Kiểm tra xem port nào đang bị chiếm: `netstat -ano | findstr :<port>`
-- Dừng process đang chiếm port hoặc đổi port trong cấu hình
-
----
-
-## 📁 Cấu trúc thư mục
-
-```
-docvault/
-├── apps/
-│   └── web/                        # Frontend Next.js 15
-│       └── src/
-│           ├── app/                # App Router pages
-│           │   ├── (app)/          # Các trang cần đăng nhập
-│           │   │   ├── dashboard/      # Tổng quan
-│           │   │   ├── documents/      # Danh sách & chi tiết tài liệu
-│           │   │   ├── my-documents/   # Tài liệu của tôi
-│           │   │   ├── approvals/      # Trang phê duyệt
-│           │   │   ├── audit/          # Nhật ký kiểm toán
-│           │   │   ├── settings/       # Cài đặt
-│           │   │   └── profile/        # Hồ sơ
-│           │   └── (auth)/         # Trang đăng nhập
-│           ├── components/         # UI components
-│           ├── features/           # Feature modules
-│           ├── lib/                # Utilities, hooks, auth
-│           ├── providers/          # React context providers
-│           └── types/              # TypeScript types
-│
-├── services/
-│   ├── gateway/                    # API Gateway (NestJS, port 3000)
-│   ├── metadata-service/           # Metadata & ACL management (port 3001)
-│   ├── document-service/           # Upload/Download via MinIO (port 3002)
-│   ├── workflow-service/           # Máy trạng thái duyệt (port 3003)
-│   ├── audit-service/              # Nhật ký kiểm toán (port 3004)
-│   └── notification-service/       # Thông báo (port 3005)
-│
-├── infra/
-│   ├── docker-compose.dev.yml      # Docker: Postgres, MinIO, Keycloak
-│   ├── .env.example                # Cấu hình mẫu cho Docker
-│   ├── db/                         # Script bootstrap Postgres
-│   ├── keycloak/                   # Realm config & seed users
-│   └── minio/                      # Script tạo bucket MinIO
-│
-├── libs/
-│   ├── auth/                       # Shared auth primitives
-│   ├── contracts/                  # OpenAPI spec & event schemas
-│   └── throttler/                  # Rate limiting utility
-│
-├── scripts/
-│   ├── e2e-check.mjs              # Script kiểm thử E2E
-│   ├── start-sequential.mjs       # Script khởi động tuần tự
-│   └── demo.sh                    # Script demo
-│
-├── docs/
-│   ├── API_CONTRACT.md            # Chi tiết API endpoints
-│   ├── ERD.md                     # Entity Relationship Diagram
-│   ├── PROJECT_STATUS.md          # Trạng thái dự án
-│   ├── RUN_PROJECT.md             # Hướng dẫn chạy chi tiết
-│   └── verification-report.md    # Báo cáo kiểm tra tích hợp
-│
-├── images/                        # Hình ảnh kiến trúc & use case
-├── start-all.ps1                  # PowerShell script khởi động (Windows)
-├── package.json                   # Root workspace config
-├── pnpm-workspace.yaml            # pnpm workspace definition
-└── turbo.json                     # Turbo build config
-```
-
----
-
-## ⚠ Lưu ý quan trọng
-
-1. **Compliance Officer (CO)** luôn bị chặn tải file xuống, dù ACL cho phép. Logic nằm trong `metadata-service/src/policy/policy.service.ts`. CO chỉ xem trước được tài liệu **PUBLIC**, nhưng thấy metadata (chi tiết) cho tất cả tài liệu PUBLISHED và ARCHIVED.
-
-2. **Approver** là quyền cao nhất sau Admin — có thể xem trước tài liệu ở **mọi** mức phân loại bảo mật.
-
-3. **Archive** chỉ dành cho Editor chủ sở hữu hoặc Admin (Approver không có quyền này). Tài liệu ARCHIVED chỉ cho **xem trước**, không cho tải xuống.
-
-4. **Thứ tự khởi động** rất quan trọng: Gateway phải khởi động **sau cùng**, sau khi tất cả backend services đã sẵn sàng.
-
-5. **ACL: DENY ưu tiên hơn ALLOW** — nếu cùng tài liệu có cả rule ALLOW và DENY, DENY sẽ được áp dụng.
-
-6. **Gateway tự động ghi audit** cho mọi request nhận được.
-
-7. **Download có watermark** — file PDF với phân loại CONFIDENTIAL/SECRET sẽ được đóng watermark khi tải xuống.
-
----
-
-## 📄 Tài liệu liên quan
-
-| Tài liệu | Đường dẫn |
+| Service | URL |
 |---|---|
-| README gốc (Tiếng Anh) | [`README.md`](../README.md) |
-| API Contract chi tiết | [`API_CONTRACT.md`](API_CONTRACT.md) |
-| Entity Relationship Diagram | [`ERD.md`](ERD.md) |
-| Trạng thái dự án | [`PROJECT_STATUS.md`](PROJECT_STATUS.md) |
-| Hướng dẫn chạy chi tiết | [`RUN_PROJECT.md`](RUN_PROJECT.md) |
-| Báo cáo kiểm tra tích hợp | [`verification-report.md`](verification-report.md) |
-| Cấu hình Infrastructure | [`../infra/README.md`](../infra/README.md) |
+| Gateway | http://localhost:3000/docs |
+| metadata-service | http://localhost:3001/docs |
+| document-service | http://localhost:3002/docs |
+| workflow-service | http://localhost:3003/docs |
+| audit-service | http://localhost:3004/docs |
+
+### Xem dữ liệu trực tiếp
+
+- **Prisma Studio** (xem database PostgreSQL):
+  ```bash
+  pnpm --filter metadata-service prisma:studio
+  ```
+  Mở: http://localhost:5555
+
+- **MinIO Console** (xem file đã upload):
+  Mở: http://localhost:9001 — đăng nhập: `minioadmin` / `minioadminpw`
+
+- **Keycloak Admin** (quản lý tài khoản):
+  Mở: http://localhost:8080 — đăng nhập: `admin` / `adminpw`
