@@ -162,13 +162,13 @@ export class WorkflowService {
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];
 
-    // Ownership / role guard: only owner or admin can delete
+    // Ownership / role guard: only owner-editor or admin can delete
     if (
-      document.ownerId !== actorId &&
-      !roles.includes('admin')
+      !roles.includes('admin') &&
+      !(roles.includes('editor') && document.ownerId === actorId)
     ) {
       throw new ForbiddenException(
-        'Only the document owner or admin can delete a document',
+        'Only the document owner (editor) or admin can delete a document',
       );
     }
 

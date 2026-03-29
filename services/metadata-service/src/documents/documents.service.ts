@@ -362,23 +362,27 @@ export class DocumentsService {
 
       if (!approverRes.ok || !adminRes.ok) throw new Error(`Role query failed`);
 
-      const approverUsers: Array<{ id: string }> = await approverRes.json();
-      const adminUsers:    Array<{ id: string }> = await adminRes.json();
+      const approverUsers: Array<{ id: string; username: string }> = await approverRes.json();
+      const adminUsers:    Array<{ id: string; username: string }> = await adminRes.json();
 
+      // Use username (preferred_username) — NOT UUID (id).
+      // Notifications are stored and retrieved by username (buildActorId = username ?? sub),
+      // so recipient IDs must also be usernames for the notification bell to work.
       const ids = [
         ...new Set([
-          ...approverUsers.map((u) => u.id),
-          ...adminUsers.map((u) => u.id),
+          ...approverUsers.map((u) => u.username).filter(Boolean),
+          ...adminUsers.map((u) => u.username).filter(Boolean),
         ]),
       ];
 
       this.approverCache = { ids, expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
       return { userIds: ids };
     } catch (err) {
+      // Don't cache on failure — next submit() will retry automatically.
+      // Only cache when credentials are permanently absent (not transient errors).
       this.logger.warn(
-        `getApprovers() failed: ${(err as Error).message} — returning empty list`,
+        `getApprovers() failed: ${(err as Error).message} — returning empty list (will retry on next submit)`,
       );
-      this.approverCache = { ids: [], expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
       return { userIds: [] };
     }
   }

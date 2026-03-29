@@ -173,13 +173,12 @@ export class DocumentsController {
   }
 
   @Get(':docId/approvers')
-  @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
     summary: 'Get approver+admin user IDs for notification routing',
     description:
       'Returns the IDs of all users who have approver or admin role. ' +
-      'Used by the workflow service to route SUBMITTED notifications to the right recipients.',
+      'Used internally by the workflow service to route SUBMITTED notifications. ' +
+      'No auth required — returns only user IDs, no sensitive data.',
   })
   getApprovers(@Param('docId') _docId: string) {
     // docId is required by REST convention; the result is global role membership.

@@ -96,7 +96,7 @@ export function canDeleteDocument(
   if (!session) return false;
   if (doc.status !== 'DRAFT') return false;
   if (hasRole(session, 'admin')) return true;
-  return isOwner(session, doc.ownerId);
+  return hasRole(session, 'editor') && isOwner(session, doc.ownerId);
 }
 
 // ── Download / ACL / Audit ────────────────────────────────────────────────────

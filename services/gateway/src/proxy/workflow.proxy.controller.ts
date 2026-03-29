@@ -118,7 +118,8 @@ export class WorkflowProxyController {
   }
 
   @Delete(':docId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
   @ApiOperation({
     summary: 'Delete a DRAFT document (soft delete)',
     description:

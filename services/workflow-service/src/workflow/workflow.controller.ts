@@ -67,7 +67,8 @@ export class WorkflowController {
   }
 
   @Delete(':docId')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
   @ApiOperation({ summary: 'Delete a DRAFT document (soft delete)' })
   delete(@Param('docId') docId: string, @Req() req: any) {
     return this.workflowService.delete(
