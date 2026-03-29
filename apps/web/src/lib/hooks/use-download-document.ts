@@ -2,8 +2,9 @@
 
 import { useState } from 'react';
 import { authorizeDownload, presignDownload } from '@/features/documents/documents.api';
+import apiClient from '@/lib/api/client';
 import { getErrorMessage } from '@/lib/api/errors';
-import { triggerBrowserDownload } from '@/lib/utils/download';
+import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 
 interface UseDownloadDocumentOptions {
   onError?: (message: string) => void;
@@ -26,12 +27,14 @@ export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
         // Non-watermark files: download directly from MinIO via presigned URL
         triggerBrowserDownload(result.url, result.filename || filename);
       } else {
-        // Watermark required: stream via gateway using the API base URL (must include /api)
-        const apiBase = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:3000/api';
-        const base = apiBase.replace(/\/$/, '');
-        const token = encodeURIComponent(authorization.grantToken);
-        const url = `${base}/documents/${docId}/versions/${authorization.version}/stream?token=${token}`;
-        triggerBrowserDownload(url, result.filename || filename);
+        // Watermark required: fetch via authenticated axios request, then download blob
+        const streamUrl = `/documents/${docId}/versions/${authorization.version}/stream?token=${encodeURIComponent(authorization.grantToken)}`;
+        const response = await apiClient.get(streamUrl, { responseType: 'blob' });
+
+        const blobUrl = URL.createObjectURL(response.data);
+        triggerBrowserDownload(blobUrl, result.filename || filename);
+        // Free memory after a short delay to allow download to start
+        setTimeout(() => revokeObjectUrl(blobUrl), 5000);
       }
     } catch (err) {
       options?.onError?.(getErrorMessage(err));

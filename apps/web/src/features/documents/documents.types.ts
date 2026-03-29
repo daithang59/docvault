@@ -158,12 +158,14 @@ export interface DownloadAuthorizationResult {
 }
 
 export interface PresignedDownloadResult {
-  url: string;
+  url: string | null;
   docId?: string;
   version?: number;
   filename?: string;
   expiresAt?: string;
   expiresInSeconds?: number;
+  watermarkRequired?: boolean;
+  streamingEndpoint?: string;
 }
 
 export interface PreviewAuthorizationResult {

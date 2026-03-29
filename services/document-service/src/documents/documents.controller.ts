@@ -95,21 +95,26 @@ export class DocumentsController {
   ) {
     const context = buildRequestContext(req);
 
-    const response = await this.documentsService.getStreamWithToken(
-      docId,
-      token,
-      context.actorId,
-    );
+    try {
+      const response = await this.documentsService.getStreamWithToken(
+        docId,
+        token,
+        context.actorId,
+      );
 
-    if (response.contentType) {
-      res.setHeader('Content-Type', response.contentType);
+      if (response.contentType) {
+        res.setHeader('Content-Type', response.contentType);
+      }
+      res.setHeader(
+        'Content-Disposition',
+        `attachment; filename="${encodeURIComponent(response.filename)}"`,
+      );
+
+      return response.stream;
+    } catch (err) {
+      console.error('[StreamVersion] Error streaming document:', (err as Error).message, (err as Error).stack);
+      throw err;
     }
-    res.setHeader(
-      'Content-Disposition',
-      `attachment; filename="${encodeURIComponent(response.filename)}"`,
-    );
-
-    return response.stream;
   }
 
   @Get(':docId/preview')

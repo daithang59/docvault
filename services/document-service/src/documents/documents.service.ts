@@ -186,11 +186,15 @@ export class DocumentsService {
 
     let finalBuffer = rawBuffer;
     if (grantPayload.watermarkRequired) {
-      finalBuffer = this.watermarkService.applyWatermark(rawBuffer, {
-        username: actorId,
-        timestamp: new Date().toISOString(),
-        classification: grantPayload.classification,
-      });
+      finalBuffer = await this.watermarkService.applyWatermark(
+        rawBuffer,
+        {
+          username: actorId,
+          timestamp: new Date().toISOString(),
+          classification: grantPayload.classification,
+        },
+        grantPayload.contentType,
+      );
     }
 
     return {
@@ -232,11 +236,15 @@ export class DocumentsService {
 
       let finalBuffer = rawBuffer;
       if (grantPayload.watermarkRequired) {
-        finalBuffer = this.watermarkService.applyWatermark(rawBuffer, {
-          username: context.actorId,
-          timestamp: new Date().toISOString(),
-          classification: grantPayload.classification,
-        });
+        finalBuffer = await this.watermarkService.applyWatermark(
+          rawBuffer,
+          {
+            username: context.actorId,
+            timestamp: new Date().toISOString(),
+            classification: grantPayload.classification,
+          },
+          grantPayload.contentType,
+        );
       }
 
       return {

@@ -365,6 +365,11 @@ export class PolicyService {
     ownerId: string,
     hasExplicitAllow: boolean,
   ): string | null {
+    // Admin bypasses all classification-based restrictions
+    if (roles.includes('admin')) {
+      return null;
+    }
+
     switch (classification) {
       case 'PUBLIC':
         return null;
