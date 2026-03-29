@@ -28,6 +28,11 @@ export const STATUS_COLORS: Record<DocumentStatus, ColorConfig> = {
     text: 'text-gray-600',
     border: 'border-gray-200',
   },
+  DELETED: {
+    bg: 'bg-red-50',
+    text: 'text-red-700',
+    border: 'border-red-200',
+  },
 };
 
 export const CLASSIFICATION_COLORS: Record<ClassificationLevel, ColorConfig> = {

@@ -1,52 +1,52 @@
 # README_CONTEXT.md — DocVault (Part 1: Web Microservices MVP)
 
-> Luu y: day la tai lieu context/ke hoach ban dau. De xem implementation hien tai cua repo, uu tien doc `docs/PROJECT_STATUS.md`.
+> **Note:** This is an initial context/planning document. For the current implementation, refer to `docs/PROJECT_STATUS.md`.
 
-> Scope hiện tại: **chỉ phần 1 — xây dựng web microservices** (chưa DevSecOps).  
-> Mục tiêu: có **E2E demo flow** chạy local bằng Docker Compose.
-
----
-
-## 1) MVP E2E Flow (bắt buộc demo được)
-
-**Editor** tạo document + upload file → **Submit** (Pending) → **Approver** approve → **Published** → **Viewer** download.
-
-**Compliance Officer**: xem **audit logs** OK, nhưng **bị deny download** (phải enforce ở backend, không phải chỉ ẩn nút ở frontend).
+> Current scope: **Phase 1 only — web microservices build** (no DevSecOps yet).
+> Goal: have an **E2E demo flow** running locally via Docker Compose.
 
 ---
 
-## 2) RBAC (tối thiểu)
+## 1) MVP E2E Flow (must be demonstrable)
+
+**Editor** creates document + uploads file → **Submit** (Pending) → **Approver** approves → **Published** → **Viewer** downloads.
+
+**Compliance Officer**: view **audit logs** OK, but **download denied** (must be enforced at backend, not just hiding the button in the frontend).
+
+---
+
+## 2) RBAC (minimum)
 
 Roles (Keycloak):
-- `viewer`: xem metadata + download **Published** nếu policy allow
-- `editor`: tạo document, upload version, submit workflow
+- `viewer`: view metadata + download **Published** if policy allows
+- `editor`: create document, upload version, submit workflow
 - `approver`: approve/reject workflow
-- `compliance_officer`: **audit:read**, **không được download file**
+- `compliance_officer`: **audit:read**, **cannot download files**
 
-Permission rules cốt lõi:
-- Download chỉ cho phép khi `status=Published` và user có quyền theo ACL/policy.
-- Compliance Officer luôn bị deny download (dù status Published).
+Core permission rules:
+- Download only allowed when `status=Published` and user has permission via ACL/policy.
+- Compliance Officer always denied download (even if status is Published).
 
 ---
 
-## 3) Kiến trúc Microservices (Service Boundaries)
+## 3) Microservices Architecture (Service Boundaries)
 
 Services (MVP):
 1. **Gateway**: verify JWT + route requests.
-2. **Metadata Service (Postgres)**: source of truth metadata + ACL + status.
+2. **Metadata Service (Postgres)**: source of truth for metadata + ACL + status.
 3. **Document Service (MinIO)**: upload/download blob + version objects.
 4. **Workflow Service**: state machine Draft→Pending→Published.
 5. **Audit Service (MongoDB optional)**: append-only audit events + query.
-6. **Notification Service (optional)**: notify submit/approve (REST trước, queue sau).
+6. **Notification Service (optional)**: notify submit/approve (REST first, queue later).
 
-Nguyên tắc:
-- Document Service **không** quyết định policy download (policy check nằm ở Gateway/Metadata).
-- Workflow Service chỉ điều phối trạng thái, update status qua Metadata.
-- Audit Service là nơi tập trung ghi “ai làm gì khi nào”.
+Principles:
+- Document Service **does not** decide download policy (policy check lives at Gateway/Metadata).
+- Workflow Service only orchestrates status, updates status via Metadata.
+- Audit Service is the central place to record "who did what when".
 
 ---
 
-## 4) Monorepo Structure (khuyến nghị)
+## 4) Monorepo Structure (recommended)
 
 ```text
 docvault/
@@ -78,34 +78,34 @@ docvault/
 
 ## 5) Local Dev (docker compose)
 
-Docker Compose tối thiểu:
+Minimum Docker Compose:
 - Keycloak
 - Postgres (metadata)
 - MinIO (document blobs)
-- MongoDB (audit) *(tuỳ chọn)*
+- MongoDB (audit) *(optional)*
 - services (gateway + microservices)
 - apps/web
 
 **Definition of Done**
-- `docker compose up` chạy ổn
-- login Keycloak lấy JWT
-- upload file vào MinIO qua Document Service
-- flow submit/approve/publish và download theo RBAC chạy đúng
+- `docker compose up` runs cleanly
+- login to Keycloak to get JWT
+- upload file to MinIO via Document Service
+- submit/approve/publish and download flow works correctly per RBAC
 
 ---
 
 ## 6) API Contract Summary (agent-friendly)
 
-> Tất cả FE gọi qua **Gateway**.  
-> JWT role claims được đọc từ Keycloak.
+> All FE calls go through **Gateway**.
+> JWT role claims are read from Keycloak.
 
 ### Metadata Service
 - `POST /documents` → create Draft metadata
 - `GET /documents/:id` → get document (policy-filtered fields)
 - `GET /documents` → search list (filters: status/tag/owner)
 - `POST /documents/:id/acl` → set ACL (editor/admin)
-- `POST /documents/:id/version` → add version pointer (document-service gọi)
-- `POST /documents/:id/status` → update status (workflow gọi)
+- `POST /documents/:id/version` → add version pointer (document-service calls)
+- `POST /documents/:id/status` → update status (workflow calls)
 - `GET /documents/:id/download` → authorize download (return presigned or stream proxy)
 
 ### Document Service
@@ -127,7 +127,7 @@ Docker Compose tối thiểu:
 
 ---
 
-## 7) Demo Script (vai trò và kịch bản)
+## 7) Demo Script (roles and scenarios)
 
 Seed users:
 - `viewer1` (role viewer)
@@ -136,38 +136,39 @@ Seed users:
 - `co1` (role compliance_officer)
 
 Demo steps:
-1) editor1: create doc + upload + submit  
-2) approver1: approve → published  
-3) viewer1: download OK  
-4) co1: xem audit OK; cố download → 403 (deny)
+1) editor1: create doc + upload + submit
+2) approver1: approve → published
+3) viewer1: download OK
+4) co1: view audit OK; attempt download → 403 (deny)
 
 ---
 
-# DocVault_KeHoach.md — Kế hoạch triển khai Microservices (MVP)
+# DocVault_KeHoach.md — Microservices MVP Implementation Plan
 
-## 0) Nguyên tắc làm MVP để nhanh “ra demo”
-- Ưu tiên **REST sync** để flow chạy ổn trước.
-- Event/Queue (RabbitMQ) chỉ thêm sau, cho audit/notify.
-- Chốt states & RBAC sớm để tránh refactor tốn kém.
+## 0) MVP Principles for Fast Demo
+
+- Prioritize **REST sync** so the flow runs reliably first.
+- Event/Queue (RabbitMQ) only added later, for audit/notify.
+- Lock down states & RBAC early to avoid expensive refactoring.
 
 ---
 
-## 1) Setup repo + local env (Day 1–2)
+## 1) Repo Setup + Local Env (Day 1–2)
 
-### 1.1 Compose dev
-Chạy: Keycloak + Postgres + MinIO + (MongoDB) + services.
+### 1.1 Compose Dev
+Run: Keycloak + Postgres + MinIO + (MongoDB) + services.
 
 **DoD**
 - healthchecks ok
-- Keycloak realm + roles + users seed được
-- MinIO console + bucket sẵn
-- Postgres migrations chạy
+- Keycloak realm + roles + users seeded
+- MinIO console + bucket ready
+- Postgres migrations run
 
 ---
 
-## 2) Contract-first (Day 2–3)
+## 2) Contract-First (Day 2–3)
 
-### 2.1 Entities MVP
+### 2.1 MVP Entities
 **Document**
 - `docId, ownerId, title, classification, tags[]`
 - `status: Draft | Pending | Published`
@@ -177,24 +178,24 @@ Chạy: Keycloak + Postgres + MinIO + (MongoDB) + services.
 - `version, objectKey, checksum, size, createdAt, createdBy`
 
 **ACL**
-- allow theo role/user/group (MVP có thể bắt đầu allow theo role + owner)
+- allow by role/user/group (MVP can start with role + owner)
 
 **AuditEvent**
 - `eventId, actorId, actorRole, action, resourceType, resourceId, result, ip, timestamp`
 
-### 2.2 RBAC rules
-- Viewer: read + download Published allow
+### 2.2 RBAC Rules
+- Viewer: read + download Published allowed
 - Editor: create + upload + submit
 - Approver: approve/reject
 - Compliance Officer: audit read only; **deny download**
 
 **DoD**
-- OpenAPI YAML cho từng service ở `libs/contracts/openapi/`
-- Shared schemas ở `libs/contracts/schemas/`
+- OpenAPI YAML for each service in `libs/contracts/openapi/`
+- Shared schemas in `libs/contracts/schemas/`
 
 ---
 
-## 3) IAM + Gateway skeleton (Day 3–5)
+## 3) IAM + Gateway Skeleton (Day 3–5)
 
 ### 3.1 Keycloak
 - realm `docvault`
@@ -204,7 +205,7 @@ Chạy: Keycloak + Postgres + MinIO + (MongoDB) + services.
 ### 3.2 Gateway
 - verify JWT (iss/aud/exp)
 - routing
-- RBAC guard cơ bản (endpoint-level)
+- basic RBAC guard (endpoint-level)
 
 **DoD**
 - no token → 401
@@ -213,15 +214,15 @@ Chạy: Keycloak + Postgres + MinIO + (MongoDB) + services.
 
 ---
 
-## 4) Build theo thứ tự (Week 2)
+## 4) Build in Order (Week 2)
 
 ### 4.1 Metadata Service (Postgres)
-Chức năng:
+Functions:
 - CRUD metadata
-- store status + versions pointers
-- policy check download/fields
+- store status + version pointers
+- policy check for download/fields
 
-Endpoints tối thiểu:
+Minimal endpoints:
 - `POST /documents`
 - `GET /documents/:id`
 - `GET /documents`
@@ -230,17 +231,17 @@ Endpoints tối thiểu:
 - `GET /documents/:id/download` (authorize)
 
 **DoD**
-- migrations chuẩn
-- policy middleware chạy đúng
-- compliance_officer download luôn 403
+- standard migrations
+- policy middleware runs correctly
+- compliance_officer download always 403
 
 ---
 
 ### 4.2 Document Service (MinIO)
-Chức năng:
-- upload multipart → MinIO
+Functions:
+- multipart upload → MinIO
 - checksum/size
-- gọi metadata add version pointer
+- call metadata to add version pointer
 
 Endpoints:
 - `POST /documents/:id/upload`
@@ -261,13 +262,13 @@ Endpoints:
 - `POST /workflow/:docId/reject` (optional)
 
 **DoD**
-- submit/approve update status qua metadata
+- submit/approve update status via metadata
 
 ---
 
 ### 4.4 Audit Service
 - ingest events
-- query theo user/time/action
+- query by user/time/action
 - CO-only access
 
 Endpoints:
@@ -275,27 +276,27 @@ Endpoints:
 - `GET /audit/query`
 
 **DoD**
-- CO query OK; others deny
+- CO query OK; others denied
 
 ---
 
 ### 4.5 Notification Service (optional)
 MVP:
-- workflow gọi REST notify, log console/email/Slack sau
+- workflow calls REST notify, log console/email/Slack later
 
 **DoD**
-- submit/approve tạo notify log
+- submit/approve creates notify log
 
 ---
 
-## 5) Checklist E2E Demo Ready (Week 3–4)
-- RBAC đúng theo matrix
+## 5) E2E Demo-Ready Checklist (Week 3–4)
+- RBAC correct per matrix
 - audit coverage: upload, submit, approve, download allow/deny
 - 1-click local demo: compose + seed + Postman collection
 
 ---
 
-## 6) Timeline đề xuất (14 ngày)
+## 6) Proposed Timeline (14 days)
 - D1: monorepo + compose + healthchecks
 - D2: contracts + schemas + migrations skeleton
 - D3: keycloak realm/roles/users
@@ -310,18 +311,18 @@ MVP:
 
 ---
 
-# DocVault_KeHoachFE.md — Kế hoạch Frontend (MVP)
+# DocVault_KeHoachFE.md — Frontend Plan (MVP)
 
-## 1) Stack FE
+## 1) FE Stack
 - Next.js 14 + TypeScript
 - TailwindCSS + shadcn/ui
 - TanStack Query + Zustand
 - React Hook Form + Zod
-- OIDC: keycloak-js hoặc oidc-client-ts
+- OIDC: keycloak-js or oidc-client-ts
 
 **DoD**
-- login OIDC
-- gọi API qua Gateway kèm Bearer token
+- OIDC login
+- call API via Gateway with Bearer token
 
 ---
 
@@ -340,7 +341,7 @@ Authenticated:
 
 ---
 
-## 3) RBAC UX matrix
+## 3) RBAC UX Matrix
 
 | Feature | Viewer | Editor | Approver | Compliance Officer |
 |---|---:|---:|---:|---:|
@@ -351,7 +352,7 @@ Authenticated:
 | Approve/Reject | ❌ | ❌ | ✅ | ❌ |
 | View audit logs | ❌ | ❌ | ❌ | ✅ |
 
-> FE chỉ ẩn/hiện; backend mới là enforcement chính.
+> FE only shows/hides; backend is the primary enforcement.
 
 ---
 
@@ -367,22 +368,22 @@ Authenticated:
 
 ---
 
-## 5) UI theo màn (đủ demo)
+## 5) UI Per Screen (enough for demo)
 - Documents list: search/filter/status badge
-- Create+Upload: wizard 2 bước
-- Detail: actions theo role & status
+- Create+Upload: 2-step wizard
+- Detail: actions per role & status
 - Approvals: approve/reject modal
 - Audit: filter time range/user/action + table
 
 ---
 
-## 6) E2E tests (Playwright/Cypress)
-1) Editor upload → submit → Approver approve → Viewer download OK  
+## 6) E2E Tests (Playwright/Cypress)
+1) Editor upload → submit → Approver approve → Viewer download OK
 2) Compliance Officer download → 403; audit query OK
 
 ---
 
-## 7) Timeline FE (8 ngày)
+## 7) FE Timeline (8 days)
 - D1: scaffold + layout + env
 - D2: OIDC + apiClient + route guard
 - D3: documents list + detail read-only

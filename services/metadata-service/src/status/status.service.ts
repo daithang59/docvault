@@ -20,12 +20,14 @@ import {
  *  APPROVE : PENDING   → PUBLISHED
  *  REJECT  : PENDING   → DRAFT
  *  ARCHIVE : PUBLISHED → ARCHIVED
+ *  DELETE  : DRAFT     → DELETED
  */
 const TRANSITION_MAP: Record<string, { from: string; to: string }> = {
   SUBMIT: { from: 'DRAFT', to: 'PENDING' },
   APPROVE: { from: 'PENDING', to: 'PUBLISHED' },
   REJECT: { from: 'PENDING', to: 'DRAFT' },
   ARCHIVE: { from: 'PUBLISHED', to: 'ARCHIVED' },
+  DELETE: { from: 'DRAFT', to: 'DELETED' },
 };
 
 @Injectable()
@@ -86,6 +88,9 @@ export class StatusService {
     if (dto.action === 'ARCHIVE') {
       updateData.archivedAt = new Date();
     }
+    if (dto.action === 'DELETE') {
+      updateData.deletedAt = new Date();
+    }
 
     const actorId = buildActorId(user);
 
@@ -117,6 +122,19 @@ export class StatusService {
       resourceId: docId,
       result: 'SUCCESS',
       reason: dto.reason ?? `${document.status} -> ${transition.to}`,
+      metadata: {
+        docId,
+        title: document.title,
+        fromStatus: document.status,
+        toStatus: transition.to,
+        action: dto.action,
+        reason: dto.reason ?? null,
+        actorId,
+        publishedAt: updated.publishedAt ?? null,
+        archivedAt: updated.archivedAt ?? null,
+        deletedAt: updated.deletedAt ?? null,
+        triggeredAt: new Date().toISOString(),
+      },
     });
 
     return updated;

@@ -1,6 +1,5 @@
 import { ConflictException, ForbiddenException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
-import { AuditClient } from '../audit/audit.client';
 import { MetadataClient } from '../metadata/metadata.client';
 import { NotificationClient } from '../notification/notification.client';
 import { WorkflowService } from './workflow.service';
@@ -29,7 +28,6 @@ const mockContext = {
 describe('WorkflowService', () => {
   let workflowService: WorkflowService;
   let metadataClient: jest.Mocked<MetadataClient>;
-  let auditClient: jest.Mocked<AuditClient>;
   let notificationClient: jest.Mocked<NotificationClient>;
 
   beforeEach(async () => {
@@ -44,12 +42,6 @@ describe('WorkflowService', () => {
           },
         },
         {
-          provide: AuditClient,
-          useValue: {
-            emitEvent: jest.fn().mockResolvedValue(undefined),
-          },
-        },
-        {
           provide: NotificationClient,
           useValue: {
             notify: jest.fn().mockResolvedValue(undefined),
@@ -60,7 +52,6 @@ describe('WorkflowService', () => {
 
     workflowService = module.get<WorkflowService>(WorkflowService);
     metadataClient = module.get(MetadataClient);
-    auditClient = module.get(AuditClient);
     notificationClient = module.get(NotificationClient);
   });
 
@@ -85,12 +76,6 @@ describe('WorkflowService', () => {
         'SUBMIT',
         mockContext,
       );
-      expect(auditClient.emitEvent).toHaveBeenCalledWith(mockContext, {
-        action: 'DOCUMENT_SUBMITTED',
-        resourceType: 'DOCUMENT',
-        resourceId: 'doc-1',
-        result: 'SUCCESS',
-      });
       expect(notificationClient.notify).toHaveBeenCalledWith(mockContext, {
         type: 'SUBMITTED',
         docId: 'doc-1',
@@ -227,13 +212,6 @@ describe('WorkflowService', () => {
         expect.objectContaining({}),
         'Insufficient coverage',
       );
-      expect(auditClient.emitEvent).toHaveBeenCalledWith(
-        expect.objectContaining({}),
-        expect.objectContaining({
-          action: 'DOCUMENT_REJECTED',
-          reason: 'Insufficient coverage',
-        }),
-      );
       expect(notificationClient.notify).toHaveBeenCalledWith(
         expect.objectContaining({ type: 'REJECTED', reason: 'Insufficient coverage' }),
       );
@@ -319,33 +297,6 @@ describe('WorkflowService', () => {
       );
 
       expect(result.status).toBe('ARCHIVED');
-    });
-  });
-
-  // ─── error handling ────────────────────────────────────────────────────────
-
-  describe('error handling', () => {
-    it('should emit audit error event and re-throw on submit failure', async () => {
-      metadataClient.getDocument.mockResolvedValue(mockDoc());
-
-      const error = new ForbiddenException('not allowed');
-      metadataClient.updateStatus.mockRejectedValue(error);
-
-      await expect(
-        workflowService.submit(
-          'doc-1',
-          mockUser({ roles: ['editor'] }),
-          mockContext,
-        ),
-      ).rejects.toThrow(ForbiddenException);
-
-      expect(auditClient.emitEvent).toHaveBeenCalledWith(
-        mockContext,
-        expect.objectContaining({
-          action: 'DOCUMENT_SUBMITTED',
-          result: 'DENY',
-        }),
-      );
     });
   });
 });

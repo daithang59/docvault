@@ -1,5 +1,6 @@
+import { IsOptional, IsString } from 'class-validator';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, Min } from 'class-validator';
 
 export class PresignDownloadDto {
   @IsOptional()
@@ -7,4 +8,9 @@ export class PresignDownloadDto {
   @IsInt()
   @Min(1)
   version?: number;
+
+  /** Pre-authorized grant token from authorizeDownload — skips re-authorization */
+  @IsOptional()
+  @IsString()
+  grantToken?: string;
 }

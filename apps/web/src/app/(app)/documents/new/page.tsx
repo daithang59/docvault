@@ -2,13 +2,15 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useQueryClient } from '@tanstack/react-query';
 import { DocumentForm, DocumentFormValues } from '@/components/documents/document-form';
 import { UploadDropzone } from '@/components/documents/upload-dropzone';
 import { PageHeader } from '@/components/common/page-header';
 import { ProtectedAction } from '@/components/common/protected-action';
 import { EmptyState } from '@/components/common/empty-state';
 import { useCreateDocument } from '@/lib/hooks/use-documents';
-import { uploadDocument } from '@/lib/api/documents';
+import { uploadDocumentFile } from '@/features/documents/documents.api';
+import { documentsKeys } from '@/features/documents/documents.keys';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
@@ -16,6 +18,7 @@ import { getErrorMessage } from '@/lib/api/errors';
 
 export default function NewDocumentPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [file, setFile] = useState<File | null>(null);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -32,9 +35,13 @@ export default function NewDocumentPage() {
       toast.success(TOAST_MESSAGES.DOCUMENT_CREATED);
 
       if (file) {
+        setIsUploading(true);
         try {
-          setIsUploading(true);
-          await uploadDocument(doc.id, file);
+          await uploadDocumentFile(doc.id, file);
+          // Invalidate the detail query so the next page fetches fresh data
+          // that includes the newly created DocumentVersion row from PostgreSQL.
+          await qc.invalidateQueries({ queryKey: documentsKeys.detail(doc.id) });
+          await qc.invalidateQueries({ queryKey: documentsKeys.lists() });
           toast.success(TOAST_MESSAGES.VERSION_UPLOADED);
         } catch (uploadErr) {
           toast.error(
@@ -61,40 +68,43 @@ export default function NewDocumentPage() {
       fallback={
         <EmptyState
           icon="lock"
-          title="Không có quyền truy cập"
-          description="Bạn cần vai trò Editor hoặc Admin để tạo tài liệu mới."
+          title="Access Denied"
+          description="You need the Editor or Admin role to create a new document."
         />
       }
     >
-      <div className="animate-in delay-1 mx-auto max-w-2xl">
+      <div className="animate-in delay-1 mx-auto">
         <PageHeader
           title="New Document"
           subtitle="Create a new document entry and optionally upload the initial file."
         />
       </div>
-      <div className="animate-in delay-2 mx-auto max-w-2xl">
+      <div className="animate-in delay-2 mx-auto">
         <div
-          className="space-y-6 rounded-2xl border p-4 sm:p-6"
+          className="grid grid-cols-1 lg:grid-cols-2 gap-4 rounded-2xl border p-4 sm:p-6"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
         >
-          <DocumentForm
-            submitLabel="Save Draft"
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-          >
-            <button
-              type="button"
-              onClick={() => router.back()}
-              className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
-              style={{ borderColor: 'var(--border-strong)' }}
-              disabled={isLoading}
+          {/* Left: form */}
+          <div className="min-w-0">
+            <DocumentForm
+              submitLabel="Save Draft"
+              onSubmit={handleSubmit}
+              isLoading={isLoading}
             >
-              Cancel
-            </button>
-          </DocumentForm>
+              <button
+                type="button"
+                onClick={() => router.back()}
+                className="rounded-xl border bg-[var(--input-bg)] px-5 py-2.5 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)]"
+                style={{ borderColor: 'var(--border-strong)' }}
+                disabled={isLoading}
+              >
+                Cancel
+              </button>
+            </DocumentForm>
+          </div>
 
-          {/* File upload section */}
-          <div className="border-t pt-5" style={{ borderColor: 'var(--border-soft)' }}>
+          {/* Right: file upload */}
+          <div className="min-w-0 flex flex-col justify-start gap-3">
             <h3 className="mb-1 text-sm font-semibold text-[var(--text-strong)]">Initial File (optional)</h3>
             <p className="mb-4 text-xs text-[var(--text-muted)]">
               Attach a file to this document. You can also upload later from the document detail page.

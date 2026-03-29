@@ -1,22 +1,8 @@
 import axios from 'axios';
 import { env } from '@/config/env';
 import { loadSession } from './session';
-import { parseJwt, extractRoles, extractUsername, extractUserId } from './token';
 import type { Session } from '@/types/auth';
 import type { UserInfo } from '@/features/auth/auth.types';
-const REFRESH_THRESHOLD_SECONDS = 60; // Refresh if token expires in < 60s
-
-function tokenExpiresSoon(token: string): boolean {
-  try {
-    const payload = parseJwt(token);
-    if (!payload?.exp) return true;
-    const msUntilExpiry = (payload.exp as number) * 1000 - Date.now();
-    return msUntilExpiry < REFRESH_THRESHOLD_SECONDS * 1000;
-  } catch {
-    return true;
-  }
-}
-
 /**
  * Attempt to refresh the session by querying the gateway /me endpoint.
  * Falls back to the current token if refresh fails.
@@ -32,10 +18,9 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
     return null;
   }
 
-  // Only refresh if expiry is approaching
-  if (!tokenExpiresSoon(session.accessToken)) {
-    return null;
-  }
+  // Note: Client-side JWT expiry check is intentionally skipped.
+  // Keycloak in Docker may issue tokens with exp claims that are stale due to clock drift.
+  // The /me endpoint below performs real token validation against Keycloak JWKS.
 
   try {
     const response = await axios.get<{
@@ -54,22 +39,16 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
     });
 
     const data = response.data;
-    const currentPayload = parseJwt(session.accessToken);
-
-    // /me validates the token with Keycloak — if it returns 200, token is still valid.
-    // We re-extract roles from the same token (not from /me which may not include all claims).
-    // If /me returned a new token, use it; otherwise keep the current one.
-    const newPayload = currentPayload;
 
     const userInfo: UserInfo = {
-      sub: data.sub || extractUserId(newPayload!),
-      username: data.username || extractUsername(newPayload!),
-      preferred_username: data.username || extractUsername(newPayload!),
+      sub: data.sub ?? '',
+      username: data.username ?? 'unknown',
+      preferred_username: data.username ?? 'unknown',
       email: data.email,
       firstName: data.firstName,
       lastName: data.lastName,
       displayName: data.displayName,
-      roles: extractRoles(newPayload!),
+      roles: (data.roles ?? []) as UserInfo['roles'],
     };
 
     return {

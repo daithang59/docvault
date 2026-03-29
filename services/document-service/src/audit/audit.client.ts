@@ -9,6 +9,7 @@ type AuditEventPayload = {
   resourceId?: string;
   result: 'SUCCESS' | 'DENY' | 'CONFLICT' | 'ERROR';
   reason?: string;
+  metadata?: Record<string, unknown>;
 };
 
 @Injectable()
@@ -38,6 +39,7 @@ export class AuditClient {
             reason: event.reason,
             ip: context.ip,
             traceId: context.traceId,
+            metadata: event.metadata,
           },
           {
             headers: {

@@ -1,33 +1,33 @@
 # DocVault
 
-**DocVault** là hệ thống quản lý tài liệu doanh nghiệp theo kiến trúc **microservices**, xây dựng với NestJS. Hệ thống hỗ trợ vòng đời tài liệu đầy đủ: tạo → upload → duyệt → xuất bản → lưu trữ, kèm theo kiểm soát truy cập (RBAC) và nhật ký audit chống giả mạo.
+**DocVault** is an enterprise document management system built on a **microservices** architecture using NestJS. It supports the full document lifecycle: create → upload → review → publish → archive, with role-based access control (RBAC) and tamper-proof audit logging.
 
 ---
 
-## Kiến trúc hệ thống
+## System Architecture
 
-### Sơ đồ tổng quan các tầng
+### Layer Overview
 
 ```mermaid
 flowchart TB
-    subgraph CLIENT["🖥️ Client"]
+    subgraph CLIENT["Client"]
         FE["Frontend Next.js\n:3010"]
     end
 
-    subgraph GATEWAY["🔐 API Gateway — :3000"]
-        GW["gateway\nXác thực JWT · RBAC · Routing · Audit wrapper"]
+    subgraph GATEWAY["API Gateway — :3000"]
+        GW["gateway\nJWT Auth · RBAC · Routing · Audit wrapper"]
     end
 
-    subgraph SERVICES["⚙️ Microservices"]
+    subgraph SERVICES["Microservices"]
         direction LR
         META["metadata-service\n:3001\nMetadata · ACL · Status · History"]
         DOC["document-service\n:3002\nUpload · Download · MinIO"]
         WF["workflow-service\n:3003\nState machine · Submit · Approve"]
         AUDIT["audit-service\n:3004\nHash-chain audit log"]
-        NOTIF["notification-service\n:3005\nThông báo"]
+        NOTIF["notification-service\n:3005\nNotifications"]
     end
 
-    subgraph INFRA["🐳 Docker Infrastructure"]
+    subgraph INFRA["Docker Infrastructure"]
         direction LR
         KC["Keycloak\n:8080\nAuth & Users"]
         PG["PostgreSQL\n:5432\nDatabase"]
@@ -57,14 +57,14 @@ flowchart TB
     DOC -.->|"store files"| MINIO
 ```
 
-### Vòng đời tài liệu
+### Document Lifecycle
 
 ```mermaid
 flowchart LR
-    DRAFT(["📝 DRAFT"])
-    PENDING(["⏳ PENDING"])
-    PUBLISHED(["✅ PUBLISHED"])
-    ARCHIVED(["📦 ARCHIVED"])
+    DRAFT(["DRAFT"])
+    PENDING(["PENDING"])
+    PUBLISHED(["PUBLISHED"])
+    ARCHIVED(["ARCHIVED"])
 
     DRAFT -->|"Editor submit"| PENDING
     PENDING -->|"Approver approve"| PUBLISHED
@@ -74,11 +74,11 @@ flowchart LR
 
 ---
 
-## Biểu đồ Use Case
+## Use Case Diagram
 
 ```mermaid
 flowchart LR
-    subgraph ACTORS["👤 Người dùng"]
+    subgraph ACTORS["Actors"]
         V(["Viewer"])
         E(["Editor"])
         A(["Approver"])
@@ -86,23 +86,26 @@ flowchart LR
         ADM(["Admin"])
     end
 
-    subgraph USECASES["📋 Chức năng hệ thống"]
-        UC1["Xem danh sách tài liệu"]
-        UC2["Xem chi tiết tài liệu"]
-        UC3["Tạo tài liệu mới"]
+    subgraph USECASES["System Functions"]
+        UC1["View document list"]
+        UC2["View document details"]
+        UC3["Create new document"]
         UC4["Upload file"]
-        UC5["Phân quyền ACL"]
-        UC6["Submit để duyệt\nDRAFT → PENDING"]
-        UC7["Duyệt tài liệu\nPENDING → PUBLISHED"]
-        UC8["Từ chối tài liệu\nPENDING → DRAFT"]
-        UC9["Lưu trữ tài liệu\nPUBLISHED → ARCHIVED"]
-        UC10["Tải file đã xuất bản"]
-        UC11["Xem audit log"]
+        UC5["Manage ACL permissions"]
+        UC6["Submit for review\nDRAFT → PENDING"]
+        UC7["Approve document\nPENDING → PUBLISHED"]
+        UC8["Reject document\nPENDING → DRAFT"]
+        UC9["Archive document\nPUBLISHED → ARCHIVED"]
+        UC10["Download published file"]
+        UC11["View audit log"]
+        UC12["Preview document\nPUBLISHED / ARCHIVED"]
+        UC13["My Documents\nView owned documents"]
     end
 
     V --> UC1
     V --> UC2
     V --> UC10
+    V --> UC12
 
     E --> UC1
     E --> UC2
@@ -112,16 +115,20 @@ flowchart LR
     E --> UC6
     E --> UC9
     E --> UC10
+    E --> UC12
+    E --> UC13
 
     A --> UC1
     A --> UC2
     A --> UC7
     A --> UC8
     A --> UC10
+    A --> UC12
 
     CO --> UC1
     CO --> UC2
     CO --> UC11
+    CO -.->|"PUBLIC only"| UC12
 
     ADM --> UC1
     ADM --> UC2
@@ -134,92 +141,118 @@ flowchart LR
     ADM --> UC9
     ADM --> UC10
     ADM --> UC11
+    ADM --> UC12
+    ADM --> UC13
 ```
 
-> ⚠️ **Lưu ý:** Compliance Officer **không thể tải file** dù có bất kỳ quyền ACL nào — luật này được enforce ở tầng `metadata-service`.
+> **Note:** Compliance Officer **cannot download files** regardless of any ACL permissions — this rule is enforced at the `metadata-service` layer. CO **can preview only PUBLIC** published/archived documents, but sees metadata (details) for all PUBLISHED and ARCHIVED documents for audit purposes.
 
-### Vai trò người dùng
+### User Roles
 
-| Vai trò | Quyền chính |
-|---------|-------------|
-| `viewer` | Xem danh sách, xem chi tiết, tải file đã xuất bản |
-| `editor` | Tạo tài liệu, upload file, submit duyệt, lưu trữ (tài liệu của mình) |
-| `approver` | Duyệt / từ chối tài liệu đang chờ |
-| `compliance_officer` | Xem audit log — **không được tải file** |
-| `admin` | Toàn quyền |
+| Role | Main Permissions |
+|------|------------------|
+| `viewer` | View list (PUBLIC), preview, download published files |
+| `editor` | Create documents, upload files, submit for review, archive (own docs) |
+| `approver` | Approve / reject documents, preview **all** classification levels |
+| `compliance_officer` | View metadata for all PUBLISHED + ARCHIVED documents, view audit log, preview **PUBLIC only** — **cannot download files** |
+| `admin` | Full access |
+
+### Classification × Role Matrix
+
+#### Document List Visibility
+
+| Classification | viewer | editor | approver | CO | admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `INTERNAL` | ❌ | ✅ | ✅ | ✅ | ✅ |
+| `CONFIDENTIAL` | ❌ | ❌ | ✅ | ✅ | ✅ |
+| `SECRET` | ❌ | ❌ | ✅ | ✅ | ✅ |
+
+#### Document Preview
+
+| Classification | viewer | editor | approver | CO | admin |
+|---|:---:|:---:|:---:|:---:|:---:|
+| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
+| `INTERNAL` | ✅ | ✅ | ✅ | ❌ | ✅ |
+| `CONFIDENTIAL` | ❌ | ✅¹ | ✅ | ❌ | ✅ |
+| `SECRET` | ❌ | ❌ | ✅ | ❌ | ✅ |
+
+> ¹ Requires explicit ACL or is the owner
+
+> Beyond the matrix above, a user always sees documents they **own** or have an **ACL entry** for — regardless of classification level.
 
 ---
 
-## Yêu cầu cài đặt
+## Installation Requirements
 
-| Công cụ | Phiên bản tối thiểu |
-|---------|---------------------|
+| Tool | Minimum Version |
+|------|-----------------|
 | Node.js | 18+ |
 | pnpm | 8+ |
 | Docker Desktop | 24+ |
-| Git | bất kỳ |
+| Git | any |
 
 ---
 
-## Hướng dẫn chạy dự án
+## Running the Project
 
-### Cách nhanh — Một lệnh duy nhất
+### Quick Start — Single Command
 
 ```bash
 pnpm start:sequential
 ```
 
-Script tự động khởi động **tất cả services theo đúng thứ tự**, polling health endpoint trước khi chuyển sang service tiếp theo:
+This script automatically starts **all services in the correct order**, polling the health endpoint before moving to the next service:
 
 ```
 metadata-service (:3001) → document-service (:3002) → workflow-service (:3003)
   → notification-service (:3005) → audit-service (:3004) → gateway (:3000)
 ```
 
-Các bước tùy chọn (Prisma deploy, audit log migration) mặc định bị bỏ qua. Bật bằng:
+Optional steps (Prisma deploy, audit log migration) are skipped by default. Enable with:
 
 ```bash
 RUN_PRISMA_DEPLOY=1 RUN_AUDIT_MIGRATION=1 pnpm start:sequential
 ```
 
-Tùy chỉnh health-check timeout:
+Customize health-check timeout:
 
 ```bash
 SERVICE_HEALTH_TIMEOUT_MS=180000 pnpm start:sequential
 ```
 
-> Đảm bảo Docker infra đã chạy trước (xem Bước 1 bên dưới).
+> Make sure Docker infra is already running (see Step 1 below).
 
 ---
 
-### Cách chi tiết — Từng bước
+### Detailed Step-by-Step
 
-#### Bước 1 — Cài dependencies
+#### Step 1 — Install Dependencies
 
 ```bash
 pnpm install
 ```
 
-#### Bước 2 — Khởi động hạ tầng (Docker)
+#### Step 2 — Start Infrastructure (Docker)
 
-Lệnh này sẽ khởi động: **PostgreSQL**, **MinIO**, **Keycloak** (kèm seed realm & user mẫu).
+This starts: **PostgreSQL**, **MinIO**, **Keycloak** (with seeded realm & sample users).
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
 ```
 
-Chờ tất cả container **healthy** (khoảng 30–60 giây):
+Wait for all containers to be **healthy** (about 30–60 seconds):
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml ps
 ```
 
-> **Services sau khi chạy:**
+> **Services after startup:**
 > - PostgreSQL: `localhost:5432`
 > - MinIO Console: [http://localhost:9001](http://localhost:9001) (user: `minioadmin` / `minioadminpw`)
 > - Keycloak Admin: [http://localhost:8080](http://localhost:8080) (user: `admin` / `adminpw`)
 
-#### Bước 3 — Chạy database migration
+#### Step 3 — Run Database Migrations
 
 ```bash
 # metadata-service (PostgreSQL)
@@ -229,9 +262,9 @@ pnpm --filter metadata-service prisma:deploy
 pnpm --filter audit-service prisma:deploy
 ```
 
-#### Bước 4 — Khởi động các Backend Service
+#### Step 4 — Start Backend Services
 
-Mỗi service chạy trong một terminal riêng:
+Each service runs in its own terminal:
 
 ```bash
 # Terminal 1 — metadata-service (port 3001)
@@ -249,53 +282,53 @@ pnpm --filter audit-service start:dev
 # Terminal 5 — notification-service (port 3005)
 pnpm --filter notification-service start:dev
 
-# Terminal 6 — gateway (port 3000) — khởi động SAU CÙNG
+# Terminal 6 — gateway (port 3000) — start LAST
 pnpm --filter gateway start:dev
 ```
 
-> **Thứ tự quan trọng:** Gateway phải khởi động **sau** khi các services khác đã sẵn sàng.
+> **Important order:** Gateway must start **after** all other services are ready.
 
-#### Bước 5 — Khởi động Frontend
+#### Step 5 — Start Frontend
 
 ```bash
 cd apps/web
 
-# Sao chép file env
+# Copy env file
 cp .env.example .env.local
 
-# Chạy dev server
+# Run dev server
 npx next dev -p 3010
 ```
 
-Mở trình duyệt: [http://localhost:3010](http://localhost:3010)
+Open browser: [http://localhost:3010](http://localhost:3010)
 
 ---
 
-## Kiểm tra hệ thống
+## Testing the System
 
-### Chạy E2E kiểm tra toàn bộ luồng BE
+### Run E2E Checks for the Full BE Flow
 
 ```bash
 node scripts/e2e-check.mjs
 ```
 
-Bao gồm các kiểm tra:
-- Không có token → 401
-- Token hết hạn → 401
-- Viewer tạo tài liệu → 403
-- Editor tạo + upload → 201, file lưu vào MinIO ✅
-- Viewer tải khi draft → 403
-- Editor submit → PENDING
-- Approver approve → PUBLISHED
-- Approve lần 2 → 409 Conflict
-- Viewer tải khi PUBLISHED → 200
-- Compliance Officer tải file → 403
-- Compliance Officer xem audit → 200
-- Viewer xem audit → 403
+Includes:
+- No token → 401
+- Expired token → 401
+- Viewer creates document → 403
+- Editor creates + uploads → 201, file stored in MinIO ✅
+- Viewer downloads draft → 403
+- Editor submits → PENDING
+- Approver approves → PUBLISHED
+- Approve again → 409 Conflict
+- Viewer downloads PUBLISHED → 200
+- Compliance Officer downloads file → 403
+- Compliance Officer views audit → 200
+- Viewer views audit → 403
 
 ### API Swagger
 
-Sau khi services chạy:
+With services running:
 
 | Service | Swagger UI |
 |---------|-----------|
@@ -308,19 +341,19 @@ Sau khi services chạy:
 
 ---
 
-## Tài khoản demo (Keycloak)
+## Demo Accounts (Keycloak)
 
-Mật khẩu tất cả tài khoản: **`Passw0rd!`**
+Password for all accounts: **`Passw0rd!`**
 
-| Username | Vai trò | Mô tả |
-|----------|---------|-------|
-| `viewer1` | viewer | Xem & tải tài liệu đã xuất bản |
-| `editor1` | editor | Tạo, upload, submit tài liệu |
-| `approver1` | approver | Duyệt / từ chối tài liệu |
-| `co1` | compliance_officer | Xem audit log (không tải được file) |
-| `admin1` | admin | Toàn quyền |
+| Username | Role | Description |
+|----------|------|-------------|
+| `viewer1` | viewer | View & download published documents |
+| `editor1` | editor | Create, upload, submit documents |
+| `approver1` | approver | Approve / reject documents |
+| `co1` | compliance_officer | View audit log (cannot download files) |
+| `admin1` | admin | Full access |
 
-### Lấy JWT token từ Keycloak
+### Get JWT Token from Keycloak
 
 ```bash
 curl -s -X POST \
@@ -332,37 +365,37 @@ curl -s -X POST \
 
 ---
 
-## Luồng nghiệp vụ chính
+## Core Business Flows
 
-### Upload và Xuất bản tài liệu
+### Upload and Publish Document
 
 ```
 Editor                    Gateway              Services
   │                          │                    │
-  ├─ POST /api/metadata/documents ──────────────► │ Tạo metadata (DRAFT)
-  ├─ POST /api/documents/:id/upload ───────────► │ Upload lên MinIO
+  ├─ POST /api/metadata/documents ──────────────► │ Create metadata (DRAFT)
+  ├─ POST /api/documents/:id/upload ────────────► │ Upload to MinIO
   ├─ POST /api/workflow/:id/submit ────────────► │ DRAFT → PENDING
   │                                               │
 Approver                                          │
-  ├─ POST /api/workflow/:id/approve ───────────► │ PENDING → PUBLISHED
+  ├─ POST /api/workflow/:id/approve ────────────► │ PENDING → PUBLISHED
   │                                               │
 Viewer                                            │
-  └─ POST /api/documents/:id/presign-download ──► │ Lấy URL tải file
+  └─ POST /api/documents/:id/presign-download ──► │ Get download URL
 ```
 
-### Luồng Compliance
+### Compliance Flow
 
 ```
 Compliance Officer   Gateway         metadata-service
   │                    │                    │
-  ├─ GET /api/metadata/documents ─────────► │ Xem danh sách → 200 ✅
-  ├─ GET /api/audit/query ─────────────────► │ Xem audit log → 200 ✅
-  └─ POST /api/documents/:id/presign-download │ Tải file → 403 ❌ (luôn bị chặn)
+  ├─ GET /api/metadata/documents ──────────► │ View list → 200 ✅
+  ├─ GET /api/audit/query ─────────────────► │ View audit log → 200 ✅
+  └─ POST /api/documents/:id/presign-download │ Download file → 403 ❌ (always blocked)
 ```
 
 ---
 
-## Cấu trúc thư mục
+## Directory Structure
 
 ```
 docvault/
@@ -370,47 +403,94 @@ docvault/
 │   └── web/                    # Frontend Next.js 15
 ├── services/
 │   ├── gateway/                # API Gateway (NestJS, port 3000)
-│   ├── metadata-service/       # Quản lý metadata & ACL (port 3001)
-│   ├── document-service/       # Upload/Download MinIO (port 3002)
-│   ├── workflow-service/       # State machine duyệt tài liệu (port 3003)
-│   ├── audit-service/          # Audit log chống giả mạo (port 3004)
-│   └── notification-service/   # Thông báo (port 3005)
+│   ├── metadata-service/       # Metadata & ACL management (port 3001)
+│   ├── document-service/       # Upload/Download via MinIO (port 3002)
+│   ├── workflow-service/       # Document review state machine (port 3003)
+│   ├── audit-service/          # Tamper-proof audit log (port 3004)
+│   └── notification-service/   # Notifications (port 3005)
 ├── infra/
 │   ├── docker-compose.dev.yml  # Infra: Postgres, MinIO, Keycloak
-│   ├── .env.example            # Cấu hình infra mẫu
+│   ├── .env.example            # Sample infra config
 │   └── keycloak/               # Realm config & seed users
 ├── scripts/
-│   ├── e2e-check.mjs           # Script kiểm tra E2E tự động
-│   ├── start-sequential.mjs    # Script khởi động tuần tự tất cả services
+│   ├── e2e-check.mjs           # Automated E2E check script
+│   ├── start-sequential.mjs   # Sequential startup script for all services
 │   └── demo.sh                 # Demo script
 └── docs/
-    ├── demo-users.md           # Thông tin tài khoản & phân quyền
-    ├── demo-flow.md            # Kịch bản demo từng bước
-    ├── ERD.md                  # Entity Relationship Diagram chi tiết
-    ├── PROJECT_STATUS.md       # Trạng thái project & known gaps
-    └── verification-report.md  # Báo cáo kiểm tra tích hợp
+    ├── demo-users.md           # Account & permission info
+    ├── demo-flow.md            # Step-by-step demo scenarios
+    ├── ERD.md                  # Entity Relationship Diagram
+    ├── PROJECT_STATUS.md       # Project status & known gaps
+    └── verification-report.md # Integration check report
 ```
 
 ---
 
-## Mô hình dữ liệu
+## Data Model
 
 ### Database `docvault_metadata` (PostgreSQL)
 
-- `documents` — metadata, tags, phân loại, trạng thái, publishedAt, archivedAt
-- `document_versions` — con trỏ tới các phiên bản file trên MinIO
-- `document_acl` — kiểm soát quyền truy cập (USER / ROLE / GROUP)
-- `document_workflow_history` — lịch sử chuyển trạng thái
+- `documents` — metadata, tags, classification, status, publishedAt, archivedAt
+- `document_versions` — pointers to file versions stored in MinIO
+- `document_acl` — access control (USER / ROLE / GROUP)
+- `document_workflow_history` — status transition history
 
 ### Database `docvault_audit` (PostgreSQL)
 
-- `audit_events` — sự kiện audit với **hash chain SHA-256** chống giả mạo
+- `audit_events` — audit events with **SHA-256 hash chain** for tamper proofing
+
+### Database `docvault_metadata` — Document Comments
+
+- `document_comments` — comments/notes on documents (authorId, content, timestamp)
 
 ---
 
-## Ghi chú quan trọng
+## Advanced Features
 
-- **Compliance Officer** luôn bị từ chối tải file, kể cả khi ACL cho phép (logic trong `metadata-service/policy.service.ts`).
-- **Archive** chỉ dành cho editor sở hữu tài liệu hoặc admin (không phải approver).
-- Gateway tự động ghi audit cho mọi request nhận được.
-- Trạng thái tài liệu: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.
+### Bulk Actions
+
+Select multiple documents in the table and perform batch operations:
+
+- **Bulk Submit**: Select multiple DRAFT → Submit all at once
+- **Bulk Approve**: Approver selects multiple PENDING → Batch approve
+- **Bulk Archive**: Select multiple PUBLISHED → Archive simultaneously
+
+> Results displayed via toast: `"Bulk Submit: 3 succeeded, 1 failed"`.
+
+### Document Comments
+
+All users with document view permission can leave comments/notes:
+
+- Displayed on document detail page (right column)
+- Supported across all roles: viewer, editor, approver, CO, admin
+- API: `GET/POST /api/metadata/documents/:docId/comments`
+
+### Full-text Search (Server-side)
+
+Search documents by title, description, and tags:
+
+- Search processed server-side (PostgreSQL ILIKE) → efficient with large datasets
+- API: `GET /api/metadata/documents?q=keyword`
+- Frontend automatically sends query to server when typing in the search box
+
+### My Documents
+
+Editor/Admin has a dedicated `/my-documents` page showing only their owned documents:
+
+- Sidebar menu: **My Documents** (FolderOpen icon)
+- Auto-filtered by `ownerId` — easy personal document management
+- Full support: bulk actions, filters, submit/archive
+
+---
+
+## Important Notes
+
+- **Compliance Officer** is always denied file downloads, even if ACL permits it (logic in `metadata-service/policy.service.ts`). CO **can only preview PUBLIC documents**, but sees metadata (details) for all PUBLISHED and ARCHIVED documents for audit purposes.
+- **Approver** is the highest non-admin permission — can preview documents at **all** classification levels.
+- **Preview** supports `PUBLISHED` and `ARCHIVED` documents. PDFs are rendered via `pdf.js` (canvas) — no download button, no right-click save.
+- **Archive** is only available to editors who own the document or admins (not approvers). ARCHIVED documents **can only be previewed**, not downloaded.
+- **Classification Visibility**: PUBLIC (all) → INTERNAL (editor+) → CONFIDENTIAL (approver+) → SECRET (approver+). CO sees all PUBLISHED (metadata only).
+- **Bulk Actions** supports batch Submit, Approve, Archive — each doc is called via sequential API.
+- **Document Comments** stored in the `document_comments` table — unlimited comments.
+- Gateway automatically logs audit for every request received.
+- Document status flow: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.

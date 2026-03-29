@@ -22,39 +22,93 @@ import { cn } from '@/lib/utils/cn';
 import { formatRelative } from '@/lib/utils/date';
 import {
   fetchNotifications,
+  fetchUnreadCount,
+  markAsRead,
   markAllNotificationsRead,
   NotificationRecord,
+  NotificationPage,
 } from '@/features/notifications/notifications.api';
 
-const NOTIF_META: Record<string, { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }> = {
-  SUBMITTED: { label: 'was submitted for review', Icon: Send, color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300' },
-  APPROVED:  { label: 'was approved', Icon: FileCheck, color: 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-300' },
-  REJECTED:  { label: 'was rejected', Icon: XCircle, color: 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-300' },
-  ARCHIVED:  { label: 'was archived', Icon: Archive, color: 'text-slate-500 bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300' },
+// ── Constants ────────────────────────────────────────────────────────────────
+const POLL_INTERVAL_MS = 30_000; // refresh badge every 30 seconds
+
+// ── NOTIF_META — now includes ARCHIVED + DELETED ─────────────────────────────
+const NOTIF_META: Record<
+  string,
+  { label: string; Icon: React.ComponentType<{ className?: string }>; color: string }
+> = {
+  SUBMITTED: {
+    label: 'was submitted for review',
+    Icon: Send,
+    color: 'text-blue-600 bg-blue-50 dark:bg-blue-950/50 dark:text-blue-300',
+  },
+  APPROVED: {
+    label: 'was approved',
+    Icon: FileCheck,
+    color: 'text-green-600 bg-green-50 dark:bg-green-950/50 dark:text-green-300',
+  },
+  REJECTED: {
+    label: 'was rejected',
+    Icon: XCircle,
+    color: 'text-red-600 bg-red-50 dark:bg-red-950/50 dark:text-red-300',
+  },
+  ARCHIVED: {
+    label: 'was archived',
+    Icon: Archive,
+    color: 'text-slate-500 bg-slate-100 dark:bg-slate-800/60 dark:text-slate-300',
+  },
+  DELETED: {
+    label: 'was deleted',
+    Icon: Archive,
+    color: 'text-slate-400 bg-slate-50 dark:bg-slate-800/30 dark:text-slate-400',
+  },
 };
 
-function NotificationItem({ notif }: { notif: NotificationRecord }) {
-  const meta = NOTIF_META[notif.type] ?? NOTIF_META.SUBMITTED;
+// ── NotificationItem ──────────────────────────────────────────────────────────
+function NotificationItem({
+  notif,
+  onMarkRead,
+}: {
+  notif: NotificationRecord;
+  onMarkRead: (id: string) => void;
+}) {
+  const meta   = NOTIF_META[notif.type] ?? NOTIF_META.SUBMITTED;
   const { Icon } = meta;
+  // Prefer docTitle; fall back to truncated docId for older records
+  const docLabel = notif.docTitle ?? `${notif.docId.slice(0, 8)}…`;
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 px-4 py-3 transition-colors hover:bg-[var(--bg-muted)]/60',
-        !notif.read && 'bg-[var(--color-primary-light)]/60',
+        'group flex items-start gap-3 px-4 py-3 transition-colors cursor-pointer',
+        'hover:bg-[var(--bg-muted)]/60',
+        !notif.read && 'bg-[var(--color-primary-light)]/40',
       )}
+      onClick={() => {
+        if (!notif.read) onMarkRead(notif.id);
+      }}
     >
-      <div className={cn('mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg', meta.color)}>
+      <div
+        className={cn(
+          'mt-0.5 flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-lg',
+          meta.color,
+        )}
+      >
         <Icon className="h-3.5 w-3.5" />
       </div>
       <div className="flex-1 min-w-0">
         <p className="text-sm leading-snug text-[var(--text-main)]">
-          Document <span className="font-medium text-[var(--text-strong)]">{notif.docId.slice(0, 8)}…</span> {meta.label}.
+          <span className="font-medium text-[var(--text-strong)]">{docLabel}</span>{' '}
+          {meta.label}.
           {notif.reason && (
-            <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">{notif.reason}</span>
+            <span className="mt-0.5 block truncate text-xs text-[var(--text-muted)]">
+              Reason: {notif.reason}
+            </span>
           )}
         </p>
-        <p className="mt-1 text-xs text-[var(--text-muted)]">{formatRelative(notif.createdAt)}</p>
+        <p className="mt-1 text-xs text-[var(--text-muted)]">
+          {formatRelative(notif.createdAt)}
+        </p>
       </div>
       {!notif.read && (
         <span
@@ -66,58 +120,97 @@ function NotificationItem({ notif }: { notif: NotificationRecord }) {
   );
 }
 
+// ── AppTopbar ────────────────────────────────────────────────────────────────
 export function AppTopbar() {
   const { session, logout } = useAuth();
   const router = useRouter();
-  const [dropdownOpen, setDropdownOpen] = useState(false);
-  const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState<NotificationRecord[]>([]);
+
+  // ── Notification state ─────────────────────────────────────────────────
+  const [notifOpen,    setNotifOpen]    = useState(false);
+  const [notifPage,    setNotifPage]    = useState<NotificationPage | null>(null);
+  const [unreadCount,  setUnreadCount]  = useState(0);
   const [notifLoading, setNotifLoading] = useState(false);
   const notifRef = useRef<HTMLDivElement>(null);
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // ── [A] Badge polling — runs every 30 s to keep bell badge fresh ──────────
+  useEffect(() => {
+    if (!session) return;
 
+    // Fire immediately on mount
+    fetchUnreadCount()
+      .then(({ count }) => setUnreadCount(count))
+      .catch(() => {});
+
+    const interval = setInterval(() => {
+      fetchUnreadCount()
+        .then(({ count }) => setUnreadCount(count))
+        .catch(() => {});
+    }, POLL_INTERVAL_MS);
+
+    return () => clearInterval(interval);
+  }, [session]);
+
+  // ── [B] Dropdown open — fetch paginated list ─────────────────────────────
+  useEffect(() => {
+    if (!notifOpen || !session) return;
+
+    setNotifLoading(true);
+    fetchNotifications(1, 20)
+      .then((page) => setNotifPage(page))
+      .catch(() => {})
+      .finally(() => setNotifLoading(false));
+  }, [notifOpen, session]);
+
+  // ── [C] Close dropdown on outside click ──────────────────────────────────
   useEffect(() => {
     if (!notifOpen) return;
-
-    function handleClick(e: MouseEvent) {
+    const handler = (e: MouseEvent) => {
       if (notifRef.current && !notifRef.current.contains(e.target as Node)) {
         setNotifOpen(false);
       }
-    }
-
-    document.addEventListener('mousedown', handleClick);
-    return () => document.removeEventListener('mousedown', handleClick);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
   }, [notifOpen]);
 
-  useEffect(() => {
-    if (!notifOpen) return;
+  // ── [D] Individual mark-as-read (optimistic) ─────────────────────────────
+  function handleMarkRead(id: string) {
+    // Optimistic UI — update immediately
+    setUnreadCount((c) => Math.max(0, c - 1));
+    setNotifPage((prev) =>
+      prev
+        ? { ...prev, records: prev.records.map((r) => (r.id === id ? { ...r, read: true } : r)) }
+        : prev,
+    );
+    // Fire API; revert on failure
+    markAsRead(id).catch(() => {
+      setUnreadCount((c) => c + 1);
+    });
+  }
 
-    fetchNotifications()
-      .then((data) => {
-        setNotifications(data);
-        if (data.some((n) => !n.read)) {
-          markAllNotificationsRead().catch(() => {});
-        }
+  // ── [E] Mark all read ────────────────────────────────────────────────────
+  function handleMarkAllRead() {
+    markAllNotificationsRead()
+      .then(() => {
+        setUnreadCount(0);
+        setNotifPage((prev) =>
+          prev
+            ? { ...prev, records: prev.records.map((r) => ({ ...r, read: true })) }
+            : prev,
+        );
       })
-      .catch(() => {})
-      .finally(() => setNotifLoading(false));
-  }, [notifOpen]);
-
-  function handleLogout() {
-    logout();
-    // Redirect to server-side logout that also ends Keycloak SSO session
-    window.location.href = '/api/auth/logout';
+      .catch(() => {});
   }
 
   function toggleNotifications() {
-    setNotifOpen((prev) => {
-      const next = !prev;
-      if (next) {
-        setNotifLoading(true);
-      }
-      return next;
-    });
+    setNotifOpen((prev) => !prev);
+  }
+
+  const notifications = notifPage?.records ?? [];
+
+  function handleLogout() {
+    logout();
+    window.location.href = '/api/auth/logout';
   }
 
   const avatarInitials =
@@ -131,6 +224,8 @@ export function AppTopbar() {
       session?.user.preferred_username) ??
     'User';
 
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
   return (
     <header
       className="sticky top-0 z-30 flex h-14 items-center justify-between border-b px-6"
@@ -143,9 +238,7 @@ export function AppTopbar() {
       }}
     >
       <div className="flex items-center gap-3">
-        {session?.user.roles[0] && (
-          <RoleBadge role={session.user.roles[0] as UserRole} />
-        )}
+        <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />
       </div>
 
       <div className="flex items-center gap-2">
@@ -187,14 +280,14 @@ export function AppTopbar() {
                 boxShadow: 'var(--surface-shadow-lg)',
               }}
             >
-              <div className="flex items-center justify-between border-b px-4 py-3" style={{ borderColor: 'var(--border-soft)' }}>
+              <div
+                className="flex items-center justify-between border-b px-4 py-3"
+                style={{ borderColor: 'var(--border-soft)' }}
+              >
                 <p className="text-sm font-semibold text-[var(--text-strong)]">Notifications</p>
                 {unreadCount > 0 && (
                   <button
-                    onClick={() => {
-                      markAllNotificationsRead().catch(() => {});
-                      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-                    }}
+                    onClick={handleMarkAllRead}
                     className="flex items-center gap-1 text-xs text-[var(--color-primary)] transition-colors hover:opacity-85"
                   >
                     <CheckCheck className="h-3.5 w-3.5" />
@@ -210,7 +303,10 @@ export function AppTopbar() {
                       <div key={i} className="flex items-start gap-3">
                         <div className="mt-0.5 h-7 w-7 shrink-0 rounded-lg bg-[var(--bg-muted)]" />
                         <div className="flex-1 space-y-1.5 pt-0.5">
-                          <div className="h-3 w-full animate-pulse rounded bg-[var(--bg-muted)]" style={{ width: `${w}%` }} />
+                          <div
+                            className="h-3 w-full animate-pulse rounded bg-[var(--bg-muted)]"
+                            style={{ width: `${w}%` }}
+                          />
                           <div className="h-2.5 w-1/3 animate-pulse rounded bg-[var(--bg-muted)]" />
                         </div>
                       </div>
@@ -222,7 +318,13 @@ export function AppTopbar() {
                     <p className="text-sm">No notifications</p>
                   </div>
                 ) : (
-                  notifications.map((notif) => <NotificationItem key={notif.id} notif={notif} />)
+                  notifications.map((notif) => (
+                    <NotificationItem
+                      key={notif.id}
+                      notif={notif}
+                      onMarkRead={handleMarkRead}
+                    />
+                  ))
                 )}
               </div>
             </div>
@@ -242,7 +344,9 @@ export function AppTopbar() {
             <div className="relative h-7 w-7 overflow-hidden rounded-lg">
               <div className="absolute inset-0 bg-gradient-to-br from-blue-500 to-violet-500 opacity-20" />
               <div className="absolute inset-0.5 flex items-center justify-center rounded-[5px] bg-slate-800 dark:bg-slate-900">
-                <span className="text-[10px] font-bold uppercase tracking-tight text-blue-400">{avatarInitials}</span>
+                <span className="text-[10px] font-bold uppercase tracking-tight text-blue-400">
+                  {avatarInitials}
+                </span>
               </div>
             </div>
             <span className="hidden text-sm font-medium md:block">{displayName}</span>
@@ -268,15 +372,23 @@ export function AppTopbar() {
                 boxShadow: 'var(--surface-shadow-lg)',
               }}
             >
-              <div className="border-b px-4 py-3.5" style={{ borderColor: 'var(--border-soft)' }}>
+              <div
+                className="border-b px-4 py-3.5"
+                style={{ borderColor: 'var(--border-soft)' }}
+              >
                 <p className="text-sm font-semibold text-[var(--text-strong)]">{displayName}</p>
                 {session?.user.email && (
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">{session.user.email}</p>
                 )}
-                <p className="mt-0.5 text-xs text-[var(--text-faint)]">ID: {session?.user.sub?.slice(0, 8)}…</p>
+                <p className="mt-0.5 text-xs text-[var(--text-faint)]">
+                  ID: {session?.user.sub?.slice(0, 8)}…
+                </p>
               </div>
               <button
-                onClick={() => { setDropdownOpen(false); router.push('/profile'); }}
+                onClick={() => {
+                  setDropdownOpen(false);
+                  router.push('/profile');
+                }}
                 className="flex w-full items-center gap-2.5 px-4 py-2.5 text-sm text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
               >
                 <User className="h-4 w-4" />

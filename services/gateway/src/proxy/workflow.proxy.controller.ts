@@ -1,4 +1,4 @@
-import { Body, Controller, Param, Post, Req, UseGuards } from '@nestjs/common';
+import { Body, Controller, Delete, Param, Post, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import {
   ApiBearerAuth,
@@ -113,6 +113,24 @@ export class WorkflowProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.WORKFLOW_SERVICE_URL}/workflow/${docId}/archive`,
+    });
+    return response.data;
+  }
+
+  @Delete(':docId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Delete a DRAFT document (soft delete)',
+    description:
+      'Permanently deletes a **DRAFT** document. ' +
+      '**Only the document owner or admin may delete.** ' +
+      'Deleted documents are removed from all views but retained in the database.',
+  })
+  async deleteDocument(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'DELETE',
+      url: `${process.env.WORKFLOW_SERVICE_URL}/workflow/${docId}`,
     });
     return response.data;
   }

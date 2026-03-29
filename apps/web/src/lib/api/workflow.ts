@@ -7,4 +7,5 @@ export {
   approveDocument,
   rejectDocument,
   archiveDocument,
+  deleteDocument,
 } from '@/features/workflow/workflow.api';

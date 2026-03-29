@@ -1,8 +1,9 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { getDocuments, createDocument, updateDocument } from '@/lib/api/metadata';
-import { uploadDocument } from '@/lib/api/documents';
+import { uploadDocumentFile } from '@/features/documents/documents.api';
 import { submitDocument, approveDocument, rejectDocument, archiveDocument } from '@/lib/api/workflow';
+import { useDeleteDocument } from '@/features/workflow/workflow.hooks';
 import { CreateDocumentDto, UpdateDocumentDto } from '@/types/document';
 
 export function useDocuments() {
@@ -36,10 +37,11 @@ export function useUpdateDocument(docId: string) {
 export function useUploadDocument(docId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) => uploadDocument(docId, file),
+    mutationFn: (file: File) => uploadDocumentFile(docId, file),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: documentsKeys.detail(docId) });
       qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(docId) });
     },
   });
 }
@@ -91,3 +93,5 @@ export function useArchiveDocument(docId: string) {
     },
   });
 }
+
+export { useDeleteDocument } from '@/features/workflow/workflow.hooks';

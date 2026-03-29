@@ -66,14 +66,14 @@ export function UploadDropzone({
         onDragLeave={() => setIsDragging(false)}
         onDrop={onDrop}
         className={cn(
-          'rounded-xl border-2 border-dashed p-8 text-center transition-all',
+          'rounded-xl border-2 border-dashed p-5 text-center transition-all',
           isDragging
             ? 'border-[var(--color-primary)] bg-[var(--color-primary-light)]'
             : 'border-[var(--input-border)] bg-[var(--bg-subtle)] hover:border-[var(--color-primary)] hover:bg-[var(--color-primary-light)]',
           disabled && 'pointer-events-none opacity-50'
         )}
       >
-        <Upload className="mx-auto mb-3 h-8 w-8 text-[var(--text-muted)]" />
+        <Upload className="mx-auto mb-2 h-6 w-6 text-[var(--text-muted)]" />
         <p className="mb-1 text-sm font-medium text-[var(--text-main)]">
           Drop file here or{' '}
           <label className="cursor-pointer text-[var(--color-primary)] hover:underline">

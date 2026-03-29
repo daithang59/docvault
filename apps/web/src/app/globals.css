@@ -64,6 +64,10 @@
   --status-archived-text: #4B5563;
   --status-archived-border: #E5E7EB;
 
+  --status-deleted-bg: #FEF2F2;
+  --status-deleted-text: #991B1B;
+  --status-deleted-border: #FECACA;
+
   /* Classification */
   --class-public-bg: #F0FDF4;
   --class-public-text: #166534;
@@ -271,6 +275,10 @@
   --status-archived-bg: rgba(107, 114, 128, 0.15);
   --status-archived-text: #9CA3AF;
   --status-archived-border: rgba(107, 114, 128, 0.25);
+
+  --status-deleted-bg: rgba(239, 68, 68, 0.15);
+  --status-deleted-text: #F87171;
+  --status-deleted-border: rgba(239, 68, 68, 0.3);
 
   /* ── Classification badges ──────────────────────────────────────────────── */
   --class-public-bg: rgba(34, 197, 94, 0.12);
@@ -511,6 +519,8 @@ body {
 /* ── Page content wrapper ──────────────────────────────────────────────────── */
 .page-content {
   animation: fadeInUp 0.4s cubic-bezier(0.22, 1, 0.36, 1) both;
+  /* Fill the remaining viewport height so pages with little content don't look sparse */
+  min-height: calc(100dvh - 56px - 1.5rem); /* 56px = topbar h-14, 1.5rem = py-6 */
 }
 
 /* ── Interactive card — hover lift + glow ───────────────────────────────────── */

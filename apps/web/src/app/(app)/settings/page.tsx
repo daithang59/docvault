@@ -62,12 +62,12 @@ export default function SettingsPage() {
 
   return (
     <PageShell
-      title="Thông tin hệ thống"
-      description="Thông tin phiên đăng nhập và cấu hình môi trường"
+      title="System Information"
+      description="Session details and environment configuration."
     >
       {/* ── Session Info ────────────────────────────────────── */}
       <div className="animate-in delay-1">
-        <SectionLabel>Phiên đăng nhập</SectionLabel>
+        <SectionLabel>Login Session</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2">
         <InfoCard
           icon={<AtSign size={15} className="text-[var(--color-primary)]" />}
@@ -77,7 +77,7 @@ export default function SettingsPage() {
         />
         <InfoCard
           icon={<KeyRound size={15} className="text-[var(--color-primary)]" />}
-          label="Loại phiên"
+          label="Session Type"
           value={user ? 'Authenticated (Keycloak SSO)' : 'Demo / Not logged in'}
         />
         <InfoCard
@@ -92,7 +92,7 @@ export default function SettingsPage() {
 
       {/* ── Roles ───────────────────────────────────────────── */}
       <div className="animate-in delay-2">
-        <SectionLabel>Vai trò &amp; quyền hạn</SectionLabel>
+        <SectionLabel>Roles &amp; Permissions</SectionLabel>
         <div
           className="relative overflow-hidden rounded-xl border p-5"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
@@ -108,7 +108,7 @@ export default function SettingsPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-sm text-[var(--text-muted)]">Không có vai trò nào được gán.</p>
+              <p className="text-sm text-[var(--text-muted)]">No roles have been assigned.</p>
             )}
           </div>
         </div>
@@ -116,17 +116,17 @@ export default function SettingsPage() {
 
       {/* ── Environment ──────────────────────────────────────── */}
       <div className="animate-in delay-3">
-        <SectionLabel>Môi trường</SectionLabel>
+        <SectionLabel>Environment</SectionLabel>
         <div className="grid gap-3 sm:grid-cols-2">
         <InfoCard
           icon={<User size={15} className="text-[var(--color-primary)]" />}
-          label="Ứng dụng"
+          label="Application"
           value={process.env.NEXT_PUBLIC_APP_NAME ?? 'DocVault'}
         />
         <InfoCard
           icon={<Globe size={15} className="text-[var(--color-primary)]" />}
           label="API Gateway URL"
-          value={process.env.NEXT_PUBLIC_API_BASE_URL ?? 'Chưa cấu hình'}
+          value={process.env.NEXT_PUBLIC_API_BASE_URL ?? 'Not configured'}
           mono
           muted
         />

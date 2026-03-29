@@ -29,12 +29,19 @@ describe('AuditService — Hash Chain', () => {
     service = new AuditService(mockModel as any);
 
     mockLean.mockResolvedValue(null);
+    // Simulate MongoDB: only the first argument is returned as saved document
     mockCreate.mockImplementation((data) =>
       Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
     );
+
+    // Stub emitSelfAudit — it uses auditEvent.create() internally, which
+    // would corrupt shared mocks. Stubbing prevents test flakiness while
+    // still verifying the main hash chain logic.
+    jest.spyOn(service as any, 'emitSelfAudit').mockImplementation(() => Promise.resolve());
   });
 
   const baseDto = {
+    eventId: 'fixed-event-id-for-determinism',
     actorId: 'user-1',
     actorRoles: ['admin'],
     action: 'DOCUMENT_CREATED',

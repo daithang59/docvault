@@ -1,18 +1,18 @@
 # Docs
 
 - `RUN_PROJECT.md`
-  - Huong dan chay local end-to-end moi nhat cho backend, frontend, env va e2e
+  - Latest end-to-end local run guide for backend, frontend, env and e2e
 - `PROJECT_STATUS.md`
-  - Snapshot trang thai codebase theo runtime hien tai
+  - Codebase status snapshot based on current runtime
 - `demo-flow.md`
-  - Kich ban demo tay tung buoc sau khi stack da chay
+  - Step-by-step manual demo scenario after stack is running
 - `demo-users.md`
-  - User seed, role mapping va cach login
+  - Seed users, role mapping and login instructions
 - `REFRACTOR_SUMMARY.md`
-  - Tong hop cac thay doi refactor da ap dung
+  - Summary of refactoring changes applied
 - `ERD.md`
-  - ERD hien tai va ownership theo bounded context
+  - Current ERD and ownership by bounded context
 - `README_CONTEXT.md`
-  - Context planning va roadmap ban dau
+  - Initial planning context and roadmap
 
-Neu can chay du an, doc `RUN_PROJECT.md` truoc.
+If you need to run the project, read `RUN_PROJECT.md` first.

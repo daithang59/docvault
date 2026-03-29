@@ -51,13 +51,6 @@ export class PolicyService {
     const deniedReason = this.getDeniedReason(document.status, roles);
 
     if (!requestedVersion || requestedVersion < 1) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: 'Document has no uploaded version',
-      });
       throw new ForbiddenException('Document has no uploaded version');
     }
 
@@ -75,24 +68,10 @@ export class PolicyService {
     }
 
     if (deniedReason) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: deniedReason,
-      });
       throw new ForbiddenException(deniedReason);
     }
 
     if (this.matchesAcl(document.aclEntries, actorId, roles, AclEffect.DENY)) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: 'Download denied by ACL',
-      });
       throw new ForbiddenException('Download denied by ACL');
     }
 
@@ -113,13 +92,6 @@ export class PolicyService {
     );
 
     if (classificationReason) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: classificationReason,
-      });
       throw new ForbiddenException(classificationReason);
     }
 
@@ -130,6 +102,21 @@ export class PolicyService {
       resourceType: 'DOCUMENT',
       resourceId: docId,
       result: 'SUCCESS',
+      metadata: {
+        docId,
+        title: null,
+        classification: document.classification,
+        status: document.status,
+        version: requestedVersion,
+        objectKey: versionRecord.objectKey,
+        filename: versionRecord.filename,
+        contentType: versionRecord.contentType ?? null,
+        fileSize: versionRecord.size,
+        checksum: versionRecord.checksum,
+        actorId,
+        roles,
+        expiresAt: expiresAt.toISOString(),
+      },
     });
 
     return {
@@ -182,13 +169,6 @@ export class PolicyService {
     const requestedVersion = dto.version ?? document.currentVersion;
 
     if (!requestedVersion || requestedVersion < 1) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: 'Document has no uploaded version',
-      });
       throw new ForbiddenException('Document has no uploaded version');
     }
 
@@ -208,13 +188,6 @@ export class PolicyService {
     // NOTE: compliance_officer is allowed here — preview is not download
     const statusDeniedReason = this.getPreviewDeniedReason(document.status);
     if (statusDeniedReason) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: statusDeniedReason,
-      });
       throw new ForbiddenException(statusDeniedReason);
     }
 
@@ -226,13 +199,6 @@ export class PolicyService {
         AclEffect.DENY,
       )
     ) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: 'Preview denied by ACL',
-      });
       throw new ForbiddenException('Preview denied by ACL');
     }
 
@@ -252,13 +218,6 @@ export class PolicyService {
     );
 
     if (classificationReason) {
-      await this.auditClient.emitEvent(context, {
-        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
-        resourceType: 'DOCUMENT',
-        resourceId: docId,
-        result: 'DENY',
-        reason: classificationReason,
-      });
       throw new ForbiddenException(classificationReason);
     }
 
@@ -269,6 +228,17 @@ export class PolicyService {
       resourceType: 'DOCUMENT',
       resourceId: docId,
       result: 'SUCCESS',
+      metadata: {
+        docId,
+        classification: document.classification,
+        status: document.status,
+        version: requestedVersion,
+        filename: versionRecord.filename,
+        contentType: versionRecord.contentType ?? null,
+        actorId,
+        roles,
+        expiresAt: expiresAt.toISOString(),
+      },
     });
 
     return {
@@ -374,6 +344,11 @@ export class PolicyService {
       return null;
     }
 
+    // Approver can preview ALL classifications (highest non-admin authority)
+    if (roles.includes('approver')) {
+      return null;
+    }
+
     return this.getClassificationDeniedReason(
       classification,
       roles,
@@ -390,6 +365,11 @@ export class PolicyService {
     ownerId: string,
     hasExplicitAllow: boolean,
   ): string | null {
+    // Admin bypasses all classification-based restrictions
+    if (roles.includes('admin')) {
+      return null;
+    }
+
     switch (classification) {
       case 'PUBLIC':
         return null;

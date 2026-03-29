@@ -16,8 +16,9 @@ import {
   presignDownload,
 } from './documents.api';
 import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto } from './documents.types';
-import { triggerBrowserDownload } from '@/lib/utils/download';
+import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
+import apiClient from '@/lib/api/client';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -110,8 +111,20 @@ export function useDownloadDocument() {
   return useMutation({
     mutationFn: async ({ id, filename }: { id: string; filename?: string }) => {
       const authorization = await authorizeDownload(id);
-      const { url, filename: serverFilename } = await presignDownload(id, authorization.version);
-      triggerBrowserDownload(url, filename ?? serverFilename ?? authorization.filename ?? `document-${id}`);
+      const result = await presignDownload(id, authorization.version, authorization.grantToken);
+      const resolvedFilename = filename ?? result.filename ?? authorization.filename ?? `document-${id}`;
+
+      if (result.url) {
+        // Non-watermark: direct MinIO presigned URL
+        triggerBrowserDownload(result.url, resolvedFilename);
+      } else {
+        // Watermark required: fetch via authenticated axios, then download blob
+        const streamUrl = `/documents/${id}/versions/${authorization.version}/stream?token=${encodeURIComponent(authorization.grantToken)}`;
+        const response = await apiClient.get(streamUrl, { responseType: 'blob' });
+        const blobUrl = URL.createObjectURL(response.data);
+        triggerBrowserDownload(blobUrl, resolvedFilename);
+        setTimeout(() => revokeObjectUrl(blobUrl), 5000);
+      }
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

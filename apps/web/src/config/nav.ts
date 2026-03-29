@@ -14,6 +14,12 @@ export const NAV_ITEMS: NavItem[] = [
     roles: ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'],
   },
   {
+    label: 'My Documents',
+    href: '/my-documents',
+    icon: 'FolderOpen',
+    roles: ['editor', 'admin'],
+  },
+  {
     label: 'New Document',
     href: '/documents/new',
     icon: 'FilePlus',

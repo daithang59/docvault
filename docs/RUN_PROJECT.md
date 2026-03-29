@@ -1,22 +1,22 @@
-# Chạy dự án local
+# Running the Project Locally
 
 Updated: 2026-03-18
 
-Tài liệu này là hướng dẫn chạy DocVault trên máy local theo trạng thái code hiện tại.
+This document is a guide for running DocVault on a local machine based on the current code state.
 
-## 1. Yêu cầu
+## 1. Requirements
 
 - Node.js 20+
 - `pnpm` 9+
-- Docker Desktop hoặc Docker Engine + Docker Compose
-- Các port còn trống:
+- Docker Desktop or Docker Engine + Docker Compose
+- Free ports:
   - `3000` gateway
   - `3001` metadata-service
   - `3002` document-service
   - `3003` workflow-service
   - `3004` audit-service
   - `3005` notification-service
-  - `3100` frontend web, nên dùng port này để tránh đụng backend
+  - `3100` frontend web — use this port to avoid conflicts with backend
   - `5432` Postgres
   - `5555` Prisma Studio (PostgreSQL GUI)
   - `8080` Keycloak
@@ -24,39 +24,39 @@ Tài liệu này là hướng dẫn chạy DocVault trên máy local theo trạn
   - `9000` MinIO API
   - `9001` MinIO Console
 
-## 2. Cài dependencies
+## 2. Install Dependencies
 
-Chạy ở thư mục gốc repo:
+Run from the repo root:
 
 ```bash
 pnpm install
 ```
 
-## 3. Khởi động hạ tầng
+## 3. Start Infrastructure
 
-Infra local đang nằm trong `infra/docker-compose.dev.yml`.
+The local infra is in `infra/docker-compose.dev.yml`.
 
 ```bash
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
-Lệnh này sẽ khởi động:
+This starts:
 
 - Postgres
 - MongoDB
-- MongoDB Express (GUI cho MongoDB)
+- MongoDB Express (GUI for MongoDB)
 - MinIO
 - MinIO init job
 - Keycloak
 
-Lưu ý:
+Note:
 
-- MongoDB chứa audit logs (audit-service dùng MongoDB thay vì PostgreSQL).
-- Nếu bạn đã có volume Postgres cũ từ giai đoạn proto-microservice, nên xóa volume cũ hoặc tạo lại database trước khi migrate.
+- MongoDB stores audit logs (audit-service uses MongoDB instead of PostgreSQL).
+- If you already have an old Postgres volume from the proto-microservices phase, you should delete the old volume or recreate the database before migrating.
 
-## 4. Tạo file môi trường
+## 4. Create Environment Files
 
-Tạo các file sau bằng cách copy từ `.env.example`:
+Create the following files by copying from `.env.example`:
 
 - `services/gateway/.env`
 - `services/metadata-service/.env`
@@ -66,7 +66,7 @@ Tạo các file sau bằng cách copy từ `.env.example`:
 - `services/notification-service/.env`
 - `apps/web/.env.local`
 
-Giá trị mặc định trong repo hiện đã khớp với stack local:
+Default values in the repo already match the local stack:
 
 - gateway: `http://localhost:3000`
 - metadata-service: `http://localhost:3001`
@@ -77,25 +77,25 @@ Giá trị mặc định trong repo hiện đã khớp với stack local:
 - Keycloak: `http://localhost:8080`
 - MinIO: `http://localhost:9000`
 
-Biến quan trọng của frontend:
+Important frontend variables:
 
 ```env
 NEXT_PUBLIC_APP_NAME=DocVault
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 ```
 
-## 5. Chạy migration
+## 5. Run Migrations
 
-Sau khi Postgres đã lên:
+After Postgres is up:
 
 ```bash
 pnpm --filter metadata-service prisma:deploy
 pnpm --filter audit-service prisma:deploy
 ```
 
-### Xem data (GUI)
+### View Data (GUI)
 
-Sau khi Docker infra đã chạy, có thể mở giao diện GUI để xem trực tiếp:
+With Docker infra running, you can open GUI tools to inspect data directly:
 
 **PostgreSQL — Prisma Studio** (metadata-service):
 
@@ -103,19 +103,19 @@ Sau khi Docker infra đã chạy, có thể mở giao diện GUI để xem trự
 pnpm --filter metadata-service prisma:studio
 ```
 
-Mở: http://localhost:5555
+Open: http://localhost:5555
 
-Xem 4 bảng: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
+View 4 tables: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
 
 **MongoDB — MongoDB Express**:
 
-Mở: http://localhost:8081
+Open: http://localhost:8081
 
-Đăng nhập: `mongoadmin` / `mongoadminpw`
+Login: `mongoadmin` / `mongoadminpw`
 
-## 6. Khởi động backend
+## 6. Start Backend
 
-Khuyến nghị chạy từng service trong terminal riêng theo thứ tự sau:
+Recommended: run each service in a separate terminal in this order:
 
 ```bash
 pnpm --filter metadata-service start:dev
@@ -126,7 +126,7 @@ pnpm --filter workflow-service start:dev
 pnpm --filter gateway start:dev
 ```
 
-Các URL backend sau khi chạy:
+Backend URLs after startup:
 
 - Gateway Swagger: `http://localhost:3000/docs`
 - Metadata Swagger: `http://localhost:3001/docs`
@@ -135,7 +135,7 @@ Các URL backend sau khi chạy:
 - Audit Swagger: `http://localhost:3004/docs`
 - Notification Swagger: `http://localhost:3005/docs`
 
-Health check nhanh:
+Quick health check:
 
 - `http://localhost:3000/health`
 - `http://localhost:3001/health`
@@ -144,35 +144,35 @@ Health check nhanh:
 - `http://localhost:3004/health`
 - `http://localhost:3005/health`
 
-## 7. Khởi động frontend
+## 7. Start Frontend
 
-Frontend nên chạy riêng trên port `3100` để không đụng:
+The frontend should run separately on port `3100` to avoid conflicts with:
 
 - gateway `3000`
 - metadata-service `3001`
-- các backend service còn lại `3002` đến `3005`
+- remaining backend services `3002` to `3005`
 
-Chạy:
+Run:
 
 ```bash
 pnpm --filter web dev -- --port 3100
 ```
 
-Mở:
+Open:
 
 - `http://localhost:3100`
 
-Trang login:
+Login page:
 
 - `http://localhost:3100/login`
 
-## 8. Đăng nhập và user mẫu
+## 8. Login and Sample Users
 
-Password cho toàn bộ user seed:
+Password for all seeded users:
 
 - `Passw0rd!`
 
-Các user có sẵn:
+Available users:
 
 - `viewer1`
 - `editor1`
@@ -180,76 +180,76 @@ Các user có sẵn:
 - `co1`
 - `admin1`
 
-Frontend hiện hỗ trợ 2 cách đăng nhập:
+The frontend currently supports 2 login modes:
 
 - Demo Login
-  - phù hợp để xem UI/role guard nhanh
+  - good for quickly viewing UI/role guards
 - JWT Token
-  - dùng token thật từ Keycloak để đi full backend
+  - use real token from Keycloak to go through the full backend
 
 Keycloak local:
 
 - `http://localhost:8080`
 
-## 9. Smoke test nhanh
+## 9. Quick Smoke Test
 
-Sau khi toàn bộ backend đã chạy, có thể chạy e2e smoke test:
+After all backend is running, you can run the E2E smoke test:
 
 ```bash
 pnpm test:e2e
 ```
 
-Script này sẽ kiểm tra các luồng chính:
+This script checks the main flows:
 
-- unauthorized bị chặn
-- viewer không create được
-- editor create/upload/submit được
-- approver approve được
-- viewer tải file sau publish
-- compliance officer query audit được nhưng không tải file được
+- unauthorized requests are blocked
+- viewer cannot create
+- editor can create/upload/submit
+- approver can approve
+- viewer can download file after publish
+- compliance officer can query audit but cannot download files
 
-## 10. Chế độ chạy nhanh và các lưu ý
+## 10. Quick Run Mode and Notes
 
-Root script hiện có:
+Root script currently has:
 
 ```bash
 pnpm dev
 ```
 
-Tuy nhiên, script này chạy toàn bộ workspace qua Turbo, bao gồm cả `apps/web`. Vì web mặc định dùng port `3000`, nó có thể đụng với gateway nếu không tự đổi port.
+However, this script runs the entire workspace through Turbo, including `apps/web`. Since web defaults to port `3000`, it may conflict with the gateway if you don't change the port.
 
-Khuyến nghị hiện tại:
+Current recommendation:
 
-- chạy backend service riêng như ở bước 6
-- chạy frontend riêng như ở bước 7 trên port `3100`
+- run backend services separately as in step 6
+- run frontend separately as in step 7 on port `3100`
 
-## 11. Nếu có lỗi thường gặp
+## 11. Common Errors
 
-### Postgres migrate lỗi
+### Postgres Migration Error
 
-Kiểm tra:
+Check:
 
-- container Postgres đã healthy chưa
-- database `docvault_metadata` và `docvault_audit` đã được init chưa
-- volume cũ có đang giữ schema cũ hay không
+- Postgres container is healthy
+- database `docvault_metadata` and `docvault_audit` have been initialized
+- old volume is not holding onto old schema
 
-### Frontend gọi API lỗi
+### Frontend API Call Error
 
-Kiểm tra:
+Check:
 
-- `apps/web/.env.local` có trỏ đúng `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api`
-- gateway đã chạy ở port `3000`
-- frontend đang mở ở `3100`, không phải `3000` hoặc `3001`
+- `apps/web/.env.local` points to correct `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api`
+- gateway is running on port `3000`
+- frontend is open on `3100`, not `3000` or `3001`
 
-### Không lấy được token Keycloak
+### Cannot Get Keycloak Token
 
-Kiểm tra:
+Check:
 
-- Keycloak đã lên ở `http://localhost:8080`
-- realm `docvault` đã được import
-- client secret trong docs và `.env` khớp với seed hiện tại
+- Keycloak is up at `http://localhost:8080`
+- realm `docvault` has been imported
+- client secret in docs and `.env` matches the current seed
 
-## 12. Tài liệu liên quan
+## 12. Related Documents
 
 - `README.md`
 - `docs/demo-flow.md`

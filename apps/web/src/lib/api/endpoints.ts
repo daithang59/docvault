@@ -15,6 +15,7 @@ export const apiEndpoints = {
       workflowHistory: (docId: string) => `/metadata/documents/${docId}/workflow-history`,
       acl: (docId: string) => `/metadata/documents/${docId}/acl`,
       downloadAuthorize: (docId: string) => `/metadata/documents/${docId}/download-authorize`,
+      comments: (docId: string) => `/metadata/documents/${docId}/comments`,
     },
   },
   documents: {
@@ -29,6 +30,7 @@ export const apiEndpoints = {
     approve: (docId: string) => `/workflow/${docId}/approve`,
     reject: (docId: string) => `/workflow/${docId}/reject`,
     archive: (docId: string) => `/workflow/${docId}/archive`,
+    delete: (docId: string) => `/workflow/${docId}`,
   },
   audit: {
     query: '/audit/query',

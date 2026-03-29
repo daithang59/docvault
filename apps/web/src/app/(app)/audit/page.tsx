@@ -32,12 +32,12 @@ export default function AuditPage() {
     return (
       <EmptyState
         icon="lock"
-        title="Không có quyền truy cập"
-        description="Bạn cần vai trò Compliance Officer hoặc Admin để xem nhật ký audit."
+        title="Access Denied"
+        description="You need the Compliance Officer or Admin role to view audit logs."
         action={
           <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
             <Shield size={13} />
-            <span>Vai trò hiện tại của bạn không đủ quyền.</span>
+            <span>Your current role does not have sufficient permissions.</span>
           </div>
         }
       />

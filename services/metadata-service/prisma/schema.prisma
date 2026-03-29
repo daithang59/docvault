@@ -13,6 +13,7 @@ enum DocumentStatus {
   PENDING
   PUBLISHED
   ARCHIVED
+  DELETED
 }
 
 enum ClassificationLevel {
@@ -46,6 +47,7 @@ enum WorkflowAction {
   APPROVE
   REJECT
   ARCHIVE
+  DELETE
   RETENTION
 }
 
@@ -62,9 +64,11 @@ model Document {
   updatedAt       DateTime          @updatedAt
   publishedAt     DateTime?
   archivedAt      DateTime?
+  deletedAt       DateTime?
   versions        DocumentVersion[]
   aclEntries      DocumentAcl[]
   workflowHistory DocumentWorkflowHistory[]
+  comments        DocumentComment[]
 
   @@index([ownerId])
   @@index([status])
@@ -118,4 +122,18 @@ model DocumentWorkflowHistory {
 
   @@index([docId, createdAt])
   @@map("document_workflow_history")
+}
+
+model DocumentComment {
+  id          String   @id @default(uuid())
+  docId       String
+  authorId    String
+  authorRoles String[]
+  content     String
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  document    Document @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, createdAt])
+  @@map("document_comments")
 }

@@ -41,12 +41,12 @@ export default function ApprovalsPage() {
     return (
       <EmptyState
         icon="lock"
-        title="Không có quyền truy cập"
-        description="Bạn cần vai trò Approver hoặc Admin để xem trang này."
+        title="Access Denied"
+        description="You need the Approver or Admin role to view this page."
         action={
           <div className="mt-2 inline-flex items-center gap-1.5 text-xs text-[var(--text-faint)]">
             <Shield size={13} />
-            <span>Vai trò hiện tại của bạn không đủ quyền.</span>
+            <span>Your current role does not have sufficient permissions.</span>
           </div>
         }
       />

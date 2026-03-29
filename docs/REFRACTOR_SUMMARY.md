@@ -1,24 +1,24 @@
 # REFACTOR_SUMMARY.md
 
-Cập nhật: 2026-03-15
+Updated: 2026-03-15
 
-Tài liệu này tổng hợp các thay đổi đã được thực hiện khi refactor DocVault từ trạng thái "proto-microservice" sang microservices MVP đúng boundary.
+This document summarizes the changes made when refactoring DocVault from a "proto-microservice" state to a proper microservices MVP with clear boundaries.
 
-## 1. Mục tiêu đã xử lý
+## 1. Goals Addressed
 
-- Tách logic blob upload/download/presign ra khỏi `metadata-service`
-- Tách workflow state machine submit/approve/reject ra service riêng
-- Tách audit ingest/query append-only ra service riêng
-- Tạo `notification-service` tối thiểu cho MVP
-- Mở rộng `gateway` thành entrypoint đúng nghĩa cho tất cả service
-- Giữ JWT Keycloak, route-level RBAC, và enforce compliance policy download ở backend
+- Extracted blob upload/download/presign logic out of `metadata-service`
+- Extracted workflow state machine submit/approve/reject into a separate service
+- Extracted audit ingest/query append-only into a separate service
+- Created minimal `notification-service` for MVP
+- Expanded `gateway` into a proper entrypoint for all services
+- Kept JWT Keycloak, route-level RBAC, and compliance policy download enforcement at the backend
 
-## 2. Boundary mới sau refactor
+## 2. New Boundaries After Refactor
 
 ### gateway
 
-- Verify JWT bằng issuer/audience/expiration
-- Route đầy đủ:
+- Verify JWT by issuer/audience/expiration
+- Full routing:
   - `/api/metadata/**`
   - `/api/documents/**`
   - `/api/workflow/**`
@@ -28,14 +28,14 @@ Tài liệu này tổng hợp các thay đổi đã được thực hiện khi r
   - `X-Request-Id`
   - `X-User-Id`
   - `X-Roles`
-- Phát audit wrapper event:
+- Emit audit wrapper events:
   - `REQUEST_RECEIVED`
   - `REQUEST_OK`
   - `REQUEST_DENIED`
 
 ### metadata-service
 
-Giữ lại:
+Retained:
 
 - document metadata CRUD
 - ACL
@@ -43,14 +43,14 @@ Giữ lại:
 - version pointer registration
 - download authorization / policy check
 
-Đã loại bỏ:
+Removed:
 
 - MinIO upload/download
 - presigned URL generation
 - workflow transition logic
 - audit persistence/query logic
 
-Endpoint chính:
+Key endpoints:
 
 - `POST /documents`
 - `GET /documents`
@@ -64,40 +64,40 @@ Endpoint chính:
 
 ### document-service
 
-Sở hữu:
+Owns:
 
 - MinIO/S3 client
-- upload multipart
+- multipart upload
 - checksum SHA-256
 - object key `doc/{docId}/v{n}/{filename}`
 - presign download
 - direct stream download
 
-Endpoint chính:
+Key endpoints:
 
 - `POST /documents/:docId/upload`
 - `POST /documents/:docId/presign-download`
 - `GET /documents/:docId/versions/:version/stream`
 
-Sau upload, service gọi metadata-service để ghi version pointer.
+After upload, the service calls metadata-service to write the version pointer.
 
 ### workflow-service
 
-Sở hữu:
+Owns:
 
 - workflow state machine MVP
 - transition validation
 - role/status/owner check
-- call metadata-service để update status
-- call audit-service và notification-service
+- call metadata-service to update status
+- call audit-service and notification-service
 
-Transition MVP:
+MVP transitions:
 
-- `DRAFT -> PENDING` qua `submit`
-- `PENDING -> PUBLISHED` qua `approve`
-- `PENDING -> DRAFT` qua `reject`
+- `DRAFT -> PENDING` via `submit`
+- `PENDING -> PUBLISHED` via `approve`
+- `PENDING -> DRAFT` via `reject`
 
-Endpoint chính:
+Key endpoints:
 
 - `POST /workflow/:docId/submit`
 - `POST /workflow/:docId/approve`
@@ -105,84 +105,85 @@ Endpoint chính:
 
 ### audit-service
 
-Sở hữu:
+Owns:
 
 - append-only ingest
-- query theo actor/time/action/resource/result
-- role gate cho query
+- query by actor/time/action/resource/result
+- role gate for query
 
-Endpoint chính:
+Key endpoints:
 
 - `POST /audit/events`
 - `GET /audit/query`
 
-`GET /audit/query` chỉ cho `compliance_officer`.
+`GET /audit/query` is only accessible to `compliance_officer`.
 
 ### notification-service
 
-Sở hữu:
+Owns:
 
 - `POST /notify`
-- dev mode log ra console
-- event type:
+- dev mode logs to console
+- event types:
   - `SUBMITTED`
   - `APPROVED`
   - `REJECTED`
 
-## 3. Role và policy
+## 3. Roles and Policy
 
-- Roles đang dùng:
-  - `viewer`
-  - `editor`
-  - `approver`
-  - `compliance_officer`
-  - `admin` vẫn được giữ cho local admin task
-- `co` trong Keycloak được alias thành `compliance_officer` để không phá seed cũ
-- `compliance_officer` xem audit được nhưng luôn bị deny download file
-- Viewer chỉ download được khi document đã `PUBLISHED`
+Roles currently in use:
+- `viewer`
+- `editor`
+- `approver`
+- `compliance_officer`
+- `admin` still kept for local admin tasks
 
-## 4. Data model và migration
+- `co` in Keycloak is aliased to `compliance_officer` to not break the old seed
+- `compliance_officer` can view audit but always denied file downloads
+- Viewer can only download when document is `PUBLISHED`
+
+## 4. Data Model and Migration
 
 ### Metadata DB
 
-Bảng runtime mới:
+Runtime tables:
 
 - `documents`
 - `document_versions`
 - `document_acl`
 
-Migration mới:
+New migration:
 
 - `services/metadata-service/prisma/migrations/20260315000000_refactor_microservices_boundary`
 
 ### Audit DB
 
-Database mới:
+New database:
 
 - `docvault_audit`
 
-Bảng runtime mới:
+Runtime table:
 
 - `audit_events`
 
-Migration mới:
+New migration:
 
 - `services/audit-service/prisma/migrations/20260315001000_init_audit_service`
 
 ### Infra
 
-- `infra/db/init-postgres.sql` được cập nhật để tạo `docvault_audit`
-- `uuid-ossp` được enable cho cả `docvault_metadata` và `docvault_audit`
-- `infra/keycloak/realm-docvault.json` được cập nhật để `co1` có thêm role `compliance_officer`
+- `infra/db/init-postgres.sql` updated to create `docvault_audit`
+- `uuid-ossp` enabled for both `docvault_metadata` and `docvault_audit`
+- `infra/keycloak/realm-docvault.json` updated so `co1` has additional role `compliance_officer`
 
-## 5. Logging, validation, error contract
+## 5. Logging, Validation, Error Contract
 
-Tất cả service mới/đã refactor đều được bổ sung:
+All new/refactored services received:
 
 - Swagger/OpenAPI
 - DTO validation (`class-validator`)
-- standard error response thông qua global exception filter
-- structured JSON log với:
+- standard error response via global exception filter
+- structured JSON log with:
   - `traceId`
   - `service`
   - `route`
@@ -191,57 +192,57 @@ Tất cả service mới/đã refactor đều được bổ sung:
   - `result`
   - `latencyMs`
 
-## 6. Script và tài liệu đã thêm/cập nhật
+## 6. Scripts and Documentation Added/Updated
 
-### Script
+### Scripts
 
 - `scripts/demo.sh`
 - `scripts/e2e-check.mjs`
 
-`scripts/e2e-check.mjs` cover các case chính:
+`scripts/e2e-check.mjs` covers the main cases:
 
 - no token -> 401
 - expired-like token -> 401
 - viewer create -> 403
 - editor create -> 201
-- upload -> object có trong MinIO
+- upload -> object in MinIO
 - viewer download DRAFT -> 403
 - submit -> `PENDING`
 - approve -> `PUBLISHED`
-- approve lần 2 -> 409
+- approve again -> 409
 - viewer published download -> 200
 - compliance officer download -> 403
 - compliance officer audit query -> 200
 - viewer audit query -> 403
 
-### Tài liệu
+### Documentation
 
 - `README.md`
 - `docs/PROJECT_STATUS.md`
 - `docs/README.md`
-- README riêng của từng service đã được đổi từ placeholder sang boundary thực tế
+- Per-service README updated from placeholder to actual boundary details
 
-## 7. Các file/chủng loại thay đổi quan trọng
+## 7. Important Files/Classes Changed
 
 - gateway:
-  - thêm `src/proxy/*`
-  - thêm gateway-level audit wrapper trong `src/main.ts`
+  - added `src/proxy/*`
+  - added gateway-level audit wrapper in `src/main.ts`
 - metadata-service:
-  - xóa `src/storage/*`
-  - xóa audit persistence cũ
-  - thêm `src/acl/*`, `src/status/*`, `src/versions/*`, `src/policy/*`
+  - removed `src/storage/*`
+  - removed old audit persistence
+  - added `src/acl/*`, `src/status/*`, `src/versions/*`, `src/policy/*`
 - document-service:
-  - tạo source code đầy đủ cho storage, metadata client, audit client, upload/download module
+  - created full source code for storage, metadata client, audit client, upload/download module
 - workflow-service:
-  - tạo source code đầy đủ cho workflow, metadata/audit/notification client
+  - created full source code for workflow, metadata/audit/notification client
 - audit-service:
-  - tạo source code đầy đủ + Prisma schema/migration
+  - created full source code + Prisma schema/migration
 - notification-service:
-  - tạo source code đầy đủ cho notify endpoint
+  - created full source code for notify endpoint
 
-## 8. Phần đã verify
+## 8. Verified
 
-Đã chạy thành công:
+Successfully ran:
 
 - `pnpm build`
 - `pnpm test`
@@ -251,29 +252,29 @@ Tất cả service mới/đã refactor đều được bổ sung:
 - `pnpm --filter audit-service prisma:deploy`
 - `node scripts/e2e-check.mjs`
 
-Các case live E2E đã pass:
+Live E2E cases passed:
 
 - no token -> `401`
 - expired-like token -> `401`
 - viewer create -> `403`
 - editor create -> `201`
-- upload -> object xuất hiện trong MinIO
+- upload -> object appears in MinIO
 - viewer download DRAFT -> `403`
 - submit -> `PENDING`
 - approve -> `PUBLISHED`
-- approve lần 2 -> `409`
+- approve again -> `409`
 - viewer published download -> `200`
 - compliance officer download -> `403`
 - compliance officer audit query -> `200`
 - viewer audit query -> `403`
 
-## 9. Ghi chú thực tế
+## 9. Practical Notes
 
-- Workspace hiện có thể build, lint, và chạy live E2E pass
-- Trong lúc bring-up runtime đã phải fix thêm một số vấn đề hạ tầng/code:
-  - Prisma client của `metadata-service` và `audit-service` bị đè lẫn nhau trong workspace
-  - JWT verification cần tương thích token Keycloak có `azp` thay vì `aud`
-  - downstream `403/409` từ metadata bị nuốt thành `500` ở service trung gian
-  - một số service thiếu hẳn cấu hình ESLint dù đã khai báo script `lint`
+- Workspace can build, lint, and run live E2E passing
+- During runtime bring-up, several infrastructure/code issues had to be fixed:
+  - Prisma client of `metadata-service` and `audit-service` were overwriting each other in the workspace
+  - JWT verification needed to be compatible with Keycloak tokens that have `azp` instead of `aud`
+  - downstream `403/409` from metadata was being swallowed as `500` in intermediate services
+  - some services were missing ESLint configuration entirely despite having `lint` scripts declared
 
-Nếu cần, file này có thể được dùng làm changelog implementation cho PR hoặc checkpoint.
+If needed, this file can serve as an implementation changelog for PR or checkpoint.

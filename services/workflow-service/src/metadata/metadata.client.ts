@@ -6,6 +6,7 @@ import {
   HttpException,
   HttpStatus,
   Injectable,
+  Logger,
   NotFoundException,
 } from '@nestjs/common';
 import { AxiosError } from 'axios';
@@ -14,6 +15,7 @@ import { RequestContext } from '../common/request-context';
 
 @Injectable()
 export class MetadataClient {
+  private readonly logger = new Logger(MetadataClient.name);
   private readonly baseUrl = process.env.METADATA_SERVICE_URL!;
 
   constructor(private readonly http: HttpService) {}
@@ -28,9 +30,30 @@ export class MetadataClient {
     );
   }
 
+  /**
+   * Calls metadata-service GET /documents/:docId/approvers.
+   * The endpoint ignores the docId (approver role is global), but the path
+   * param is required by REST convention. Pass any valid UUID.
+   * Gracefully degrades to an empty list if the call fails.
+   */
+  async getApprovers(context: RequestContext): Promise<{ userIds: string[] }> {
+    try {
+      return await this.request(() =>
+        firstValueFrom(
+          this.http.get(`${this.baseUrl}/documents/00000000-0000-0000-0000-000000000000/approvers`, {
+            headers: this.buildHeaders(context),
+          }),
+        ),
+      );
+    } catch {
+      this.logger.warn('getApprovers() failed; returning empty list');
+      return { userIds: [] };
+    }
+  }
+
   async updateStatus(
     docId: string,
-    status: 'PENDING' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED',
+    status: 'PENDING' | 'PUBLISHED' | 'DRAFT' | 'ARCHIVED' | 'DELETED',
     action: string,
     context: RequestContext,
     reason?: string,

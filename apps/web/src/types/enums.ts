@@ -1,7 +1,7 @@
 // Global enums and literal union types for DocVault FE
 // Single source of truth — import from here, not from individual type files
 
-export type DocumentStatus = 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED';
+export type DocumentStatus = 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED' | 'DELETED';
 
 export type ClassificationLevel = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'SECRET';
 
@@ -18,7 +18,7 @@ export type UserRole =
   | 'compliance_officer'
   | 'admin';
 
-export type WorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'ARCHIVE';
+export type WorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'ARCHIVE' | 'DELETE';
 
 export type AuditResult = 'SUCCESS' | 'DENY' | 'ERROR' | 'CONFLICT';
 

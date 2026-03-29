@@ -38,14 +38,14 @@ export default function EditDocumentPage({ params }: Props) {
     return (
       <EmptyState
         icon="lock"
-        title="Không có quyền chỉnh sửa"
-        description="Bạn không có quyền chỉnh sửa tài liệu này."
+        title="Editing Not Allowed"
+        description="You do not have permission to edit this document."
         action={
           <Link
             href={ROUTES.DOCUMENT_DETAIL(id)}
             className="mt-2 inline-flex items-center gap-1.5 text-sm text-[var(--color-primary)] hover:underline"
           >
-            Quay lại tài liệu
+            Back to document
           </Link>
         }
       />

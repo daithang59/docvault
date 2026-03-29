@@ -6,6 +6,7 @@ export const ROUTES = {
   DOCUMENT_DETAIL: (id: string) => `/documents/${id}`,
   DOCUMENT_EDIT: (id: string) => `/documents/${id}/edit`,
   APPROVALS: '/approvals',
+  MY_DOCUMENTS: '/my-documents',
   AUDIT: '/audit',
   PROFILE: '/profile',
 } as const;

@@ -13,6 +13,7 @@ import {
   canPreviewDocument,
   canUploadVersion,
   canManageAcl,
+  canDeleteDocument,
 } from '@/lib/auth/guards';
 import {
   useSubmitDocument,
@@ -20,12 +21,13 @@ import {
   useRejectDocument,
   useArchiveDocument,
   useUploadDocument,
+  useDeleteDocument,
 } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
 import {
-  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye
+  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
@@ -42,7 +44,7 @@ interface DocumentActionPanelProps {
 export function DocumentActionPanel({ doc, onActionComplete, onPreview }: DocumentActionPanelProps) {
   const { session } = useAuth();
 
-  const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | null>(null);
+  const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -52,6 +54,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   const reject = useRejectDocument(doc.id);
   const archive = useArchiveDocument(doc.id);
   const upload = useUploadDocument(doc.id);
+  const deleteDoc = useDeleteDocument(doc.id);
   const { download, isDownloading } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
@@ -126,7 +129,13 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   async function handleUpload() {
     if (!uploadFile) return;
     try {
-      await upload.mutateAsync(uploadFile);
+      const result = await upload.mutateAsync(uploadFile);
+      // Defensive: ensure the response actually contains a version record.
+      // If the backend silently fails (e.g. HTTP 500 with empty body),
+      // mutateAsync resolves with undefined and we must not show success.
+      if (!result) {
+        throw new Error('Server returned an empty response.');
+      }
       toast.success(TOAST_MESSAGES.VERSION_UPLOADED);
       setShowUpload(false);
       setUploadFile(null);
@@ -143,7 +152,8 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
     canRejectDocument(session, doc) ||
     canArchiveDocument(session, doc) ||
     canDownloadDocument(session, doc) ||
-    canPreviewDocument(session, doc);
+    canPreviewDocument(session, doc) ||
+    canDeleteDocument(session, doc);
 
   if (!hasAnyAction) return null;
 
@@ -233,6 +243,16 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </button>
         )}
 
+        {canDeleteDocument(session, doc) && (
+          <button
+            onClick={() => setConfirmType('delete')}
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-4 py-2.5 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95"
+          >
+            <Trash2 className="h-4 w-4" />
+            Delete Document
+          </button>
+        )}
+
         {canPreviewDocument(session, doc) && onPreview && (
           <button
             onClick={onPreview}
@@ -300,6 +320,24 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
         confirmLabel="Archive"
         variant="destructive"
         onConfirm={handleArchive}
+      />
+      <ConfirmDialog
+        open={confirmType === 'delete'}
+        onOpenChange={(o) => !o && setConfirmType(null)}
+        title="Delete Document"
+        description="This document will be permanently deleted. This action cannot be undone."
+        confirmLabel="Delete"
+        variant="destructive"
+        onConfirm={async () => {
+          try {
+            await deleteDoc.mutateAsync();
+            toast.success('Document deleted.');
+            onActionComplete?.();
+          } catch (e) {
+            const msg = getErrorMessage(e);
+            toast.error(msg);
+          }
+        }}
       />
     </div>
   );

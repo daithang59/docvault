@@ -6,6 +6,7 @@ export const STATUS_LABELS: Record<DocumentStatus, string> = {
   PENDING: 'Pending',
   PUBLISHED: 'Published',
   ARCHIVED: 'Archived',
+  DELETED: 'Deleted',
 };
 
 export const CLASSIFICATION_LABELS: Record<ClassificationLevel, string> = {
@@ -28,6 +29,7 @@ export const WORKFLOW_ACTION_LABELS = {
   APPROVE: 'Approved',
   REJECT: 'Rejected',
   ARCHIVE: 'Archived',
+  DELETE: 'Deleted',
 } as const;
 
 export const TOAST_MESSAGES = {
@@ -42,12 +44,13 @@ export const TOAST_MESSAGES = {
   DOWNLOAD_RESTRICTED: 'Only published documents can be downloaded.',
   ACL_UPDATED: 'Access control updated.',
   // 409 Conflict messages — business-specific
-  CONFLICT_SUBMIT: 'Tài liệu không còn ở trạng thái có thể gửi duyệt.',
-  CONFLICT_APPROVE: 'Tài liệu không còn chờ duyệt.',
-  CONFLICT_REJECT: 'Tài liệu không còn chờ duyệt.',
-  CONFLICT_ARCHIVE: 'Tài liệu không thể lưu trữ ở trạng thái hiện tại.',
-  CONFLICT_UPLOAD: 'Không thể tải phiên bản mới lên tài liệu ở trạng thái này.',
+  CONFLICT_SUBMIT: 'Document is no longer in a submittable state.',
+  CONFLICT_APPROVE: 'Document is no longer pending approval.',
+  CONFLICT_REJECT: 'Document is no longer pending approval.',
+  CONFLICT_ARCHIVE: 'Document cannot be archived in its current state.',
+  CONFLICT_DELETE: 'Only documents in DRAFT status can be deleted.',
+  CONFLICT_UPLOAD: 'Cannot upload a new version to a document in this state.',
   // Forbidden
-  FORBIDDEN_DOWNLOAD: 'Bạn không có quyền tải tài liệu này.',
-  FORBIDDEN_ACTION: 'Bạn không có quyền thực hiện thao tác này.',
+  FORBIDDEN_DOWNLOAD: 'You do not have permission to download this document.',
+  FORBIDDEN_ACTION: 'You do not have permission to perform this action.',
 } as const;

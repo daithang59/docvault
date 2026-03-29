@@ -6,13 +6,13 @@
   "private": true,
   "license": "UNLICENSED",
   "scripts": {
-    "build": "nest build",
+    "build": "tsc --project tsconfig.build.json",
     "format": "prettier --write \"src/**/*.ts\" \"test/**/*.ts\"",
-    "dev": "nest start --watch",
-    "start": "nest start",
-    "start:dev": "nest start --watch",
-    "start:debug": "nest start --debug --watch",
-    "start:prod": "node dist/main",
+    "dev": "ts-node-dev -r tsconfig-paths/register --project tsconfig.build.json --respawn --transpile-only --exit-child src/main.ts",
+    "start": "ts-node -r tsconfig-paths/register --project tsconfig.build.json src/main.ts",
+    "start:dev": "ts-node-dev -r tsconfig-paths/register --project tsconfig.build.json --respawn --transpile-only --exit-child src/main.ts",
+    "start:debug": "ts-node-dev -r tsconfig-paths/register --project tsconfig.build.json --respawn --transpile-only --exit-child --inspect src/main.ts",
+    "start:prod": "node -r tsconfig-paths/register dist/main",
     "lint": "eslint \"{src,apps,libs,test}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
     "test:watch": "jest --watch",
@@ -32,6 +32,7 @@
     "@nestjs/platform-express": "^10.0.0",
     "@nestjs/schedule": "^6.1.1",
     "@nestjs/swagger": "^7.4.2",
+    "@nestjs/throttler": "^6.5.0",
     "@prisma/adapter-pg": "^7.5.0",
     "@prisma/client": "^7.5.0",
     "@prisma/client-runtime-utils": "7.5.0",
@@ -44,7 +45,8 @@
     "pg": "^8.20.0",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "swagger-ui-express": "^5.0.1"
+    "swagger-ui-express": "^5.0.1",
+    "@docvault/throttler": "workspace:*"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",
@@ -69,6 +71,7 @@
     "ts-jest": "^29.1.0",
     "ts-loader": "^9.4.3",
     "ts-node": "^10.9.1",
+    "ts-node-dev": "^2.0.0",
     "tsconfig-paths": "^4.2.0",
     "typescript": "^5.1.3"
   },

@@ -1,16 +1,16 @@
-# DocVault — Bảng Endpoint Gateway & Response DTOs
+# DocVault — Gateway Endpoint Table & Response DTOs
 
-> Base URL: `http://localhost:3000/api`  
-> Tất cả request phải gửi header: `Authorization: Bearer <keycloak_jwt>`
+> Base URL: `http://localhost:3000/api`
+> All requests must include header: `Authorization: Bearer <keycloak_jwt>`
 
 ---
 
 ## 1. Documents — Metadata
 
-### GET `/metadata/documents` — Danh sách tài liệu
+### GET `/metadata/documents` — Document List
 **Roles:** viewer, editor, approver, compliance_officer, admin
 
-**Query params:** _(none hiện tại, sorted by createdAt desc)_
+**Query params:** _(none currently, sorted by createdAt desc)_
 
 **Response `200`:**
 ```jsonc
@@ -34,7 +34,7 @@
 
 ---
 
-### GET `/metadata/documents/:docId` — Chi tiết tài liệu
+### GET `/metadata/documents/:docId` — Document Detail
 **Roles:** viewer, editor, approver, compliance_officer, admin
 
 **Response `200`:**
@@ -82,27 +82,27 @@
 
 ---
 
-### POST `/metadata/documents` — Tạo tài liệu mới
+### POST `/metadata/documents` — Create New Document
 **Roles:** editor, admin
 
 **Request body:**
 ```jsonc
 {
-  "title": "string",          // bắt buộc
-  "description": "string",   // tùy chọn
-  "classification": "PUBLIC | INTERNAL | CONFIDENTIAL | SECRET", // tùy chọn, default INTERNAL
-  "tags": ["string"]         // tùy chọn, tối đa 50 tags
+  "title": "string",          // required
+  "description": "string",     // optional
+  "classification": "PUBLIC | INTERNAL | CONFIDENTIAL | SECRET", // optional, default INTERNAL
+  "tags": ["string"]          // optional, max 50 tags
 }
 ```
 
-**Response `201`:** (Document object — như list item nhưng tags đã sanitize)
+**Response `201`:** (Document object — same as list item, tags sanitized)
 
 ---
 
-### PATCH `/metadata/documents/:docId` — Cập nhật metadata
-**Roles:** editor (phải là owner), admin
+### PATCH `/metadata/documents/:docId` — Update Metadata
+**Roles:** editor (must be owner), admin
 
-**Request body:** _(mọi field đều tùy chọn)_
+**Request body:** _(all fields optional)_
 ```jsonc
 {
   "title": "string",
@@ -112,11 +112,11 @@
 }
 ```
 
-**Response `200`:** Document object đã cập nhật
+**Response `200`:** Updated Document object
 
 ---
 
-### GET `/metadata/documents/:docId/workflow-history` — Lịch sử workflow
+### GET `/metadata/documents/:docId/workflow-history` — Workflow History
 **Roles:** viewer, editor, approver, compliance_officer, admin
 
 **Response `200`:**
@@ -137,14 +137,14 @@
 
 ---
 
-### POST `/metadata/documents/:docId/acl` — Upsert ACL rule
+### POST `/metadata/documents/:docId/acl` — Upsert ACL Rule
 **Roles:** editor, admin
 
 **Request body:**
 ```jsonc
 {
   "subjectType": "USER | ROLE | GROUP | ALL",
-  "subjectId": "string",   // userId / roleName / groupName (null nếu ALL)
+  "subjectId": "string",   // userId / roleName / groupName (null if ALL)
   "permission": "READ | DOWNLOAD | WRITE | APPROVE",
   "effect": "ALLOW | DENY"
 }
@@ -154,20 +154,20 @@
 
 ---
 
-### GET `/metadata/documents/:docId/acl` — Xem danh sách ACL
+### GET `/metadata/documents/:docId/acl` — View ACL List
 **Roles:** editor, approver, compliance_officer, admin
 
 **Response `200`:** Array of ACL Entry objects
 
 ---
 
-### POST `/metadata/documents/:docId/download-authorize` — Xin phép download
-**Roles:** viewer, editor, approver, admin _(compliance_officer bị deny)_
+### POST `/metadata/documents/:docId/download-authorize` — Request Download Permission
+**Roles:** viewer, editor, approver, admin _(compliance_officer denied)_
 
-**Request body:** _(tùy chọn)_
+**Request body:** _(optional)_
 ```jsonc
 {
-  "version": 1   // tùy chọn, default là currentVersion
+  "version": 1   // optional, defaults to currentVersion
 }
 ```
 
@@ -184,9 +184,9 @@
   "grantToken": "base64url.signature"
 }
 ```
-> **FE dùng `grantToken` này để gọi tiếp `/documents/:docId/presign-download` hoặc `/stream`.**
+> **FE uses this `grantToken` to call `/documents/:docId/presign-download` or `/stream`.**
 
-**Response `403`:** Khi compliance_officer gọi, hoặc document chưa PUBLISHED:
+**Response `403`:** When compliance_officer calls, or document is not yet PUBLISHED:
 ```jsonc
 { "statusCode": 403, "message": "Only published documents can be downloaded" }
 ```
@@ -195,8 +195,8 @@
 
 ## 2. Documents — Blob (MinIO)
 
-### POST `/documents/:docId/upload` — Upload file
-**Roles:** editor, admin  
+### POST `/documents/:docId/upload` — Upload File
+**Roles:** editor, admin
 **Content-Type:** `multipart/form-data`
 
 **Form field:** `file` — binary file
@@ -216,14 +216,14 @@
 
 ---
 
-### POST `/documents/:docId/presign-download` — Lấy presigned URL
-**Roles:** viewer, editor, approver, admin _(compliance_officer bị deny)_
+### POST `/documents/:docId/presign-download` — Get Presigned URL
+**Roles:** viewer, editor, approver, admin _(compliance_officer denied)_
 
 **Request body:**
 ```jsonc
 {
-  "grantToken": "base64url.signature",   // bắt buộc, lấy từ download-authorize
-  "version": 1                           // tùy chọn
+  "grantToken": "base64url.signature",   // required, from download-authorize
+  "version": 1                           // optional
 }
 ```
 
@@ -237,10 +237,10 @@
 
 ---
 
-### GET `/documents/:docId/versions/:version/stream` — Stream file trực tiếp
+### GET `/documents/:docId/versions/:version/stream` — Stream File Directly
 **Roles:** viewer, editor, approver, admin
 
-**Headers trả về:**
+**Response headers:**
 - `Content-Type: application/pdf`
 - `Content-Disposition: attachment; filename="file.pdf"`
 
@@ -253,14 +253,14 @@
 ### POST `/workflow/:docId/submit` — Submit (DRAFT → PENDING)
 **Roles:** editor, admin
 
-**Response `200`:** Document object có `status: "PENDING"`
+**Response `200`:** Document object with `status: "PENDING"`
 
 ---
 
 ### POST `/workflow/:docId/approve` — Approve (PENDING → PUBLISHED)
 **Roles:** approver, admin
 
-**Response `200`:** Document object có `status: "PUBLISHED"`, `publishedAt: "ISO8601"`
+**Response `200`:** Document object with `status: "PUBLISHED"`, `publishedAt: "ISO8601"`
 
 ---
 
@@ -270,39 +270,39 @@
 **Request body:**
 ```jsonc
 {
-  "reason": "string"   // tùy chọn, lý do reject
+  "reason": "string"   // optional, reason for rejection
 }
 ```
 
-**Response `200`:** Document object có `status: "DRAFT"`
+**Response `200`:** Document object with `status: "DRAFT"`
 
 ---
 
 ### POST `/workflow/:docId/archive` — Archive (PUBLISHED → ARCHIVED)
 **Roles:** approver, admin
 
-> _Gateway proxy chưa có endpoint này — cần thêm vào `workflow.proxy.controller.ts`_
+> _Gateway proxy does not yet have this endpoint — needs to be added to `workflow.proxy.controller.ts`_
 
-**Response `200`:** Document object có `status: "ARCHIVED"`, `archivedAt: "ISO8601"`
+**Response `200`:** Document object with `status: "ARCHIVED"`, `archivedAt: "ISO8601"`
 
 ---
 
 ## 4. Audit
 
-### GET `/audit/query` — Truy vấn audit logs
+### GET `/audit/query` — Query Audit Logs
 **Roles:** compliance_officer
 
 **Query params:**
-| Param | Type | Mô tả |
+| Param | Type | Description |
 |---|---|---|
-| `actorId` | string | Lọc theo user thực hiện |
-| `action` | string | Lọc theo hành động (VD: `DOCUMENT_SUBMIT`) |
-| `resourceType` | string | Lọc loại resource (VD: `DOCUMENT`) |
-| `resourceId` | string | UUID tài liệu |
-| `result` | string | `SUCCESS` hoặc `DENY` |
-| `from` | ISO8601 | Từ thời điểm |
-| `to` | ISO8601 | Đến thời điểm |
-| `limit` | int (1-200) | Số bản ghi, default 100 |
+| `actorId` | string | Filter by performing user |
+| `action` | string | Filter by action (e.g. `DOCUMENT_SUBMIT`) |
+| `resourceType` | string | Filter by resource type (e.g. `DOCUMENT`) |
+| `resourceId` | string | Document UUID |
+| `result` | string | `SUCCESS` or `DENY` |
+| `from` | ISO8601 | Start time |
+| `to` | ISO8601 | End time |
+| `limit` | int (1-200) | Number of records, default 100 |
 
 **Response `200`:**
 ```jsonc
@@ -327,18 +327,18 @@
 
 ---
 
-## Tổng hợp bảng endpoint
+## Endpoint Summary Table
 
-| Method | Gateway path | Roles | Mô tả |
+| Method | Gateway path | Roles | Description |
 |---|---|---|---|
-| GET | `/metadata/documents` | tất cả | Danh sách docs |
-| POST | `/metadata/documents` | editor, admin | Tạo doc mới |
-| GET | `/metadata/documents/:docId` | tất cả | Chi tiết doc + versions + ACL |
-| PATCH | `/metadata/documents/:docId` | editor (owner), admin | Sửa metadata |
-| GET | `/metadata/documents/:docId/workflow-history` | tất cả | Lịch sử workflow |
+| GET | `/metadata/documents` | all | Document list |
+| POST | `/metadata/documents` | editor, admin | Create new doc |
+| GET | `/metadata/documents/:docId` | all | Doc detail + versions + ACL |
+| PATCH | `/metadata/documents/:docId` | editor (owner), admin | Edit metadata |
+| GET | `/metadata/documents/:docId/workflow-history` | all | Workflow history |
 | POST | `/metadata/documents/:docId/acl` | editor, admin | Upsert ACL rule |
-| GET | `/metadata/documents/:docId/acl` | editor, approver, CO, admin | Xem ACL |
-| POST | `/metadata/documents/:docId/download-authorize` | tất cả (CO bị deny) | Xin grant token |
+| GET | `/metadata/documents/:docId/acl` | editor, approver, CO, admin | View ACL |
+| POST | `/metadata/documents/:docId/download-authorize` | all (CO denied) | Request grant token |
 | POST | `/documents/:docId/upload` | editor, admin | Upload file |
 | POST | `/documents/:docId/presign-download` | viewer, editor, approver, admin | Presigned URL |
 | GET | `/documents/:docId/versions/:version/stream` | viewer, editor, approver, admin | Stream file |
@@ -346,26 +346,26 @@
 | POST | `/workflow/:docId/approve` | approver, admin | PENDING → PUBLISHED |
 | POST | `/workflow/:docId/reject` | approver, admin | PENDING → DRAFT |
 | POST | `/workflow/:docId/archive` | approver, admin | PUBLISHED → ARCHIVED ⚠️ |
-| GET | `/audit/query` | compliance_officer | Truy vấn audit log |
+| GET | `/audit/query` | compliance_officer | Query audit log |
 
-> ⚠️ **Archive endpoint chưa được thêm vào gateway proxy.** Cần thêm vào `workflow.proxy.controller.ts`.
+> ⚠️ **Archive endpoint has not been added to gateway proxy yet.** Needs to be added to `workflow.proxy.controller.ts`.
 
 ---
 
-## Error Response Format (chung)
+## Error Response Format
 
 ```jsonc
 {
   "statusCode": 400 | 401 | 403 | 404 | 409,
-  "message": "string hoặc string[]",
+  "message": "string or string[]",
   "error": "string"
 }
 ```
 
-| Code | Tình huống |
+| Code | Situation |
 |---|---|
-| 401 | Không có / sai / hết hạn JWT |
-| 403 | Sai role hoặc bị ACL deny |
-| 404 | DocId không tồn tại |
-| 409 | Conflict (VD: approve doc đã published) |
-| 400 | Request body không hợp lệ |
+| 401 | Missing / invalid / expired JWT |
+| 403 | Wrong role or ACL denied |
+| 404 | DocId does not exist |
+| 409 | Conflict (e.g. approving an already published doc) |
+| 400 | Invalid request body |

@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { cn } from '@/lib/utils/cn';
 import { UserRole } from '@/types/auth';
 import { useMounted } from '@/lib/hooks/use-mounted';
+import { usePendingCount } from '@/lib/hooks/use-pending-count';
 
 function SidebarNav({
   pathname,
@@ -16,6 +17,7 @@ function SidebarNav({
   visibleItems,
   onLinkClick,
   mounted,
+  pendingCount,
 }: {
   pathname: string;
   session: {
@@ -32,6 +34,8 @@ function SidebarNav({
   onLinkClick: () => void;
   /** True once the component has mounted on the client — used to prevent hydration mismatches */
   mounted?: boolean;
+  /** Number of pending approval documents */
+  pendingCount?: number;
 }) {
   const avatarInitials =
     session?.user.firstName && session?.user.lastName
@@ -94,6 +98,15 @@ function SidebarNav({
               />
               <Icon className={cn('h-4 w-4 shrink-0 transition-colors duration-200', isActive ? 'text-[var(--color-primary)]' : 'text-[var(--sidebar-text)]')} />
               <span className="flex-1">{item.label}</span>
+              {/* Pending count badge — only on Approvals item */}
+              {item.href === '/approvals' && pendingCount && pendingCount > 0 && (
+                <span
+                  className="flex h-5 min-w-5 shrink-0 items-center justify-center rounded-full px-1.5 text-[10px] font-bold leading-none text-white"
+                  style={{ background: 'var(--status-pending-text)' }}
+                >
+                  {pendingCount > 99 ? '99+' : pendingCount}
+                </span>
+              )}
               {/* Active dot — always rendered, animated */}
               <span
                 className="h-1.5 w-1.5 shrink-0 rounded-full bg-[var(--color-primary)] transition-all duration-300"
@@ -141,6 +154,7 @@ export function AppSidebar() {
   const { session } = useAuth();
   const [mobileOpen, setMobileOpen] = useState(false);
   const mounted = useMounted();
+  const { data: pendingCount } = usePendingCount();
 
   // Prevent hydration mismatch: defer role-based filtering to client mount
   const visibleItems = mounted
@@ -177,6 +191,7 @@ export function AppSidebar() {
             visibleItems={visibleItems}
             onLinkClick={() => setMobileOpen(false)}
             mounted={mounted}
+            pendingCount={pendingCount}
           />
         </div>
       </aside>
@@ -229,6 +244,7 @@ export function AppSidebar() {
               visibleItems={visibleItems}
               onLinkClick={() => setMobileOpen(false)}
               mounted={mounted}
+              pendingCount={pendingCount}
             />
           </aside>
         </div>
