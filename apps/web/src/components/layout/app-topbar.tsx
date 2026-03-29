@@ -238,9 +238,7 @@ export function AppTopbar() {
       }}
     >
       <div className="flex items-center gap-3">
-        {session?.user.roles[0] && (
-          <RoleBadge role={session.user.roles[0] as UserRole} />
-        )}
+        <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />
       </div>
 
       <div className="flex items-center gap-2">

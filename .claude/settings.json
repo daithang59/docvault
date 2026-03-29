@@ -9,7 +9,8 @@
       "Read(//c//**)",
       "Bash(Get-ChildItem -Path C:/ -ErrorAction SilentlyContinue)",
       "Bash(Select-Object Name, Mode)",
-      "Bash(docker ps:*)"
+      "Bash(docker ps:*)",
+      "Bash(timeout 10 pnpm dev)"
     ]
   }
 }

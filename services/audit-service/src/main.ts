@@ -1,7 +1,6 @@
 // Load env FIRST — before any module that uses process.env
 import { config as dotenvConfig } from 'dotenv';
-import { join } from 'path';
-dotenvConfig({ path: join(__dirname, '../../.env') });
+dotenvConfig(); // loads .env from process.cwd() (monorepo root when using pnpm --filter)
 
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';

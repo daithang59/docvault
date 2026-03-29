@@ -1,6 +1,6 @@
 import { ExecutionContext, Injectable } from '@nestjs/common';
 import { ThrottlerGuard } from '@nestjs/throttler';
-import { isInternalServiceCall } from '../../../../libs/throttler/src';
+import { isInternalServiceCall } from '@docvault/throttler';
 
 /**
  * Backend throttler guard:
