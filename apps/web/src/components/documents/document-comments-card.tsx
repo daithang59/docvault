@@ -2,10 +2,10 @@
 
 import { useState } from 'react';
 import { useComments, useAddComment } from '@/lib/hooks/use-comments';
-import { formatOwnerName } from '@/lib/utils/format';
 import { formatDateTime } from '@/lib/utils/date';
 import { MessageSquare, Send } from 'lucide-react';
 import { toast } from 'sonner';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 
 interface DocumentCommentsCardProps {
   docId: string;
@@ -15,6 +15,8 @@ export function DocumentCommentsCard({ docId }: DocumentCommentsCardProps) {
   const { data: comments = [], isLoading } = useComments(docId);
   const addComment = useAddComment(docId);
   const [text, setText] = useState('');
+  const authorIds = [...new Set(comments.map((c) => c.authorId).filter(Boolean))];
+  const { data: displayNames } = useOwnerDisplayNames(authorIds);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -88,7 +90,7 @@ export function DocumentCommentsCard({ docId }: DocumentCommentsCardProps) {
             >
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-medium text-[var(--color-primary)]">
-                  {formatOwnerName(c.authorId)}
+                  {displayNames?.[c.authorId]?.displayName ?? c.authorId}
                 </span>
                 <span className="text-[10px] text-[var(--text-faint)]">
                   {formatDateTime(c.createdAt)}
