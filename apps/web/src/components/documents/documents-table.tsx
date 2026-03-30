@@ -10,8 +10,6 @@ import {
   ColumnDef,
   SortingState,
   RowSelectionState,
-  Row,
-  Header,
 } from '@tanstack/react-table';
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -101,7 +99,8 @@ export function DocumentsTable({
       ? [
           {
             id: 'select',
-            header: ({ table }: Header<DocumentListItem>) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            header: ({ table }: any) => (
               <input
                 type="checkbox"
                 checked={table.getIsAllPageRowsSelected()}
@@ -110,7 +109,8 @@ export function DocumentsTable({
                 aria-label="Select all"
               />
             ),
-            cell: ({ row }: { row: Row<DocumentListItem> }) => (
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            cell: ({ row }: any) => (
               <input
                 type="checkbox"
                 checked={row.getIsSelected()}
