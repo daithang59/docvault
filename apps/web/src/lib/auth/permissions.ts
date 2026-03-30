@@ -14,10 +14,10 @@ interface DocumentContext {
   classification?: string;
 }
 
-// ownerId is stored as username (preferred_username) — not sub.
-// Use username for ownership checks, not sub (which may be undefined in the session).
+// ownerId is stored as sub (Keycloak UUID).
+// Use sub for ownership checks.
 function isOwner(session: Session | null, ownerId: string | undefined): boolean {
-  return session?.user?.username === ownerId;
+  return session?.user?.sub === ownerId;
 }
 
 // ── Document list / creation ──────────────────────────────────────────────────

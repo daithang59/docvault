@@ -32,12 +32,22 @@ async function fetchUserDisplayNames(ids: string[]): Promise<Record<string, User
 /**
  * Returns a map of { [ownerId]: displayName } for the given owner IDs.
  * Results are cached so concurrent callers share one network request.
+ * UUIDs that can't be resolved will have displayName replaced with "Unknown User".
  */
 export function useOwnerDisplayNames(ownerIds: string[]) {
   return useQuery({
     // Deduplicate + stable key
     queryKey: ['user-displays', [...new Set(ownerIds)].sort()],
-    queryFn: () => fetchUserDisplayNames([...new Set(ownerIds)]),
+    queryFn: async () => {
+      const results = await fetchUserDisplayNames([...new Set(ownerIds)]);
+      // Post-process: UUIDs that couldn't be resolved by the backend → "Unknown User"
+      for (const id of Object.keys(results)) {
+        if (id.includes('-') && !results[id]?.displayName) {
+          results[id] = { displayName: 'Unknown User', username: id };
+        }
+      }
+      return results;
+    },
     staleTime: 10 * 60 * 1000, // 10 minutes — display names don't change often
   });
 }
@@ -58,6 +68,8 @@ async function fetchOwnerDisplayName(ownerId: string): Promise<string> {
   } catch {
     // Fall through to fallback
   }
+  // UUIDs (contain hyphens) can't be formatted — return a generic label
+  if (ownerId.includes('-')) return 'Unknown User';
   // Format as "Editor 1"
   return ownerId
     .replace(/(\d+)$/, ' $1')
