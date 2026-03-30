@@ -75,6 +75,7 @@ export class WorkflowService {
       context,
     );
 
+    // Notify the document owner (document.ownerId is the owner's sub/UUID)
     await this.notificationClient.notify(context, {
       type:        'APPROVED',
       docId,
@@ -111,6 +112,7 @@ export class WorkflowService {
       reason,
     );
 
+    // Notify the document owner (document.ownerId is the owner's sub/UUID)
     await this.notificationClient.notify(context, {
       type:        'REJECTED',
       docId,
@@ -147,10 +149,11 @@ export class WorkflowService {
       context,
     );
 
+    // Use actorId (sub/UUID) to notify the owner — matches buildActorId used in GET /notify.
     await this.notificationClient.notify(context, {
       type:        'ARCHIVED',
       docId,
-      recipientId: document.ownerId,
+      recipientId: actorId,
       docTitle:    document.title,
     });
 
@@ -185,11 +188,11 @@ export class WorkflowService {
       context,
     );
 
-    // Notify stakeholders (fire-and-forget)
+    // Notify stakeholders (fire-and-forget) — use actorId (sub/UUID).
     await this.notificationClient.notify(context, {
       type:        'DELETED',
       docId,
-      recipientId: document.ownerId,
+      recipientId: actorId,
       docTitle:    document.title,
     });
 

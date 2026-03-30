@@ -89,7 +89,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       email: payload.email,
       firstName: payload.given_name,
       lastName: payload.family_name,
-      displayName: payload.name ?? ([payload.given_name, payload.family_name].filter(Boolean).join(' ') || undefined),
+      displayName:
+        payload.name ??
+        ([payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
+          undefined),
       roles: Array.from(roles),
       raw: payload,
     };

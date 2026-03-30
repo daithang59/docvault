@@ -54,8 +54,8 @@ export default function MyDocumentsPage() {
     onError: (msg) => toast.error(msg),
   });
 
-  // Backend stores ownerId as username (via buildActorId = username ?? sub)
-  const currentUserId = session?.user?.username ?? session?.user?.preferred_username ?? session?.user?.sub ?? '';
+  // Backend stores ownerId as sub (Keycloak UUID)
+  const currentUserId = session?.user?.sub ?? '';
 
   const filtered = useMemo(() => {
     if (!docs) return [];

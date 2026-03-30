@@ -133,7 +133,9 @@ export class DocumentsProxyController {
     @Res() res: Response,
   ) {
     // Forward query params (e.g. ?token=grantToken for token-verified streaming)
-    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.DOCUMENT_SERVICE_URL}/documents/${docId}/versions/${version}/stream${queryString}`,
@@ -186,29 +188,29 @@ export class DocumentsProxyController {
       responseType: 'stream',
     });
 
-      // Forward all relevant streaming headers
-      const headers = response.headers as Record<
-        string,
-        string | string[] | undefined
-      >;
-      if (headers['content-type']) {
-        res.setHeader('Content-Type', String(headers['content-type']));
-      }
-      if (headers['content-disposition']) {
-        res.setHeader(
-          'Content-Disposition',
-          String(headers['content-disposition']),
-        );
-      }
-      if (headers['accept-ranges']) {
-        res.setHeader('Accept-Ranges', String(headers['accept-ranges']));
-      }
-      if (headers['content-range']) {
-        res.setHeader('Content-Range', String(headers['content-range']));
-      }
-      if (headers['content-length']) {
-        res.setHeader('Content-Length', String(headers['content-length']));
-      }
+    // Forward all relevant streaming headers
+    const headers = response.headers as Record<
+      string,
+      string | string[] | undefined
+    >;
+    if (headers['content-type']) {
+      res.setHeader('Content-Type', String(headers['content-type']));
+    }
+    if (headers['content-disposition']) {
+      res.setHeader(
+        'Content-Disposition',
+        String(headers['content-disposition']),
+      );
+    }
+    if (headers['accept-ranges']) {
+      res.setHeader('Accept-Ranges', String(headers['accept-ranges']));
+    }
+    if (headers['content-range']) {
+      res.setHeader('Content-Range', String(headers['content-range']));
+    }
+    if (headers['content-length']) {
+      res.setHeader('Content-Length', String(headers['content-length']));
+    }
 
     (response.data as NodeJS.ReadableStream).pipe(res);
   }

@@ -184,7 +184,8 @@ export class DocumentsService {
         description: dto.description,
         classification: (dto.classification ?? 'INTERNAL') as any,
         tags: this.sanitizeTags(dto.tags),
-        ownerId: buildActorId(user),
+        // Use context.actorId — correct for both direct calls and gateway forwarded calls.
+        ownerId: context.actorId,
       },
     });
 
@@ -220,7 +221,8 @@ export class DocumentsService {
       throw new NotFoundException('Document not found');
     }
 
-    this.assertCanManage(document.ownerId, user);
+    // Use context.actorId — correct even when req.user is stripped by gateway.
+    this.assertCanManage(document.ownerId, context.actorId, context.roles);
 
     const data: Record<string, any> = {};
     const changes: Record<string, { old: unknown; new: unknown }> = {};
@@ -268,9 +270,7 @@ export class DocumentsService {
     return [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
   }
 
-  private assertCanManage(ownerId: string, user: ServiceUser) {
-    const actorId = buildActorId(user);
-    const roles = user.roles ?? [];
+  private assertCanManage(ownerId: string, actorId: string, roles: string[]) {
     const isEditor = roles.includes('editor') || roles.includes('admin');
 
     if (!isEditor || (ownerId !== actorId && !roles.includes('admin'))) {
@@ -365,13 +365,12 @@ export class DocumentsService {
       const approverUsers: Array<{ id: string; username: string }> = await approverRes.json();
       const adminUsers:    Array<{ id: string; username: string }> = await adminRes.json();
 
-      // Use username (preferred_username) — NOT UUID (id).
-      // Notifications are stored and retrieved by username (buildActorId = username ?? sub),
-      // so recipient IDs must also be usernames for the notification bell to work.
+      // Use sub (id/UUID) — NOT username.
+      // Notifications are stored and retrieved by sub (UUID) to match req.user.sub in GET /notify.
       const ids = [
         ...new Set([
-          ...approverUsers.map((u) => u.username).filter(Boolean),
-          ...adminUsers.map((u) => u.username).filter(Boolean),
+          ...approverUsers.map((u) => u.id).filter(Boolean),
+          ...adminUsers.map((u) => u.id).filter(Boolean),
         ]),
       ];
 

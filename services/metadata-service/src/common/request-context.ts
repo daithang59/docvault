@@ -13,7 +13,7 @@ export type RequestContext = {
 };
 
 export function buildActorId(user: ServiceUser): string {
-  return user.username ?? user.sub;
+  return user.sub ?? user.username ?? 'unknown';
 }
 
 export function buildRequestContext(req: any): RequestContext {

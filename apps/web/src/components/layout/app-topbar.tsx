@@ -17,7 +17,7 @@ import { useRouter } from 'next/navigation';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { UserRole } from '@/types/auth';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, startTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { formatRelative } from '@/lib/utils/date';
 import {
@@ -154,11 +154,14 @@ export function AppTopbar() {
   useEffect(() => {
     if (!notifOpen || !session) return;
 
-    setNotifLoading(true);
+    // Wrap state updates to avoid cascading renders.
+    startTransition(() => {
+      setNotifLoading(true);
+    });
     fetchNotifications(1, 20)
-      .then((page) => setNotifPage(page))
+      .then((page) => startTransition(() => setNotifPage(page)))
       .catch(() => {})
-      .finally(() => setNotifLoading(false));
+      .finally(() => startTransition(() => setNotifLoading(false)));
   }, [notifOpen, session]);
 
   // ── [C] Close dropdown on outside click ──────────────────────────────────
