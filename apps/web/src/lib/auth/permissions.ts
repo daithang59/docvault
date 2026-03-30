@@ -44,7 +44,7 @@ export function canEditDocument(
 ): boolean {
   if (!session) return false;
   if (hasRole(session, 'admin')) return true;
-  if (doc.status !== 'DRAFT') return false;
+  // Editor + owner can edit their document in any status (DRAFT, PUBLISHED, ARCHIVED, etc.)
   if (hasRole(session, 'editor') && isOwner(session, doc.ownerId)) return true;
   return false;
 }
