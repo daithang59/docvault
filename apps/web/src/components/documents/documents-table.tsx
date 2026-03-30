@@ -17,9 +17,10 @@ import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
-import { truncateEnd, formatOwnerName } from '@/lib/utils/format';
+import { truncateEnd } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
 
 interface DocumentsTableProps {
@@ -52,6 +53,8 @@ export function DocumentsTable({
   onBulkApprove,
 }: DocumentsTableProps) {
   const { session } = useAuth();
+  const ownerIds = [...new Set(data.map((d) => d.ownerId).filter(Boolean))];
+  const { data: displayNames } = useOwnerDisplayNames(ownerIds);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
   const [activeMenu, setActiveMenu] = useState<string | null>(null);
@@ -96,6 +99,7 @@ export function DocumentsTable({
       ? [
           {
             id: 'select',
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             header: ({ table }: any) => (
               <input
                 type="checkbox"
@@ -105,6 +109,7 @@ export function DocumentsTable({
                 aria-label="Select all"
               />
             ),
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             cell: ({ row }: any) => (
               <input
                 type="checkbox"
@@ -158,7 +163,7 @@ export function DocumentsTable({
                   {doc.description.length > 150 ? doc.description.slice(0, 150) + '…' : doc.description}
                 </p>
                 <div className="mt-2 flex items-center gap-3 text-[10px]" style={{ color: 'var(--text-faint)' }}>
-                  <span>Owner: <span className="font-mono">{doc.ownerId ? formatOwnerName(doc.ownerId) : 'Unknown'}</span></span>
+                  <span>Owner: <span className="font-medium">{doc.ownerId ? (displayNames?.[doc.ownerId]?.displayName ?? doc.ownerId) : 'Unknown'}</span></span>
                   <span>{formatDateTime(doc.updatedAt)}</span>
                 </div>
               </div>
@@ -189,7 +194,7 @@ export function DocumentsTable({
       header: 'Owner',
       cell: ({ row }) => (
         <span className="text-xs text-[var(--text-muted)]">
-          {row.original.ownerId ? formatOwnerName(row.original.ownerId) : 'Unknown'}
+          {row.original.ownerId ? (displayNames?.[row.original.ownerId]?.displayName ?? row.original.ownerId) : 'Unknown'}
         </span>
       ),
     },

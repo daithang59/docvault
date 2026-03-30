@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { Send, CheckCircle, XCircle, Archive } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 
 const ACTION_CONFIG = {
   SUBMIT: { icon: Send, color: 'text-[var(--color-primary)]', bg: 'bg-[var(--stat-total-bg)]', label: 'Submitted' },
@@ -20,6 +21,8 @@ interface DocumentWorkflowTimelineProps {
 export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelineProps) {
   const { session } = useAuth();
   const currentSub = session?.user.sub;
+  const actorIds = [...new Set(history.map((h) => h.actorId).filter(Boolean))];
+  const { data: displayNames } = useOwnerDisplayNames(actorIds);
   const sorted = [...history].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -72,7 +75,7 @@ export function DocumentWorkflowTimeline({ history }: DocumentWorkflowTimelinePr
                           {entry.actorId === currentSub && session?.user.displayName ? (
                             <span className="font-medium text-[var(--text-main)]">{session.user.displayName}</span>
                           ) : (
-                            <span className="font-medium">{entry.actorDisplay ?? entry.actorId}</span>
+                            <span className="font-medium">{displayNames?.[entry.actorId]?.displayName ?? entry.actorDisplay ?? entry.actorId}</span>
                           )}
                         </span>
                         <span>{formatDateTime(entry.createdAt)}</span>

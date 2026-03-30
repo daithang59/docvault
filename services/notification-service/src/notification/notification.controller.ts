@@ -31,9 +31,8 @@ export class NotificationController {
     @Query('page')  page?: string,
     @Query('limit') limit?: string,
   ) {
-    // Prefer username (preferred_username from Keycloak) over sub (UUID).
-    // Notifications are stored by the same username that buildActorId() uses.
-    const userId = req.user?.username ?? req.user?.sub ?? 'anonymous';
+    // Use sub (UUID) to match buildActorId() — sub ?? username ?? 'unknown'.
+    const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
     return this.ns.getForUser(
       userId,
       page  ? parseInt(page,  10) : 1,
@@ -42,11 +41,12 @@ export class NotificationController {
   }
 
   // ── GET /notify/unread-count ─────────────────────────────────────────────
-  /** Lightweight polling endpoint — returns only the count. No auth required. */
+  /** Lightweight — returns unread count for the authenticated user. */
   @Get('notify/unread-count')
   @ApiOperation({ summary: 'Get unread notification count' })
   unreadCount(@Req() req: any) {
-    const userId = req.user?.username ?? req.user?.sub ?? 'anonymous';
+    // Use sub (UUID) to match buildActorId() — sub ?? username ?? 'unknown'.
+    const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
     return { count: this.ns.getUnreadCount(userId) };
   }
 

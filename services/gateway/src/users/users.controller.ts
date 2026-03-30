@@ -49,7 +49,9 @@ export class UsersController {
 
       const displayName =
         (user['displayName'] as string) ??
-        ([user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
+        ([user['firstName'] as string, user['lastName'] as string]
+          .filter(Boolean)
+          .join(' ') ||
           undefined);
 
       return {
@@ -79,7 +81,9 @@ export class UsersController {
         sub: u.sub,
         username: u.preferred_username ?? u.username,
         displayName:
-          u.name ?? ([u.given_name, u.family_name].filter(Boolean).join(' ') || undefined),
+          u.name ??
+          ([u.given_name, u.family_name].filter(Boolean).join(' ') ||
+            undefined),
         firstName: u.given_name,
         lastName: u.family_name,
         email: u.email,
@@ -93,7 +97,9 @@ export class UsersController {
 
       const displayName =
         (user['displayName'] as string) ??
-        ([user['firstName'] as string, user['lastName'] as string].filter(Boolean).join(' ') ||
+        ([user['firstName'] as string, user['lastName'] as string]
+          .filter(Boolean)
+          .join(' ') ||
           undefined);
 
       return {
@@ -127,12 +133,16 @@ export class UsersController {
       'Returns a map of { [userId]: { displayName, username } } for the given user IDs. ' +
       'Supports both Keycloak user UUIDs (sub) and usernames.',
   })
-  async getBatch(@Body() body: { ids: string[] }, @Req() req: Request & { user?: Record<string, unknown> }) {
+  async getBatch(
+    @Body() body: { ids: string[] },
+    @Req() req: Request & { user?: Record<string, unknown> },
+  ) {
     const accessToken = req.headers['authorization']?.replace('Bearer ', '');
     const { ids } = body;
 
     if (!ids?.length) return {};
-    const result: Record<string, { displayName: string; username: string }> = {};
+    const result: Record<string, { displayName: string; username: string }> =
+      {};
 
     // If admin credentials are available, use Keycloak Admin API for full names
     if (process.env.KEYCLOAK_CLIENT_SECRET) {
@@ -156,18 +166,36 @@ export class UsersController {
                 // Direct fetch by UUID
                 const res = await axios.get(
                   `${this.keycloakBaseUrl}/admin/realms/${this.realm}/users/${userId}`,
-                  { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 },
+                  {
+                    headers: { Authorization: `Bearer ${adminToken}` },
+                    timeout: 5000,
+                  },
                 );
                 kcUser = res.data;
               } else {
                 // Search by username
-                const searchRes = await axios.get<{ id: string; username: string; firstName?: string; lastName?: string; displayName?: string; attributes?: { displayName?: string[] } }[]>(
+                const searchRes = await axios.get<
+                  {
+                    id: string;
+                    username: string;
+                    firstName?: string;
+                    lastName?: string;
+                    displayName?: string;
+                    attributes?: { displayName?: string[] };
+                  }[]
+                >(
                   `${this.keycloakBaseUrl}/admin/realms/${this.realm}/users?username=${encodeURIComponent(userId)}`,
-                  { headers: { Authorization: `Bearer ${adminToken}` }, timeout: 5000 },
+                  {
+                    headers: { Authorization: `Bearer ${adminToken}` },
+                    timeout: 5000,
+                  },
                 );
                 const found = searchRes.data.find((u) => u.username === userId);
                 if (!found) {
-                  result[userId] = { displayName: formatUsername(userId), username: userId };
+                  result[userId] = {
+                    displayName: formatUsername(userId),
+                    username: userId,
+                  };
                   return;
                 }
                 kcUser = found;
@@ -177,11 +205,17 @@ export class UsersController {
                 displayName:
                   kcUser.attributes?.displayName?.[0] ??
                   kcUser.displayName ??
-                  ([kcUser.firstName, kcUser.lastName].filter(Boolean).join(' ') || kcUser.username),
+                  ([kcUser.firstName, kcUser.lastName]
+                    .filter(Boolean)
+                    .join(' ') ||
+                    kcUser.username),
                 username: kcUser.username,
               };
             } catch {
-              result[userId] = { displayName: formatUsername(userId), username: userId };
+              result[userId] = {
+                displayName: formatUsername(userId),
+                username: userId,
+              };
             }
           }),
         );
@@ -219,7 +253,10 @@ export class UsersController {
             username: u.preferred_username ?? userId,
           };
         } catch {
-          result[userId] = { displayName: formatUsername(userId), username: userId };
+          result[userId] = {
+            displayName: formatUsername(userId),
+            username: userId,
+          };
         }
       }),
     );

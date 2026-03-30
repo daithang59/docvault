@@ -48,7 +48,7 @@ export class ProxyService {
             ...config.headers,
             Authorization: buildAuthorizationHeader(req),
             'x-request-id': req.traceId ?? req.headers['x-request-id'],
-            'x-user-id': req.user?.username ?? req.user?.sub ?? '',
+            'x-user-id': req.user?.sub ?? req.user?.username ?? '',
             'x-roles': (req.user?.roles ?? []).join(','),
           },
           maxBodyLength: Infinity,

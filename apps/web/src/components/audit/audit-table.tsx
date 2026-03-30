@@ -5,6 +5,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { truncateMiddle } from '@/lib/utils/format';
 import { EmptyState } from '@/components/common/empty-state';
 import { cn } from '@/lib/utils/cn';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 
 interface AuditTableProps {
   data: AuditLogEntry[];
@@ -14,6 +15,8 @@ interface AuditTableProps {
 }
 
 export function AuditTable({ data, total = 0, page = 1, pageSize = 20 }: AuditTableProps) {
+  const actorIds = [...new Set(data.map((d) => d.actorId).filter(Boolean))];
+  const { data: displayNames } = useOwnerDisplayNames(actorIds);
   if (data.length === 0) {
     return (
       <EmptyState
@@ -47,8 +50,8 @@ export function AuditTable({ data, total = 0, page = 1, pageSize = 20 }: AuditTa
                 <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-muted)]">
                   {formatDateTime(entry.timestamp)}
                 </td>
-                <td className="whitespace-nowrap px-4 py-3 font-mono text-xs text-[var(--text-main)]">
-                  {truncateMiddle(entry.actorId, 14)}
+                <td className="whitespace-nowrap px-4 py-3 text-xs text-[var(--text-main)]">
+                  {displayNames?.[entry.actorId]?.displayName ?? truncateMiddle(entry.actorId, 14)}
                 </td>
                 <td className="px-4 py-3">
                   <div className="flex flex-wrap gap-1">

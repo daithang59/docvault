@@ -24,6 +24,8 @@ export function titleCase(str: string): string {
  * "viewer2" → "Viewer 2"
  */
 export function formatOwnerName(ownerId: string): string {
+  // UUIDs contain hyphens — should be resolved via useOwnerDisplayNames, return as-is
+  if (ownerId.includes('-')) return ownerId;
   // Already looks human-readable (has space or title-case letters)
   if (/[A-Z]/.test(ownerId) || /\s/.test(ownerId)) return ownerId;
 
