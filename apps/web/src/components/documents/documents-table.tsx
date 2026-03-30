@@ -10,6 +10,8 @@ import {
   ColumnDef,
   SortingState,
   RowSelectionState,
+  Row,
+  Header,
 } from '@tanstack/react-table';
 import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2 } from 'lucide-react';
 import Link from 'next/link';
@@ -17,7 +19,7 @@ import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
-import { truncateEnd, formatOwnerName } from '@/lib/utils/format';
+import { truncateEnd } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
@@ -99,7 +101,7 @@ export function DocumentsTable({
       ? [
           {
             id: 'select',
-            header: ({ table }: any) => (
+            header: ({ table }: Header<DocumentListItem>) => (
               <input
                 type="checkbox"
                 checked={table.getIsAllPageRowsSelected()}
@@ -108,7 +110,7 @@ export function DocumentsTable({
                 aria-label="Select all"
               />
             ),
-            cell: ({ row }: any) => (
+            cell: ({ row }: { row: Row<DocumentListItem> }) => (
               <input
                 type="checkbox"
                 checked={row.getIsSelected()}

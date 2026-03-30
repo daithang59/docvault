@@ -38,7 +38,9 @@ export class MetadataProxyController {
   })
   async list(@Req() req: any) {
     // Forward query params (e.g. ?q=keyword) to the downstream service
-    const queryString = req.url.includes('?') ? req.url.substring(req.url.indexOf('?')) : '';
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents${queryString}`,
