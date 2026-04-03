@@ -33,11 +33,6 @@ describe('AuditService — Hash Chain', () => {
     mockCreate.mockImplementation((data) =>
       Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
     );
-
-    // Stub emitSelfAudit — it uses auditEvent.create() internally, which
-    // would corrupt shared mocks. Stubbing prevents test flakiness while
-    // still verifying the main hash chain logic.
-    jest.spyOn(service as any, 'emitSelfAudit').mockImplementation(() => Promise.resolve());
   });
 
   const baseDto = {
