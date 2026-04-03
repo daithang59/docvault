@@ -4,6 +4,9 @@
     "dev": { "cache": false, "persistent": true },
     "build": { "dependsOn": ["^build"], "outputs": ["dist/**", ".next/**"] },
     "lint": {},
-    "test": {}
+    "test": {},
+    "prisma:generate": {
+      "cache": false
+    }
   }
 }

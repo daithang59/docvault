@@ -39,6 +39,7 @@ describe('WorkflowService', () => {
           useValue: {
             getDocument: jest.fn(),
             updateStatus: jest.fn(),
+            getApprovers: jest.fn().mockResolvedValue({ userIds: ['approver1'] }),
           },
         },
         {
@@ -79,7 +80,8 @@ describe('WorkflowService', () => {
       expect(notificationClient.notify).toHaveBeenCalledWith(mockContext, {
         type: 'SUBMITTED',
         docId: 'doc-1',
-        actorId: 'alice',
+        docTitle: 'Test Doc',
+        recipientIds: ['approver1'],
       });
     });
 
@@ -158,6 +160,7 @@ describe('WorkflowService', () => {
 
       expect(result.status).toBe('PUBLISHED');
       expect(notificationClient.notify).toHaveBeenCalledWith(
+        expect.any(Object),
         expect.objectContaining({ type: 'APPROVED' }),
       );
     });
@@ -213,6 +216,7 @@ describe('WorkflowService', () => {
         'Insufficient coverage',
       );
       expect(notificationClient.notify).toHaveBeenCalledWith(
+        expect.any(Object),
         expect.objectContaining({ type: 'REJECTED', reason: 'Insufficient coverage' }),
       );
     });
@@ -251,6 +255,7 @@ describe('WorkflowService', () => {
 
       expect(result.status).toBe('ARCHIVED');
       expect(notificationClient.notify).toHaveBeenCalledWith(
+        expect.any(Object),
         expect.objectContaining({ type: 'ARCHIVED' }),
       );
     });
