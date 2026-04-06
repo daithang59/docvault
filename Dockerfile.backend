@@ -1,0 +1,58 @@
+# Use node 20 alpine as base
+FROM node:20-alpine AS base
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME:$PATH"
+RUN corepack enable pnpm
+
+# Stage 1: Prune the monorepo to only what's needed for the specific service
+FROM base AS builder
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+RUN pnpm install turbo --global
+COPY . .
+ARG SERVICE_NAME
+RUN turbo prune ${SERVICE_NAME} --docker
+
+# Stage 2: Install dependencies and build the service
+FROM base AS installer
+RUN apk update && apk add --no-cache libc6-compat
+WORKDIR /app
+
+# First copy the pruned package.json and lockfile
+COPY .gitignore .gitignore
+COPY --from=builder /app/out/json/ .
+COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
+RUN pnpm install --frozen-lockfile
+
+# Copy the rest of the source and build
+COPY --from=builder /app/out/full/ .
+ARG SERVICE_NAME
+# Generate Prisma client if it exists in the service
+RUN if [ -f "services/${SERVICE_NAME}/prisma/schema.prisma" ]; then \
+      cd services/${SERVICE_NAME} && pnpm prisma generate; \
+    fi
+RUN pnpm turbo run build --filter=${SERVICE_NAME}...
+
+# Stage 3: Create the final production image
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+
+# Create a user to run for security
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nestjs
+USER nestjs
+
+ARG SERVICE_NAME
+# Copy built files and necessary node_modules
+COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/package.json ./package.json
+COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/dist ./dist
+COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
+COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/node_modules ./services/${SERVICE_NAME}/node_modules
+
+# Also copy shared libs
+# If prisma was used, copy the generated client
+COPY --from=installer --chown=nestjs:nodejs /app/libs ./libs
+
+EXPOSE 3000
+CMD ["node", "dist/main"]
