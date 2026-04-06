@@ -3,7 +3,7 @@ pipeline {
 
     environment {
         NODE_IMAGE = 'node:20-alpine'
-        TRIVY_IMAGE = 'aquasec/trivy:latest'
+        TRIVY_IMAGE = 'aquasec/trivy:0.50.1' 
         SONAR_SCANNER_IMAGE = 'sonarsource/sonar-scanner-cli:latest'
     }
 
@@ -60,15 +60,15 @@ pipeline {
                         script {
                             echo '>>> Running SCA Scan (OWASP Dependency-Check)...'
                             sh 'mkdir -p dependency-check-report'
-                            // Create a directory for the database cache on the host
-                            sh 'mkdir -p dependency-check-data'
+                            // Cache outside workspace to survive cleanWs()
+                            sh 'mkdir -p /home/abby/jenkins_workspace/dependency-check-data'
                             
                             sh """
                                 docker run --rm \
                                     --network host \
                                     -v ${env.WORKSPACE}:/src \
                                     -v ${env.WORKSPACE}/dependency-check-report:/report \
-                                    -v ${env.WORKSPACE}/dependency-check-data:/usr/share/dependency-check/data \
+                                    -v /home/abby/jenkins_workspace/dependency-check-data:/usr/share/dependency-check/data \
                                     owasp/dependency-check:latest \
                                     --project "DocVault" \
                                     --scan /src \
@@ -105,10 +105,12 @@ pipeline {
                     steps {
                         script {
                             echo '>>> Running Trivy Filesystem Scan...'
+                            // Cache outside workspace
+                            sh 'mkdir -p /home/abby/jenkins_workspace/trivy-cache'
                             sh """
                                 docker run --rm \
                                     -v ${env.WORKSPACE}:/src \
-                                    -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
+                                    -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                                     ${env.TRIVY_IMAGE} \
                                     fs /src --scanners vuln,secret,config --severity HIGH,CRITICAL
                             """
@@ -138,7 +140,7 @@ pipeline {
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
-                                -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
+                                -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                                 ${env.TRIVY_IMAGE} \
                                 image --severity HIGH,CRITICAL duyimew/${service}:latest
                         """
@@ -151,7 +153,7 @@ pipeline {
                     sh """
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
-                            -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
+                            -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                             ${env.TRIVY_IMAGE} \
                             image --severity HIGH,CRITICAL duyimew/docvault:latest
                     """
