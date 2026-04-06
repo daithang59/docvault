@@ -1,9 +1,10 @@
 # --- 1. Dependencies & Build Artifacts ---
-node_modules
-.next
-dist
-.turbo
-out
+**/node_modules
+**/.next
+**/dist
+**/.turbo
+**/out
+**/.pnpm-store
 *.log
 npm-debug.log*
 yarn-debug.log*
@@ -31,6 +32,8 @@ pnpm-debug.log*
 .DS_Store
 Thumbs.db
 *.swp
+*.pdf
+*.md
 
 # --- 5. Project Docs & Media ---
 docs
@@ -45,6 +48,9 @@ test-results
 .nyc_output
 Jenkinsfile
 .github/workflows
+dependency-check-report
+dependency-check-data
+trivy-cache
 
 # --- 7. Infrastructure & Local Dev ---
 infra

@@ -13,7 +13,6 @@ RUN turbo prune web --docker
 FROM base AS installer                                                                                        
 RUN apk update && apk add --no-cache libc6-compat                                                             
 WORKDIR /app                                                                                                  
-COPY .gitignore .gitignore                                                                                    
 COPY --from=builder /app/out/json/ .                                                                          
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml                                                  
 RUN pnpm install --frozen-lockfile                                                                            

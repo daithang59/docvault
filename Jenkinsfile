@@ -72,6 +72,8 @@ pipeline {
                                     owasp/dependency-check:latest \
                                     --project "DocVault" \
                                     --scan /src \
+				    --exclude "**/node_modules/**" \
+  				    --exclude "**/.pnpm-store/**" \
                                     --format "HTML" \
                                     --out /report \
                                     --disableNodeAudit \
