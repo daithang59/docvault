@@ -75,7 +75,7 @@ pipeline {
                                     --format "HTML" \
                                     --out /report \
                                     --disableNodeAudit \
-				    --disableKev
+                                    --disableKnownExploited
                             """
                         }
                     }
