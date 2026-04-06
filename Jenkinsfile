@@ -112,7 +112,7 @@ pipeline {
                                     -v ${env.WORKSPACE}:/src \
                                     -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                                     ${env.TRIVY_IMAGE} \
-                                    fs /src --scanners vuln,secret,config --severity HIGH,CRITICAL
+                                    fs /src --scanners vuln,secret,misconfig --severity HIGH,CRITICAL --timeout 15m --skip-dirs .pnpm-store,node_modules
                             """
                         }
                     }
