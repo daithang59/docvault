@@ -100,6 +100,21 @@ pipeline {
                         }
                     }
                 }
+
+                stage('Trivy FS Scan') {
+                    steps {
+                        script {
+                            echo '>>> Running Trivy Filesystem Scan...'
+                            sh """
+                                docker run --rm \
+                                    -v ${env.WORKSPACE}:/src \
+                                    -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
+                                    ${env.TRIVY_IMAGE} \
+                                    fs /src --scanners vuln,secret,config --severity HIGH,CRITICAL
+                            """
+                        }
+                    }
+                }
             }
         }
 
@@ -117,28 +132,28 @@ pipeline {
                     
                     services.each { service ->
                         echo ">>> Building Docker Image for ${service}..."
-                        sh "docker build -t docvault/${service}:latest --build-arg SERVICE_NAME=${service} -f Dockerfile.backend ."
+                        sh "docker build -t duyimew/${service}:latest --build-arg SERVICE_NAME=${service} -f Dockerfile.backend ."
                         
-                        echo ">>> Scanning Image docvault/${service}:latest with Trivy..."
+                        echo ">>> Scanning Image duyimew/${service}:latest with Trivy..."
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
                                 -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
                                 ${env.TRIVY_IMAGE} \
-                                image --severity HIGH,CRITICAL docvault/${service}:latest
+                                image --severity HIGH,CRITICAL duyimew/${service}:latest
                         """
                     }
                     
                     echo ">>> Building Docker Image for web..."
-                    sh "docker build -t docvault/web:latest -f apps/web/Dockerfile ."
+                    sh "docker build -t duyimew/docvault:latest -f apps/web/Dockerfile ."
                     
-                    echo ">>> Scanning Image docvault/web:latest with Trivy..."
+                    echo ">>> Scanning Image duyimew/docvault:latest with Trivy..."
                     sh """
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
                             -v ${env.WORKSPACE}/trivy-cache:/root/.cache/ \
                             ${env.TRIVY_IMAGE} \
-                            image --severity HIGH,CRITICAL docvault/web:latest
+                            image --severity HIGH,CRITICAL duyimew/docvault:latest
                     """
                 }
             }
@@ -147,8 +162,27 @@ pipeline {
         stage('Push to Registry') {
             steps {
                 script {
-                    echo '>>> Pushing images to registry...'
-                    echo 'NOTE: this is still a placeholder'
+                    echo '>>> Logging into Docker Hub...'
+                    withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                        sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
+                        
+                        def services = [
+                            'gateway', 
+                            'metadata-service', 
+                            'document-service', 
+                            'notification-service', 
+                            'workflow-service', 
+                            'audit-service'
+                        ]
+                        
+                        services.each { service ->
+                            echo ">>> Pushing duyimew/${service}:latest to Docker Hub..."
+                            sh "docker push duyimew/${service}:latest"
+                        }
+
+                        echo ">>> Pushing duyimew/docvault:latest to Docker Hub..."
+                        sh "docker push duyimew/docvault:latest"
+                    }
                 }
             }
         }
