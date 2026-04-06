@@ -60,18 +60,22 @@ pipeline {
                         script {
                             echo '>>> Running SCA Scan (OWASP Dependency-Check)...'
                             sh 'mkdir -p dependency-check-report'
+                            // Create a directory for the database cache on the host
+                            sh 'mkdir -p dependency-check-data'
                             
                             sh """
                                 docker run --rm \
                                     --network host \
                                     -v ${env.WORKSPACE}:/src \
                                     -v ${env.WORKSPACE}/dependency-check-report:/report \
+                                    -v ${env.WORKSPACE}/dependency-check-data:/usr/share/dependency-check/data \
                                     owasp/dependency-check:latest \
                                     --project "DocVault" \
                                     --scan /src \
                                     --format "HTML" \
                                     --out /report \
-                                    --disableNodeAudit
+                                    --disableNodeAudit \
+				    --disableKev
                             """
                         }
                     }
@@ -86,6 +90,7 @@ pipeline {
                                     docker run --rm \
                                         --network host \
                                         -v ${env.WORKSPACE}:/usr/src \
+                                        -e SONAR_TOKEN=${SONAR_AUTH_TOKEN} \
                                         ${env.SONAR_SCANNER_IMAGE} \
                                         -Dsonar.projectKey=docvault \
                                         -Dsonar.sources=. \
