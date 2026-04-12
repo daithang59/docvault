@@ -1,7 +1,7 @@
 # workflow-service values
 image:
   repository: duyimew/workflow-service
-  tag: "v60"
+  tag: "v61"
 
 service:
   port: 3003
