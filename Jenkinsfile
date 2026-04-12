@@ -8,6 +8,8 @@ pipeline {
     }
 
     stages {
+        
+
         stage('System Check') {
             steps {
                 script {
@@ -142,6 +144,7 @@ pipeline {
         stage('Build & Container Security') {
             steps {
                 script {
+                    def tag = "v${env.BUILD_NUMBER}"
                     def services = [
                         'gateway', 
                         'metadata-service', 
@@ -152,29 +155,29 @@ pipeline {
                     ]
                     
                     services.each { service ->
-                        echo ">>> Building Docker Image for ${service}..."
-                        sh "docker build -t duyimew/${service}:latest --build-arg SERVICE_NAME=${service} -f Dockerfile.backend ."
+                        echo ">>> Building Docker Image for ${service}:${tag}..."
+                        sh "docker build -t duyimew/${service}:${tag} -t duyimew/${service}:latest --build-arg SERVICE_NAME=${service} -f Dockerfile.backend ."
                         
-                        echo ">>> Scanning Image duyimew/${service}:latest with Trivy..."
+                        echo ">>> Scanning Image duyimew/${service}:${tag} with Trivy..."
                         sh """
                             docker run --rm \
                                 -v /var/run/docker.sock:/var/run/docker.sock \
                                 -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                                 ${env.TRIVY_IMAGE} \
-                                image --severity HIGH,CRITICAL duyimew/${service}:latest
+                                image --severity HIGH,CRITICAL duyimew/${service}:${tag}
                         """
                     }
                     
-                    echo ">>> Building Docker Image for web..."
-                    sh "docker build -t duyimew/docvault:latest -f apps/web/Dockerfile ."
+                    echo ">>> Building Docker Image for web:${tag}..."
+                    sh "docker build -t duyimew/docvault:${tag} -t duyimew/docvault:latest -f apps/web/Dockerfile ."
                     
-                    echo ">>> Scanning Image duyimew/docvault:latest with Trivy..."
+                    echo ">>> Scanning Image duyimew/docvault:${tag} with Trivy..."
                     sh """
                         docker run --rm \
                             -v /var/run/docker.sock:/var/run/docker.sock \
                             -v /home/abby/jenkins_workspace/trivy-cache:/root/.cache/ \
                             ${env.TRIVY_IMAGE} \
-                            image --severity HIGH,CRITICAL duyimew/docvault:latest
+                            image --severity HIGH,CRITICAL duyimew/docvault:${tag}
                     """
                 }
             }
@@ -183,6 +186,7 @@ pipeline {
         stage('Push to Registry') {
             steps {
                 script {
+                    def tag = "v${env.BUILD_NUMBER}"
                     echo '>>> Logging into Docker Hub...'
                     withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                         sh "echo \$DOCKER_PASS | docker login -u \$DOCKER_USER --password-stdin"
@@ -197,11 +201,13 @@ pipeline {
                         ]
                         
                         services.each { service ->
-                            echo ">>> Pushing duyimew/${service}:latest to Docker Hub..."
+                            echo ">>> Pushing duyimew/${service}:${tag} to Docker Hub..."
+                            sh "docker push duyimew/${service}:${tag}"
                             sh "docker push duyimew/${service}:latest"
                         }
 
-                        echo ">>> Pushing duyimew/docvault:latest to Docker Hub..."
+                        echo ">>> Pushing duyimew/docvault:${tag} to Docker Hub..."
+                        sh "docker push duyimew/docvault:${tag}"
                         sh "docker push duyimew/docvault:latest"
                     }
                 }
