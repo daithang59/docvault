@@ -1,7 +1,7 @@
 # audit-service values
 image:
   repository: duyimew/audit-service
-  tag: "v54"
+  tag: "v55"
 
 service:
   port: 3004
