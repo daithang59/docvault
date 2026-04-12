@@ -1,0 +1,11 @@
+# notification-service values
+image:
+  repository: duyimew/notification-service
+  tag: "latest"
+
+service:
+  port: 3005
+
+env:
+  NODE_ENV: production
+  PORT: "3005"

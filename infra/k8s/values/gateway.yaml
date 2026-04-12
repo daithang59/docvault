@@ -1,0 +1,12 @@
+# gateway service values
+image:
+  repository: duyimew/gateway
+  tag: "latest" # Jenkins will update this line
+
+service:
+  port: 3000
+
+env:
+  NODE_ENV: production
+  PORT: "3000"
+  DATABASE_URL: "postgresql://user:pass@db:5432/gateway"

@@ -1,0 +1,11 @@
+# audit-service values
+image:
+  repository: duyimew/audit-service
+  tag: "latest"
+
+service:
+  port: 3004
+
+env:
+  NODE_ENV: production
+  PORT: "3004"

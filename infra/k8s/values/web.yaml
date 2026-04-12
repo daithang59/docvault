@@ -1,0 +1,12 @@
+# web app values
+image:
+  repository: duyimew/docvault
+  tag: "latest"
+
+service:
+  port: 3006
+
+env:
+  NODE_ENV: production
+  PORT: "3006"
+  NEXT_PUBLIC_API_URL: "http://gateway:3000/api"
