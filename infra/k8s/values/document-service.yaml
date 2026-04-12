@@ -1,7 +1,7 @@
 # document-service values
 image:
   repository: duyimew/document-service
-  tag: "v58"
+  tag: "v59"
 
 service:
   port: 3002
