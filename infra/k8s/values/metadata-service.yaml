@@ -1,7 +1,7 @@
 # metadata-service values
 image:
   repository: duyimew/metadata-service
-  tag: "v57"
+  tag: "v58"
 
 service:
   port: 3001
