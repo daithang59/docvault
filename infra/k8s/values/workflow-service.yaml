@@ -1,7 +1,7 @@
 # workflow-service values
 image:
   repository: duyimew/workflow-service
-  tag: "latest"
+  tag: "v52"
 
 service:
   port: 3003
