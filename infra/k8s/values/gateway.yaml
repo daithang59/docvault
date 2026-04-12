@@ -1,7 +1,7 @@
 # gateway service values
 image:
   repository: duyimew/gateway
-  tag: "v56"
+  tag: "v57"
 
 service:
   port: 3000
