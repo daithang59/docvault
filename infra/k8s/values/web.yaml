@@ -1,7 +1,7 @@
 # web app values
 image:
   repository: duyimew/docvault
-  tag: "v52"
+  tag: "v53"
 
 service:
   port: 3006
