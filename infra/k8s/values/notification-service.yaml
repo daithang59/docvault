@@ -1,7 +1,7 @@
 # notification-service values
 image:
   repository: duyimew/notification-service
-  tag: "v53"
+  tag: "v54"
 
 service:
   port: 3005
