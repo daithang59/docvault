@@ -1,0 +1,25 @@
+# Default values for docvault-service.
+# This file will be overwritten for each service (gateway, metadata, etc.)
+
+replicaCount: 1
+
+image:
+  repository: duyimew/gateway
+  pullPolicy: IfNotPresent
+  # Overridden by Jenkins during build
+  tag: "latest"
+
+service:
+  type: ClusterIP
+  port: 3000
+
+resources:
+  limits:
+    cpu: 200m
+    memory: 256Mi
+  requests:
+    cpu: 100m
+    memory: 128Mi
+
+env:
+  NODE_ENV: production

@@ -1,0 +1,11 @@
+# document-service values
+image:
+  repository: duyimew/document-service
+  tag: "latest"
+
+service:
+  port: 3002
+
+env:
+  NODE_ENV: production
+  PORT: "3002"

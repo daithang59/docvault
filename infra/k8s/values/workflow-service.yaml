@@ -1,0 +1,11 @@
+# workflow-service values
+image:
+  repository: duyimew/workflow-service
+  tag: "latest"
+
+service:
+  port: 3003
+
+env:
+  NODE_ENV: production
+  PORT: "3003"

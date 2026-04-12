@@ -119,6 +119,23 @@ pipeline {
                         }
                     }
                 }
+
+                stage('IaC - Checkov Scan') {
+                    steps {
+                        script {
+                            echo '>>> Running Checkov IaC Scan (Docker & Helm)...'
+                            sh """
+                                docker run --rm \
+                                    -v ${env.WORKSPACE}:/tf \
+                                    bridgecrew/checkov:latest \
+                                    --directory /tf \
+                                    --soft-fail \
+                                    --framework dockerfile,helm \
+                                    --output cli
+                            """
+                        }
+                    }
+                }
             }
         }
 
@@ -191,11 +208,39 @@ pipeline {
             }
         }
 
-        stage('GitOps - ArgoCD Sync') {
+        stage('GitOps - Update K8s Manifests') {
             steps {
                 script {
-                    echo '>>> Triggering ArgoCD Sync / Updating Manifests...'
-                    echo 'NOTE: This stage still a placeholder'
+                    echo '>>> Updating Helm values with new image tags...'
+                    def tag = "v${env.BUILD_NUMBER}"
+                    def services = [
+                        'gateway', 
+                        'metadata-service', 
+                        'document-service', 
+                        'notification-service', 
+                        'workflow-service', 
+                        'audit-service'
+                    ]
+                    
+                    // 1. Update each service's values file
+                    services.each { service ->
+                        sh "sed -i 's/tag: .*/tag: \"${tag}\"/' infra/k8s/values/${service}.yaml"
+                    }
+                    
+                    // Update web (docvault) values too
+                    sh "sed -i 's/tag: .*/tag: \"${tag}\"/' infra/k8s/values/web.yaml || echo 'web.yaml not yet created'"
+
+                    // 2. Commit and Push back to this repo
+                    // Note: Use [skip ci] to prevent infinite build loops!
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                        sh """
+                            git config user.email "truongnguyenduyp6@gmail.com"
+                            git config user.name "duyimew"
+                            git add infra/k8s/values/*.yaml
+                            git commit -m "chore(gitops): update image tags to ${tag} [skip ci]"
+                            git push https://${GIT_USER}:${GIT_PASS}@github.com/duyimew/docvault.git HEAD:testing
+                        """
+                    }
                 }
             }
         }
