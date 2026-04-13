@@ -50,6 +50,7 @@ COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/packag
 COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/dist ./services/${SERVICE_NAME}/dist
 COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/node_modules ./services/${SERVICE_NAME}/node_modules
 
+COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/generated* ./services/${SERVICE_NAME}/generated/
 # Copy root package.json for potential dependency lookups
 COPY --from=installer --chown=nestjs:nodejs /app/package.json ./package.json
 
