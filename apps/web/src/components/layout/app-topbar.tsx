@@ -18,6 +18,7 @@ import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { UserRole } from '@/types/auth';
 import { useState, useEffect, useRef, startTransition } from 'react';
+import { useMounted } from '@/lib/hooks/use-mounted';
 import { cn } from '@/lib/utils/cn';
 import { formatRelative } from '@/lib/utils/date';
 import {
@@ -124,6 +125,7 @@ function NotificationItem({
 export function AppTopbar() {
   const { session, logout } = useAuth();
   const router = useRouter();
+  const mounted = useMounted();
 
   // ── Notification state ─────────────────────────────────────────────────
   const [notifOpen,    setNotifOpen]    = useState(false);
@@ -241,7 +243,7 @@ export function AppTopbar() {
       }}
     >
       <div className="flex items-center gap-3">
-        <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />
+        {mounted && <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />}
       </div>
 
       <div className="flex items-center gap-2">
