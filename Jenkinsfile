@@ -273,7 +273,7 @@ pipeline {
                     // We scan the NodePort address of the gateway on the VM
                     sh """
                         docker run --rm \
-                            -v ${env.WORKSPACE}/zap-report:/zap/wrk:rw \
+                            -v \${pwd}/zap-report:/zap/wrk:rw \
                             ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
                             -t http://10.0.3.138:30000/api \
                             -r zap_report.html \
