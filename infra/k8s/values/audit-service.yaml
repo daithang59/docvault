@@ -9,3 +9,8 @@ service:
 env:
   NODE_ENV: production
   PORT: "3004"
+  KEYCLOAK_BASE_URL: "http://keycloak:8080"
+
+envFrom:
+  - secretRef:
+      name: docvault-app-secrets
