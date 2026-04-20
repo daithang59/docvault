@@ -1,7 +1,7 @@
 # gateway service values
 image:
   repository: duyimew/gateway
-  tag: "v77"
+  tag: "v81"
 
 service:
   type: NodePort
