@@ -263,14 +263,35 @@ pipeline {
                 }
             }
         }
+
+        stage('DAST - OWASP ZAP Scan') {
+            steps {
+                script {
+                    echo '>>> Running DAST Scan (OWASP ZAP) against Gateway API...'
+                    sh 'mkdir -p zap-report'
+                    // We scan the NodePort address of the gateway on the VM
+                    sh """
+                        docker run --rm \
+                            -v ${env.WORKSPACE}/zap-report:/zap/wrk:rw \
+                            ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
+                            -t http://10.0.3.138:30000/api \
+                            -r zap_report.html \
+                            -I || echo "ZAP found issues or returned non-zero, continuing..."
+                    """
+                }
+            }
+        }
     }
 
     post {
         always {
             echo '>>> Archiving Security Reports...'
             archiveArtifacts artifacts: 'dependency-check-report/*.html', allowEmptyArchive: true
+            archiveArtifacts artifacts: 'zap-report/*.html', allowEmptyArchive: true
             
-            echo '>>> Cleaning up workspace...'
+            echo '>>> Cleaning up workspace'
+           
+            
             cleanWs()
         }
     }
