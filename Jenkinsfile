@@ -92,7 +92,8 @@ pipeline {
                                     --format "HTML" \
                                     --out /report \
                                     --disableNodeAudit \
-                                    --disableKnownExploited
+                                    --disableKnownExploited \
+				    --noupdate
                             """
                         }
                     }
