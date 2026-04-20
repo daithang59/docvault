@@ -4,7 +4,9 @@ image:
   tag: "v72"
 
 service:
+  type: NodePort
   port: 3000
+  nodePort: 30000
 
 env:
   NODE_ENV: production

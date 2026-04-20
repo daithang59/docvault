@@ -4,9 +4,11 @@ image:
   tag: "v72"
 
 service:
+  type: NodePort
   port: 3006
+  nodePort: 30006
 
 env:
   NODE_ENV: production
   PORT: "3006"
-  NEXT_PUBLIC_API_URL: "http://gateway:3000/api"
+  NEXT_PUBLIC_API_URL: "http://10.0.3.138:30000/api"
