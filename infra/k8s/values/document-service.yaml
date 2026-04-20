@@ -9,3 +9,14 @@ service:
 env:
   NODE_ENV: production
   PORT: "3002"
+  KEYCLOAK_BASE_URL: "http://keycloak:8080"
+  METADATA_SERVICE_URL: "http://docvault-metadata:3001"
+  AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
+  S3_ENDPOINT: "http://minio:9000"
+  S3_BUCKET: "docvault"
+  S3_REGION: "us-east-1"
+  S3_FORCE_PATH_STYLE: "true"
+
+envFrom:
+  - secretRef:
+      name: docvault-app-secrets

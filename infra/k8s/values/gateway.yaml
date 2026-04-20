@@ -9,4 +9,13 @@ service:
 env:
   NODE_ENV: production
   PORT: "3000"
-  DATABASE_URL: "postgresql://user:pass@db:5432/gateway"
+  KEYCLOAK_BASE_URL: "http://keycloak:8080"
+  METADATA_SERVICE_URL: "http://docvault-metadata:3001"
+  DOCUMENTS_SERVICE_URL: "http://docvault-document-service:3002"
+  WORKFLOW_SERVICE_URL: "http://docvault-workflow-service:3003"
+  AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
+  NOTIFY_SERVICE_URL: "http://docvault-notification-service:3005"
+
+envFrom:
+  - secretRef:
+      name: docvault-app-secrets
