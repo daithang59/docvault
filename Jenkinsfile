@@ -1,5 +1,5 @@
-// Requires Jenkins Global Trusted Pipeline Library 'docvault-shared' pointing to this repository.
-@Library('docvault-shared@main') _
+
+@Library('docvault@testng') _
 
 def cfg = [:]
 
