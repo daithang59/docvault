@@ -1,38 +1,41 @@
 # Huong Dan Thu Muc CI (Tieng Viet)
 
-Tai lieu nay mo ta cau truc thu muc `ci/`, chuc nang cua tung file, cach cac module tuong tac voi nhau, va phan giai thich chi tiet cho `buildAndScan.groovy`.
+Tai lieu nay mo ta cau truc cac file CI, chuc nang cua tung file, cach cac module tuong tac voi nhau, va phan giai thich chi tiet cho `buildAndScan.groovy`.
 
-## 1) Thu muc `ci/` gom nhung gi
+## 1) Cac file CI gom nhung gi
 
 ```text
 ci/
 └── jenkins/
-    ├── config.groovy
+   ├── config.groovy (legacy)
     └── steps/
-        ├── preventLoop.groovy
-        ├── systemCheck.groovy
-        ├── install.groovy
-        ├── dependencyCheck.groovy
-        ├── trivyFsScan.groovy
-        ├── unitTests.groovy
-        ├── sonarSast.groovy
-        ├── iacCheckov.groovy
-        ├── buildAndScan.groovy
-        ├── pushAndGitOps.groovy
-        ├── dastZap.groovy
-        └── postCleanup.groovy
+      └── ... (cac module cu)
+vars/
+   ├── docvaultConfig.groovy
+   ├── preventLoop.groovy
+   ├── systemCheck.groovy
+   ├── installStep.groovy
+   ├── dependencyCheck.groovy
+   ├── trivyFsScan.groovy
+   ├── unitTests.groovy
+   ├── sonarSast.groovy
+   ├── iacCheckov.groovy
+   ├── buildAndScan.groovy
+   ├── pushAndGitOps.groovy
+   ├── dastZap.groovy
+   └── postCleanup.groovy
 ```
 
-Luu y: File dieu phoi chinh van la `Jenkinsfile` o root cua repository. `Jenkinsfile` se load cac module trong `ci/jenkins/`.
+Luu y: File dieu phoi chinh van la `Jenkinsfile` o root cua repository. `Jenkinsfile` nay dung cac shared-library global trong `vars/`.
 
 ## 2) Mo hinh thuc thi
 
-`Jenkinsfile` duoc giu nhe, logic chi tiet nam trong `ci/jenkins/steps`.
+`Jenkinsfile` duoc giu nhe, logic chi tiet nam trong cac shared-library global tai `vars/`.
 
 Luong chay tong quan:
 
 1. Checkout source.
-2. Load config (`config.groovy`) va cac step module (`load(...)`).
+2. Lay config bang `docvaultConfig()` va goi cac shared-library global (khong dung `load(...)`).
 3. Chay cac buoc bao ve (`Prevent Loop`, `System Check`, `Install`).
 4. Chay nhom kiem tra truoc build theo parallel:
    - Dependency check (SCA)
@@ -47,7 +50,7 @@ Luong chay tong quan:
 
 ## 3) Chuc nang tung file
 
-### `ci/jenkins/config.groovy`
+### `vars/docvaultConfig.groovy`
 
 Noi tap trung cac cau hinh CI:
 
@@ -57,50 +60,51 @@ Noi tap trung cac cau hinh CI:
 - GitOps repo + branch dich (`GITOPS_BRANCH` co the override)
 - URL muc tieu cho ZAP
 
-File nay tra ve map `cfg` de cac step su dung.
+File nay tra ve map `cfg` de cac shared-library step su dung.
 
-### `ci/jenkins/steps/preventLoop.groovy`
+### `vars/preventLoop.groovy`
 
 Dung pipeline neu commit moi nhat co `[skip ci]` de tranh vong lap tu commit GitOps.
 
-### `ci/jenkins/steps/systemCheck.groovy`
+### `vars/systemCheck.groovy`
 
 Kiem tra nhanh agent (co Docker khong) de fail som neu moi truong loi.
 
-### `ci/jenkins/steps/install.groovy`
+### `vars/installStep.groovy`
 
 Cai dependency va chay Prisma generate trong container Node.
 
-### `ci/jenkins/steps/dependencyCheck.groovy`
+### `vars/dependencyCheck.groovy`
 
 Chay OWASP Dependency-Check va fail khi CVSS >= 7.
 Sinh report vao `dependency-check-report/` (HTML + JSON).
 
-### `ci/jenkins/steps/trivyFsScan.groovy`
+### `vars/trivyFsScan.groovy`
 
 Trivy scan filesystem workspace va fail neu co HIGH/CRITICAL.
 
-### `ci/jenkins/steps/unitTests.groovy`
+### `vars/unitTests.groovy`
 
 Chay test (`pnpm turbo run test`) trong container Node.
 
-### `ci/jenkins/steps/sonarSast.groovy`
+### `vars/sonarSast.groovy`
 
 Chay Sonar scanner trong Docker, dung `withSonarQubeEnv` cua Jenkins.
 
-### `ci/jenkins/steps/iacCheckov.groovy`
+### `vars/iacCheckov.groovy`
 
 Chay Checkov cho Dockerfile + Helm:
+
 - In ket qua ra console
 - Luu ket qua vao `checkov-report/checkov-report.txt`
 - Fail build neu Checkov tra ve exit code khac 0
 
-### `ci/jenkins/steps/buildAndScan.groovy`
+### `vars/buildAndScan.groovy`
 
 Xac dinh service nao can build dua tren thay doi Git, build image cho service bi anh huong, sau do Trivy scan image theo che do fail-fast.
 Ket qua tra ve la CSV danh sach service da build.
 
-### `ci/jenkins/steps/pushAndGitOps.groovy`
+### `vars/pushAndGitOps.groovy`
 
 - Dang nhap Docker Hub bang `DOCKER_CONFIG` tam thoi
 - Push tag `v<BUILD_NUMBER>` va `latest`
@@ -108,11 +112,11 @@ Ket qua tra ve la CSV danh sach service da build.
 - Dung `GIT_ASKPASS` de auth HTTPS an toan hon
 - Retry push voi fetch/rebase de giam xung dot race condition
 
-### `ci/jenkins/steps/dastZap.groovy`
+### `vars/dastZap.groovy`
 
 Chay OWASP ZAP baseline va tao report HTML + JSON trong `zap-report/`.
 
-### `ci/jenkins/steps/postCleanup.groovy`
+### `vars/postCleanup.groovy`
 
 Luon archive artifact va don workspace.
 
@@ -120,9 +124,9 @@ Luon archive artifact va don workspace.
 
 ### Truyen config
 
-Tat ca step duoc `Jenkinsfile` load va goi voi `cfg` (neu can).
+Tat ca step global duoc shared library expose tu `vars/`, sau do `Jenkinsfile` goi voi `cfg` (neu can).
 
-- `cfg` duoc tao 1 lan tu `config.groovy`
+- `cfg` duoc tao 1 lan tu `docvaultConfig.groovy`
 - Gia tri trong `cfg` duoc dung xuyen suot (image, service, path, URL)
 
 ### Luong du lieu giua cac stage
@@ -149,7 +153,7 @@ File nay dai hon cac file khac vi no gom 3 nhiem vu:
 
 ### Dau vao
 
-- `cfg` tu `config.groovy`
+- `cfg` tu `docvaultConfig.groovy`
 - Bien moi truong/param:
   - `FORCE_BUILD_ALL` (param/env)
   - Metadata PR (`CHANGE_TARGET`)
@@ -242,10 +246,10 @@ Logic hien tai uu tien do chinh xac bao mat: neu mo ho thi build tat ca.
 
 Quy trinh de xuyen suot voi kien truc hien tai:
 
-1. Tao `ci/jenkins/steps/<newStep>.groovy` voi `def call(...)` va `return this`.
-2. Load module trong stage `Checkout & Initialize Modules` cua `Jenkinsfile`.
-3. Goi module o stage phu hop.
-4. Neu tao report, nho them archive trong `postCleanup.groovy`.
+1. Tao `vars/<newStep>.groovy` voi `def call(...)`.
+2. Goi truc tiep trong `Jenkinsfile` (vi du `<newStep>(cfg)` neu can config).
+3. Dat loi goi module o stage phu hop.
+4. Neu tao report, nho them archive trong `vars/postCleanup.groovy`.
 
 ## 7) Troubleshooting nhanh
 
@@ -253,4 +257,3 @@ Quy trinh de xuyen suot voi kien truc hien tai:
 - Push bi skip: `BUILT_SERVICES` dang rong.
 - Loi push GitOps: kiem tra branch dich co ton tai va credential ID trong Jenkins.
 - Loi Sonar: kiem tra ten Sonar installation trong Jenkins va token binding.
-

@@ -1,38 +1,41 @@
 # CI Folder Guide (English)
 
-This document explains the structure of the `ci/` folder, what each file does, how modules interact, and a deep dive into `buildAndScan.groovy`.
+This document explains the structure of the CI pipeline files, what each file does, how modules interact, and a deep dive into `buildAndScan.groovy`.
 
-## 1) What the `ci/` folder contains
+## 1) What the CI pipeline files contain
 
 ```text
 ci/
 └── jenkins/
-    ├── config.groovy
+   ├── config.groovy (legacy)
     └── steps/
-        ├── preventLoop.groovy
-        ├── systemCheck.groovy
-        ├── install.groovy
-        ├── dependencyCheck.groovy
-        ├── trivyFsScan.groovy
-        ├── unitTests.groovy
-        ├── sonarSast.groovy
-        ├── iacCheckov.groovy
-        ├── buildAndScan.groovy
-        ├── pushAndGitOps.groovy
-        ├── dastZap.groovy
-        └── postCleanup.groovy
+      └── ... (legacy step modules)
+vars/
+   ├── docvaultConfig.groovy
+   ├── preventLoop.groovy
+   ├── systemCheck.groovy
+   ├── installStep.groovy
+   ├── dependencyCheck.groovy
+   ├── trivyFsScan.groovy
+   ├── unitTests.groovy
+   ├── sonarSast.groovy
+   ├── iacCheckov.groovy
+   ├── buildAndScan.groovy
+   ├── pushAndGitOps.groovy
+   ├── dastZap.groovy
+   └── postCleanup.groovy
 ```
 
-Important: The orchestrator is still `Jenkinsfile` at repo root. It loads modules from `ci/jenkins/`.
+Important: The orchestrator is still `Jenkinsfile` at repo root. It now uses shared-library globals from `vars/`.
 
 ## 2) Execution model
 
-`Jenkinsfile` is intentionally thin and delegates logic to files under `ci/jenkins/steps`.
+`Jenkinsfile` is intentionally thin and delegates logic to shared-library globals under `vars/`.
 
 High-level flow:
 
 1. Checkout code.
-2. Load config (`config.groovy`) and step modules (`load(...)`).
+2. Resolve config (`docvaultConfig()`) and call shared-library globals (no `load(...)`).
 3. Run guard steps (`Prevent Loop`, `System Check`, `Install`).
 4. Run pre-build checks in parallel:
    - Dependency check (SCA)
@@ -47,7 +50,7 @@ High-level flow:
 
 ## 3) File-by-file responsibilities
 
-### `ci/jenkins/config.groovy`
+### `vars/docvaultConfig.groovy`
 
 Single source of CI constants and runtime settings:
 
@@ -57,50 +60,51 @@ Single source of CI constants and runtime settings:
 - GitOps repo and target branch (`GITOPS_BRANCH` override supported)
 - ZAP target
 
-It returns a `cfg` map that all step scripts use.
+It returns a `cfg` map that all shared-library step globals use.
 
-### `ci/jenkins/steps/preventLoop.groovy`
+### `vars/preventLoop.groovy`
 
 Stops CI when latest commit contains `[skip ci]`. This prevents self-trigger loops caused by GitOps update commits.
 
-### `ci/jenkins/steps/systemCheck.groovy`
+### `vars/systemCheck.groovy`
 
 Basic agent validation (`docker --version`) to fail early if the runner is not ready.
 
-### `ci/jenkins/steps/install.groovy`
+### `vars/installStep.groovy`
 
 Runs dependency install and Prisma generate inside a Node container.
 
-### `ci/jenkins/steps/dependencyCheck.groovy`
+### `vars/dependencyCheck.groovy`
 
 Runs OWASP Dependency-Check and fails on CVSS >= 7.
 Outputs reports to `dependency-check-report/` (HTML + JSON).
 
-### `ci/jenkins/steps/trivyFsScan.groovy`
+### `vars/trivyFsScan.groovy`
 
 Runs Trivy filesystem scan over workspace and fails on HIGH/CRITICAL findings.
 
-### `ci/jenkins/steps/unitTests.groovy`
+### `vars/unitTests.groovy`
 
 Runs test suite (`pnpm turbo run test`) in containerized Node environment.
 
-### `ci/jenkins/steps/sonarSast.groovy`
+### `vars/sonarSast.groovy`
 
 Runs Sonar scanner in Docker with Jenkins Sonar environment (`withSonarQubeEnv`).
 
-### `ci/jenkins/steps/iacCheckov.groovy`
+### `vars/iacCheckov.groovy`
 
 Runs Checkov for Dockerfile + Helm checks.
+
 - Streams result to console
 - Saves output to `checkov-report/checkov-report.txt`
 - Fails build when Checkov exits non-zero
 
-### `ci/jenkins/steps/buildAndScan.groovy`
+### `vars/buildAndScan.groovy`
 
 Decides what to build based on git changes, builds impacted images, then Trivy scans each built image with fail-fast gates.
 Returns a CSV list of built services used by downstream stage.
 
-### `ci/jenkins/steps/pushAndGitOps.groovy`
+### `vars/pushAndGitOps.groovy`
 
 - Logs in to Docker Hub using isolated `DOCKER_CONFIG`
 - Pushes built image tags (`v<BUILD_NUMBER>` + `latest`)
@@ -108,11 +112,11 @@ Returns a CSV list of built services used by downstream stage.
 - Uses `GIT_ASKPASS` for safer HTTPS auth
 - Retries push with fetch/rebase to handle branch race conditions
 
-### `ci/jenkins/steps/dastZap.groovy`
+### `vars/dastZap.groovy`
 
 Runs OWASP ZAP baseline scan and outputs HTML + JSON report in `zap-report/`.
 
-### `ci/jenkins/steps/postCleanup.groovy`
+### `vars/postCleanup.groovy`
 
 Always archives artifacts and cleans workspace.
 
@@ -120,9 +124,9 @@ Always archives artifacts and cleans workspace.
 
 ### Config and dependency injection
 
-All step files are loaded by `Jenkinsfile` and called with `cfg` when needed.
+All step globals are exposed by the shared library (`vars/`) and called by `Jenkinsfile` with `cfg` when needed.
 
-- `cfg` is produced once by `config.groovy`
+- `cfg` is produced once by `docvaultConfig.groovy`
 - `cfg` values are consumed across steps (images, service names, paths, URLs)
 
 ### Cross-stage data flow
@@ -149,7 +153,7 @@ This script is longer because it combines three concerns:
 
 ### Inputs
 
-- `cfg` map from `config.groovy`
+- `cfg` map from `docvaultConfig.groovy`
 - Environment and params:
   - `FORCE_BUILD_ALL` (param/env)
   - PR metadata (`CHANGE_TARGET`)
@@ -242,10 +246,10 @@ The current logic degrades to full rebuild when uncertain, prioritizing security
 
 Recommended pattern:
 
-1. Create `ci/jenkins/steps/<newStep>.groovy` with `def call(...)` and `return this`.
-2. Load it in `Jenkinsfile` during `Checkout & Initialize Modules`.
+1. Create `vars/<newStep>.groovy` with `def call(...)`.
+2. Reference it directly in `Jenkinsfile` (for example `<newStep>(cfg)` when config is needed).
 3. Call it in the appropriate stage.
-4. If it generates reports, archive them in `postCleanup.groovy`.
+4. If it generates reports, archive them in `vars/postCleanup.groovy`.
 
 ## 7) Quick troubleshooting
 
@@ -253,4 +257,3 @@ Recommended pattern:
 - Push skipped: `BUILT_SERVICES` was empty.
 - GitOps push fails: verify target branch exists and Jenkins credential IDs are correct.
 - Sonar failures: verify Jenkins Sonar installation name and token binding.
-
