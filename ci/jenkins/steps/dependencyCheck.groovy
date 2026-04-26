@@ -2,6 +2,7 @@ def call() {
     echo '>>> Running SCA Scan...'
     sh 'mkdir -p dependency-check-report'
     sh """
+        set -eu
         docker run --rm \\
             -v ${env.WORKSPACE}:/src \\
             -v ${env.WORKSPACE}/dependency-check-report:/report \\
@@ -12,8 +13,9 @@ def call() {
             --exclude \"**/node_modules/**\" \\
             --exclude \"**/.pnpm-store/**\" \\
             --format \"HTML\" \\
+            --format \"JSON\" \\
             --out /report \\
-            --disableNodeAudit \\
+            --failOnCVSS 7 \\
             --disableKnownExploited \\
             --noupdate
     """
