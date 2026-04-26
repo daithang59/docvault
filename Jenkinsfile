@@ -4,6 +4,9 @@ def systemCheck
 def installStep
 def dependencyCheck
 def trivyFsScan
+def unitTests
+def sonarSast
+def iacCheckov
 def buildAndScan
 def pushAndGitOps
 def dastZap
@@ -11,6 +14,15 @@ def postCleanup
 
 pipeline {
     agent { label 'docker-agent-alpine-ubuntu-vm' }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        booleanParam(name: 'FORCE_BUILD_ALL', defaultValue: false, description: 'Rebuild and rescan all images regardless of detected file changes.')
+        string(name: 'GITOPS_BRANCH', defaultValue: 'gitops-testing', description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).')
+    }
 
     environment {
         NODE_IMAGE = 'node:20-alpine'
@@ -32,6 +44,9 @@ pipeline {
                     installStep = load('ci/jenkins/steps/install.groovy')
                     dependencyCheck = load('ci/jenkins/steps/dependencyCheck.groovy')
                     trivyFsScan = load('ci/jenkins/steps/trivyFsScan.groovy')
+                    unitTests = load('ci/jenkins/steps/unitTests.groovy')
+                    sonarSast = load('ci/jenkins/steps/sonarSast.groovy')
+                    iacCheckov = load('ci/jenkins/steps/iacCheckov.groovy')
                     buildAndScan = load('ci/jenkins/steps/buildAndScan.groovy')
                     pushAndGitOps = load('ci/jenkins/steps/pushAndGitOps.groovy')
                     dastZap = load('ci/jenkins/steps/dastZap.groovy')
@@ -78,6 +93,30 @@ pipeline {
                     steps {
                         script {
                             trivyFsScan.call(cfg)
+                        }
+                    }
+                }
+
+                stage('Unit Tests') {
+                    steps {
+                        script {
+                            unitTests.call(cfg)
+                        }
+                    }
+                }
+
+                stage('SAST - SonarQube') {
+                    steps {
+                        script {
+                            sonarSast.call(cfg)
+                        }
+                    }
+                }
+
+                stage('IaC - Checkov Scan') {
+                    steps {
+                        script {
+                            iacCheckov.call(cfg)
                         }
                     }
                 }
