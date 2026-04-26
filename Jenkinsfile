@@ -1,16 +1,7 @@
+// Requires Jenkins Global Trusted Pipeline Library 'docvault-shared' pointing to this repository.
+@Library('docvault-shared@main') _
+
 def cfg = [:]
-def preventLoop
-def systemCheck
-def installStep
-def dependencyCheck
-def trivyFsScan
-def unitTests
-def sonarSast
-def iacCheckov
-def buildAndScan
-def pushAndGitOps
-def dastZap
-def postCleanup
 
 pipeline {
     agent { label 'docker-agent-alpine-ubuntu-vm' }
@@ -32,25 +23,12 @@ pipeline {
     }
 
     stages {
-        stage('Checkout & Initialize Modules') {
+        stage('Checkout & Initialize Config') {
             steps {
                 echo '>>> Checking out source code...'
                 checkout scm
                 script {
-                    cfg = load('ci/jenkins/config.groovy').call()
-
-                    preventLoop = load('ci/jenkins/steps/preventLoop.groovy')
-                    systemCheck = load('ci/jenkins/steps/systemCheck.groovy')
-                    installStep = load('ci/jenkins/steps/install.groovy')
-                    dependencyCheck = load('ci/jenkins/steps/dependencyCheck.groovy')
-                    trivyFsScan = load('ci/jenkins/steps/trivyFsScan.groovy')
-                    unitTests = load('ci/jenkins/steps/unitTests.groovy')
-                    sonarSast = load('ci/jenkins/steps/sonarSast.groovy')
-                    iacCheckov = load('ci/jenkins/steps/iacCheckov.groovy')
-                    buildAndScan = load('ci/jenkins/steps/buildAndScan.groovy')
-                    pushAndGitOps = load('ci/jenkins/steps/pushAndGitOps.groovy')
-                    dastZap = load('ci/jenkins/steps/dastZap.groovy')
-                    postCleanup = load('ci/jenkins/steps/postCleanup.groovy')
+                    cfg = docvaultConfig()
                 }
             }
         }
@@ -58,7 +36,7 @@ pipeline {
         stage('Prevent Loop') {
             steps {
                 script {
-                    preventLoop.call()
+                    preventLoop()
                 }
             }
         }
@@ -66,7 +44,7 @@ pipeline {
         stage('System Check') {
             steps {
                 script {
-                    systemCheck.call()
+                    systemCheck()
                 }
             }
         }
@@ -74,7 +52,7 @@ pipeline {
         stage('Install') {
             steps {
                 script {
-                    installStep.call(cfg)
+                    installStep(cfg)
                 }
             }
         }
@@ -84,7 +62,7 @@ pipeline {
                 stage('SCA - Dependency Check') {
                     steps {
                         script {
-                            dependencyCheck.call()
+                            dependencyCheck()
                         }
                     }
                 }
@@ -92,7 +70,7 @@ pipeline {
                 stage('Trivy FS Scan') {
                     steps {
                         script {
-                            trivyFsScan.call(cfg)
+                            trivyFsScan(cfg)
                         }
                     }
                 }
@@ -100,7 +78,7 @@ pipeline {
                 stage('Unit Tests') {
                     steps {
                         script {
-                            unitTests.call(cfg)
+                            unitTests(cfg)
                         }
                     }
                 }
@@ -108,7 +86,7 @@ pipeline {
                 stage('SAST - SonarQube') {
                     steps {
                         script {
-                            sonarSast.call(cfg)
+                            sonarSast(cfg)
                         }
                     }
                 }
@@ -116,7 +94,7 @@ pipeline {
                 stage('IaC - Checkov Scan') {
                     steps {
                         script {
-                            iacCheckov.call(cfg)
+                            iacCheckov(cfg)
                         }
                     }
                 }
@@ -126,7 +104,7 @@ pipeline {
         stage('Build & Scan Services') {
             steps {
                 script {
-                    env.BUILT_SERVICES = buildAndScan.call(cfg)
+                    env.BUILT_SERVICES = buildAndScan(cfg)
                 }
             }
         }
@@ -135,7 +113,7 @@ pipeline {
             when { expression { env.BUILT_SERVICES?.trim() } }
             steps {
                 script {
-                    pushAndGitOps.call(cfg, env.BUILT_SERVICES)
+                    pushAndGitOps(cfg, env.BUILT_SERVICES)
                 }
             }
         }
@@ -143,7 +121,7 @@ pipeline {
         stage('DAST - OWASP ZAP') {
             steps {
                 script {
-                    dastZap.call(cfg)
+                    dastZap(cfg)
                 }
             }
         }
@@ -152,7 +130,7 @@ pipeline {
     post {
         always {
             script {
-                postCleanup.call()
+                postCleanup()
             }
         }
     }
