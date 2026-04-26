@@ -1,5 +1,5 @@
 
-@Library('docvault@testng') _
+@Library('docvault@testing') _
 
 def cfg = [:]
 
