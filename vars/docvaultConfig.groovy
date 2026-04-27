@@ -4,7 +4,7 @@ def call() {
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
         nodeImage: 'node:20-alpine',
-        trivyImage: 'aquasec/trivy:0.50.1',
+        trivyImage: 'aquasec/trivy:0.70.0',
         sonarScannerImage: 'sonarsource/sonar-scanner-cli:latest',
         sonarQubeInstallation: 'sqdocvault',
         sonarProjectKey: 'docvault',

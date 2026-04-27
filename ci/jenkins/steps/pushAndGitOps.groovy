@@ -29,6 +29,25 @@ def pushImages(cfg, builtList, tag) {
 
                 builtList.each { service ->
                     def imageName = (service == cfg.webAppName) ? cfg.webImageName : service
+
+    def resolveImageDigest(cfg, imageName, tag) {
+        def imageRef = "${cfg.dockerOrg}/${imageName}:${tag}"
+        def repoDigest = sh(
+            script: "docker inspect --format='{{index .RepoDigests 0}}' ${imageRef}",
+            returnStdout: true
+        ).trim()
+
+        if (!repoDigest) {
+            error("Unable to resolve an image digest for ${imageRef}.")
+        }
+
+        def parts = repoDigest.split('@', 2)
+        if (parts.size() != 2 || !parts[1].trim()) {
+            error("Unexpected docker digest format for ${imageRef}: ${repoDigest}")
+        }
+
+        return parts[1].trim()
+    }
                     echo ">>> Pushing ${cfg.dockerOrg}/${imageName}:${tag} to Docker Hub..."
                     sh "docker push ${cfg.dockerOrg}/${imageName}:${tag}"
                     sh "docker push ${cfg.dockerOrg}/${imageName}:latest"
@@ -56,7 +75,7 @@ case "\$1" in
     *Username*) echo "\$GIT_USER" ;;
     *Password*) echo "\$GIT_PASS" ;;
     *) echo "" ;;
-esac
+        echo '>>> Updating Helm values with new image references...'
 EOF
                 chmod 700 ${askPassScript}
             """
@@ -92,7 +111,7 @@ EOF
                     git config user.name \"duyimew\"
                     git add ${cfg.helmValuesDir}/*.yaml
                     git commit -m \"chore(gitops): update tags for ${builtList.join(',')} to ${tag} [skip ci]\"
-                """
+                        sh "sed -i -e 's/tag: .*/tag: \\\"${tag}\\\"/' -e 's/digest: .*/digest: \\\"${digest}\\\"/' ${cfg.helmValuesDir}/${fileName}"
 
                 def pushed = false
                 for (int attempt = 1; attempt <= 3; attempt++) {
@@ -106,7 +125,7 @@ EOF
                     if (attempt < 3) {
                         echo ">>> GitOps push failed (attempt ${attempt}/3). Fetching latest branch and rebasing before retry."
                         sh "git fetch gitops ${targetBranch}"
-                        sh "git rebase FETCH_HEAD"
+                        git commit -m \"chore(gitops): update image refs for ${builtList.join(',')} to ${tag} [skip ci]\"
                     }
                 }
 

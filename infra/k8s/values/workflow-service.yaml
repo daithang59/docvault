@@ -2,10 +2,10 @@
 image:
   repository: duyimew/workflow-service
   tag: "v81"
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 service:
   port: 3003
-
 env:
   NODE_ENV: production
   PORT: "3003"
