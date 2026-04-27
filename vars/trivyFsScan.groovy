@@ -1,7 +1,6 @@
 def call(cfg) {
     echo '>>> Running Trivy Filesystem Scan...'
     sh """
-        set -eu
         docker run --rm \\
             -v ${env.WORKSPACE}:/src \\
             ${cfg.trivyImage} \\

@@ -2,7 +2,6 @@ def call() {
     echo '>>> Running SCA Scan...'
     sh 'mkdir -p dependency-check-report'
     sh """
-        set -eu
         docker run --rm \\
             -v ${env.WORKSPACE}:/src \\
             -v ${env.WORKSPACE}/dependency-check-report:/report \\

@@ -61,6 +61,9 @@ USER nestjs
 
 EXPOSE 3000
 
+HEALTHCHECK --interval=30s --timeout=5s --start-period=20s --retries=3 \
+  CMD node -e "const http=require('http');const port=process.env.PORT||3000;const paths=['/health','/api/health'];const check=(i)=>{if(i>=paths.length)process.exit(1);const req=http.get({host:'127.0.0.1',port,path:paths[i],timeout:4000},(res)=>{res.resume();if(res.statusCode&&res.statusCode>=200&&res.statusCode<400)process.exit(0);check(i+1);});req.on('error',()=>check(i+1));req.on('timeout',()=>{req.destroy();check(i+1);});};check(0);"
+
 # Run the service from its own directory to ensure relative node_modules resolution
 WORKDIR /app/services/${SERVICE_NAME}
 CMD ["node", "dist/main"]
