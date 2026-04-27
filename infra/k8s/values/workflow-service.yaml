@@ -5,7 +5,9 @@ image:
   digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 service:
+  type: NodePort
   port: 3003
+  nodePort: 30003
 env:
   NODE_ENV: production
   PORT: "3003"
