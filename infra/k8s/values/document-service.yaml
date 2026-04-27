@@ -1,4 +1,6 @@
 # document-service values
+namespace: default
+
 image:
   repository: duyimew/document-service
   tag: "v81"

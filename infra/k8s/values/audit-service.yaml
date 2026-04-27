@@ -1,4 +1,6 @@
 # audit-service values
+namespace: default
+
 image:
   repository: duyimew/audit-service
   tag: "v81"

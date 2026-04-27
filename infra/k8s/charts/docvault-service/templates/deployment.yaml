@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: {{ .Release.Name }}
+  namespace: {{ .Values.namespace | quote }}
   labels:
     app: {{ .Release.Name }}
 spec:
@@ -17,6 +18,8 @@ spec:
       containers:
         - name: {{ .Release.Name }}
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          securityContext:
+            readOnlyRootFilesystem: true          
           ports:
             - containerPort: {{ .Values.service.port }}
           resources:

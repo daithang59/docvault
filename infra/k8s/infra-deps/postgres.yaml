@@ -49,6 +49,8 @@ spec:
       containers:
         - name: postgres
           image: postgres:16-alpine
+          securityContext:
+            readOnlyRootFilesystem: true
           ports:
             - containerPort: 5432
           env:
@@ -73,11 +75,19 @@ spec:
               subPath: init.sql
             - name: postgres-data
               mountPath: /var/lib/postgresql/data
+            - name: postgres-tmp
+              mountPath: /tmp
+            - name: postgres-run
+              mountPath: /var/run/postgresql
       volumes:
         - name: postgres-init
           configMap:
             name: postgres-init-sql
         - name: postgres-data
+          emptyDir: {}
+        - name: postgres-tmp
+          emptyDir: {}
+        - name: postgres-run
           emptyDir: {}
 ---
 apiVersion: v1
