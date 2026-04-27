@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -29,7 +29,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -51,7 +51,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -73,7 +73,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -95,7 +95,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -117,7 +117,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
@@ -139,7 +139,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/duyimew/docvault.git'
-    targetRevision: testing
+    targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
