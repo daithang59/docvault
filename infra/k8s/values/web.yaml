@@ -2,12 +2,12 @@
 image:
   repository: duyimew/docvault
   tag: "v81"
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 service:
   type: NodePort
   port: 3006
   nodePort: 30006
-
 env:
   NODE_ENV: production
   PORT: "3006"

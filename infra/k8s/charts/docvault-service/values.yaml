@@ -9,6 +9,7 @@ image:
   pullPolicy: IfNotPresent
   # Overridden by Jenkins during build
   tag: "latest"
+  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
 
 service:
   type: ClusterIP
