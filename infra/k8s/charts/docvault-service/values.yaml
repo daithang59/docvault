@@ -2,6 +2,7 @@
 # This file will be overwritten for each service (gateway, metadata, etc.)
 
 replicaCount: 1
+namespace: docvault
 
 image:
   repository: duyimew/gateway

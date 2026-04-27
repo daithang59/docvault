@@ -1,4 +1,6 @@
 # gateway service values
+namespace: default
+
 image:
   repository: duyimew/gateway
   tag: "v81"
