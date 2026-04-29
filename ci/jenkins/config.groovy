@@ -18,7 +18,7 @@ def call() {
         backendDockerfile: 'Dockerfile.backend',
         helmValuesDir: 'infra/k8s/values',
         gitOpsBranch: gitOpsBranch,
-        gitOpsRepoUrl: 'https://github.com/duyimew/docvault.git',
+        gitOpsRepoUrl: 'https://github.com/daithang59/docvault.git',
         zapTarget: 'http://10.0.3.138:30000/api'
     ]
 }
