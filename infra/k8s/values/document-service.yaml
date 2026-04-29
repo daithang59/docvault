@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/document-service
+  repository: daithang59/document-service
   tag: "v81"
   digest: ""
+
+healthPath: /health
 
 service:
   type: NodePort

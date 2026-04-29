@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/workflow-service
+  repository: daithang59/workflow-service
   tag: "v81"
   digest: ""
+
+healthPath: /health
 
 service:
   type: NodePort

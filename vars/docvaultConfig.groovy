@@ -1,5 +1,5 @@
 def call() {
-    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'testing'
+    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'gitops-testing'
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -10,7 +10,7 @@ def call() {
         sonarProjectKey: 'docvault',
         sonarHostUrl: 'http://10.0.3.137:9005',
         checkovImage: 'bridgecrew/checkov:latest',
-        dockerOrg: 'duyimew',
+        dockerOrg: 'daithang59',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
         webAppName: 'web',
         webImageName: 'docvault',

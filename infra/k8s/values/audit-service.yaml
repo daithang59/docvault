@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/audit-service
+  repository: daithang59/audit-service
   tag: "v81"
   digest: ""
+
+healthPath: /health
 
 service:
   type: NodePort

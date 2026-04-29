@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/metadata-service
+  repository: daithang59/metadata-service
   tag: "v81"
   digest: ""
+
+healthPath: /health
 
 service:
   type: NodePort
