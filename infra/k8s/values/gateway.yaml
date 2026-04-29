@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/gateway
+  repository: daithang59/gateway
   tag: "v81"
   digest: ""
+
+healthPath: /api/health
 
 service:
   type: NodePort

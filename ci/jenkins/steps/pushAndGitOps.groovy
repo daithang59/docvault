@@ -150,8 +150,8 @@ EOF
 
                 sh """
                     set -eu
-                    git -C '${gitOpsWorktree}' config user.email "truongnguyenduyp6@gmail.com"
-                    git -C '${gitOpsWorktree}' config user.name "duyimew"
+                    git -C '${gitOpsWorktree}' config user.email "daithang59@users.noreply.github.com"
+                    git -C '${gitOpsWorktree}' config user.name "daithang59"
                     git -C '${gitOpsWorktree}' add '${cfg.helmValuesDir}'/*.yaml
                     git -C '${gitOpsWorktree}' commit -m "chore(gitops): update image refs for ${builtList.join(',')} to ${tag} [skip ci]"
                 """

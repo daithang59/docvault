@@ -5,7 +5,7 @@ replicaCount: 1
 namespace: default
 
 image:
-  repository: duyimew/gateway
+  repository: daithang59/gateway
   pullPolicy: IfNotPresent
   # Overridden by Jenkins during build
   tag: "latest"
@@ -14,6 +14,8 @@ image:
 service:
   type: ClusterIP
   port: 3000
+
+healthPath: /health
 
 resources:
   limits:

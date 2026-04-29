@@ -1,5 +1,5 @@
 
-@Library('docvault@testing') _
+@Library('docvault@devsecops-pipeline') _
 
 def cfg = [:]
 

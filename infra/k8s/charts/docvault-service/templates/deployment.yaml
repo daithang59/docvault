@@ -1,5 +1,6 @@
 {{- $zeroDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000" -}}
 {{- $imageDigest := .Values.image.digest | default "" -}}
+{{- $healthPath := .Values.healthPath | default "/health" -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -38,7 +39,7 @@ spec:
             - containerPort: {{ .Values.service.port }}
           livenessProbe:
             httpGet:
-              path: /api/health
+              path: {{ $healthPath | quote }}
               port: {{ .Values.service.port }}
             initialDelaySeconds: 15
             periodSeconds: 10
@@ -46,7 +47,7 @@ spec:
             failureThreshold: 3
           readinessProbe:
             httpGet:
-              path: /api/health
+              path: {{ $healthPath | quote }}
               port: {{ .Values.service.port }}
             initialDelaySeconds: 5
             periodSeconds: 10

@@ -2,9 +2,11 @@
 namespace: default
 
 image:
-  repository: duyimew/notification-service
+  repository: daithang59/notification-service
   tag: "v81"
   digest: ""
+
+healthPath: /health
 
 service:
   type: NodePort

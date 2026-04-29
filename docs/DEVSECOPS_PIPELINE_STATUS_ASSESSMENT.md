@@ -13,11 +13,11 @@ Repo hiện đang ở **cuối Phase 3 - Jenkins CI cơ bản** và chạm một
 - Pipeline code đã có nền rõ: `Jenkinsfile`, `vars/*.groovy`, Docker build, Trivy, SonarQube, Checkov, Dependency-Check, ZAP, push image và GitOps update.
 - GitOps đi đúng hướng: Jenkins update Helm values trên branch GitOps, không deploy trực tiếp bằng `kubectl`.
 
-Blocker lớn nhất:
+Blocker còn lại lớn nhất:
 
 - Jenkins, credentials, SonarQube, Docker Hub namespace, GitOps branch và ArgoCD chưa được cấu hình/chạy thật.
-- `Jenkinsfile` vẫn dùng `@Library('docvault@testing')`, trong khi fix pipeline hiện nằm trên `devsecops-pipeline`.
-- K8s/Helm còn hardcode môi trường dev và có nguy cơ probe sai: chart dùng `/api/health` cho mọi service, trong khi backend service expose `/health`; chỉ gateway có global prefix `/api`.
+- Docker Hub namespace đã được đặt về `daithang59`, nhưng vẫn cần xác nhận Docker Hub account/repository thật sự tồn tại và Jenkins credential có quyền push.
+- K8s/Helm đã có `healthPath` theo từng service, nhưng chưa được xác nhận bằng deploy thật lên cluster.
 
 ## Architecture Fit Review
 
@@ -49,9 +49,9 @@ Blocker lớn nhất:
 | Area | Expected | Current state in repo | Gap | Severity | Recommended action |
 |---|---|---|---|---|---|
 | Jenkins setup | Jenkins chạy được pipeline từ SCM. | Chỉ có `Jenkinsfile` và guide; user chưa deploy Jenkins. | Chưa operational. | High | Deploy Jenkins, cài plugins, credentials, agent label, tạo job branch `devsecops-pipeline`. |
-| Shared library branch | Jenkins dùng đúng branch chứa fix. | `Jenkinsfile` dùng `@Library('docvault@testing')`. | Có thể lấy code pipeline cũ. | High | Đổi tạm sang `@Library('docvault@devsecops-pipeline')` trước khi merge. |
-| Docker namespace | Push image vào namespace user sở hữu. | `vars/docvaultConfig.groovy` và values còn `duyimew`. | Có thể push fail hoặc deploy image sai owner. | High | Đổi `dockerOrg` và image repositories sang Docker Hub namespace của bạn. |
-| K8s health probes | Probe đúng endpoint từng service. | Chart dùng `/api/health` cho mọi release. | Backend services không set global prefix `/api`. | High | Cho phép `healthPath` trong values; gateway/web dùng `/api/health`, backend dùng `/health`. |
+| Shared library branch | Jenkins dùng đúng branch chứa fix. | `Jenkinsfile` dùng `@Library('docvault@devsecops-pipeline')`. | Cần đổi lại sau khi merge vào `testing`. | Low | Khi PR merge xong, đổi library/job branch theo branch CI chính thức. |
+| Docker namespace | Push image vào namespace user sở hữu. | `dockerOrg` và values đang dùng `daithang59`. | Chưa xác nhận Docker Hub namespace thật. | Medium | Kiểm tra Docker Hub account/repositories và credential `dockerhub-credentials`. |
+| K8s health probes | Probe đúng endpoint từng service. | Chart dùng `healthPath`; gateway/web `/api/health`, backend `/health`. | Chưa verify bằng cluster thật. | Low | Render Helm và kiểm tra pod readiness sau ArgoCD sync. |
 | GitOps branch | Branch deploy state tồn tại. | Pipeline default `gitops-testing`, ArgoCD targetRevision cũng vậy. | Chưa xác nhận branch đã tạo. | High | Tạo/push `gitops-testing` trước khi chạy Push & GitOps. |
 | Sonar quality gate | Fail pipeline khi quality gate fail. | `sonarSast.groovy` chỉ chạy scanner, chưa thấy `waitForQualityGate`. | Chưa là gate thật. | Medium | Thêm stage `Quality Gate` sau Sonar hoặc cấu hình fail condition rõ. |
 | Trivy FS gate | Fail khi có HIGH/CRITICAL. | `trivyFsScan.groovy` thiếu `--exit-code 1`. | Có thể chỉ report, không chặn. | Medium | Thêm `--exit-code 1` hoặc policy severity rõ. |
@@ -64,8 +64,8 @@ Blocker lớn nhất:
 
 ## Top Priorities
 
-1. **Sửa cấu hình branch và Docker namespace**: đổi `@Library` sang `devsecops-pipeline` khi test, đổi `dockerOrg`/image repositories khỏi `duyimew`.
-2. **Tạo `gitops-testing` và chuẩn hóa Helm values**: tạo branch, sửa health probe path, kiểm tra values cho từng service.
+1. **Xác nhận Docker Hub namespace `daithang59`**: tạo repositories hoặc đảm bảo Jenkins credential có quyền auto-create/push.
+2. **Tạo/verify `gitops-testing`**: branch này là desired state cho ArgoCD và nơi Jenkins update image tag/digest.
 3. **Deploy Jenkins local/VM bằng Docker**: cài plugin, credentials `dockerhub-credentials` và `github-credentials`, label agent, tạo job SCM.
 4. **Chạy pipeline từng lớp**: `Install`, `Unit Tests`, `Trivy FS`, `Sonar`, `Checkov`, `Build & Scan Services`, sau đó mới `Push & GitOps`.
 5. **Chỉ bật ArgoCD/ZAP sau khi CI ổn**: apply ArgoCD app manifests, verify sync, rồi mới bật DAST với target thật.
@@ -73,8 +73,8 @@ Blocker lớn nhất:
 ## Anti-Pattern Warnings
 
 - Đừng dựng monitoring/ZAP trước khi Jenkins build-push-GitOps chạy ổn. ZAP đang phụ thuộc gateway deployed thật.
-- Đừng merge/chạy Jenkins với `@Library('docvault@testing')` nếu branch `testing` chưa có các fix pipeline hiện tại.
-- Đừng để `duyimew` làm Docker namespace nếu bạn không có quyền push Docker Hub namespace đó.
+- Đừng đổi Jenkins về `@Library('docvault@testing')` trước khi branch `testing` có các fix pipeline hiện tại.
+- Đừng giữ Docker namespace `daithang59` nếu Docker Hub thật của bạn dùng tên khác.
 - Đừng coi security scan là gate hoàn chỉnh khi Sonar chưa có quality gate và Trivy FS/Dependency-Check chưa fail pipeline nhất quán.
 - Đừng xem K8s manifests là sẵn sàng deploy khi health probe còn dùng một path chung cho các service khác nhau.
 
@@ -82,10 +82,10 @@ Blocker lớn nhất:
 
 ### Must-do
 
-- Đổi Jenkins shared library branch khi test pipeline: `@Library('docvault@devsecops-pipeline')`.
-- Đổi `dockerOrg` trong `vars/docvaultConfig.groovy` và image repository trong `infra/k8s/values/*.yaml`.
-- Sửa Helm chart để mỗi service có `healthPath`.
-- Tạo `gitops-testing` trên `origin`.
+- Verify Jenkins shared library branch đang dùng `@Library('docvault@devsecops-pipeline')`.
+- Verify Docker Hub namespace `daithang59` và credential push image.
+- Verify Helm chart render đúng `healthPath` cho từng service.
+- Tạo hoặc xác nhận `gitops-testing` trên `origin`.
 - Deploy Jenkins, tạo credentials, chạy job với `FORCE_BUILD_ALL=true`.
 
 ### Should-do
