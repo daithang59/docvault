@@ -1,8 +1,10 @@
 # web app values
+namespace: default
+
 image:
   repository: duyimew/docvault
   tag: "v81"
-  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  digest: ""
 
 service:
   type: NodePort
@@ -11,4 +13,7 @@ service:
 env:
   NODE_ENV: production
   PORT: "3006"
-  NEXT_PUBLIC_API_URL: "http://10.0.3.138:30000/api"
+  NEXT_PUBLIC_APP_NAME: "DocVault"
+  NEXT_PUBLIC_API_BASE_URL: "http://10.0.3.138:30000/api"
+  GATEWAY_URL: "http://10.0.3.138:30000"
+  FRONTEND_URL: "http://10.0.3.138:30006"
