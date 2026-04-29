@@ -4,7 +4,7 @@ namespace: default
 image:
   repository: duyimew/metadata-service
   tag: "v81"
-  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  digest: ""
 
 service:
   type: NodePort
@@ -14,6 +14,8 @@ env:
   NODE_ENV: production
   PORT: "3001"
   KEYCLOAK_BASE_URL: "http://keycloak:8080"
+  KEYCLOAK_REALM: "docvault"
+  KEYCLOAK_AUDIENCE: "docvault-gateway"
   AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
 
 envFrom:

@@ -2,14 +2,14 @@
 # This file will be overwritten for each service (gateway, metadata, etc.)
 
 replicaCount: 1
-namespace: docvault
+namespace: default
 
 image:
   repository: duyimew/gateway
   pullPolicy: IfNotPresent
   # Overridden by Jenkins during build
   tag: "latest"
-  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  digest: ""
 
 service:
   type: ClusterIP

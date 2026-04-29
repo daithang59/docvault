@@ -1,8 +1,10 @@
 # workflow-service values
+namespace: default
+
 image:
   repository: duyimew/workflow-service
   tag: "v81"
-  digest: "sha256:0000000000000000000000000000000000000000000000000000000000000000"
+  digest: ""
 
 service:
   type: NodePort
@@ -12,8 +14,11 @@ env:
   NODE_ENV: production
   PORT: "3003"
   KEYCLOAK_BASE_URL: "http://keycloak:8080"
+  KEYCLOAK_REALM: "docvault"
+  KEYCLOAK_AUDIENCE: "docvault-gateway"
   METADATA_SERVICE_URL: "http://docvault-metadata:3001"
   AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
+  NOTIFICATION_SERVICE_URL: "http://docvault-notification-service:3005"
 
 envFrom:
   - secretRef:
