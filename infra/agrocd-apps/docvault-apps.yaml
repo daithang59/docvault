@@ -6,7 +6,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -28,7 +28,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -50,7 +50,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -72,7 +72,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -94,7 +94,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -116,7 +116,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
@@ -138,7 +138,7 @@ metadata:
 spec:
   project: default
   source:
-    repoURL: 'https://github.com/duyimew/docvault.git'
+    repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
     path: infra/k8s/charts/docvault-service
     helm:
