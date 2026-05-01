@@ -27,8 +27,13 @@ def call(Map cfg = [:]) {
             fi
 
             SKIP_ARGS=""
-            if [ -n "$CHECKOV_SKIP_CHECKS" ]; then
-              SKIP_ARGS="--skip-check $CHECKOV_SKIP_CHECKS"
+            if [ -n "${CHECKOV_SKIP_CHECKS:-}" ]; then
+              SKIP_ARGS="--skip-check ${CHECKOV_SKIP_CHECKS}"
+            fi
+
+            EXTRA_ARGS=""
+            if [ -n "${CHECKOV_EXTRA_ARGS:-}" ]; then
+              EXTRA_ARGS="${CHECKOV_EXTRA_ARGS}"
             fi
 
             status=0
@@ -39,7 +44,7 @@ def call(Map cfg = [:]) {
                 $TARGET_ARGS \
                 --framework terraform,kubernetes,helm \
                 $SKIP_ARGS \
-                $CHECKOV_EXTRA_ARGS \
+                $EXTRA_ARGS \
                 --output cli \
                 > checkov-report/checkov-report.txt 2>&1
             then
