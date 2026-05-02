@@ -11,9 +11,10 @@ pipeline {
     }
 
     parameters {
-        booleanParam(name: 'FORCE_BUILD_ALL', defaultValue: false, description: 'Rebuild and rescan all images regardless of detected file changes.')
-        string(name: 'GITOPS_BRANCH', defaultValue: 'gitops-testing', description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).')
-    }
+    booleanParam(name: 'FORCE_BUILD_ALL', defaultValue: false, description: 'Rebuild and rescan all images regardless of detected file changes.')
+    string(name: 'GITOPS_BRANCH', defaultValue: 'gitops-testing', description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).')
+    booleanParam(name: 'RUN_ZAP', defaultValue: false, description: 'Run DAST scan after deploy target is reachable.')
+}
 
     environment {
         NODE_IMAGE = 'node:20-alpine'
@@ -102,12 +103,22 @@ pipeline {
         }
 
         stage('Build & Scan Services') {
-            steps {
-                script {
-                    env.BUILT_SERVICES = buildAndScan(cfg)
-                }
+    steps {
+        script {
+            def built = buildAndScan(cfg)
+            echo "buildAndScan returned: ${built}"
+            echo "buildAndScan type: ${built?.getClass()?.name}"
+
+            if (built instanceof Collection) {
+                env.BUILT_SERVICES = built.join(',')
+            } else {
+                env.BUILT_SERVICES = (built ?: '').toString().trim()
             }
+
+            echo "Normalized BUILT_SERVICES='${env.BUILT_SERVICES}'"
         }
+    }
+}
 
         stage('Push & GitOps') {
             when { expression { env.BUILT_SERVICES?.trim() } }
@@ -118,13 +129,17 @@ pipeline {
             }
         }
 
-        stage('DAST - OWASP ZAP') {
-            steps {
-                script {
-                    dastZap(cfg)
-                }
-            }
+
+stage('DAST - OWASP ZAP') {
+    when {
+        expression { return params.RUN_ZAP }
+    }
+    steps {
+        script {
+            dastZap(cfg)
         }
+    }
+}
     }
 
     post {
