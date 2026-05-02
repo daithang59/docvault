@@ -41,6 +41,7 @@ def call(Map cfg = [:]) {
                 -Dsonar.sources="${sources}" \\
                 -Dsonar.exclusions="${exclusions}" \\
                 -Dsonar.host.url="\${SONAR_HOST}" \\
+                -Dsonar.scanner.skipJreProvisioning=true \\
                 ${extraArgs}
         """
     }
