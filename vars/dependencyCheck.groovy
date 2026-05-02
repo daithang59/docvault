@@ -8,10 +8,12 @@ def call() {
 
     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
         withCredentials([string(credentialsId: 'nvd-api-key', variable: 'NVD_API_KEY')]) {
-            sh """
+            sh '''
+                set -eu
+
                 docker run --rm \\
-                    -v ${env.WORKSPACE}:/src \\
-                    -v ${env.WORKSPACE}/dependency-check-report:/report \\
+                    -v "$WORKSPACE:/src" \\
+                    -v "$WORKSPACE/dependency-check-report:/report" \\
                     -v /var/jenkins_home/dependency-check-data:/usr/share/dependency-check/data \\
                     owasp/dependency-check:latest \\
                     --project "DocVault" \\
@@ -36,7 +38,7 @@ def call() {
                     --failOnCVSS 7 \\
                     --disableKnownExploited \\
                     --nvdApiKey "$NVD_API_KEY"
-            """
+            '''
         }
     }
 }
