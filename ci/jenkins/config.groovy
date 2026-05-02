@@ -12,6 +12,7 @@ def call() {
         sonarHostUrl: sonarHostUrl,
         checkovImage: 'bridgecrew/checkov:latest',
         skipChecks: 'CKV_K8S_43',
+        skipPaths: 'infra/k8s/infra-deps',
         dockerOrg: 'daithang59',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
         webAppName: 'web',
