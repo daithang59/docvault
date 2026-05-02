@@ -8,7 +8,7 @@ def call(Map cfg = [:]) {
     String projectVersion   = cfg.sonarProjectVersion ?: (env.BUILD_NUMBER ?: 'local')
     String sources          = cfg.sonarSources ?: 'apps,services,libs'
     String exclusions       = cfg.sonarExclusions ?: '**/node_modules/**,**/.pnpm-store/**,**/dist/**,**/.next/**,**/coverage/**,infra/**,charts/**,checkov-report/**,dependency-check-report/**,Dockerfile.jenkins,**/.scannerwork/**'
-    String hostOverride     = cfg.sonarHostUrl ?: 'http://host.docker.internal:9000'
+    String hostFallback     = cfg.sonarHostUrl ?: 'http://host.docker.internal:9000'
     String extraArgs        = cfg.extraArgs ?: ''
     boolean enforceQG       = cfg.containsKey('enforceQualityGate') ? cfg.enforceQualityGate : false
     int qgTimeoutMinutes    = (cfg.qualityGateTimeoutMinutes ?: 10) as int
@@ -19,7 +19,7 @@ def call(Map cfg = [:]) {
 
             mkdir -p .sonar-cache
 
-            SONAR_HOST="${hostOverride}"
+            SONAR_HOST="\${SONAR_HOST_URL:-${hostFallback}}"
 
             echo ">>> SonarQube installation : ${installationName}"
             echo ">>> Sonar host             : \${SONAR_HOST}"

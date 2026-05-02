@@ -1,5 +1,6 @@
 def call() {
     def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'gitops-testing'
+    def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'http://host.docker.internal:9000'
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -8,7 +9,7 @@ def call() {
         sonarScannerImage: 'sonarsource/sonar-scanner-cli:latest',
         sonarQubeInstallation: 'sqdocvault',
         sonarProjectKey: 'docvault',
-        sonarHostUrl: 'http://10.0.3.137:9005',
+        sonarHostUrl: sonarHostUrl,
         checkovImage: 'bridgecrew/checkov:latest',
         dockerOrg: 'daithang59',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
