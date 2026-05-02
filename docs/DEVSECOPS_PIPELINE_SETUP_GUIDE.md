@@ -205,16 +205,16 @@ Chạy SonarQube local:
 ```bash
 docker run -d \
   --name docvault-sonarqube \
-  -p 9005:9000 \
+  -p 9000:9000 \
   sonarqube:community
 ```
 
-Mở `http://localhost:9005`, tạo token, rồi cấu hình trong Jenkins:
+Mở `http://localhost:9000`, tạo token, rồi cấu hình trong Jenkins:
 
 ```text
 Manage Jenkins -> System -> SonarQube servers
 Name: sqdocvault
-Server URL: http://host.docker.internal:9005
+Server URL: http://host.docker.internal:9000
 Token: <sonar-token>
 ```
 
@@ -234,7 +234,7 @@ Kiểm tra và sửa các giá trị sau cho đúng môi trường của bạn:
 dockerOrg: '<dockerhub-user>'
 gitOpsRepoUrl: 'https://github.com/daithang59/docvault.git'
 gitOpsBranch: 'gitops-testing'
-sonarHostUrl: 'http://host.docker.internal:9005'
+sonarHostUrl: 'http://host.docker.internal:9000'
 zapTarget: 'http://<gateway-nodeport-host>:30000/api'
 ```
 
