@@ -43,6 +43,11 @@ def call(Map cfg = [:]) {
               IFS=$OLDIFS
             fi
 
+            EXTRA_ARGS=""
+            if [ -n "${CHECKOV_EXTRA_ARGS:-}" ]; then
+              EXTRA_ARGS="${CHECKOV_EXTRA_ARGS}"
+            fi
+
             status=0
             if docker run --rm \
                 -v "$WORKSPACE:/repo" \
@@ -51,7 +56,7 @@ def call(Map cfg = [:]) {
                 $TARGET_ARGS \
                 --framework terraform,kubernetes,helm \
                 $SKIP_ARGS \
-                $CHECKOV_EXTRA_ARGS \
+                $EXTRA_ARGS \
                 --output cli \
                 > checkov-report/checkov-report.txt 2>&1
             then
