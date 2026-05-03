@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/docvault
-  tag: "v81"
-  digest: ""
+  tag: "v23"
+  digest: "sha256:6250b18e066094b232c6d468ebfd7ab28dbdddb4d79e8e04e599bdcb31ec6b0b"
 
 healthPath: /api/health
 
