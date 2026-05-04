@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/notification-service
-  tag: "v23"
-  digest: "sha256:9307116d50d8de198d66d9e7f254d6d6f11b66d81502daa8c7cab88dd1298596"
+  tag: "v25"
+  digest: "sha256:b37f72f38c760f91434327c2c41bbb477c6d4d854c0d10133f9cb837b7cc9fa5"
 
 healthPath: /health
 

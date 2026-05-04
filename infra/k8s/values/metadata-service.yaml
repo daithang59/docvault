@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/metadata-service
-  tag: "v23"
-  digest: "sha256:10d5822349f12fe2d910eddb486fac08a33459c5740e497ea60a5dfc6be4943b"
+  tag: "v25"
+  digest: "sha256:6caee1c586dd1e699344447990f0c7275498419feeaf8e083b4f130b67f8b5a2"
 
 healthPath: /health
 

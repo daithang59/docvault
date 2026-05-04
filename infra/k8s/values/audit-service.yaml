@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/audit-service
-  tag: "v23"
-  digest: "sha256:387ddb5ddc1b67fef0380150f729122859c0bbe67a4158e274b149e91d2bcc64"
+  tag: "v25"
+  digest: "sha256:8b2c8cb04c6d4bb09bcf11595be2f558decb068e2dc11d8e7f9c49de6a9df5a5"
 
 healthPath: /health
 
