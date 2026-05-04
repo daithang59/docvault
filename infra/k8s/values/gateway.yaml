@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/gateway
-  tag: "v23"
-  digest: "sha256:718bfb659bb9b6ae6c7fe1e0356c1690b7581c4a7730f17a35025f110a6dce0a"
+  tag: "v25"
+  digest: "sha256:fe80879bde20dd00accda1bec9f8ad489349fea94b04ac5904dce922b661239d"
 
 healthPath: /api/health
 

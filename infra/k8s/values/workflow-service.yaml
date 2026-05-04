@@ -3,8 +3,8 @@ namespace: default
 
 image:
   repository: daithang59/workflow-service
-  tag: "v23"
-  digest: "sha256:4d66c033092322dc4e3b5c9bf2c51755935a60008e8e7214489299073ff77556"
+  tag: "v25"
+  digest: "sha256:5a67b5e244a5e00d201dffe0f4efa628b4cd6b72be4f5fe2906540fbe549786e"
 
 healthPath: /health
 
