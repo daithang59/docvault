@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: daithang59/notification-service
-  tag: "v25"
-  digest: "sha256:b37f72f38c760f91434327c2c41bbb477c6d4d854c0d10133f9cb837b7cc9fa5"
+  tag: "v27"
+  digest: "sha256:60215ca72c057bfd8a71c4b3190649eda46c90e516bceaf56ca3e19f7851f216"
 
 healthPath: /health
 
