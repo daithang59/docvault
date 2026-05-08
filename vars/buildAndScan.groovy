@@ -154,29 +154,33 @@ List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady
         batch.each { target ->
             def currentTarget = target
             branches[currentTarget.name] = {
-                buildAndScanTarget(cfg, currentTarget, tag, trivyDbReady)
+                buildTarget(cfg, currentTarget, tag)
             }
         }
 
         parallel branches
+
+        batch.each { target ->
+            scanTarget(cfg, target, tag, trivyDbReady)
+        }
+
         builtList.addAll(batch.collect { it.name })
     }
 
     return builtList
 }
 
-void buildAndScanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
+void buildTarget(cfg, Map target, String tag) {
     def repository = target.repository
     def dockerfile = target.dockerfile
     def buildArgs = target.buildArgs ?: [:]
     def cacheFrom = "${repository}:latest"
-    def trivyCacheVolume = trivyDbReady ? 'trivy-cache' : "trivy-cache-${target.name}"
-    def trivyDbFlags = trivyDbReady ? '--skip-db-update' : ''
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
 
     sh """
         set -eu
+        export DOCKER_BUILDKIT=1
         docker pull '${cacheFrom}' >/dev/null 2>&1 || true
         docker build \\
             --build-arg BUILDKIT_INLINE_CACHE=1 \\
@@ -187,6 +191,12 @@ void buildAndScanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
             -f '${dockerfile}' \\
             .
     """
+}
+
+void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
+    def repository = target.repository
+    def trivyCacheVolume = trivyDbReady ? 'trivy-cache' : "trivy-cache-${target.name}"
+    def trivyDbFlags = trivyDbReady ? '--skip-db-update' : ''
 
     echo ">>> Scanning Image ${repository}:${tag}..."
     sh """
@@ -195,7 +205,7 @@ void buildAndScanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
             -v /var/run/docker.sock:/var/run/docker.sock \\
             -v ${trivyCacheVolume}:/root/.cache/trivy \\
             ${cfg.trivyImage} \\
-            image ${trivyDbFlags} --severity CRITICAL --exit-code 1 --no-progress '${repository}:${tag}'
+            image ${trivyDbFlags} --scanners vuln --severity CRITICAL --exit-code 1 --no-progress '${repository}:${tag}'
     """
 }
 
