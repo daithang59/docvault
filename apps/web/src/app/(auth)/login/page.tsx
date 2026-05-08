@@ -45,10 +45,9 @@ export default function LoginPage() {
             accessToken: data.accessToken,
             user: data.user,
           });
-          // Clear the short-lived cookies now that session is in localStorage
+          // Clear only the short-lived user bootstrap cookie. Keep HttpOnly
+          // token cookies so the app can rehydrate after refreshes or redirects.
           deleteCookie('dv_user');
-          deleteCookie('dv_access_token');
-          deleteCookie('dv_refresh_token');
           router.push(ROUTES.DASHBOARD);
         })
         .catch(() => {
