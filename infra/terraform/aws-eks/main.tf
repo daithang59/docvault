@@ -127,3 +127,32 @@ module "eks" {
 
   tags = local.tags
 }
+
+# -- NodePort security group rules ------------------------------------
+# Allow external access to web (30006) and keycloak (30080) on worker nodes.
+# Gateway stays ClusterIP (accessed via Next.js server-side rewrites).
+
+locals {
+  nodeport_rules = {
+    web      = { port = 30006, desc = "NodePort: docvault-web" }
+    keycloak = { port = 30080, desc = "NodePort: keycloak" }
+  }
+}
+
+variable "nodeport_access_cidrs" {
+  description = "CIDR blocks allowed to reach NodePort services (web, keycloak). Use 0.0.0.0/0 for open access."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "nodeport" {
+  for_each = local.nodeport_rules
+
+  type              = "ingress"
+  from_port         = each.value.port
+  to_port           = each.value.port
+  protocol          = "tcp"
+  cidr_blocks       = var.nodeport_access_cidrs
+  description       = each.value.desc
+  security_group_id = module.eks.node_security_group_id
+}
