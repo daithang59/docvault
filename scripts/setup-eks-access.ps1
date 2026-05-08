@@ -48,13 +48,44 @@ if (-not $nodeIp) {
 
 $webUrl = "http://${nodeIp}:30006"
 $kcUrl  = "http://${nodeIp}:30080"
+$kcIssuer = "${kcUrl}/realms/docvault"
 
 Write-Host "  Node IP:  $nodeIp" -ForegroundColor Green
 Write-Host "  Web URL:  $webUrl" -ForegroundColor Green
 Write-Host "  KC URL:   $kcUrl" -ForegroundColor Green
+Write-Host "  KC Issuer: $kcIssuer" -ForegroundColor Green
 
 # ── Step 2: Patch deployments ───────────────────────────────────
 Write-Host "`n[2/3] Patching deployments..." -ForegroundColor Yellow
+
+$runtimePatchedApps = @(
+    "docvault-web",
+    "docvault-gateway",
+    "docvault-metadata",
+    "docvault-document-service",
+    "docvault-workflow-service",
+    "docvault-audit-service",
+    "docvault-notification-service"
+)
+
+foreach ($app in $runtimePatchedApps) {
+    $argoPatch = @{
+        spec = @{
+            ignoreDifferences = @(
+                @{
+                    group = "apps"
+                    kind = "Deployment"
+                    jsonPointers = @("/spec/template/spec/containers/0/env")
+                }
+            )
+            syncPolicy = @{
+                syncOptions = @("CreateNamespace=true", "RespectIgnoreDifferences=true")
+            }
+        }
+    } | ConvertTo-Json -Depth 10
+
+    kubectl patch application $app -n argocd --type merge -p $argoPatch 2>$null | Out-Null
+}
 
 # Patch web app
 Write-Host "  Patching docvault-web..."
@@ -66,7 +97,26 @@ kubectl set env deployment/docvault-web -n $Namespace `
 Write-Host "  Patching docvault-gateway..."
 kubectl set env deployment/docvault-gateway -n $Namespace `
     FRONTEND_URL="$webUrl" `
-    ALLOWED_ORIGINS="$webUrl,http://localhost:3006"
+    ALLOWED_ORIGINS="$webUrl,http://localhost:3006" `
+    KEYCLOAK_BASE_URL="http://keycloak:8080" `
+    KEYCLOAK_ISSUER="$kcIssuer"
+
+# Patch backend services to accept the public Keycloak issuer while keeping
+# KEYCLOAK_BASE_URL on the in-cluster service for JWKS/token calls.
+$authDeployments = @(
+    "docvault-metadata",
+    "docvault-document-service",
+    "docvault-workflow-service",
+    "docvault-audit-service",
+    "docvault-notification-service"
+)
+
+foreach ($deployment in $authDeployments) {
+    Write-Host "  Patching $deployment auth issuer..."
+    kubectl set env deployment/$deployment -n $Namespace `
+        KEYCLOAK_BASE_URL="http://keycloak:8080" `
+        KEYCLOAK_ISSUER="$kcIssuer"
+}
 
 Write-Host "  Deployments patched. Pods will restart automatically." -ForegroundColor Green
 
