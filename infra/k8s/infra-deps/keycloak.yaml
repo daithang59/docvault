@@ -16,8 +16,6 @@ spec:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.0
           args: ["start-dev", "--import-realm"]
-          securityContext:
-            readOnlyRootFilesystem: true
           ports:
             - containerPort: 8080
           env:
@@ -33,10 +31,14 @@ spec:
             - name: realm-import
               mountPath: /opt/keycloak/data/import/realm-docvault.json
               subPath: realm-docvault.json
+            - name: kc-tmp
+              mountPath: /tmp
       volumes:
         - name: realm-import
           configMap:
             name: keycloak-realm-config
+        - name: kc-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
