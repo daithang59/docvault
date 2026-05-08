@@ -167,28 +167,40 @@ if ($kcReady) {
             -Headers @{ Authorization = "Bearer $adminToken" }
         $clientUuid = $clients[0].id
 
-        # Update redirect URIs and web origins
-        $updateBody = @{
-            redirectUris = @(
-                "http://localhost:3000/*",
-                "http://localhost:3006/*",
-                "http://localhost:3006/api/auth/callback",
-                "$webUrl/*",
-                "$webUrl/api/auth/callback"
-            )
-            webOrigins = @(
-                "http://localhost:3000",
-                "http://localhost:3006",
-                $webUrl
-            )
-        } | ConvertTo-Json
+        # Update redirect URIs, post-logout redirects, and web origins.
+        # Keep the existing client object so Keycloak does not drop unrelated
+        # client settings during PUT.
+        $client = $clients[0]
+        $client.redirectUris = @(
+            "http://localhost:3000/*",
+            "http://localhost:3006/*",
+            "http://localhost:3006/api/auth/callback",
+            "$webUrl/*",
+            "$webUrl/api/auth/callback"
+        )
+        $client.webOrigins = @(
+            "http://localhost:3000",
+            "http://localhost:3006",
+            $webUrl
+        )
+
+        if (-not $client.attributes) {
+            $client | Add-Member -MemberType NoteProperty -Name attributes -Value ([pscustomobject]@{})
+        }
+        $client.attributes | Add-Member `
+            -MemberType NoteProperty `
+            -Name "post.logout.redirect.uris" `
+            -Value "+" `
+            -Force
+
+        $updateBody = $client | ConvertTo-Json -Depth 20
 
         Invoke-RestMethod -Method Put `
             -Uri "http://localhost:18090/admin/realms/docvault/clients/$clientUuid" `
             -Headers @{ Authorization = "Bearer $adminToken"; "Content-Type" = "application/json" } `
             -Body $updateBody
 
-        Write-Host "  Keycloak redirect URIs updated." -ForegroundColor Green
+        Write-Host "  Keycloak redirect and logout URIs updated." -ForegroundColor Green
     }
     catch {
         Write-Warning "Could not auto-update Keycloak: $_"

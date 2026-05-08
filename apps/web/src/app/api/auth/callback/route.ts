@@ -64,7 +64,7 @@ export async function GET(req: NextRequest) {
     }
 
     const tokens = await tokenRes.json();
-    const { access_token, refresh_token, expires_in } = tokens;
+    const { access_token, refresh_token, id_token, expires_in } = tokens;
 
     const payload = JSON.parse(atob(access_token.split('.')[1])) as JwtPayload;
     const user = {
@@ -88,6 +88,16 @@ export async function GET(req: NextRequest) {
 
     if (refresh_token) {
       response.cookies.set('dv_refresh_token', refresh_token, {
+        httpOnly: true,
+        secure: isSecure(req),
+        sameSite: 'lax',
+        maxAge: 7 * 24 * 60 * 60,
+        path: '/',
+      });
+    }
+
+    if (id_token) {
+      response.cookies.set('dv_id_token', id_token, {
         httpOnly: true,
         secure: isSecure(req),
         sameSite: 'lax',
