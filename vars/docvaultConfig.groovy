@@ -11,6 +11,7 @@ def call() {
         sonarQubeInstallation: 'sqdocvault',
         sonarProjectKey: 'docvault',
         sonarHostUrl: sonarHostUrl,
+        sonarHostCandidates: [sonarHostUrl, 'http://localhost:9000', 'http://127.0.0.1:9000', 'http://172.17.0.1:9000'],
         sonarDockerRunArgs: '--network host --add-host=host.docker.internal:host-gateway',
         checkovImage: 'bridgecrew/checkov:latest',
         terraformImage: 'hashicorp/terraform:1.8.5',
