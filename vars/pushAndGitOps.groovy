@@ -42,15 +42,11 @@ def pushImages(cfg, builtList, tag) {
             withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                 sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
 
+                runPushesInBatches(cfg, builtList, tag)
+
                 builtList.each { service ->
                     def imageName = imageNameForService(cfg, service)
                     def repository = "${cfg.dockerOrg}/${imageName}"
-                    def taggedImage = "${repository}:${tag}"
-
-                    echo ">>> Pushing ${taggedImage} to Docker Hub..."
-                    sh "docker push ${taggedImage}"
-                    sh "docker push ${repository}:latest"
-
                     imageDigests[service] = resolveImageDigest(repository, tag)
                 }
 
@@ -62,6 +58,38 @@ def pushImages(cfg, builtList, tag) {
     }
 
     return imageDigests
+}
+
+def runPushesInBatches(cfg, builtList, tag) {
+    def batchSize = (cfg.pushParallelism ?: 3) as Integer
+    if (batchSize < 1) {
+        batchSize = 1
+    }
+
+    def batches = builtList.collate(batchSize)
+    batches.eachWithIndex { batch, index ->
+        echo ">>> Push batch ${index + 1}/${batches.size()} with ${batch.size()} image(s)"
+
+        def branches = [:]
+        batch.each { service ->
+            def currentService = service
+            branches[currentService] = {
+                pushImage(cfg, currentService, tag)
+            }
+        }
+
+        parallel branches
+    }
+}
+
+def pushImage(cfg, service, tag) {
+    def imageName = imageNameForService(cfg, service)
+    def repository = "${cfg.dockerOrg}/${imageName}"
+    def taggedImage = "${repository}:${tag}"
+
+    echo ">>> Pushing ${taggedImage} to Docker Hub..."
+    sh "docker push ${taggedImage}"
+    sh "docker push ${repository}:latest"
 }
 
 def imageNameForService(cfg, service) {

@@ -18,6 +18,8 @@ def call() {
         skipPaths: 'infra/k8s/infra-deps',
         dockerOrg: 'daithang59',
         buildParallelism: 3,
+        pushParallelism: 3,
+        pnpmStoreVolume: 'docvault-pnpm-store',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
         webAppName: 'web',
         webImageName: 'docvault',
