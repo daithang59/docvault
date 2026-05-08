@@ -37,6 +37,11 @@ spec:
           volumeMounts:
             - name: minio-data
               mountPath: /data
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: tmp
+          emptyDir: {}
   volumeClaimTemplates:
     - metadata:
         name: minio-data

@@ -1,102 +1,50 @@
-# DocVault Port Forward Testing
+# DocVault EKS Access Guide
 
-Tai lieu nay dung de test DocVault tren EKS/Argo CD qua `kubectl port-forward`.
+Tai lieu nay dung de truy cap DocVault tren EKS.
 
-## 1. Chuan bi hosts cho Keycloak
+## Kien truc
 
-Mo PowerShell bang quyen Administrator, them hostname `keycloak` tro ve local:
-
-```powershell
-Add-Content -Path C:\Windows\System32\drivers\etc\hosts -Value "`n127.0.0.1 keycloak"
+```
+Browser ─── NodePort:30006 ───► Web App (Next.js)
+  │                                 │
+  │  /api/* (rewrites)              ▼ (server-side proxy)
+  │                            Gateway (ClusterIP:3000)
+  │
+  └── SSO ── NodePort:30080 ──► Keycloak
 ```
 
-Kiem tra:
+- **Web App**: NodePort 30006 — truy cap truc tiep
+- **Gateway API**: ClusterIP — browser goi `/api/*` qua web app, Next.js proxy server-side
+- **Keycloak**: NodePort 30080 — browser redirect cho SSO
+
+## 1. Setup sau moi lan scale node
+
+Sau khi scale node tu 0 len (hoac lan dau deploy), chay:
 
 ```powershell
-ping keycloak
+.\scripts\setup-eks-access.ps1
 ```
 
-## 2. Chay port-forward
+Script tu dong:
+1. Detect node external IP moi
+2. Patch `FRONTEND_URL`, `KEYCLOAK_BROWSER_BASE_URL`, `ALLOWED_ORIGINS`
+3. Update Keycloak redirect URIs
 
-Mo 4 PowerShell terminal rieng, moi terminal chay 1 lenh va de nguyen khong tat.
+**Khong can commit, khong can pipeline, khong rebuild image.**
 
-### Web app
+## 2. Truy cap
 
-```powershell
-kubectl port-forward -n docvault svc/docvault-web 3006:3006
-```
-
-Truy cap:
+Sau khi script chay xong, se in ra URL:
 
 ```text
-http://localhost:3006
+http://<node-ip>:30006          → Web App
+http://<node-ip>:30006/api      → Gateway API (proxied)
+http://<node-ip>:30080          → Keycloak
 ```
-
-### Gateway API
-
-Image frontend hien tai goi API tai `http://localhost:3000/api`, nen forward gateway vao port `3000`:
-
-```powershell
-kubectl port-forward -n docvault svc/docvault-gateway 3000:3000
-```
-
-Kiem tra:
-
-```powershell
-curl.exe http://localhost:3000/api/health
-```
-
-Ket qua mong doi:
-
-```json
-{"status":"ok","service":"gateway"}
-```
-
-### Keycloak
-
-Khong dung local port `8080` neu may dang chay Jenkins. Dung port `18080`:
-
-```powershell
-kubectl port-forward -n docvault svc/keycloak 18080:8080
-```
-
-Truy cap Keycloak:
-
-```text
-http://keycloak:18080
-```
-
-### Argo CD
-
-Khong dung local port `8080` neu may dang chay Jenkins. Dung port `18081`:
-
-```powershell
-kubectl port-forward -n argocd svc/argocd-server 18081:443
-```
-
-Truy cap Argo CD:
-
-```text
-https://localhost:18081
-```
-
-Neu browser canh bao certificate self-signed, chon tiep tuc vao trang.
 
 ## 3. Dang nhap demo
 
-Mo:
-
-```text
-http://localhost:3006/login
-```
-
-Khi bam SSO, browser phai redirect sang:
-
-```text
-http://keycloak:18080/realms/docvault/...
-```
-
-Tai khoan demo:
+Mo: `http://<node-ip>:30006/login`
 
 | Username | Password | Role |
 | --- | --- | --- |
@@ -106,14 +54,14 @@ Tai khoan demo:
 | `co1` | `Passw0rd!` | compliance_officer |
 | `admin1` | `Passw0rd!` | admin |
 
-## 4. Test API bang token
-
-Lay token tu Keycloak:
+## 4. Test API
 
 ```powershell
+$nodeIp = kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type==\"ExternalIP\")].address}'
+
 $token = (Invoke-RestMethod `
   -Method Post `
-  -Uri "http://keycloak:18080/realms/docvault/protocol/openid-connect/token" `
+  -Uri "http://${nodeIp}:30080/realms/docvault/protocol/openid-connect/token" `
   -ContentType "application/x-www-form-urlencoded" `
   -Body @{
     client_id="docvault-gateway"
@@ -122,79 +70,41 @@ $token = (Invoke-RestMethod `
     username="editor1"
     password="Passw0rd!"
   }).access_token
+
+# API calls go through web proxy
+Invoke-RestMethod -Uri "http://${nodeIp}:30006/api/me" -Headers @{ Authorization = "Bearer $token" }
 ```
 
-Goi API gateway:
+## 5. Scale node workflow
 
 ```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:3000/api/me" `
-  -Headers @{ Authorization = "Bearer $token" }
+# Di ngu - scale ve 0
+aws eks update-nodegroup-config --cluster-name docvault-eks --nodegroup-name <ng-name> `
+  --scaling-config minSize=0,desiredSize=0,maxSize=3 --region ap-southeast-1
+
+# Sang hom sau - scale lai
+aws eks update-nodegroup-config --cluster-name docvault-eks --nodegroup-name <ng-name> `
+  --scaling-config minSize=1,desiredSize=2,maxSize=3 --region ap-southeast-1
+
+# Chay setup script (1 lenh duy nhat)
+.\scripts\setup-eks-access.ps1
 ```
 
-List documents:
+## 6. Troubleshooting
 
 ```powershell
-Invoke-RestMethod `
-  -Uri "http://localhost:3000/api/metadata/documents" `
-  -Headers @{ Authorization = "Bearer $token" }
-```
-
-Ket qua ban dau co the la mang rong:
-
-```json
-[]
-```
-
-## 5. Troubleshooting nhanh
-
-Kiem tra service:
-
-```powershell
+# Kiem tra services
 kubectl get svc -n docvault
-```
 
-Kiem tra pod:
-
-```powershell
+# Kiem tra pods
 kubectl get pods -n docvault
+
+# Kiem tra node IP
+kubectl get nodes -o wide
+
+# Kiem tra env hien tai cua web
+kubectl get deployment docvault-web -n docvault -o jsonpath='{.spec.template.spec.containers[0].env}' | ConvertFrom-Json | Format-Table
+
+# ArgoCD (van dung port-forward)
+kubectl port-forward -n argocd svc/argocd-server 18081:443
 ```
-
-Kiem tra Argo CD health:
-
-```powershell
-kubectl get applications -n argocd
-```
-
-Kiem tra Argo CD UI port-forward:
-
-```text
-https://localhost:18081
-```
-
-Neu browser bao `ERR_CONNECTION_REFUSED` toi `localhost:3000`, gateway port-forward chua chay hoac bi tat:
-
-```powershell
-kubectl port-forward -n docvault svc/docvault-gateway 3000:3000
-```
-
-Neu SSO redirect sang Jenkins o `localhost:8080`, Keycloak URL/hosts chua dung. Can dam bao:
-
-```text
-127.0.0.1 keycloak
-```
-
-va dang chay:
-
-```powershell
-kubectl port-forward -n docvault svc/keycloak 18080:8080
-```
-
-Neu `/api/metadata/documents` tra `500`, kiem tra metadata-service va database schema:
-
-```powershell
-kubectl logs -n docvault deploy/docvault-metadata --tail=100
-kubectl exec -n docvault deploy/db -- psql -U docvault -d docvault_metadata -c "\dt"
-```
-
-Luu y: Postgres hien dang dung `emptyDir`, neu pod `db` bi recreate thi schema/data co the mat va can apply lai migration.

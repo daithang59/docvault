@@ -16,8 +16,6 @@ spec:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.0
           args: ["start-dev", "--import-realm"]
-          securityContext:
-            readOnlyRootFilesystem: false
           ports:
             - containerPort: 8080
           env:
@@ -33,16 +31,21 @@ spec:
             - name: realm-import
               mountPath: /opt/keycloak/data/import/realm-docvault.json
               subPath: realm-docvault.json
+            - name: kc-tmp
+              mountPath: /tmp
       volumes:
         - name: realm-import
           configMap:
             name: keycloak-realm-config
+        - name: kc-tmp
+          emptyDir: {}
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: keycloak
 spec:
+  type: NodePort
   selector:
     app: keycloak
   ports:
@@ -50,7 +53,4 @@ spec:
       protocol: TCP
       port: 8080
       targetPort: 8080
-    - name: http-local-forward
-      protocol: TCP
-      port: 18080
-      targetPort: 8080
+      nodePort: 30080
