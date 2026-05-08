@@ -14,8 +14,7 @@ locals {
 }
 
 module "vpc" {
-  source  = "terraform-aws-modules/vpc/aws"
-  version = "~> 5.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=7c1f791efd61f326ed6102d564d1a65d1eceedf0" # v5.21.0
 
   name = "${local.name}-vpc"
   cidr = "10.20.0.0/16"
@@ -47,8 +46,7 @@ module "vpc" {
 }
 
 module "eks" {
-  source  = "terraform-aws-modules/eks/aws"
-  version = "20.32.0"
+  source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=608c41a295a415f9aeea5c397a9dc123cee6d4c9" # v20.32.0
 
   cluster_name    = local.name
   cluster_version = var.cluster_version
@@ -128,4 +126,33 @@ module "eks" {
   }
 
   tags = local.tags
+}
+
+# -- NodePort security group rules ------------------------------------
+# Allow external access to web (30006) and keycloak (30080) on worker nodes.
+# Gateway stays ClusterIP (accessed via Next.js server-side rewrites).
+
+locals {
+  nodeport_rules = {
+    web      = { port = 30006, desc = "NodePort: docvault-web" }
+    keycloak = { port = 30080, desc = "NodePort: keycloak" }
+  }
+}
+
+variable "nodeport_access_cidrs" {
+  description = "CIDR blocks allowed to reach NodePort services (web, keycloak). Use 0.0.0.0/0 for open access."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+resource "aws_security_group_rule" "nodeport" {
+  for_each = local.nodeport_rules
+
+  type              = "ingress"
+  from_port         = each.value.port
+  to_port           = each.value.port
+  protocol          = "tcp"
+  cidr_blocks       = var.nodeport_access_cidrs
+  description       = each.value.desc
+  security_group_id = module.eks.node_security_group_id
 }
