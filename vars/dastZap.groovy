@@ -3,7 +3,7 @@ def call(cfg) {
         error('ZAP target is empty. Set the ZAP_TARGET parameter only after Gateway is reachable from the Jenkins/ZAP container.')
     }
 
-    echo '>>> Running DAST Scan against Gateway API...'
+    echo '>>> Running DAST Scan against deployed web target...'
     sh 'mkdir -p zap-report'
 
     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
