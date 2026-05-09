@@ -30,7 +30,8 @@ def call(cfg) {
                     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
                     -t "$ZAP_TARGET" \
                     -r zap_report.html \
-                    -J zap_report.json
+                    -J zap_report.json \
+                    -I
             '''
         }
     }
