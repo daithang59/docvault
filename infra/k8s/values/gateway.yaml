@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: daithang59/gateway
-  tag: "v49"
-  digest: "sha256:e755260e67cb278c9793cd3a5728baf437f0c415b83b6ff204d99c8f16ac59b4"
+  tag: "v50"
+  digest: "sha256:73aef539e32f8448b3cb44f8d5c6e7f286ec3de2d99752165bfb374cd86d4b77"
 
 healthPath: /api/health
 
