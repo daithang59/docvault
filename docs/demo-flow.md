@@ -128,21 +128,33 @@ Expected result:
 
 ## Observability Demo Add-On
 
-Apply the monitoring Argo CD app:
+Apply the monitoring and logging Argo CD apps:
 
 ```powershell
 kubectl apply -f infra/argocd-apps/monitoring.yaml
-kubectl get app monitoring-stack -n argocd
+kubectl apply -f infra/argocd-apps/loki.yaml
+kubectl get app monitoring-stack loki-stack -n argocd
 kubectl get pods -n monitoring
 ```
 
-Open Grafana:
+Open Grafana and Loki:
 
 ```powershell
 kubectl port-forward svc/monitoring-stack-grafana -n monitoring 3000:80
+kubectl port-forward svc/loki-stack -n monitoring 3100:3100
 ```
 
-Navigate to `http://localhost:3000` and capture dashboard evidence for pod health, CPU/RAM and workload status.
+Navigate to `http://localhost:3000` and capture:
+
+- Grafana dashboards for pod health, CPU/RAM and workload status.
+- Grafana Explore logs with datasource **Loki** and query `{namespace="docvault"}`.
+
+Optional API check:
+
+```powershell
+$query = [uri]::EscapeDataString('{namespace="docvault"}')
+Invoke-RestMethod -Uri "http://127.0.0.1:3100/loki/api/v1/query_range?query=$query&limit=5"
+```
 
 ---
 
