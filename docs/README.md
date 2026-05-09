@@ -1,13 +1,15 @@
 # Docs
 
 - `TEAM_SETUP_DEPLOYMENT_GUIDE.md`
-  - Team onboarding and deployment guide covering local run, Jenkins/SonarQube, Terraform/EKS, Argo CD, NodePort access and PR checklist
+  - Team onboarding and deployment guide covering Jenkins/SonarQube, Terraform/EKS, Argo CD, NodePort access and PR checklist
 - `RUN_PROJECT.md`
   - Latest end-to-end local run guide for backend, frontend, env and e2e
 - `PROJECT_STATUS.md`
   - Codebase status snapshot based on current runtime
 - `demo-flow.md`
-  - Step-by-step manual demo scenario after stack is running
+  - Step-by-step EKS demo scenario, including ZAP, Grafana metrics and Loki logs, plus local fallback
+- `security-sca-triage.md`
+  - SCA fixes, remaining exceptions and evidence checklist for Dependency Check
 - `demo-users.md`
   - Seed users, role mapping and login instructions
 - `REFRACTOR_SUMMARY.md`
