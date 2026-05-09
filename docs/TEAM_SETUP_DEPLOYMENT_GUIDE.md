@@ -4,9 +4,9 @@ Mục tiêu của tài liệu này là làm entry point cho thành viên mới c
 chạy dự án, dùng Jenkins/SonarQube trên Docker, dùng Terraform để tạo AWS EKS,
 deploy bằng Argo CD/GitOps và truy cập web app trên EKS qua NodePort.
 
-Tài liệu này gom các bước quan trọng nhất. Khi cần chi tiết hơn, đọc thêm:
+Tài liệu này gom các bước quan trọng nhất để triển khai trên EKS. Khi cần chi
+tiết hơn, đọc thêm:
 
-- `docs/RUN_PROJECT.md`: chạy local backend/frontend.
 - `docs/DEVSECOPS_PIPELINE_SETUP_GUIDE.md`: cấu hình Jenkins pipeline.
 - `docs/jenkins_docker.md`: chạy Jenkins bằng Docker.
 - `docs/sonarqube-docker-jenkins-setup.md`: chạy SonarQube và nối với Jenkins.
@@ -32,7 +32,7 @@ Không commit secrets, `.env`, `terraform.tfvars`, Terraform state hoặc plan f
 
 ## 2. Prerequisites
 
-Máy local/dev machine cần có:
+Máy dùng để thao tác triển khai cần có:
 
 - Git
 - Docker Desktop hoặc Docker Engine + Docker Compose
@@ -52,120 +52,20 @@ corepack enable
 corepack prepare pnpm@9.15.0 --activate
 ```
 
-## 3. Clone và Cài Đặt Dependency
+## 3. Clone Repository
 
 ```powershell
 git clone https://github.com/daithang59/docvault.git
 cd docvault
 git checkout devsecops-pipeline
-pnpm install
-```
-
-Chạy quick verification:
-
-```powershell
-pnpm lint
-pnpm test
-pnpm build
 ```
 
 Nếu đang clone sau khi PR đã merge, checkout `main` thay cho
 `devsecops-pipeline`.
 
-## 4. Chạy Local App
+## 4. Jenkins và SonarQube Trên Docker
 
-### 4.1. Tạo env file
-
-Từ repo root:
-
-```powershell
-Copy-Item .env.example .env
-```
-
-Nếu cần chạy service từ thư mục riêng, copy thêm file `.env.example` của service
-tương ứng:
-
-```powershell
-Copy-Item services\gateway\.env.example services\gateway\.env
-Copy-Item services\metadata-service\.env.example services\metadata-service\.env
-Copy-Item services\document-service\.env.example services\document-service\.env
-Copy-Item services\workflow-service\.env.example services\workflow-service\.env
-Copy-Item services\audit-service\.env.example services\audit-service\.env
-Copy-Item services\notification-service\.env.example services\notification-service\.env
-```
-
-### 4.2. Start local infrastructure
-
-Dùng file example trực tiếp:
-
-```powershell
-docker compose -f infra\docker-compose.dev.yml --env-file infra\.env.example up -d
-```
-
-Hoặc tạo file env riêng:
-
-```powershell
-Copy-Item infra\.env.example infra\.env
-docker compose -f infra\docker-compose.dev.yml --env-file infra\.env up -d
-```
-
-Stack local gồm Postgres, MongoDB, Mongo Express, MinIO, MinIO init job và
-Keycloak.
-
-### 4.3. Database migration và seed
-
-```powershell
-pnpm --filter metadata-service prisma:deploy
-pnpm --filter metadata-service db:seed
-```
-
-Audit service hiện dùng MongoDB cho audit logs. Nếu cần migrate dữ liệu audit cũ:
-
-```powershell
-$env:RUN_AUDIT_MIGRATION="true"
-```
-
-### 4.4. Start backend và frontend
-
-Backend one-command mode:
-
-```powershell
-pnpm start:sequential
-```
-
-Frontend:
-
-```powershell
-pnpm --filter web dev
-```
-
-URL mặc định:
-
-- Web: `http://localhost:3006`
-- Gateway Swagger: `http://localhost:3000/docs`
-- Keycloak: `http://localhost:8080`
-- MinIO Console: `http://localhost:9001`
-- Mongo Express: `http://localhost:8081`
-
-Seed users:
-
-- `viewer1`
-- `editor1`
-- `approver1`
-- `co1`
-- `admin1`
-
-Mật khẩu mặc định: `Passw0rd!`
-
-Smoke test:
-
-```powershell
-pnpm test:e2e
-```
-
-## 5. Jenkins và SonarQube Trên Docker
-
-### 5.1. Tạo Docker network
+### 4.1. Tạo Docker network
 
 ```powershell
 docker network create jenkins
@@ -173,7 +73,7 @@ docker network create jenkins
 
 Nếu network đã tồn tại, Docker sẽ báo lỗi trùng tên; có thể bỏ qua.
 
-### 5.2. Build Jenkins image có Docker CLI
+### 4.2. Build Jenkins image có Docker CLI
 
 Repo có `Dockerfile.jenkins` dựa trên `jenkins/jenkins:lts-jdk21` và cài Docker
 CLI.
@@ -182,7 +82,7 @@ CLI.
 docker build -t docvault-jenkins:lts-jdk21 -f Dockerfile.jenkins .
 ```
 
-### 5.3. Start Docker-in-Docker daemon
+### 4.3. Start Docker-in-Docker daemon
 
 ```powershell
 docker run --name jenkins-docker --rm --detach `
@@ -194,7 +94,7 @@ docker run --name jenkins-docker --rm --detach `
   docker:dind
 ```
 
-### 5.4. Start Jenkins controller
+### 4.4. Start Jenkins controller
 
 ```powershell
 docker run --name jenkins-blueocean --restart=on-failure --detach `
@@ -216,7 +116,7 @@ docker exec jenkins-blueocean cat /var/jenkins_home/secrets/initialAdminPassword
 
 Mở Jenkins: `http://localhost:8080`
 
-### 5.5. Start SonarQube
+### 4.5. Start SonarQube
 
 ```powershell
 docker volume create sonarqube_data
@@ -235,7 +135,7 @@ Mở SonarQube: `http://localhost:9000`
 
 Lần đầu đăng nhập `admin` / `admin`, đổi password, tạo token cho Jenkins.
 
-### 5.6. Jenkins configuration cần có
+### 4.6. Jenkins configuration cần có
 
 Credentials:
 
@@ -269,7 +169,7 @@ Pipeline parameters quan trọng:
 - `RUN_ZAP=false`: nên để false cho đến khi gateway target trên EKS reachable.
 - `ZAP_TARGET=http://<gateway-url>/api`: chỉ cần khi bật ZAP.
 
-## 6. Terraform AWS EKS
+## 5. Terraform AWS EKS
 
 Đăng nhập AWS và kiểm tra identity:
 
@@ -321,7 +221,7 @@ Quay về repo root sau khi xong:
 cd ..\..\..
 ```
 
-## 7. Bootstrap Argo CD và GitOps Apps
+## 6. Bootstrap Argo CD và GitOps Apps
 
 Cài Argo CD:
 
@@ -367,7 +267,7 @@ kubectl get svc -n docvault
 Argo CD sẽ sync từ branch `gitops-testing`. Jenkins pipeline là nơi cập nhật
 image tag/digest trên branch này sau khi build thành công.
 
-## 8. Truy Cập EKS Bằng NodePort
+## 7. Truy Cập EKS Bằng NodePort
 
 Sau khi node được tạo mới, scale về 0 rồi scale lên lại, hoặc node external IP
 thay đổi, chạy:
@@ -408,7 +308,7 @@ trong danh sách đó.
 Ghi chú: NodePort URL phụ thuộc external IP của node. Vì vậy sau mỗi lần resume
 cluster, nên chạy lại `setup-eks-access.ps1` trước khi test login/upload/preview.
 
-## 9. Pause/Resume EKS Để Tiết Kiệm Chi Phí
+## 8. Pause/Resume EKS Để Tiết Kiệm Chi Phí
 
 Lấy node group name:
 
@@ -444,9 +344,9 @@ kubectl get nodes -o wide
 .\scripts\setup-eks-access.ps1
 ```
 
-## 10. Checklist Trước Khi Mở PR Vào Main
+## 9. Checklist Trước Khi Mở PR Vào Main
 
-Chạy local verification:
+Chạy verification trước khi mở PR:
 
 ```powershell
 pnpm lint
@@ -471,7 +371,7 @@ Thông tin nên ghi trong PR:
 - Ảnh hoặc ghi chú test web app trên EKS.
 - Nếu có thay đổi env, Terraform, Kubernetes, pipeline hoặc security scan thì ghi rõ.
 
-## 11. Troubleshooting Nhanh
+## 10. Troubleshooting Nhanh
 
 ### Keycloak báo `Invalid parameter: redirect_uri`
 

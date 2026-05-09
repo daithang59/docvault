@@ -1,7 +1,7 @@
 # Docs
 
 - `TEAM_SETUP_DEPLOYMENT_GUIDE.md`
-  - Team onboarding and deployment guide covering local run, Jenkins/SonarQube, Terraform/EKS, Argo CD, NodePort access and PR checklist
+  - Team onboarding and deployment guide covering Jenkins/SonarQube, Terraform/EKS, Argo CD, NodePort access and PR checklist
 - `RUN_PROJECT.md`
   - Latest end-to-end local run guide for backend, frontend, env and e2e
 - `PROJECT_STATUS.md`
