@@ -14,6 +14,31 @@ const securityHeaders = [
     value: 'strict-origin-when-cross-origin',
   },
   {
+    key: 'Permissions-Policy',
+    value: [
+      'camera=()',
+      'microphone=()',
+      'geolocation=()',
+      'payment=()',
+      'usb=()',
+      'accelerometer=()',
+      'gyroscope=()',
+      'magnetometer=()',
+    ].join(', '),
+  },
+  {
+    key: 'Cross-Origin-Opener-Policy',
+    value: 'same-origin',
+  },
+  {
+    key: 'Cross-Origin-Embedder-Policy',
+    value: 'require-corp',
+  },
+  {
+    key: 'Cross-Origin-Resource-Policy',
+    value: 'same-origin',
+  },
+  {
     key: 'Content-Security-Policy',
     value: [
       "default-src 'self'",
@@ -24,7 +49,10 @@ const securityHeaders = [
       "font-src 'self' data:",
       "style-src 'self' 'unsafe-inline'",
       "script-src 'self' 'unsafe-inline' 'unsafe-eval'",
-      "connect-src 'self' http: https:",
+      "connect-src 'self'",
+      "object-src 'none'",
+      "worker-src 'self' blob:",
+      "manifest-src 'self'",
     ].join('; '),
   },
 ];
@@ -34,6 +62,26 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   async headers() {
     return [
+      {
+        source: '/robots.txt',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+        ],
+      },
+      {
+        source: '/sitemap.xml',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+        ],
+      },
       {
         source: '/:path*',
         headers: securityHeaders,
