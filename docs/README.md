@@ -7,7 +7,7 @@
 - `PROJECT_STATUS.md`
   - Codebase status snapshot based on current runtime
 - `demo-flow.md`
-  - Step-by-step EKS demo scenario, plus local fallback
+  - Step-by-step EKS demo scenario, including ZAP, Grafana metrics and Loki logs, plus local fallback
 - `security-sca-triage.md`
   - SCA fixes, remaining exceptions and evidence checklist for Dependency Check
 - `demo-users.md`
