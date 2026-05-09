@@ -29,7 +29,7 @@ pipeline {
         string(
             name: 'ZAP_TARGET',
             defaultValue: '',
-            description: 'Reachable Gateway API URL for ZAP, for example http://<gateway-url>/api. Required only when RUN_ZAP=true.'
+            description: 'Reachable web base URL for ZAP baseline scan, for example http://<node-ip>:30006. Required only when RUN_ZAP=true.'
         )
     }
 

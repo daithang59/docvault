@@ -113,7 +113,7 @@ Run the Jenkins pipeline after the app is reachable on EKS:
 
 ```text
 RUN_ZAP=true
-ZAP_TARGET=http://<node-external-ip>:30006/api
+ZAP_TARGET=http://<node-external-ip>:30006
 GITOPS_BRANCH=gitops-testing
 ```
 

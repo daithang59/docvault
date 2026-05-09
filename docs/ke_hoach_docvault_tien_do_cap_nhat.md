@@ -201,7 +201,7 @@ Bổ sung kiểm thử bảo mật động sau khi ứng dụng được triển
 - Lưu report vào Jenkins Artifacts.
 - Đặt rule pass/fail phù hợp.
 
-**Trạng thái hiện tại:** Đã có implementation trong Jenkins. `Jenkinsfile` có parameter `RUN_ZAP` và `ZAP_TARGET`; `vars/dastZap.groovy` kiểm tra target reachable, chạy OWASP ZAP baseline scan, xuất `zap_report.html`, `zap_report.json` và dùng policy `UNSTABLE` để không chặn demo khi ZAP trả warning/finding; `vars/postCleanup.groovy` đã archive `zap-report/*.html` và `zap-report/*.json`. Việc còn lại là chạy pipeline thật với target EKS `http://<node-ip>:30006/api` và lưu artifact làm bằng chứng.
+**Trạng thái hiện tại:** Đã có implementation trong Jenkins. `Jenkinsfile` có parameter `RUN_ZAP` và `ZAP_TARGET`; `vars/dastZap.groovy` kiểm tra target reachable, chạy OWASP ZAP baseline scan, xuất `zap_report.html`, `zap_report.json` và dùng policy `UNSTABLE` để không chặn demo khi ZAP trả warning/finding; `vars/postCleanup.groovy` đã archive `zap-report/*.html` và `zap-report/*.json`. Baseline scan nên trỏ vào web base URL `http://<node-ip>:30006` thay vì `/api` để spider nhận HTTP 200 ở target gốc.
 
 **Mức ưu tiên:** Cao. Đây là phần còn thiếu rõ ràng trong pipeline DevSecOps.
 
@@ -337,7 +337,7 @@ ArgoCD đã hoạt động tốt, chứng minh mô hình GitOps/CD đã được
 
 ### 7.1. DAST OWASP ZAP
 
-Hiện tại chưa có bằng chứng chạy OWASP ZAP thực tế trên target EKS. Code scan, target URL parameter, target reachability check, report output, UNSTABLE policy và artifact archive đã có trong pipeline. Cần chạy Jenkins với `RUN_ZAP=true` và `ZAP_TARGET=http://<node-ip>:30006/api`.
+Hiện tại đã có bằng chứng ZAP chạy được trên target EKS. Lần chạy đầu với `ZAP_TARGET=http://<node-ip>:30006/api` sinh report nhưng có spider warning vì `/api` trả 404. Baseline scan nên chạy lại với `ZAP_TARGET=http://<node-ip>:30006`; code scan, target reachability check, report output, UNSTABLE policy và artifact archive đã có trong pipeline.
 
 ### 7.2. SCA còn cảnh báo
 
@@ -391,7 +391,7 @@ Cần thu thập và lưu lại các bằng chứng:
 **Việc cần làm:**
 
 - Chạy Jenkins với `RUN_ZAP=true`.
-- Đặt `ZAP_TARGET=http://<node-ip>:30006/api`.
+- Đặt `ZAP_TARGET=http://<node-ip>:30006`.
 - Pipeline tự kiểm tra Jenkins/ZAP context truy cập được target trước khi scan.
 - Kiểm tra artifact `zap_report.html` và `zap_report.json`.
 - Policy demo đã được implement: stage chuyển `UNSTABLE` thay vì fail toàn build khi ZAP trả warning/finding, nhưng vẫn fail nếu không sinh được report.
