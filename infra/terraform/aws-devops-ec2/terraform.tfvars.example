@@ -1,0 +1,21 @@
+aws_region  = "ap-southeast-1"
+environment = "testing"
+name_prefix = "docvault-devops"
+
+# Replace this with your workstation public IP CIDR before apply.
+# Example: ["203.0.113.10/32"]
+admin_cidr_blocks = ["203.0.113.10/32"]
+
+# Set one SSH access option:
+# - existing_key_name: use a key pair that already exists in this AWS region.
+# - ssh_public_key: create a new EC2 key pair from public key material.
+existing_key_name = ""
+ssh_public_key    = ""
+
+instance_type    = "t3.large"
+root_volume_size = 80
+ubuntu_version   = "24.04"
+swap_size_gb     = 6
+
+repo_url    = "https://github.com/daithang59/docvault.git"
+repo_branch = "devsecops-pipeline"

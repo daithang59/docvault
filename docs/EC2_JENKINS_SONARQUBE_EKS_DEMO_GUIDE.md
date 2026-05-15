@@ -54,6 +54,7 @@ Repo hiện tại đang dùng Docker Hub qua `dockerhub-credentials` và `docker
 
 - 1 EC2 Ubuntu 22.04 hoặc 24.04 cho Jenkins/SonarQube.
 - 1 EKS cluster cho ứng dụng DocVault.
+- Có thể tạo EC2 DevOps server bằng Terraform tại `infra/terraform/aws-devops-ec2`.
 - Security Group cho EC2:
   - SSH `22`: chỉ mở từ IP cá nhân.
   - Jenkins `8080`: chỉ mở từ IP cá nhân hoặc IP webhook/proxy nếu cần.
@@ -80,6 +81,60 @@ Cần có:
 - SonarQube token cho Jenkins.
 - NVD API key cho OWASP Dependency-Check.
 - Kubeconfig read-only cho Argo CD health check nếu muốn bật stage này.
+
+### Dựng EC2 DevOps Server Bằng Terraform
+
+Repo có stack Terraform riêng cho EC2 Jenkins/SonarQube tại:
+
+```text
+infra/terraform/aws-devops-ec2
+```
+
+Cách này thay thế các bước thủ công ở mục 4-6: tạo EC2, cài Docker, clone repo, tạo Docker Compose và chạy Jenkins/SonarQube. Sau khi apply xong, vẫn cấu hình Jenkins credentials, SonarQube token, Jenkins shared library và pipeline job qua UI ở các mục 7-9 để không đưa secret vào Terraform state.
+
+Lệnh tham khảo:
+
+```bash
+cd infra/terraform/aws-devops-ec2
+cp terraform.tfvars.example terraform.tfvars
+```
+
+Sửa `terraform.tfvars` trước khi apply:
+
+```hcl
+admin_cidr_blocks = ["<YOUR_PUBLIC_IP>/32"]
+existing_key_name = "<YOUR_EC2_KEY_PAIR_NAME>"
+# hoặc dùng ssh_public_key nếu muốn Terraform tạo key pair từ public key.
+```
+
+Apply:
+
+```bash
+terraform init
+terraform fmt -recursive
+terraform validate
+terraform plan -out tfplan
+terraform apply tfplan
+```
+
+Sau khi apply:
+
+```bash
+terraform output jenkins_url
+terraform output sonarqube_url
+terraform output ssh_command
+terraform output bootstrap_log_command
+terraform output jenkins_initial_password_command
+```
+
+Kiểm tra trạng thái bootstrap/container:
+
+```bash
+ssh ubuntu@<EC2_PUBLIC_IP> 'sudo tail -n 200 /var/log/docvault-devops-bootstrap.log'
+ssh ubuntu@<EC2_PUBLIC_IP> 'cd /opt/docvault && docker compose -f docker-compose.devops.yml ps'
+```
+
+Nếu dùng Terraform EC2, sau khi Jenkins/SonarQube đã lên, chuyển thẳng tới mục 7 để cấu hình Jenkins.
 
 ## 3. Tạo Hoặc Kiểm Tra EKS
 
@@ -121,6 +176,8 @@ kubectl get applications -n argocd
 Nếu đã có EKS/Argo CD sẵn, chỉ cần đảm bảo Argo CD đang đọc đúng repo và đúng branch GitOps, vì pipeline sẽ cập nhật image tag trong `infra/k8s/values/*.yaml`.
 
 ## 4. Cài Docker Trên EC2
+
+Đây là cách thủ công. Nếu đã dựng EC2 bằng Terraform ở mục `Dựng EC2 DevOps Server Bằng Terraform`, bỏ qua mục 4-6 và chuyển tới mục 7.
 
 SSH vào EC2:
 

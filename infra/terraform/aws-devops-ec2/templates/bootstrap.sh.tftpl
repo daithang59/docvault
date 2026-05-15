@@ -1,0 +1,87 @@
+#!/usr/bin/env bash
+set -Eeuo pipefail
+
+exec > >(tee -a /var/log/docvault-devops-bootstrap.log) 2>&1
+trap 'echo "[ERROR] Bootstrap failed at line $LINENO"' ERR
+
+export DEBIAN_FRONTEND=noninteractive
+
+REPO_URL=${repo_url_json}
+REPO_BRANCH=${repo_branch_json}
+SWAP_SIZE_GB=${swap_size_gb}
+APP_DIR="/opt/docvault"
+
+echo "[INFO] Starting DocVault DevOps bootstrap"
+date -Is
+
+apt-get update
+apt-get install -y ca-certificates curl gnupg git
+
+install -m 0755 -d /etc/apt/keyrings
+rm -f /etc/apt/keyrings/docker.gpg
+curl -fsSL https://download.docker.com/linux/ubuntu/gpg | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
+chmod a+r /etc/apt/keyrings/docker.gpg
+
+cat > /etc/apt/sources.list.d/docker.list <<DOCKER_REPO
+deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu $(. /etc/os-release && echo "$VERSION_CODENAME") stable
+DOCKER_REPO
+
+apt-get update
+apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plugin docker-compose-plugin
+systemctl enable --now docker
+usermod -aG docker ubuntu || true
+
+cat > /etc/sysctl.d/99-sonarqube.conf <<SYSCTL
+vm.max_map_count=262144
+fs.file-max=131072
+SYSCTL
+sysctl --system
+
+if [ "$SWAP_SIZE_GB" -gt 0 ] && ! swapon --show=NAME | grep -qx "/swapfile"; then
+  if [ ! -f /swapfile ]; then
+    fallocate -l "$SWAP_SIZE_GB"G /swapfile
+    chmod 600 /swapfile
+    mkswap /swapfile
+  fi
+
+  swapon /swapfile
+  grep -q '^/swapfile ' /etc/fstab || echo '/swapfile none swap sw 0 0' >> /etc/fstab
+fi
+
+mkdir -p "$(dirname "$APP_DIR")"
+
+if [ ! -d "$APP_DIR/.git" ]; then
+  rm -rf "$APP_DIR"
+  git clone --branch "$REPO_BRANCH" --single-branch "$REPO_URL" "$APP_DIR"
+else
+  git -C "$APP_DIR" fetch origin "$REPO_BRANCH"
+  git -C "$APP_DIR" checkout "$REPO_BRANCH"
+  git -C "$APP_DIR" reset --hard "origin/$REPO_BRANCH"
+fi
+
+if [ -f "$APP_DIR/.env" ]; then
+  SONAR_DB_PASSWORD="$(awk -F= '/^SONAR_DB_PASSWORD=/{print $2; exit}' "$APP_DIR/.env" || true)"
+fi
+
+if [ -z "$${SONAR_DB_PASSWORD:-}" ]; then
+  SONAR_DB_PASSWORD="$(set +o pipefail; LC_ALL=C tr -dc 'A-Za-z0-9' < /dev/urandom | head -c 32)"
+fi
+
+cat > "$APP_DIR/.env" <<ENV_FILE
+SONAR_DB_PASSWORD=$SONAR_DB_PASSWORD
+ENV_FILE
+chmod 600 "$APP_DIR/.env"
+
+cat > "$APP_DIR/docker-compose.devops.yml" <<'COMPOSE_FILE'
+${docker_compose_content}
+COMPOSE_FILE
+
+chown -R ubuntu:ubuntu "$APP_DIR"
+
+cd "$APP_DIR"
+docker compose -f docker-compose.devops.yml build jenkins
+docker compose -f docker-compose.devops.yml up -d
+docker compose -f docker-compose.devops.yml ps
+
+echo "[INFO] Finished DocVault DevOps bootstrap"
+date -Is
