@@ -12,6 +12,8 @@
   - Vietnamese summary of the finalized Jenkins pipeline hardening, including build #61, Argo CD health checks, smoke test, ZAP, Trivy and observability
 - `setup_jenkins_k8s_account.md`
   - Read-only Kubernetes ServiceAccount and kubeconfig setup for Jenkins Argo CD health checks
+- `docvault_devops_ec2_stop_destroy_runbook.md`
+  - Stop/start or destroy guide for the Terraform-managed Jenkins/SonarQube EC2 server
 - `security-sca-triage.md`
   - SCA fixes, remaining exceptions and evidence checklist for Dependency Check
 - `demo-users.md`
