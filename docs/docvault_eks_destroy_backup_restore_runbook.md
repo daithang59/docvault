@@ -1,42 +1,42 @@
-# DocVault EKS - Backup truoc khi terraform destroy va khoi phuc sau khi apply lai
+# DocVault EKS - Backup Trước Khi Terraform Destroy Và Khôi Phục Sau Khi Apply Lại
 
-Updated: 2026-05-15
+Cập nhật: 2026-05-15
 
-Scope: checklist backup truoc khi chay `terraform destroy` trong
-`infra/terraform/aws-eks`, va ghi lai nhung gi co the khoi phuc sau khi tao
-lai EKS cluster.
+Phạm vi: checklist backup trước khi chạy `terraform destroy` trong
+`infra/terraform/aws-eks`, và ghi lại những gì có thể khôi phục sau khi tạo
+lại EKS cluster.
 
 ---
 
-## 1. Ket luan nhanh
+## 1. Kết Luận Nhanh
 
-`terraform destroy` cua thu muc `infra/terraform/aws-eks` se xoa EKS cluster,
+`terraform destroy` của thư mục `infra/terraform/aws-eks` sẽ xóa EKS cluster,
 managed node group, VPC/subnets/routes/security groups, EKS add-ons, IAM/OIDC,
-KMS key cua EKS secrets encryption va CloudWatch log group do Terraform quan ly.
+KMS key của EKS secrets encryption và CloudWatch log group do Terraform quản lý.
 
-Nhung thu can backup truoc destroy:
+Những thứ cần backup trước destroy:
 
-| Muc | Bat buoc? | Ly do |
+| Mục | Bắt buộc? | Lý do |
 |---|---:|---|
-| `terraform.tfvars`, `terraform.tfstate`, `terraform.tfstate.backup` | Co | De biet cau hinh va inventory cu sau khi state bi destroy cap nhat |
-| Kubernetes inventory YAML | Nen | De doi chieu namespace, service, Argo CD app, PVC/PV sau khi tao lai |
-| Kubernetes secrets | Co neu muon giu dung secret runtime | Chua password/token/client secret; khong commit |
-| Postgres data | Co neu data demo quan trong | Nam tren PVC/EBS hoac dump logic |
-| MongoDB data | Co neu audit/demo data quan trong | Nam tren PVC/EBS hoac dump logic |
-| MinIO data | Co neu file/object demo quan trong | Nam tren PVC/EBS |
-| Keycloak realm runtime | Chi can neu da sua qua UI | Manifest hien tai import realm tu Git va dung `emptyDir` |
-| Monitoring/Loki/Grafana runtime data | Thuong khong | Hien khong co PVC rieng; metrics/logs runtime se mat va stack duoc tao lai tu Git/Helm |
-| RDS/S3/ECR ngoai Terraform nay | Kiem tra rieng | `terraform destroy` EKS khong quan ly chung |
+| `terraform.tfvars`, `terraform.tfstate`, `terraform.tfstate.backup` | Có | Để biết cấu hình và inventory cũ sau khi state bị destroy cập nhật |
+| Kubernetes inventory YAML | Nên | Để đối chiếu namespace, service, Argo CD app, PVC/PV sau khi tạo lại |
+| Kubernetes secrets | Có nếu muốn giữ đúng secret runtime | Chứa password/token/client secret; không commit |
+| Postgres data | Có nếu data demo quan trọng | Nằm trên PVC/EBS hoặc dump logic |
+| MongoDB data | Có nếu audit/demo data quan trọng | Nằm trên PVC/EBS hoặc dump logic |
+| MinIO data | Có nếu file/object demo quan trọng | Nằm trên PVC/EBS |
+| Keycloak realm runtime | Chỉ cần nếu đã sửa qua UI | Manifest hiện tại import realm từ Git và dùng `emptyDir` |
+| Monitoring/Loki/Grafana runtime data | Thường không | Hiện không có PVC riêng; metrics/logs runtime sẽ mất và stack được tạo lại từ Git/Helm |
+| RDS/S3/ECR ngoài Terraform này | Kiểm tra riêng | `terraform destroy` EKS không quản lý chung |
 
-Neu chi can dung lai demo sach tu GitOps, khong can data cu, thi backup
-Terraform state/tfvars va inventory la du. Neu can khoi phuc du lieu, hay tao
-EBS snapshots cho 3 volume ben duoi truoc destroy.
+Nếu chỉ cần dựng lại demo sạch từ GitOps, không cần data cũ, thì backup
+Terraform state/tfvars và inventory là đủ. Nếu cần khôi phục dữ liệu, hãy tạo
+EBS snapshots cho 3 volume bên dưới trước destroy.
 
 ---
 
-## 2. Trang thai thuc te da kiem tra
+## 2. Trạng Thái Thực Tế Đã Kiểm Tra
 
-Kiem tra luc lap runbook:
+Kiểm tra lúc lập runbook:
 
 - AWS account: `900069968619`
 - Kubernetes context: `arn:aws:eks:ap-southeast-1:900069968619:cluster/docvault-eks`
@@ -44,15 +44,15 @@ Kiem tra luc lap runbook:
 - Node group: `docvault-ng-20260505092814132600000013`
 - Node group scaling: `minSize=0`, `maxSize=3`, `desiredSize=0`
 - Instance type: `t3.large`
-- Services public: khong co `LoadBalancer`, khong co `Ingress`
-- NodePort hien co: `docvault-web` port `30006`, `keycloak` port `30080`
-- RDS: khong thay DB instance nao trong cac AWS regions da enabled
-- ECR `ap-southeast-1`: khong thay repository nao
-- Argo CD apps dang co revision ung dung: `c37b9f4ef75ef57dd9594a336dd95955ff21aa7f`
-- Monitoring namespace dang co Prometheus/Loki/Grafana pods, nhung khong thay
-  PVC rieng; data runtime cua monitoring/logging co the mat khi destroy
+- Services public: không có `LoadBalancer`, không có `Ingress`
+- NodePort hiện có: `docvault-web` port `30006`, `keycloak` port `30080`
+- RDS: không thấy DB instance nào trong các AWS regions đã enabled
+- ECR `ap-southeast-1`: không thấy repository nào
+- Argo CD apps đang có revision ứng dụng: `c37b9f4ef75ef57dd9594a336dd95955ff21aa7f`
+- Monitoring namespace đang có Prometheus/Loki/Grafana pods, nhưng không thấy
+  PVC riêng; data runtime của monitoring/logging có thể mất khi destroy
 
-PVC/PV quan trong:
+PVC/PV quan trọng:
 
 | Component | PVC | PV | EBS volume | Size | AZ | Reclaim |
 |---|---|---|---|---:|---|---|
@@ -60,15 +60,15 @@ PVC/PV quan trong:
 | Postgres | `postgres-data-db-0` | `pvc-27f9cad2-9110-4d94-912d-d1684211f2f9` | `vol-010ea17ee6713d9e0` | 10Gi | `ap-southeast-1a` | Retain |
 | MinIO | `minio-data-minio-0` | `pvc-bc1f8e17-ece7-460b-b72f-d287cafbf3f2` | `vol-0a9cd9b1eae9daca4` | 20Gi | `ap-southeast-1a` | Retain |
 
-3 EBS volumes tren dang `available` vi node group da scale ve 0. Chung duoc
-ma hoa bang AWS-managed key `alias/aws/ebs`, khong phai KMS key cua module EKS,
-nen viec destroy KMS key cua EKS khong lam mat kha nang decrypt cac volume nay.
+3 EBS volumes trên đang `available` vì node group đã scale về 0. Chúng được
+mã hóa bằng AWS-managed key `alias/aws/ebs`, không phải KMS key của module EKS,
+nên việc destroy KMS key của EKS không làm mất khả năng decrypt các volume này.
 
 ---
 
-## 3. Tao thu muc backup local
+## 3. Tạo Thư Mục Backup Local
 
-Dung thu muc ngoai repo de tranh commit nham secret, tfstate hoac dump data.
+Dùng thư mục ngoài repo để tránh commit nhầm secret, tfstate hoặc dump data.
 
 PowerShell:
 
@@ -83,11 +83,11 @@ New-Item -ItemType Directory -Path $BackupRoot -Force | Out-Null
 Write-Host "BackupRoot=$BackupRoot"
 ```
 
-Tat ca file trong thu muc backup nay co the chua secret. Khong commit len Git.
+Tất cả file trong thư mục backup này có thể chứa secret. Không commit lên Git.
 
 ---
 
-## 4. Backup Terraform va AWS inventory
+## 4. Backup Terraform Và AWS Inventory
 
 ```powershell
 cd C:\Users\THANG\docvault\infra\terraform\aws-eks
@@ -120,9 +120,9 @@ aws eks describe-nodegroup `
 
 ---
 
-## 5. Backup Kubernetes inventory
+## 5. Backup Kubernetes Inventory
 
-Lenh nay chi backup metadata va manifest runtime. No khong backup du lieu trong
+Lệnh này chỉ backup metadata và manifest runtime. Nó không backup dữ liệu trong
 Postgres/MongoDB/MinIO.
 
 ```powershell
@@ -149,10 +149,10 @@ kubectl get configmap -n $env:DOCVAULT_NS -o yaml `
 
 ---
 
-## 6. Backup secrets
+## 6. Backup Secrets
 
-Can backup neu muon restore dung secret runtime hien tai. File output rat nhay
-cam, vi Kubernetes Secret chi base64 encode, khong phai encryption cho file.
+Cần backup nếu muốn restore đúng secret runtime hiện tại. File output rất nhạy
+cảm, vì Kubernetes Secret chỉ base64 encode, không phải encryption cho file.
 
 ```powershell
 kubectl get secret -n $env:DOCVAULT_NS `
@@ -165,16 +165,16 @@ kubectl get secret -n $env:ARGOCD_NS `
   -o yaml > "$BackupRoot\argocd-secrets.yaml"
 ```
 
-Neu sau khi tao lai cluster chi muon dung secret demo trong Git, co the bo qua
-restore secrets va de Argo CD tao lai tu manifest.
+Nếu sau khi tạo lại cluster chỉ muốn dùng secret demo trong Git, có thể bỏ qua
+restore secrets và để Argo CD tạo lại từ manifest.
 
 ---
 
-## 7. Backup data bang EBS snapshots
+## 7. Backup Data Bằng EBS Snapshots
 
-Day la cach phu hop voi trang thai hien tai vi node group da scale ve 0 va cac
-EBS volumes dang detached/`available`. Snapshot giu duoc disk state cua PVC,
-nhung restore vao cluster moi can thao tac gan PV thu cong.
+Đây là cách phù hợp với trạng thái hiện tại vì node group đã scale về 0 và các
+EBS volumes đang detached/`available`. Snapshot giữ được disk state của PVC,
+nhưng restore vào cluster mới cần thao tác gắn PV thủ công.
 
 ```powershell
 $PostgresVolume="vol-010ea17ee6713d9e0"
@@ -221,17 +221,17 @@ aws ec2 describe-snapshots `
   > "$BackupRoot\ebs-snapshots.describe.json"
 ```
 
-Sau khi snapshot xong, snapshots van tinh phi storage snapshot cho den khi xoa.
+Sau khi snapshot xong, snapshots vẫn tính phí storage snapshot cho đến khi xóa.
 
 ---
 
-## 8. Backup logic neu muon chac hon ve DB
+## 8. Backup Logic Nếu Muốn Chắc Hơn Về DB
 
-EBS snapshot la du cho demo, nhung backup logic de restore de hon va doc lap
-hon voi Kubernetes PV. Hien tai node group dang `desiredSize=0`, nen muon chay
-`pg_dump`/`mongodump` phai mo node lai tam thoi.
+EBS snapshot là đủ cho demo, nhưng backup logic dễ restore hơn và độc lập
+hơn với Kubernetes PV. Hiện tại node group đang `desiredSize=0`, nên muốn chạy
+`pg_dump`/`mongodump` phải mở node lại tạm thời.
 
-Mo node lai:
+Mở node lại:
 
 ```powershell
 aws eks update-nodegroup-config `
@@ -268,7 +268,7 @@ kubectl exec -n $env:DOCVAULT_NS mongo-0 -- mongodump `
 kubectl cp "$env:DOCVAULT_NS/mongo-0:/tmp/mongo-docvault_audit.archive.gz" "$BackupRoot\mongo-docvault_audit.archive.gz"
 ```
 
-Keycloak chi can export neu da sua user/client/realm qua UI sau khi deploy:
+Keycloak chỉ cần export nếu đã sửa user/client/realm qua UI sau khi deploy:
 
 ```powershell
 $KeycloakPod = kubectl get pod -n $env:DOCVAULT_NS -l app=keycloak -o jsonpath='{.items[0].metadata.name}'
@@ -276,14 +276,14 @@ kubectl exec -n $env:DOCVAULT_NS $KeycloakPod -- /opt/keycloak/bin/kc.sh export 
 kubectl cp "$env:DOCVAULT_NS/${KeycloakPod}:/tmp/docvault-realm-export.json" "$BackupRoot\keycloak-realm-export.json"
 ```
 
-Sau khi dump xong, co the scale node ve 0 lai neu chua destroy ngay.
+Sau khi dump xong, có thể scale node về 0 lại nếu chưa destroy ngay.
 
 ---
 
-## 9. Kiem tra tai nguyen ngoai Terraform EKS
+## 9. Kiểm Tra Tài Nguyên Ngoài Terraform EKS
 
-Nhung tai nguyen ngoai Terraform EKS se khong bi xoa boi `terraform destroy`,
-nhung van co the tinh phi. Kiem tra truoc khi destroy:
+Những tài nguyên ngoài Terraform EKS sẽ không bị xóa bởi `terraform destroy`,
+nhưng vẫn có thể tính phí. Kiểm tra trước khi destroy:
 
 ```powershell
 aws rds describe-db-instances `
@@ -306,14 +306,14 @@ kubectl get svc -A --field-selector spec.type=LoadBalancer -o wide
 kubectl get ingress -A -o wide
 ```
 
-Luc lap runbook nay, khong thay RDS DB instance dang ton tai trong cac enabled
-regions, khong thay LoadBalancer/Ingress, va ECR `ap-southeast-1` dang trong.
+Lúc lập runbook này, không thấy RDS DB instance đang tồn tại trong các enabled
+regions, không thấy LoadBalancer/Ingress, và ECR `ap-southeast-1` đang trống.
 
 ---
 
-## 10. Destroy sau khi backup
+## 10. Destroy Sau Khi Backup
 
-Neu da tao snapshot, doi snapshot `completed` truoc khi destroy.
+Nếu đã tạo snapshot, đợi snapshot `completed` trước khi destroy.
 
 ```powershell
 cd C:\Users\THANG\docvault\infra\terraform\aws-eks
@@ -329,13 +329,13 @@ Sau destroy:
 aws eks describe-cluster --region $env:AWS_REGION --name $env:CLUSTER_NAME
 ```
 
-Lenh tren nen bao cluster khong ton tai.
+Lệnh trên nên báo cluster không tồn tại.
 
 ---
 
-## 11. Khoi phuc sau khi terraform apply lai
+## 11. Khôi Phục Sau Khi Terraform Apply Lại
 
-Tao lai EKS:
+Tạo lại EKS:
 
 ```powershell
 cd C:\Users\THANG\docvault\infra\terraform\aws-eks
@@ -348,7 +348,7 @@ aws eks update-kubeconfig --region ap-southeast-1 --name docvault-eks
 kubectl get nodes
 ```
 
-Cai lai Argo CD va apply GitOps apps theo runbook chinh:
+Cài lại Argo CD và apply GitOps apps theo runbook chính:
 
 ```powershell
 kubectl create namespace argocd
@@ -363,34 +363,34 @@ kubectl apply -f C:\Users\THANG\docvault\infra\argocd-apps\monitoring.yaml
 kubectl apply -f C:\Users\THANG\docvault\infra\argocd-apps\loki.yaml
 ```
 
-Sau khi node co external IP moi, chay lai script patch URL runtime:
+Sau khi node có external IP mới, chạy lại script patch URL runtime:
 
 ```powershell
 cd C:\Users\THANG\docvault
 .\scripts\setup-eks-access.ps1
 ```
 
-Neu khong can data cu, dung den day la du: Argo CD se tao lai app tu Git.
+Nếu không cần data cũ, dừng đến đây là đủ: Argo CD sẽ tạo lại app từ Git.
 
 ---
 
-## 12. Restore tu EBS snapshots
+## 12. Restore Từ EBS Snapshots
 
-Chi can lam phan nay neu muon lay lai data Postgres/MongoDB/MinIO cu.
+Chỉ cần làm phần này nếu muốn lấy lại data Postgres/MongoDB/MinIO cũ.
 
-Y tuong:
+Ý tưởng:
 
-1. Tao EBS volumes moi tu snapshots trong AZ ma node moi co the chay, uu tien
-   `ap-southeast-1a` de khop voi backup hien tai.
-2. Tao static PV tro vao volume ID moi.
-3. Dam bao ten PVC khop voi StatefulSet:
+1. Tạo EBS volumes mới từ snapshots trong AZ mà node mới có thể chạy, ưu tiên
+   `ap-southeast-1a` để khớp với backup hiện tại.
+2. Tạo static PV trỏ vào volume ID mới.
+3. Đảm bảo tên PVC khớp với StatefulSet:
    - `postgres-data-db-0`
    - `mongo-data-mongo-0`
    - `minio-data-minio-0`
-4. Chi sync/apply StatefulSet sau khi PV/PVC restore da san sang, de tranh EBS
-   CSI tao volume trong moi.
+4. Chỉ sync/apply StatefulSet sau khi PV/PVC restore đã sẵn sàng, để tránh EBS
+   CSI tạo volume mới.
 
-Tao volume moi tu snapshot:
+Tạo volume mới từ snapshot:
 
 ```powershell
 $PostgresSnapshot="<snap-postgres-id>"
@@ -429,7 +429,7 @@ aws ec2 wait volume-available `
   --volume-ids $PostgresVolumeNew $MongoVolumeNew $MinioVolumeNew
 ```
 
-Tao static PV manifest rieng, thay 3 `volumeHandle` bang volume ID moi:
+Tạo static PV manifest riêng, thay 3 `volumeHandle` bằng volume ID mới:
 
 ```yaml
 apiVersion: v1
@@ -517,7 +517,7 @@ spec:
                 - ap-southeast-1a
 ```
 
-Thu tu restore an toan:
+Thứ tự restore an toàn:
 
 ```powershell
 kubectl create namespace docvault --dry-run=client -o yaml | kubectl apply -f -
@@ -526,7 +526,7 @@ kubectl apply -f C:\Users\THANG\docvault-backups\restore-static-pv.yaml
 kubectl apply -f C:\Users\THANG\docvault\infra\argocd-apps\docvault-infra.yaml
 ```
 
-Kiem tra:
+Kiểm tra:
 
 ```powershell
 kubectl get pv
@@ -534,15 +534,15 @@ kubectl get pvc -n docvault
 kubectl get pods -n docvault
 ```
 
-Neu PVC da bi tao voi volume moi truoc khi restore, dung dung lai va xu ly thu
-cong. Dung xoa PVC/PV co data neu chua chac volume nao dang chua du lieu can
-giu.
+Nếu PVC đã bị tạo với volume mới trước khi restore, dừng dùng lại và xử lý thủ
+công. Đừng xóa PVC/PV có data nếu chưa chắc volume nào đang chứa dữ liệu cần
+giữ.
 
 ---
 
-## 13. Restore tu logical dump
+## 13. Restore Từ Logical Dump
 
-Neu da tao `pg_dump`/`mongodump`, restore sau khi pods moi chay:
+Nếu đã tạo `pg_dump`/`mongodump`, restore sau khi pods mới chạy:
 
 Postgres:
 
@@ -569,7 +569,7 @@ kubectl exec -n $env:DOCVAULT_NS mongo-0 -- mongorestore `
 
 ---
 
-## 14. Sau khi restore xong
+## 14. Sau Khi Restore Xong
 
 ```powershell
 kubectl get applications -n argocd
@@ -580,11 +580,11 @@ kubectl port-forward svc/docvault-gateway -n docvault 30000:3000
 curl -I http://localhost:30000/api/health
 ```
 
-Neu dung NodePort public, chay lai:
+Nếu dùng NodePort public, chạy lại:
 
 ```powershell
 .\scripts\setup-eks-access.ps1
 ```
 
-Sau khi chac chan data da restore duoc, quyet dinh co giu hay xoa snapshots.
-Snapshots va retained/restored EBS volumes van tinh phi den khi xoa.
+Sau khi chắc chắn data đã restore được, quyết định có giữ hay xóa snapshots.
+Snapshots và retained/restored EBS volumes vẫn tính phí đến khi xóa.

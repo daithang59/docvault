@@ -206,6 +206,7 @@ infra/
     docvault-infra.yaml
     docvault-apps.yaml
     monitoring.yaml
+    loki.yaml
   db/
     README.md
     init-postgres.sql
@@ -232,7 +233,6 @@ infra/
       keycloak-cm.yaml
       minio.yaml
       mongodb.yaml
-      monitoring-ns.yaml
       postgres.yaml
     values/
       audit-service.yaml
@@ -260,6 +260,7 @@ Ghi chu:
 - `k8s/charts/docvault-service/` la Helm chart chung cho cac service DocVault.
 - `k8s/values/*.yaml` la desired state Jenkins cap nhat tren branch `gitops-testing`.
 - `k8s/infra-deps/` la dependency demo cho lan sync dau, gom Postgres, MongoDB, MinIO, Keycloak va secrets.
+- Namespace `monitoring` do cac Argo CD app observability (`monitoring.yaml`, `loki.yaml`) tu tao bang `CreateNamespace=true`, khong nam trong `infra-deps`.
 - `terraform/aws-eks/` la Terraform source tao VPC/EKS/node group/IAM lien quan.
 - `.terraform/`, `terraform.tfvars`, `tfstate`, va `tfplan` la local generated files, khong commit.
 
