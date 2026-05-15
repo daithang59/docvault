@@ -1,15 +1,15 @@
-# Huong Dan Cau Hinh Jenkins + SonarQube Tren EC2 Va Deploy DocVault Len EKS
+# Hướng Dẫn Cấu Hình Jenkins + SonarQube Trên EC2 Và Deploy DocVault Lên EKS
 
-Tai lieu nay chot huong trien khai phu hop cho do an demo:
+Tài liệu này chốt hướng triển khai phù hợp cho đồ án demo:
 
-- Jenkins va SonarQube chay tren 1 EC2 rieng bang Docker Compose.
-- Ung dung DocVault chay tren Amazon EKS.
-- Jenkins build/test/scan, push Docker image, cap nhat GitOps branch.
-- Argo CD tren EKS doc GitOps branch va sync ung dung.
+- Jenkins và SonarQube chạy trên 1 EC2 riêng bằng Docker Compose.
+- Ứng dụng DocVault chạy trên Amazon EKS.
+- Jenkins build/test/scan, push Docker image, cập nhật GitOps branch.
+- Argo CD trên EKS đọc GitOps branch và sync ứng dụng.
 
-Khong dua Jenkins va SonarQube len EKS trong pham vi do an vi se tang do phuc tap van hanh: PVC, StorageClass, Ingress, backup, RBAC va sizing cho tool DevOps. Cach EC2 + Docker Compose van the hien duoc day du CI/CD, SAST, SCA, image scan, GitOps va Kubernetes deployment.
+Không đưa Jenkins và SonarQube lên EKS trong phạm vi đồ án vì sẽ tăng độ phức tạp vận hành: PVC, StorageClass, Ingress, backup, RBAC và sizing cho tool DevOps. Cách EC2 + Docker Compose vẫn thể hiện được đầy đủ CI/CD, SAST, SCA, image scan, GitOps và Kubernetes deployment.
 
-## 1. Kien Truc Tong The
+## 1. Kiến Trúc Tổng Thể
 
 ```text
 Developer laptop
@@ -30,7 +30,7 @@ EC2 DevOps Server
   v
 Docker Hub
   |
-  | Jenkins update infra/k8s/values tren gitops-testing
+  | Jenkins update infra/k8s/values trên gitops-testing
   v
 GitOps branch
   |
@@ -46,50 +46,50 @@ Amazon EKS
   - notification-service
 ```
 
-Repo hien tai dang dung Docker Hub qua `dockerhub-credentials` va `dockerOrg` trong `vars/docvaultConfig.groovy`. Neu muon dung Amazon ECR thi can sua pipeline, nen voi demo nen giu Docker Hub de it phat sinh loi.
+Repo hiện tại đang dùng Docker Hub qua `dockerhub-credentials` và `dockerOrg` trong `vars/docvaultConfig.groovy`. Nếu muốn dùng Amazon ECR thì cần sửa pipeline, nên với demo nên giữ Docker Hub để ít phát sinh lỗi.
 
-## 2. Tai Nguyen Can Chuan Bi
+## 2. Tài Nguyên Cần Chuẩn Bị
 
 ### AWS
 
-- 1 EC2 Ubuntu 22.04 hoac 24.04 cho Jenkins/SonarQube.
-- 1 EKS cluster cho ung dung DocVault.
+- 1 EC2 Ubuntu 22.04 hoặc 24.04 cho Jenkins/SonarQube.
+- 1 EKS cluster cho ứng dụng DocVault.
 - Security Group cho EC2:
-  - SSH `22`: chi mo tu IP ca nhan.
-  - Jenkins `8080`: chi mo tu IP ca nhan hoac IP webhook/proxy neu can.
-  - SonarQube `9000`: chi mo tu IP ca nhan.
-  - Khong mo `0.0.0.0/0` cho `8080` va `9000` neu khong can demo public.
+  - SSH `22`: chỉ mở từ IP cá nhân.
+  - Jenkins `8080`: chỉ mở từ IP cá nhân hoặc IP webhook/proxy nếu cần.
+  - SonarQube `9000`: chỉ mở từ IP cá nhân.
+  - Không mở `0.0.0.0/0` cho `8080` và `9000` nếu không cần demo public.
 
-### Sizing EC2 Khuyen Nghi
+### Sizing EC2 Khuyến Nghị
 
-| Muc | Khuyen nghi |
+| Mục | Khuyến nghị |
 |---|---|
-| Instance | `t3.large` toi thieu; `t3.xlarge` on dinh hon khi build nhieu image |
-| Disk | 80 GB gp3 tro len |
+| Instance | `t3.large` tối thiểu; `t3.xlarge` ổn định hơn khi build nhiều image |
+| Disk | 80 GB gp3 trở lên |
 | OS | Ubuntu Server 22.04/24.04 LTS |
-| Swap | Nen tao 4-8 GB swap neu dung `t3.large` |
+| Swap | Nên tạo 4-8 GB swap nếu dùng `t3.large` |
 
-Jenkins, SonarQube, Docker build cache va Trivy/Dependency-Check cache deu ton RAM/disk. Neu ngay demo can on dinh, dung `t3.xlarge`, demo xong stop EC2.
+Jenkins, SonarQube, Docker build cache và Trivy/Dependency-Check cache đều tốn RAM/disk. Nếu ngày demo cần ổn định, dùng `t3.xlarge`, demo xong stop EC2.
 
-### Tai Khoan / Token
+### Tài Khoản / Token
 
-Can co:
+Cần có:
 
-- GitHub PAT co quyen clone/push repo.
-- Docker Hub token de push image.
+- GitHub PAT có quyền clone/push repo.
+- Docker Hub token để push image.
 - SonarQube token cho Jenkins.
 - NVD API key cho OWASP Dependency-Check.
-- Kubeconfig read-only cho Argo CD health check neu muon bat stage nay.
+- Kubeconfig read-only cho Argo CD health check nếu muốn bật stage này.
 
-## 3. Tao Hoac Kiem Tra EKS
+## 3. Tạo Hoặc Kiểm Tra EKS
 
-Repo da co Terraform cho EKS tai:
+Repo đã có Terraform cho EKS tại:
 
 ```text
 infra/terraform/aws-eks
 ```
 
-Lenh tham khao:
+Lệnh tham khảo:
 
 ```bash
 cd infra/terraform/aws-eks
@@ -101,14 +101,14 @@ terraform plan -out tfplan
 terraform apply tfplan
 ```
 
-Sau khi tao cluster:
+Sau khi tạo cluster:
 
 ```bash
 aws eks update-kubeconfig --region ap-southeast-1 --name docvault-eks
 kubectl get nodes
 ```
 
-Cai Argo CD va apply cac Application manifests theo tai lieu hien co:
+Cài Argo CD và apply các Application manifests theo tài liệu hiện có:
 
 ```bash
 kubectl create namespace argocd
@@ -118,17 +118,17 @@ kubectl apply -f infra/argocd-apps/docvault-apps.yaml
 kubectl get applications -n argocd
 ```
 
-Neu da co EKS/Argo CD san, chi can dam bao Argo CD dang doc dung repo va dung branch GitOps, vi pipeline se cap nhat image tag trong `infra/k8s/values/*.yaml`.
+Nếu đã có EKS/Argo CD sẵn, chỉ cần đảm bảo Argo CD đang đọc đúng repo và đúng branch GitOps, vì pipeline sẽ cập nhật image tag trong `infra/k8s/values/*.yaml`.
 
-## 4. Cai Docker Tren EC2
+## 4. Cài Docker Trên EC2
 
-SSH vao EC2:
+SSH vào EC2:
 
 ```bash
 ssh ubuntu@<EC2_PUBLIC_IP>
 ```
 
-Cai Docker:
+Cài Docker:
 
 ```bash
 sudo apt-get update
@@ -145,14 +145,14 @@ sudo apt-get install -y docker-ce docker-ce-cli containerd.io docker-buildx-plug
 sudo usermod -aG docker ubuntu
 ```
 
-Dang xuat SSH roi dang nhap lai, sau do kiem tra:
+Đăng xuất SSH rồi đăng nhập lại, sau đó kiểm tra:
 
 ```bash
 docker version
 docker compose version
 ```
 
-Cau hinh host cho SonarQube:
+Cấu hình host cho SonarQube:
 
 ```bash
 echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-sonarqube.conf
@@ -160,7 +160,7 @@ echo "fs.file-max=131072" | sudo tee -a /etc/sysctl.d/99-sonarqube.conf
 sudo sysctl --system
 ```
 
-Neu dung instance RAM thap, tao swap:
+Nếu dùng instance RAM thấp, tạo swap:
 
 ```bash
 sudo fallocate -l 6G /swapfile
@@ -171,7 +171,7 @@ echo '/swapfile none swap sw 0 0' | sudo tee -a /etc/fstab
 free -h
 ```
 
-## 5. Clone Repo Len EC2
+## 5. Clone Repo Lên EC2
 
 ```bash
 sudo mkdir -p /opt/docvault
@@ -181,9 +181,9 @@ cd /opt/docvault
 git checkout devsecops-pipeline
 ```
 
-Neu repo hoac branch cua ban khac, thay URL/branch cho dung.
+Nếu repo hoặc branch của bạn khác, thay URL/branch cho đúng.
 
-Tao file `.env` cho Docker Compose:
+Tạo file `.env` cho Docker Compose:
 
 ```bash
 cat > /opt/docvault/.env <<'EOF'
@@ -191,15 +191,15 @@ SONAR_DB_PASSWORD=change-this-demo-password
 EOF
 ```
 
-## 6. Tao Docker Compose Cho DevOps Server
+## 6. Tạo Docker Compose Cho DevOps Server
 
-Tao file:
+Tạo file:
 
 ```text
 /opt/docvault/docker-compose.devops.yml
 ```
 
-Noi dung:
+Nội dung:
 
 ```yaml
 name: docvault-devops
@@ -284,7 +284,7 @@ volumes:
   sonar_postgres_data:
 ```
 
-Build va chay:
+Build và chạy:
 
 ```bash
 cd /opt/docvault
@@ -293,24 +293,24 @@ docker compose -f docker-compose.devops.yml up -d
 docker compose -f docker-compose.devops.yml ps
 ```
 
-Lay Jenkins initial password:
+Lấy Jenkins initial password:
 
 ```bash
 docker exec docvault-jenkins cat /var/jenkins_home/secrets/initialAdminPassword
 ```
 
-Mo:
+Mở:
 
 ```text
 http://<EC2_PUBLIC_IP>:8080
 http://<EC2_PUBLIC_IP>:9000
 ```
 
-## 7. Cau Hinh Jenkins
+## 7. Cấu Hình Jenkins
 
-### 7.1 Cai Plugins
+### 7.1 Cài Plugins
 
-Cai cac plugin toi thieu:
+Cài các plugin tối thiểu:
 
 - Pipeline
 - Git
@@ -321,64 +321,64 @@ Cai cac plugin toi thieu:
 - SonarQube Scanner for Jenkins
 - Timestamper
 
-Restart Jenkins sau khi cai plugin.
+Restart Jenkins sau khi cài plugin.
 
-### 7.2 Gan Label Cho Built-in Node
+### 7.2 Gắn Label Cho Built-in Node
 
-`Jenkinsfile` dang dung:
+`Jenkinsfile` đang dùng:
 
 ```groovy
 agent { label 'docker-agent-alpine-ubuntu-vm' }
 ```
 
-Vao:
+Vào:
 
 ```text
 Manage Jenkins -> Nodes -> Built-In Node -> Configure -> Labels
 ```
 
-Them label:
+Thêm label:
 
 ```text
 docker-agent-alpine-ubuntu-vm
 ```
 
-Kiem tra trong Jenkins job hoac Script Console, agent phai chay duoc:
+Kiểm tra trong Jenkins job hoặc Script Console, agent phải chạy được:
 
 ```bash
 docker --version
 kubectl version --client=true
 ```
 
-### 7.3 Tao Jenkins Credentials
+### 7.3 Tạo Jenkins Credentials
 
-Vao:
+Vào:
 
 ```text
 Manage Jenkins -> Credentials -> System -> Global credentials
 ```
 
-Tao cac credential sau:
+Tạo các credential sau:
 
-| ID | Kind | Ghi chu |
+| ID | Kind | Ghi chú |
 |---|---|---|
 | `dockerhub-credentials` | Username with password | Username Docker Hub + access token |
-| `github-credentials` | Username with password | GitHub username + PAT co quyen push GitOps branch |
-| `sonar-token` | Secret text | Token tao trong SonarQube |
+| `github-credentials` | Username with password | GitHub username + PAT có quyền push GitOps branch |
+| `sonar-token` | Secret text | Token tạo trong SonarQube |
 | `nvd-api-key` | Secret text | NVD API key cho OWASP Dependency-Check |
-| `jenkins-argocd-kubeconfig` | Secret file | Tuy chon, chi can neu bat Argo CD health check |
+| `jenkins-argocd-kubeconfig` | Secret file | Tùy chọn, chỉ cần nếu bật Argo CD health check |
 
-Neu chua co `nvd-api-key`, stage Dependency-Check se fail vi `vars/dependencyCheck.groovy` dang yeu cau credential nay.
+Nếu chưa có `nvd-api-key`, stage Dependency-Check sẽ fail vì `vars/dependencyCheck.groovy` đang yêu cầu credential này.
 
-### 7.4 Cau Hinh SonarQube Server Trong Jenkins
+### 7.4 Cấu Hình SonarQube Server Trong Jenkins
 
-Vao:
+Vào:
 
 ```text
 Manage Jenkins -> System -> SonarQube servers
 ```
 
-Dien:
+Điền:
 
 ```text
 Name: sqdocvault
@@ -386,61 +386,61 @@ Server URL: http://sonarqube:9000
 Server authentication token: sonar-token
 ```
 
-Ten `sqdocvault` phai dung vi `vars/docvaultConfig.groovy` dang cau hinh:
+Tên `sqdocvault` phải đúng vì `vars/docvaultConfig.groovy` đang cấu hình:
 
 ```groovy
 sonarQubeInstallation: 'sqdocvault'
 ```
 
-## 8. Cau Hinh SonarQube
+## 8. Cấu Hình SonarQube
 
-Mo SonarQube:
+Mở SonarQube:
 
 ```text
 http://<EC2_PUBLIC_IP>:9000
 ```
 
-Dang nhap mac dinh:
+Đăng nhập mặc định:
 
 ```text
 Username: admin
 Password: admin
 ```
 
-Doi password ngay sau lan dang nhap dau.
+Đổi password ngay sau lần đăng nhập đầu.
 
-Tao token cho Jenkins:
+Tạo token cho Jenkins:
 
 ```text
 My Account -> Security -> Generate Tokens
 ```
 
-Dat ten vi du:
+Đặt tên ví dụ:
 
 ```text
 jenkins-sonar-token
 ```
 
-Copy token va tao Jenkins credential `sonar-token`.
+Copy token và tạo Jenkins credential `sonar-token`.
 
-Tao webhook de Quality Gate co the goi ve Jenkins:
+Tạo webhook để Quality Gate có thể gọi về Jenkins:
 
 ```text
 Administration -> Configuration -> Webhooks -> Create
 ```
 
-Dien:
+Điền:
 
 ```text
 Name: jenkins-quality-gate
 URL: http://jenkins:8080/sonarqube-webhook/
 ```
 
-Webhook nay dung Docker Compose network noi bo, khong can public Jenkins.
+Webhook này dùng Docker Compose network nội bộ, không cần public Jenkins.
 
-## 9. Cau Hinh Repo Va Pipeline
+## 9. Cấu Hình Repo Và Pipeline
 
-### 9.1 Kiem Tra `vars/docvaultConfig.groovy`
+### 9.1 Kiểm Tra `vars/docvaultConfig.groovy`
 
 File:
 
@@ -448,7 +448,7 @@ File:
 vars/docvaultConfig.groovy
 ```
 
-Can kiem tra cac gia tri:
+Cần kiểm tra các giá trị:
 
 ```groovy
 dockerOrg: 'daithang59',
@@ -457,24 +457,24 @@ gitOpsBranch: 'gitops-testing',
 sonarHostUrl: sonarHostUrl,
 ```
 
-Neu Docker Hub namespace hoac GitHub repo cua ban khac, sua:
+Nếu Docker Hub namespace hoặc GitHub repo của bạn khác, sửa:
 
 ```groovy
 dockerOrg: '<dockerhub-username>',
 gitOpsRepoUrl: 'https://github.com/<user-or-org>/docvault.git',
 ```
 
-Dong thoi kiem tra repository trong:
+Đồng thời kiểm tra repository trong:
 
 ```text
 infra/k8s/values/*.yaml
 ```
 
-Tat ca image repository nen trung Docker Hub namespace ma Jenkins push len.
+Tất cả image repository nên trùng Docker Hub namespace mà Jenkins push lên.
 
-### 9.2 Tao Branch GitOps
+### 9.2 Tạo Branch GitOps
 
-Tren may local hoac EC2:
+Trên máy local hoặc EC2:
 
 ```bash
 git checkout devsecops-pipeline
@@ -483,23 +483,23 @@ git push -u origin gitops-testing
 git checkout devsecops-pipeline
 ```
 
-Pipeline se push commit `[skip ci]` vao branch `gitops-testing` sau khi build image.
+Pipeline sẽ push commit `[skip ci]` vào branch `gitops-testing` sau khi build image.
 
-### 9.3 Cau Hinh Jenkins Shared Library
+### 9.3 Cấu Hình Jenkins Shared Library
 
-`Jenkinsfile` dang co:
+`Jenkinsfile` đang có:
 
 ```groovy
 @Library('docvault@devsecops-pipeline') _
 ```
 
-Vao:
+Vào:
 
 ```text
 Manage Jenkins -> System -> Global Trusted Pipeline Libraries
 ```
 
-Cau hinh:
+Cấu hình:
 
 ```text
 Name: docvault
@@ -510,17 +510,17 @@ Project Repository: https://github.com/daithang59/docvault.git
 Credentials: github-credentials
 ```
 
-Neu repo cua ban khac, thay URL tuong ung.
+Nếu repo của bạn khác, thay URL tương ứng.
 
-### 9.4 Tao Jenkins Pipeline Job
+### 9.4 Tạo Jenkins Pipeline Job
 
-Vao:
+Vào:
 
 ```text
 New Item -> Pipeline -> docvault-devsecops
 ```
 
-Cau hinh:
+Cấu hình:
 
 ```text
 Definition: Pipeline script from SCM
@@ -531,13 +531,13 @@ Branch Specifier: */devsecops-pipeline
 Script Path: Jenkinsfile
 ```
 
-Build trigger neu muon GitHub push tu dong chay:
+Build trigger nếu muốn GitHub push tự động chạy:
 
 ```text
 GitHub hook trigger for GITScm polling
 ```
 
-Neu Jenkins co public URL, tao GitHub webhook:
+Nếu Jenkins có public URL, tạo GitHub webhook:
 
 ```text
 Payload URL: http://<EC2_PUBLIC_IP>:8080/github-webhook/
@@ -545,43 +545,43 @@ Content type: application/json
 Event: Just the push event
 ```
 
-Neu khong muon public Jenkins, co the demo bang nut `Build with Parameters`.
+Nếu không muốn public Jenkins, có thể demo bằng nút `Build with Parameters`.
 
-## 10. Cau Hinh Kubeconfig Cho Argo CD Health Check
+## 10. Cấu Hình Kubeconfig Cho Argo CD Health Check
 
-Stage `Argo CD Health Check` la tuy chon. Neu chua can, chay pipeline voi:
+Stage `Argo CD Health Check` là tùy chọn. Nếu chưa cần, chạy pipeline với:
 
 ```text
 RUN_ARGO_HEALTH_CHECK=false
 ```
 
-Neu muon bat, repo da co RBAC:
+Nếu muốn bật, repo đã có RBAC:
 
 ```text
 infra/k8s/ci/jenkins-argocd-reader.yaml
 scripts/create-jenkins-argocd-kubeconfig.ps1
 ```
 
-Chay script tu may dang co quyen admin vao EKS:
+Chạy script từ máy đang có quyền admin vào EKS:
 
 ```powershell
 .\scripts\create-jenkins-argocd-kubeconfig.ps1
 ```
 
-Script tao file:
+Script tạo file:
 
 ```text
 jenkins-argocd-reader.kubeconfig
 ```
 
-Upload file nay vao Jenkins credential:
+Upload file này vào Jenkins credential:
 
 ```text
 Kind: Secret file
 ID: jenkins-argocd-kubeconfig
 ```
 
-Khi chay pipeline, dien:
+Khi chạy pipeline, điền:
 
 ```text
 RUN_ARGO_HEALTH_CHECK=true
@@ -589,9 +589,9 @@ KUBECONFIG_CREDENTIAL_ID=jenkins-argocd-kubeconfig
 ARGOCD_NAMESPACE=argocd
 ```
 
-## 11. Lan Chay Pipeline Dau Tien
+## 11. Lần Chạy Pipeline Đầu Tiên
 
-Chay `Build with Parameters`:
+Chạy `Build with Parameters`:
 
 ```text
 FORCE_BUILD_ALL=true
@@ -603,7 +603,7 @@ RUN_ZAP=false
 ZAP_TARGET=
 ```
 
-Thu tu stage ky vong:
+Thứ tự stage kỳ vọng:
 
 1. `Checkout & Initialize Config`
 2. `Prevent Loop`
@@ -613,7 +613,7 @@ Thu tu stage ky vong:
 6. `Build & Scan Services`
 7. `Push & GitOps`
 
-Sau khi Jenkins push GitOps branch, kiem tra:
+Sau khi Jenkins push GitOps branch, kiểm tra:
 
 ```bash
 git fetch origin gitops-testing
@@ -622,14 +622,14 @@ git log -3 --oneline
 git diff HEAD~1 -- infra/k8s/values
 ```
 
-Kiem tra Argo CD va EKS:
+Kiểm tra Argo CD và EKS:
 
 ```bash
 kubectl get applications -n argocd
 kubectl get pods -A
 ```
 
-Sau khi co URL frontend/gateway that, co the chay them:
+Sau khi có URL frontend/gateway thật, có thể chạy thêm:
 
 ```text
 DEPLOY_TARGET_URL=http://<app-url>
@@ -639,42 +639,42 @@ RUN_ZAP=true
 ZAP_TARGET=http://<app-url>
 ```
 
-## 12. Checklist Demo Voi Giang Vien
+## 12. Checklist Demo Với Giảng Viên
 
-Truoc buoi demo:
+Trước buổi demo:
 
-- [ ] EC2 dang chay va `docker compose ps` deu healthy/up.
-- [ ] Jenkins truy cap duoc tai `http://<EC2_PUBLIC_IP>:8080`.
-- [ ] SonarQube truy cap duoc tai `http://<EC2_PUBLIC_IP>:9000`.
-- [ ] Jenkins co credentials: `dockerhub-credentials`, `github-credentials`, `sonar-token`, `nvd-api-key`.
-- [ ] Jenkins built-in node co label `docker-agent-alpine-ubuntu-vm`.
-- [ ] Jenkins shared library `docvault` tro dung repo/branch.
-- [ ] Branch `gitops-testing` ton tai.
-- [ ] Argo CD dang sync cac app DocVault.
-- [ ] EKS pods cua DocVault dang `Running`.
+- [ ] EC2 đang chạy và `docker compose ps` đều healthy/up.
+- [ ] Jenkins truy cập được tại `http://<EC2_PUBLIC_IP>:8080`.
+- [ ] SonarQube truy cập được tại `http://<EC2_PUBLIC_IP>:9000`.
+- [ ] Jenkins có credentials: `dockerhub-credentials`, `github-credentials`, `sonar-token`, `nvd-api-key`.
+- [ ] Jenkins built-in node có label `docker-agent-alpine-ubuntu-vm`.
+- [ ] Jenkins shared library `docvault` trỏ đúng repo/branch.
+- [ ] Branch `gitops-testing` tồn tại.
+- [ ] Argo CD đang sync các app DocVault.
+- [ ] EKS pods của DocVault đang `Running`.
 
-Flow demo ngan gon:
+Flow demo ngắn gọn:
 
-1. Push mot commit nho len branch `devsecops-pipeline`.
-2. Jenkins tu chay pipeline hoac bam `Build with Parameters`.
-3. Mo log cac stage: install, test, Dependency-Check, Trivy, SonarQube, Checkov, build image.
-4. Mo SonarQube xem project `DocVault`.
-5. Mo GitHub branch `gitops-testing` xem commit update image tag.
-6. Mo Argo CD xem app synced/healthy.
-7. Mo URL ung dung DocVault tren EKS.
+1. Push một commit nhỏ lên branch `devsecops-pipeline`.
+2. Jenkins tự chạy pipeline hoặc bấm `Build with Parameters`.
+3. Mở log các stage: install, test, Dependency-Check, Trivy, SonarQube, Checkov, build image.
+4. Mở SonarQube xem project `DocVault`.
+5. Mở GitHub branch `gitops-testing` xem commit update image tag.
+6. Mở Argo CD xem app synced/healthy.
+7. Mở URL ứng dụng DocVault trên EKS.
 
 ## 13. Troubleshooting Nhanh
 
-### Jenkins khong chay duoc Docker
+### Jenkins Không Chạy Được Docker
 
-Kiem tra:
+Kiểm tra:
 
 ```bash
 docker exec -it docvault-jenkins sh -lc "env | grep DOCKER && docker version"
 docker logs --tail 100 docvault-docker
 ```
 
-Neu Jenkins bao khong ket noi duoc Docker daemon, restart cap container Jenkins/Docker:
+Nếu Jenkins báo không kết nối được Docker daemon, restart cặp container Jenkins/Docker:
 
 ```bash
 cd /opt/docvault
@@ -682,106 +682,106 @@ docker compose -f docker-compose.devops.yml down
 docker compose -f docker-compose.devops.yml up -d
 ```
 
-### SonarQube khong len
+### SonarQube Không Lên
 
-Kiem tra log:
+Kiểm tra log:
 
 ```bash
 docker logs --tail 200 docvault-sonarqube
 ```
 
-Kiem tra sysctl:
+Kiểm tra sysctl:
 
 ```bash
 sysctl vm.max_map_count
 ```
 
-Gia tri nen la:
+Giá trị nên là:
 
 ```text
 vm.max_map_count = 262144
 ```
 
-### Jenkins khong tim thay `sqdocvault`
+### Jenkins Không Tìm Thấy `sqdocvault`
 
-Kiem tra:
+Kiểm tra:
 
 ```text
 Manage Jenkins -> System -> SonarQube servers
 ```
 
-Name phai dung:
+Name phải đúng:
 
 ```text
 sqdocvault
 ```
 
-### Dependency-Check fail vi credential
+### Dependency-Check Fail Vì Credential
 
-Pipeline yeu cau Jenkins credential:
+Pipeline yêu cầu Jenkins credential:
 
 ```text
 nvd-api-key
 ```
 
-Tao credential dang `Secret text`. Neu khong muon dung stage nay cho demo, can sua pipeline/shared library rieng; khong nen xoa credential tam thoi bang cach hardcode token.
+Tạo credential dạng `Secret text`. Nếu không muốn dùng stage này cho demo, cần sửa pipeline/shared library riêng; không nên xóa credential tạm thời bằng cách hardcode token.
 
-### Push Docker Hub fail
+### Push Docker Hub Fail
 
-Kiem tra:
+Kiểm tra:
 
-- Credential ID phai la `dockerhub-credentials`.
-- Docker Hub token con hieu luc.
-- `dockerOrg` trong `vars/docvaultConfig.groovy` phai trung namespace Docker Hub.
-- `infra/k8s/values/*.yaml` phai tro dung image repository.
+- Credential ID phải là `dockerhub-credentials`.
+- Docker Hub token còn hiệu lực.
+- `dockerOrg` trong `vars/docvaultConfig.groovy` phải trùng namespace Docker Hub.
+- `infra/k8s/values/*.yaml` phải trỏ đúng image repository.
 
-### GitOps push fail
+### GitOps Push Fail
 
-Kiem tra:
+Kiểm tra:
 
-- Credential ID phai la `github-credentials`.
-- PAT co quyen push repo.
-- Branch `gitops-testing` da ton tai.
-- `gitOpsRepoUrl` trong `vars/docvaultConfig.groovy` dung repo cua ban.
+- Credential ID phải là `github-credentials`.
+- PAT có quyền push repo.
+- Branch `gitops-testing` đã tồn tại.
+- `gitOpsRepoUrl` trong `vars/docvaultConfig.groovy` đúng repo của bạn.
 
-### Argo CD khong sync image moi
+### Argo CD Không Sync Image Mới
 
-Kiem tra:
+Kiểm tra:
 
 ```bash
 kubectl get applications -n argocd
 kubectl describe application <app-name> -n argocd
 ```
 
-Dam bao Argo CD Application dang track branch `gitops-testing` va path dung voi chart/values trong repo.
+Đảm bảo Argo CD Application đang track branch `gitops-testing` và path đúng với chart/values trong repo.
 
-## 14. Van Hanh Va Don Dep Sau Demo
+## 14. Vận Hành Và Dọn Dẹp Sau Demo
 
-Tam dung Jenkins/SonarQube tren EC2:
+Tạm dừng Jenkins/SonarQube trên EC2:
 
 ```bash
 cd /opt/docvault
 docker compose -f docker-compose.devops.yml stop
 ```
 
-Chay lai:
+Chạy lại:
 
 ```bash
 cd /opt/docvault
 docker compose -f docker-compose.devops.yml start
 ```
 
-Backup volume Docker neu can giu cau hinh Jenkins/SonarQube:
+Backup volume Docker nếu cần giữ cấu hình Jenkins/SonarQube:
 
 ```bash
 docker volume ls | grep docvault-devops
 ```
 
-Sau demo, de tiet kiem chi phi:
+Sau demo, để tiết kiệm chi phí:
 
-- Stop EC2 neu chua can dung.
-- Pause/resume hoac destroy EKS theo cac runbook hien co:
+- Stop EC2 nếu chưa cần dùng.
+- Pause/resume hoặc destroy EKS theo các runbook hiện có:
   - `docs/docvault_eks_pause_resume_runbook.md`
   - `docs/docvault_eks_destroy_backup_restore_runbook.md`
 
-Khong xoa EBS volume/EC2 volume neu chua backup Jenkins home va SonarQube database.
+Không xóa EBS volume/EC2 volume nếu chưa backup Jenkins home và SonarQube database.
