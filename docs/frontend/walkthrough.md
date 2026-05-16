@@ -61,9 +61,9 @@ cd apps/web && npx next dev -p 3010
 
 | # | Bug | Severity | File |
 |---|-----|----------|------|
-| 1 | Gateway archive `@Roles('approver')` sai — phải là `editor` | 🔴 Critical | [services/gateway/src/proxy/workflow.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/workflow.proxy.controller.ts) |
-| 2 | Gateway thiếu `GET workflow-history` endpoint | 🔴 Critical | [services/gateway/src/proxy/metadata.proxy.controller.ts](file:///c:/NT114/docvault/services/gateway/src/proxy/metadata.proxy.controller.ts) |
-| 3 | Approvals query không invalidate sau workflow mutations | 🟡 Medium | [apps/web/src/lib/hooks/use-documents.ts](file:///c:/NT114/docvault/apps/web/src/lib/hooks/use-documents.ts) |
+| 1 | Gateway archive `@Roles('approver')` sai — phải là `editor` | 🔴 Critical | [services/gateway/src/proxy/workflow.proxy.controller.ts](../../services/gateway/src/proxy/workflow.proxy.controller.ts) |
+| 2 | Gateway thiếu `GET workflow-history` endpoint | 🔴 Critical | [services/gateway/src/proxy/metadata.proxy.controller.ts](../../services/gateway/src/proxy/metadata.proxy.controller.ts) |
+| 3 | Approvals query không invalidate sau workflow mutations | 🟡 Medium | [apps/web/src/lib/hooks/use-documents.ts](../../apps/web/src/lib/hooks/use-documents.ts) |
 
 ---
 
@@ -71,12 +71,12 @@ cd apps/web && npx next dev -p 3010
 
 | Item | Status |
 |------|--------|
-| [README.md](file:///c:/NT114/docvault/README.md) — FE section thêm vào | ✅ |
-| [apps/web/.env.example](file:///c:/NT114/docvault/apps/web/.env.example) — updated | ✅ |
-| [docs/demo-users.md](file:///c:/NT114/docvault/docs/demo-users.md) | ✅ |
-| [docs/demo-flow.md](file:///c:/NT114/docvault/docs/demo-flow.md) | ✅ |
-| [docs/verification-report.md](file:///c:/NT114/docvault/docs/verification-report.md) | ✅ |
-| [start-all.ps1](file:///c:/NT114/docvault/start-all.ps1) — script boot all services | ✅ |
+| [README.md](../../README.md) — FE section thêm vào | ✅ |
+| `apps/web/.env.example` — updated | ✅ |
+| [docs/getting-started/demo-users.md](../getting-started/demo-users.md) | ✅ |
+| [docs/getting-started/demo-flow.md](../getting-started/demo-flow.md) | ✅ |
+| [docs/getting-started/verification-report.md](../getting-started/verification-report.md) | ✅ |
+| [start-all.ps1](../../start-all.ps1) — script boot all services | ✅ |
 
 ---
 
@@ -118,4 +118,4 @@ cd apps/web && npx next dev -p 3010
 | Logout | ✅ |
 | ownerDisplay fallback | ✅ |
 
-> Browser FE demo: FE trên port 3010 chỉ có thể verify qua local browser (xem [docs/demo-flow.md](file:///c:/NT114/docvault/docs/demo-flow.md)). Dùng `npm run dev -- --port 3010` hoặc chạy [start-all.ps1](file:///c:/NT114/docvault/start-all.ps1) để boot lại.
+> Browser FE demo: FE trên port 3010 chỉ có thể verify qua local browser (xem [docs/getting-started/demo-flow.md](../getting-started/demo-flow.md)). Dùng `npm run dev -- --port 3010` hoặc chạy [start-all.ps1](../../start-all.ps1) để boot lại.

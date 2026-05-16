@@ -218,7 +218,7 @@ All new/refactored services received:
 ### Documentation
 
 - `README.md`
-- `docs/PROJECT_STATUS.md`
+- `docs/architecture/PROJECT_STATUS.md`
 - `docs/README.md`
 - Per-service README updated from placeholder to actual boundary details
 

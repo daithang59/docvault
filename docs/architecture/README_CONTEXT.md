@@ -1,6 +1,6 @@
 # README_CONTEXT.md — DocVault (Part 1: Web Microservices MVP)
 
-> **Note:** This is an initial context/planning document. For the current implementation, refer to `docs/PROJECT_STATUS.md`.
+> **Note:** This is an initial context/planning document. For the current implementation, refer to `docs/architecture/PROJECT_STATUS.md`.
 
 > Current scope: **Phase 1 only — web microservices build** (no DevSecOps yet).
 > Goal: have an **E2E demo flow** running locally via Docker Compose.

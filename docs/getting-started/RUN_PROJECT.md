@@ -252,8 +252,8 @@ Check:
 ## 12. Related Documents
 
 - `README.md`
-- `docs/demo-flow.md`
-- `docs/demo-users.md`
-- `docs/PROJECT_STATUS.md`
+- `docs/getting-started/demo-flow.md`
+- `docs/getting-started/demo-users.md`
+- `docs/architecture/PROJECT_STATUS.md`
 - `infra/README.md`
 - `services/README.md`

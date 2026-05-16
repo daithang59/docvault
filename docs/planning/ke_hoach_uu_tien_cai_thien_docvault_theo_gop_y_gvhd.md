@@ -2,7 +2,7 @@
 
 Ngày rà soát: 2026-05-06
 
-Nguồn đối chiếu chính: `docs/tong_hop_gop_y_docvault_webapp_devsecops_v2.md`
+Nguồn đối chiếu chính: `docs/planning/tong_hop_gop_y_docvault_webapp_devsecops_v2.md`
 
 Phạm vi rà soát: `apps/web`, `services/*`, `libs/*`, `infra/*`, `Jenkinsfile`, `vars/*.groovy`, OpenAPI contract và các tài liệu hiện có.
 

@@ -433,12 +433,14 @@ docvault/
 │   ├── start-sequential.mjs   # Sequential startup script for all services
 │   └── demo.sh                 # Demo script
 └── docs/
-    ├── TEAM_SETUP_DEPLOYMENT_GUIDE.md # Team setup, CI/CD, EKS and PR checklist
-    ├── demo-users.md           # Account & permission info
-    ├── demo-flow.md            # Step-by-step demo scenarios
-    ├── ERD.md                  # Entity Relationship Diagram
-    ├── PROJECT_STATUS.md       # Project status & known gaps
-    └── verification-report.md # Integration check report
+    ├── README.md               # Documentation index
+    ├── getting-started/        # Local run, usage, demo and verification guides
+    ├── architecture/           # API contract, ERD, status and refactor notes
+    ├── frontend/               # FE design, prompts, implementation and test guides
+    ├── devsecops/              # Jenkins, SonarQube, SCA and pipeline hardening docs
+    ├── infrastructure/         # EKS, Argo CD, EC2 and port-forward runbooks
+    ├── planning/               # Project plans, feedback and task assignment
+    └── archive/                # Retained miscellaneous downloaded docs
 ```
 
 ---

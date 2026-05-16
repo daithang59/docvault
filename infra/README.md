@@ -34,4 +34,4 @@ cp infra/.env.example infra/.env
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
-Xem them huong dan day du tai `../docs/RUN_PROJECT.md`.
+Xem them huong dan day du tai `../docs/getting-started/RUN_PROJECT.md`.

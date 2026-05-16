@@ -2,7 +2,7 @@
 
 Ngày tạo: 2026-05-06
 
-Nguồn kế hoạch: `docs/ke_hoach_uu_tien_cai_thien_docvault_theo_gop_y_gvhd.md`
+Nguồn kế hoạch: `docs/planning/ke_hoach_uu_tien_cai_thien_docvault_theo_gop_y_gvhd.md`
 
 Định hướng thực hiện của nhóm: **ưu tiên Pipeline DevSecOps/GitOps trước**, sau đó chuyển sang **Web App security hardening**. Cách này hợp lý vì pipeline là phần thầy góp ý nhiều về evidence, Policy as Code, registry, dev/prod, RBAC hạ tầng và Kubernetes storage. Tuy nhiên, nhóm vẫn nên chốt sớm vài quyết định Web App P0 để tránh làm pipeline xong nhưng demo bảo mật ứng dụng bị lệch.
 

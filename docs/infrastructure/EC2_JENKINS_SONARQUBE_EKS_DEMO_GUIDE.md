@@ -838,7 +838,7 @@ Sau demo, để tiết kiệm chi phí:
 
 - Stop EC2 nếu chưa cần dùng.
 - Pause/resume hoặc destroy EKS theo các runbook hiện có:
-  - `docs/docvault_eks_pause_resume_runbook.md`
-  - `docs/docvault_eks_destroy_backup_restore_runbook.md`
+  - `docs/infrastructure/docvault_eks_pause_resume_runbook.md`
+  - `docs/infrastructure/docvault_eks_destroy_backup_restore_runbook.md`
 
 Không xóa EBS volume/EC2 volume nếu chưa backup Jenkins home và SonarQube database.

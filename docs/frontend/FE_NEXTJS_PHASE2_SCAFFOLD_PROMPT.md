@@ -3,17 +3,17 @@
 Bạn là AI Agent chịu trách nhiệm **khởi tạo toàn bộ scaffold frontend Next.js** cho dự án **DocVault**. Ở phase này, mục tiêu **không phải** hoàn thiện full business logic hay polish UI 100%, mà là dựng một **codebase sạch, chạy được, có cấu trúc production-ready**, để phase tiếp theo chỉ cần fill logic và hoàn thiện từng page.
 
 Bạn phải bám sát các file context đã có từ người dùng:
-- `README_CONTEXT.md`
-- `PROJECT_STATUS.md`
-- `REFRACTOR_SUMMARY.md`
-- `ERD.md`
-- `API_CONTRACT.md`
+- `../architecture/README_CONTEXT.md`
+- `../architecture/PROJECT_STATUS.md`
+- `../architecture/REFRACTOR_SUMMARY.md`
+- `../architecture/ERD.md`
+- `../architecture/API_CONTRACT.md`
 - `FE_DESIGN_SYSTEM.md`
 - `FE_COLOR_PALETTE.md`
 - `FE_AGENT_CONTEXT_PROMPT.md`
 - `FE_NEXTJS_IMPLEMENTATION_PROMPT.md`
 
-Nếu có khác biệt giữa tài liệu cũ và implementation hiện tại, **ưu tiên implementation hiện tại** theo `PROJECT_STATUS.md`, `REFRACTOR_SUMMARY.md`, và `API_CONTRACT.md`.
+Nếu có khác biệt giữa tài liệu cũ và implementation hiện tại, **ưu tiên implementation hiện tại** theo `../architecture/PROJECT_STATUS.md`, `../architecture/REFRACTOR_SUMMARY.md`, và `../architecture/API_CONTRACT.md`.
 
 ---
 
@@ -387,7 +387,7 @@ Tạo helper để map lỗi sang UI message.
 - `acl.api.ts`
 
 ### 8.5 Endpoint mapping phải bám contract hiện tại
-Theo `API_CONTRACT.md`, scaffold method cho ít nhất:
+Theo `../architecture/API_CONTRACT.md`, scaffold method cho ít nhất:
 
 #### Documents / Metadata
 - `GET /metadata/documents`

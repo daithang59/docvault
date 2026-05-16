@@ -496,7 +496,7 @@ Hệ quả có thể xảy ra:
 
 Trạng thái quan sát được:
 
-- `docs/PROJECT_STATUS.md` trước đó là snapshot cũ
+- `docs/architecture/PROJECT_STATUS.md` trước đó là snapshot cũ
 - `apps/web/README.md` vẫn là README mặc định của Next.js
 - một số markdown mô tả hành vi khác với runtime hiện tại
 
