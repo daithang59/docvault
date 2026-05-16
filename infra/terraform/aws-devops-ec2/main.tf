@@ -2,6 +2,10 @@ data "aws_availability_zones" "available" {
   state = "available"
 }
 
+data "aws_caller_identity" "current" {}
+
+data "aws_region" "current" {}
+
 locals {
   name            = "${var.name_prefix}-${var.environment}"
   ubuntu_codename = var.ubuntu_version == "22.04" ? "jammy" : "noble"
@@ -87,6 +91,128 @@ resource "aws_vpc" "this" {
   })
 }
 
+resource "aws_default_security_group" "default" {
+  vpc_id = aws_vpc.this.id
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-default-sg"
+  })
+}
+
+resource "aws_kms_key" "cloudwatch_logs" {
+  description         = "KMS key for DocVault DevOps VPC flow logs"
+  enable_key_rotation = true
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Sid    = "EnableRootAccountAdministration"
+        Effect = "Allow"
+        Principal = {
+          AWS = "arn:aws:iam::${data.aws_caller_identity.current.account_id}:root"
+        }
+        Action   = "kms:*"
+        Resource = "*"
+      },
+      {
+        Sid    = "AllowCloudWatchLogsUse"
+        Effect = "Allow"
+        Principal = {
+          Service = "logs.${data.aws_region.current.name}.amazonaws.com"
+        }
+        Action = [
+          "kms:Encrypt",
+          "kms:Decrypt",
+          "kms:ReEncrypt*",
+          "kms:GenerateDataKey*",
+          "kms:DescribeKey"
+        ]
+        Resource = "*"
+        Condition = {
+          ArnEquals = {
+            "kms:EncryptionContext:aws:logs:arn" = "arn:aws:logs:${data.aws_region.current.name}:${data.aws_caller_identity.current.account_id}:log-group:/aws/vpc/${local.name}-flow-logs"
+          }
+        }
+      }
+    ]
+  })
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-cloudwatch-logs"
+  })
+}
+
+resource "aws_kms_alias" "cloudwatch_logs" {
+  name          = "alias/${local.name}-cloudwatch-logs"
+  target_key_id = aws_kms_key.cloudwatch_logs.key_id
+}
+
+resource "aws_cloudwatch_log_group" "vpc_flow_logs" {
+  name              = "/aws/vpc/${local.name}-flow-logs"
+  kms_key_id        = aws_kms_key.cloudwatch_logs.arn
+  retention_in_days = 365
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-flow-logs"
+  })
+}
+
+resource "aws_iam_role" "vpc_flow_logs" {
+  name = "${local.name}-vpc-flow-logs"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "vpc-flow-logs.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-vpc-flow-logs"
+  })
+}
+
+resource "aws_iam_role_policy" "vpc_flow_logs" {
+  name = "${local.name}-vpc-flow-logs"
+  role = aws_iam_role.vpc_flow_logs.id
+
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Action = [
+          "logs:CreateLogStream",
+          "logs:PutLogEvents",
+          "logs:DescribeLogGroups",
+          "logs:DescribeLogStreams"
+        ]
+        Resource = "${aws_cloudwatch_log_group.vpc_flow_logs.arn}:*"
+      }
+    ]
+  })
+}
+
+resource "aws_flow_log" "vpc" {
+  iam_role_arn    = aws_iam_role.vpc_flow_logs.arn
+  log_destination = aws_cloudwatch_log_group.vpc_flow_logs.arn
+  traffic_type    = "ALL"
+  vpc_id          = aws_vpc.this.id
+
+  depends_on = [aws_iam_role_policy.vpc_flow_logs]
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-vpc-flow-log"
+  })
+}
+
 resource "aws_internet_gateway" "this" {
   vpc_id = aws_vpc.this.id
 
@@ -99,7 +225,7 @@ resource "aws_subnet" "public" {
   vpc_id                  = aws_vpc.this.id
   cidr_block              = var.public_subnet_cidr
   availability_zone       = data.aws_availability_zones.available.names[0]
-  map_public_ip_on_launch = true
+  map_public_ip_on_launch = false
 
   tags = merge(local.tags, {
     Name = "${local.name}-public-a"
@@ -157,6 +283,36 @@ resource "aws_security_group_rule" "egress" {
   security_group_id = aws_security_group.devops.id
 }
 
+resource "aws_iam_role" "devops_instance" {
+  name = "${local.name}-instance"
+
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = {
+          Service = "ec2.amazonaws.com"
+        }
+        Action = "sts:AssumeRole"
+      }
+    ]
+  })
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-instance"
+  })
+}
+
+resource "aws_iam_instance_profile" "devops" {
+  name = "${local.name}-instance"
+  role = aws_iam_role.devops_instance.name
+
+  tags = merge(local.tags, {
+    Name = "${local.name}-instance"
+  })
+}
+
 resource "aws_instance" "devops" {
   ami                         = data.aws_ami.ubuntu.id
   instance_type               = var.instance_type
@@ -164,6 +320,9 @@ resource "aws_instance" "devops" {
   vpc_security_group_ids      = [aws_security_group.devops.id]
   key_name                    = local.instance_key_name
   associate_public_ip_address = true
+  ebs_optimized               = true
+  iam_instance_profile        = aws_iam_instance_profile.devops.name
+  monitoring                  = true
 
   metadata_options {
     http_endpoint = "enabled"

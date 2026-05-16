@@ -1,0 +1,143 @@
+{
+  "version": "1.0.0",
+  "lastScanned": 1778925673282,
+  "projectRoot": "c:\\Users\\THANG\\docvault",
+  "techStack": {
+    "languages": [
+      {
+        "name": "JavaScript/TypeScript",
+        "version": null,
+        "confidence": "high",
+        "markers": [
+          "package.json"
+        ]
+      }
+    ],
+    "frameworks": [],
+    "packageManager": "pnpm",
+    "runtime": null
+  },
+  "build": {
+    "buildCommand": "pnpm build",
+    "testCommand": "pnpm test",
+    "lintCommand": "pnpm lint",
+    "devCommand": "pnpm dev",
+    "scripts": {
+      "dev": "turbo run dev --parallel",
+      "build": "turbo run build",
+      "lint": "turbo run lint",
+      "test": "turbo run test",
+      "test:e2e": "node scripts/e2e-check.mjs",
+      "start:sequential": "node scripts/start-sequential.mjs",
+      "format": "prettier -w ."
+    }
+  },
+  "conventions": {
+    "namingStyle": null,
+    "importStyle": null,
+    "testPattern": null,
+    "fileOrganization": null
+  },
+  "structure": {
+    "isMonorepo": true,
+    "workspaces": [],
+    "mainDirectories": [
+      "docs",
+      "scripts"
+    ],
+    "gitBranches": {
+      "defaultBranch": "main",
+      "branchingStrategy": null
+    }
+  },
+  "customNotes": [],
+  "directoryMap": {
+    "apps": {
+      "path": "apps",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778925673242,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "docs": {
+      "path": "docs",
+      "purpose": "Documentation",
+      "fileCount": 1,
+      "lastAccessed": 1778925673242,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "images": {
+      "path": "images",
+      "purpose": null,
+      "fileCount": 5,
+      "lastAccessed": 1778925673253,
+      "keyFiles": [
+        "CICDPipeline_DevSecOps.png",
+        "DeployOnKubernetes.png",
+        "DocVault_Architecture.png",
+        "Luongtruycap_PhanPhoiTep.png",
+        "UseCaseDocVault.png"
+      ]
+    },
+    "infra": {
+      "path": "infra",
+      "purpose": null,
+      "fileCount": 4,
+      "lastAccessed": 1778925673254,
+      "keyFiles": [
+        "docker-compose.dev.yml",
+        "README.md"
+      ]
+    },
+    "libs": {
+      "path": "libs",
+      "purpose": null,
+      "fileCount": 1,
+      "lastAccessed": 1778925673254,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "scripts": {
+      "path": "scripts",
+      "purpose": "Build/utility scripts",
+      "fileCount": 5,
+      "lastAccessed": 1778925673255,
+      "keyFiles": [
+        "create-jenkins-argocd-kubeconfig.ps1",
+        "demo.sh",
+        "e2e-check.mjs",
+        "setup-eks-access.ps1",
+        "start-sequential.mjs"
+      ]
+    },
+    "services": {
+      "path": "services",
+      "purpose": "Business logic services",
+      "fileCount": 1,
+      "lastAccessed": 1778925673256,
+      "keyFiles": [
+        "README.md"
+      ]
+    },
+    "vars": {
+      "path": "vars",
+      "purpose": null,
+      "fileCount": 16,
+      "lastAccessed": 1778925673256,
+      "keyFiles": [
+        "argocdHealthCheck.groovy",
+        "buildAndScan.groovy",
+        "dastZap.groovy",
+        "dependencyCheck.groovy",
+        "docvaultConfig.groovy"
+      ]
+    }
+  },
+  "hotPaths": [],
+  "userDirectives": []
+}

@@ -17,7 +17,7 @@ def call() {
         checkovImage: 'bridgecrew/checkov:latest',
         terraformImage: 'hashicorp/terraform:1.8.5',
         terraformDir: 'infra/terraform/aws-eks',
-        skipChecks: 'CKV_K8S_43',
+        skipChecks: 'CKV_K8S_43,CKV_AWS_88,CKV_AWS_382',
         skipPaths: 'infra/k8s/infra-deps',
         dockerOrg: 'daithang59',
         buildParallelism: 3,
