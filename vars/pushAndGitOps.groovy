@@ -1,4 +1,5 @@
 def call(cfg, builtServicesCsv) {
+    cfg = cfg ?: [:]
     def tag = "v${env.BUILD_NUMBER}"
     def builtList = parseBuiltServices(builtServicesCsv)
     def infraChanged = env.INFRA_CHANGED == 'true'
@@ -8,15 +9,44 @@ def call(cfg, builtServicesCsv) {
         return
     }
 
-    def targetBranch = cfg.gitOpsBranch
+    def targetBranch = resolveGitOpsBranch(cfg)
+    def targetRepoUrl = resolveGitOpsRepoUrl(cfg)
+
     echo ">>> GitOps target branch: ${targetBranch}"
+    echo ">>> GitOps repository: ${targetRepoUrl}"
 
     def imageDigests = [:]
     if (builtList) {
         imageDigests = pushImages(cfg, builtList, tag)
     }
 
-    updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged)
+    updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, targetRepoUrl, infraChanged)
+}
+
+def resolveGitOpsBranch(cfg) {
+    return firstNonBlank(
+        cfg.gitOpsBranch,
+        env.GITOPS_BRANCH,
+        'gitops-testing'
+    )
+}
+
+def resolveGitOpsRepoUrl(cfg) {
+    return firstNonBlank(
+        cfg.gitOpsRepoUrl,
+        env.GITOPS_REPO_URL,
+        'https://github.com/daithang59/docvault.git'
+    )
+}
+
+def firstNonBlank(Object... values) {
+    for (value in values) {
+        def text = value?.toString()?.trim()
+        if (text) {
+            return text
+        }
+    }
+    return ''
 }
 
 def parseBuiltServices(builtServicesCsv) {
@@ -127,7 +157,7 @@ def resolveImageDigest(repository, tag) {
     return digest
 }
 
-def updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged) {
+def updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, targetRepoUrl, infraChanged) {
     echo '>>> Updating GitOps branch with new references...'
 
     def askPassScript = '.git-askpass.sh'
@@ -149,15 +179,9 @@ EOF
             """
 
             withEnv(["GIT_ASKPASS=${env.WORKSPACE}/${askPassScript}", 'GIT_TERMINAL_PROMPT=0']) {
-                def branchExists = sh(
-                    script: "git ls-remote --exit-code --heads ${cfg.gitOpsRepoUrl} ${targetBranch}",
-                    returnStatus: true
-                )
-                if (branchExists != 0) {
-                    error("GitOps branch '${targetBranch}' was not found on ${cfg.gitOpsRepoUrl}. Create the branch before running this pipeline.")
-                }
+                verifyGitOpsBranch(targetRepoUrl, targetBranch)
 
-                sh "git clone --single-branch --branch '${targetBranch}' '${cfg.gitOpsRepoUrl}' '${gitOpsWorktree}'"
+                sh "git clone --single-branch --branch '${targetBranch}' '${targetRepoUrl}' '${gitOpsWorktree}'"
 
                 // ── Step 1: Sync infra/k8s files if infrastructure changed ──
                 if (infraChanged) {
@@ -211,6 +235,30 @@ EOF
             sh "rm -rf '${gitOpsWorktree}'"
         }
     }
+}
+
+def verifyGitOpsBranch(targetRepoUrl, targetBranch) {
+    def branchStatus = sh(
+        script: "git ls-remote --exit-code --heads '${targetRepoUrl}' '${targetBranch}' >/dev/null",
+        returnStatus: true
+    )
+
+    if (branchStatus == 0) {
+        return
+    }
+
+    if (branchStatus == 2) {
+        def repoStatus = sh(
+            script: "git ls-remote --heads '${targetRepoUrl}' >/dev/null",
+            returnStatus: true
+        )
+
+        if (repoStatus == 0) {
+            error("GitOps branch '${targetBranch}' was not found on ${targetRepoUrl}. Create the branch before running this pipeline.")
+        }
+    }
+
+    error("Cannot access GitOps repository '${targetRepoUrl}' with Jenkins credential 'github-credentials'. Check that the credential is a GitHub username plus PAT with repo read/write access.")
 }
 
 /**
