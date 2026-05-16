@@ -5,6 +5,14 @@ Scope: Jenkins + SonarQube EC2 duoc tao boi Terraform tai `infra/terraform/aws-d
 
 ---
 
+## Quy uoc chay lenh
+
+- Chay cac lenh trong tai lieu nay bang **pwsh/PowerShell 7** tren Windows.
+- Khong dung `cmd.exe` vi cu phap bien moi truong `$env:...` va dau backtick xuong dong chi dung cho PowerShell.
+- Cac lenh `ssh ... '...'` ben duoi van duoc go trong pwsh; phan trong dau nhay don se chay tren EC2 Ubuntu.
+
+---
+
 ## 1. Ket luan nhanh
 
 | Cach | Tiet kiem | Mat gi | Khi nao dung |
@@ -25,22 +33,22 @@ Luu y quan trong:
 
 ## 2. Bien moi truong
 
-PowerShell:
+pwsh:
 
-```powershell
+```pwsh
 $env:AWS_REGION="ap-southeast-1"
 $env:DEVOPS_TF_DIR="infra/terraform/aws-devops-ec2"
 ```
 
 Kiem tra dang dung dung AWS account:
 
-```powershell
+```pwsh
 aws sts get-caller-identity
 ```
 
 Lay instance ID theo tag mac dinh cua stack:
 
-```powershell
+```pwsh
 $env:DEVOPS_INSTANCE_ID = aws ec2 describe-instances `
   --region $env:AWS_REGION `
   --filters `
@@ -60,7 +68,7 @@ Neu ban da doi `name_prefix` hoac `environment` trong Terraform, sua gia tri `do
 
 Kiem tra trang thai hien tai:
 
-```powershell
+```pwsh
 aws ec2 describe-instances `
   --region $env:AWS_REGION `
   --instance-ids $env:DEVOPS_INSTANCE_ID `
@@ -70,7 +78,7 @@ aws ec2 describe-instances `
 
 Stop instance:
 
-```powershell
+```pwsh
 aws ec2 stop-instances `
   --region $env:AWS_REGION `
   --instance-ids $env:DEVOPS_INSTANCE_ID
@@ -82,7 +90,7 @@ aws ec2 wait instance-stopped `
 
 Xac nhan da stop:
 
-```powershell
+```pwsh
 aws ec2 describe-instances `
   --region $env:AWS_REGION `
   --instance-ids $env:DEVOPS_INSTANCE_ID `
@@ -102,7 +110,7 @@ stopped
 
 Start instance:
 
-```powershell
+```pwsh
 aws ec2 start-instances `
   --region $env:AWS_REGION `
   --instance-ids $env:DEVOPS_INSTANCE_ID
@@ -114,7 +122,7 @@ aws ec2 wait instance-running `
 
 Lay public IP moi:
 
-```powershell
+```pwsh
 $env:DEVOPS_PUBLIC_IP = aws ec2 describe-instances `
   --region $env:AWS_REGION `
   --instance-ids $env:DEVOPS_INSTANCE_ID `
@@ -133,13 +141,13 @@ http://<DEVOPS_PUBLIC_IP>:9000
 
 Kiem tra container sau khi start:
 
-```powershell
+```pwsh
 ssh ubuntu@$env:DEVOPS_PUBLIC_IP 'cd /opt/docvault && docker compose -f docker-compose.devops.yml ps'
 ```
 
 Neu SSH can private key rieng:
 
-```powershell
+```pwsh
 ssh -i $HOME\.ssh\docvault_devops_ec2 ubuntu@$env:DEVOPS_PUBLIC_IP 'cd /opt/docvault && docker compose -f docker-compose.devops.yml ps'
 ```
 
@@ -151,7 +159,7 @@ Neu bi timeout sau khi start:
 
 Lay public IP ca nhan hien tai:
 
-```powershell
+```pwsh
 Invoke-RestMethod https://checkip.amazonaws.com
 ```
 
@@ -163,25 +171,25 @@ Chi chay buoc nay khi da chap nhan mat EC2, Docker volumes, Jenkins config, Jenk
 
 Chuyen vao thu muc Terraform:
 
-```powershell
+```pwsh
 Set-Location $env:DEVOPS_TF_DIR
 ```
 
 Xem plan destroy:
 
-```powershell
+```pwsh
 terraform plan -destroy -out destroy.tfplan
 ```
 
 Neu plan chi xoa tai nguyen cua stack `aws-devops-ec2`, apply:
 
-```powershell
+```pwsh
 terraform apply destroy.tfplan
 ```
 
 Sau destroy, kiem tra lai:
 
-```powershell
+```pwsh
 aws ec2 describe-instances `
   --region $env:AWS_REGION `
   --filters "Name=tag:Name,Values=docvault-devops-testing" `
