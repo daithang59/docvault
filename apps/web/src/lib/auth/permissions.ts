@@ -112,7 +112,7 @@ export function canDownloadDocument(
 
 /**
  * Whether the current user can preview a document.
- * CO can only preview PUBLIC documents; approver+ can preview all.
+ * Preview is file content access, so compliance officers are always blocked.
  */
 export function canPreviewDocument(
   session: Session | null,
@@ -122,8 +122,7 @@ export function canPreviewDocument(
   // Allow preview for all non-deleted statuses: owner reviewing DRAFT,
   // approver reviewing PENDING, anyone with access to PUBLISHED/ARCHIVED.
   if (doc.status === 'DELETED') return false;
-  // CO can only preview PUBLIC classification
-  if (hasRole(session, 'compliance_officer') && doc.classification !== 'PUBLIC') return false;
+  if (hasRole(session, 'compliance_officer')) return false;
   return true;
 }
 

@@ -16,11 +16,18 @@ type AuditEventPayload = {
 export class AuditClient {
   private readonly logger = new Logger(AuditClient.name);
   private readonly baseUrl = process.env.AUDIT_SERVICE_URL;
+  private readonly ingestToken = process.env.AUDIT_INGEST_TOKEN;
 
   constructor(private readonly http: HttpService) {}
 
   async emitEvent(context: RequestContext, event: AuditEventPayload) {
     if (!this.baseUrl) {
+      return;
+    }
+    if (!this.ingestToken) {
+      this.logger.warn(
+        `AUDIT_INGEST_TOKEN not set — audit event "${event.action}" dropped`,
+      );
       return;
     }
 
@@ -43,7 +50,7 @@ export class AuditClient {
           },
           {
             headers: {
-              authorization: context.authorization,
+              'x-docvault-service-token': this.ingestToken,
               'x-request-id': context.traceId,
               'x-user-id': context.actorId,
               'x-roles': context.roles.join(','),

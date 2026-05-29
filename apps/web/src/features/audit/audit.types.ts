@@ -35,3 +35,10 @@ export interface AuditQueryFilters extends PaginationParams {
   targetId?: string;
   targetType?: string;
 }
+
+export interface AuditChainStatus {
+  valid: boolean;
+  checked: number;
+  firstBrokenIndex?: number;
+  message?: string;
+}

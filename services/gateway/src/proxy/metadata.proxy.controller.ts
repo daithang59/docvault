@@ -206,12 +206,12 @@ export class MetadataProxyController {
 
   @Post('documents/:docId/preview-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Authorize document preview',
     description:
-      'Issues a preview grant token. Unlike download-authorize, this allows compliance_officer ' +
-      'and only requires READ permission (not DOWNLOAD).',
+      'Issues a preview grant token for file content access. ' +
+      'Compliance officers may inspect metadata and audit events, but cannot preview, stream, presign, or download file content.',
   })
   @HttpCode(200)
   async authorizePreview(

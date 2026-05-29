@@ -20,7 +20,7 @@ info:
     | `viewer` | Read published documents, download files |
     | `editor` | Create, upload, submit, archive documents |
     | `approver` | Approve/reject pending documents |
-    | `compliance_officer` | Read audit logs and metadata (cannot download files) |
+    | `compliance_officer` | Read audit logs and allowed metadata; cannot preview, stream, presign, or download file content |
     | `admin` | Full access |
 
     ## Document Lifecycle
@@ -29,8 +29,9 @@ info:
     ```
 
     ## Compliance Officer Restriction
-    Compliance officers (`compliance_officer`) are **never allowed** to download files,
-    regardless of ACL configuration — enforced by policy.service.ts.
+    Compliance officers (`compliance_officer`) are **never allowed** to preview,
+    stream, presign, or download file content, regardless of ACL configuration —
+    enforced by route guards and policy.service.ts.
   version: 0.1.0
 servers:
   - url: http://localhost:3000
@@ -670,6 +671,9 @@ paths:
             schema:
               type: object
               properties:
+                grantToken:
+                  type: string
+                  description: Optional pre-authorized download grant token. If omitted, document-service re-authorizes through metadata-service.
                 version: { type: integer }
       responses:
         '200':
@@ -691,8 +695,8 @@ paths:
     post:
       summary: Authorize a document preview (issues HMAC preview grant token)
       description: |
-        Authorization for inline preview. Unlike download-authorize, this endpoint:
-        - Allows compliance_officer role
+        Authorization for inline preview. Preview is file content access, so this endpoint:
+        - Denies compliance_officer role
         - Requires only READ permission (not DOWNLOAD)
         - Does not apply watermarks
       operationId: authorizePreview
@@ -718,7 +722,7 @@ paths:
         '403':
           description: |
             Forbidden. May be caused by:
-            - Document not in PUBLISHED status
+            - compliance_officer attempting preview (always denied)
             - ACL denies READ access
             - Classification level insufficient
         '404':
@@ -782,6 +786,9 @@ paths:
   /documents/{docId}/presign-download:
     post:
       summary: Request a presigned download URL
+      description: |
+        Issues a time-limited presigned URL after download authorization.
+        Compliance officers are denied because presign exposes file content access.
       operationId: presignDownload
       security:
         - bearerAuth: []
@@ -804,13 +811,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/PresignedDownloadUrl'
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer, invalid grant token, expired grant token, or policy denial
 
   /documents/{docId}/versions/{version}/stream:
     get:
       summary: Stream a document version directly
       description: |
         Returns the document binary as a streaming response.
+        If `token` is provided, it must be a valid download grant token bound to this
+        document and version. Without `token`, document-service re-authorizes through
+        metadata-service before streaming.
+        Compliance officers are denied because streaming exposes file content access.
 
         **Watermarking:** For documents classified as CONFIDENTIAL or SECRET,
         a watermark containing user identity, timestamp, and classification level
@@ -827,6 +838,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional download grant token issued by `/metadata/documents/{docId}/download-authorize`
       responses:
         '200':
           description: Binary file stream (watermarked for CONFIDENTIAL/SECRET)
@@ -836,7 +853,7 @@ paths:
                 type: string
                 format: binary
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer, invalid grant token, expired grant token, or policy denial
         '404':
           description: Document or version not found
 
@@ -846,6 +863,7 @@ paths:
       description: |
         Streams the raw document binary for inline display in a browser.
         No watermark is applied. Supports HTTP Range requests for PDF.js lazy loading.
+        Compliance officers are denied because preview is file content access.
       operationId: previewDocument
       security:
         - bearerAuth: []
@@ -875,7 +893,7 @@ paths:
                 type: string
                 format: binary
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer or metadata preview policy denial
         '404':
           description: Document or version not found
 

@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -63,7 +64,7 @@ export class DocumentsController {
 
   @Post(':docId/presign-download')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Create a presigned URL after metadata authorizes download',
   })
@@ -82,7 +83,7 @@ export class DocumentsController {
 
   @Get(':docId/versions/:version/stream')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Stream a document version by grant token (already authorized, no metadata call)',
   })
@@ -94,13 +95,20 @@ export class DocumentsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const context = buildRequestContext(req);
+    const parsedVersion = Number(version);
+    if (!Number.isInteger(parsedVersion) || parsedVersion < 1) {
+      throw new BadRequestException('Invalid document version');
+    }
 
     try {
-      const response = await this.documentsService.getStreamWithToken(
-        docId,
-        token,
-        context.actorId,
-      );
+      const response = token
+        ? await this.documentsService.getStreamWithToken(
+            docId,
+            parsedVersion,
+            token,
+            context.actorId,
+          )
+        : await this.documentsService.getStream(docId, parsedVersion, context);
 
       if (response.contentType) {
         res.setHeader('Content-Type', response.contentType);
@@ -119,7 +127,7 @@ export class DocumentsController {
 
   @Get(':docId/preview')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Stream a document for inline preview (supports Range requests)',
   })

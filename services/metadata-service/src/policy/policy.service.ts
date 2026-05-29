@@ -21,6 +21,14 @@ import {
 } from '../common/request-context';
 import { CLASSIFICATION_WATERMARK_LEVELS } from '../common/classification.constants';
 
+function requireEnv(name: string): string {
+  const value = process.env[name];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
 @Injectable()
 export class PolicyService {
   private readonly expiresInSeconds = 300;
@@ -168,6 +176,12 @@ export class PolicyService {
     const roles = user.roles ?? [];
     const requestedVersion = dto.version ?? document.currentVersion;
 
+    if (roles.includes('compliance_officer')) {
+      throw new ForbiddenException(
+        'Compliance officers are not allowed to preview file content',
+      );
+    }
+
     if (!requestedVersion || requestedVersion < 1) {
       throw new ForbiddenException('Document has no uploaded version');
     }
@@ -185,7 +199,6 @@ export class PolicyService {
       throw new NotFoundException('Document version not found');
     }
 
-    // NOTE: compliance_officer is allowed here — preview is not download
     const statusDeniedReason = this.getPreviewDeniedReason(document.status);
     if (statusDeniedReason) {
       throw new ForbiddenException(statusDeniedReason);
@@ -263,6 +276,112 @@ export class PolicyService {
     };
   }
 
+  async assertCanReadMetadata(
+    docId: string,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    const document = await this.prisma.document.findUnique({
+      where: { id: docId },
+      include: {
+        versions: { orderBy: { version: 'desc' } },
+        aclEntries: true,
+      },
+    });
+
+    if (!document || document.status === 'DELETED') {
+      throw new NotFoundException('Document not found');
+    }
+
+    const actorId = buildActorId(user);
+    const roles = user.roles ?? context.roles ?? [];
+
+    const deny = async (reason: string) => {
+      await this.auditClient.emitEvent(context, {
+        action: 'DOCUMENT_METADATA_READ_DENIED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason,
+        metadata: {
+          docId,
+          classification: document.classification,
+          status: document.status,
+          actorId,
+          roles,
+        },
+      });
+      throw new ForbiddenException(reason);
+    };
+
+    if (roles.includes('admin')) {
+      return document;
+    }
+
+    if (
+      this.matchesPreviewAcl(
+        document.aclEntries,
+        actorId,
+        roles,
+        AclEffect.DENY,
+      )
+    ) {
+      return deny('Metadata read denied by ACL');
+    }
+
+    const hasExplicitReadAllow = this.matchesPreviewAcl(
+      document.aclEntries,
+      actorId,
+      roles,
+      AclEffect.ALLOW,
+    );
+
+    if (actorId === document.ownerId || hasExplicitReadAllow) {
+      return document;
+    }
+
+    if (roles.includes('compliance_officer')) {
+      if (['PUBLISHED', 'ARCHIVED'].includes(document.status)) {
+        return document;
+      }
+      return deny('Compliance officers can only read published or archived metadata');
+    }
+
+    if (roles.includes('approver')) {
+      if (['PENDING', 'PUBLISHED', 'ARCHIVED'].includes(document.status)) {
+        return document;
+      }
+      return deny('Approvers can only read pending, published, or archived metadata');
+    }
+
+    if (document.status !== 'PUBLISHED') {
+      return deny('Only published documents are readable by this user');
+    }
+
+    const classification = document.classification as ClassificationLevel;
+
+    if (classification === 'PUBLIC') {
+      return document;
+    }
+
+    if (
+      classification === 'INTERNAL' &&
+      roles.some((role) => ['viewer', 'editor'].includes(role))
+    ) {
+      return document;
+    }
+
+    if (
+      classification === 'CONFIDENTIAL' &&
+      roles.includes('editor') &&
+      hasExplicitReadAllow
+    ) {
+      return document;
+    }
+
+    return deny('Metadata read denied by classification policy');
+  }
+
   private getDeniedReason(status: string, roles: string[]): string | null {
     if (roles.includes('compliance_officer')) {
       return 'Compliance officers are never allowed to download files';
@@ -322,9 +441,7 @@ export class PolicyService {
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const signature = createHmac(
       'sha256',
-      process.env.PREVIEW_GRANT_SECRET ??
-        process.env.DOWNLOAD_GRANT_SECRET ??
-        'docvault-download-grant-secret',
+      requireEnv('PREVIEW_GRANT_SECRET'),
     )
       .update(encoded)
       .digest('base64url');
@@ -452,7 +569,7 @@ export class PolicyService {
     const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
     const signature = createHmac(
       'sha256',
-      process.env.DOWNLOAD_GRANT_SECRET ?? 'docvault-download-grant-secret',
+      requireEnv('DOWNLOAD_GRANT_SECRET'),
     )
       .update(encoded)
       .digest('base64url');

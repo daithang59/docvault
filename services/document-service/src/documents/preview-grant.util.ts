@@ -12,11 +12,11 @@ export type PreviewGrantPayload = {
 };
 
 function getSecret() {
-  return (
-    process.env.PREVIEW_GRANT_SECRET ??
-    process.env.DOWNLOAD_GRANT_SECRET ??
-    'docvault-download-grant-secret'
-  );
+  const value = process.env.PREVIEW_GRANT_SECRET;
+  if (!value || value.trim().length === 0) {
+    throw new Error('PREVIEW_GRANT_SECRET is required');
+  }
+  return value;
 }
 
 /**

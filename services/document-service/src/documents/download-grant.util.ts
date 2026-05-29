@@ -13,7 +13,11 @@ export type GrantPayload = {
 };
 
 function getSecret() {
-  return process.env.DOWNLOAD_GRANT_SECRET ?? 'docvault-download-grant-secret';
+  const value = process.env.DOWNLOAD_GRANT_SECRET;
+  if (!value || value.trim().length === 0) {
+    throw new Error('DOWNLOAD_GRANT_SECRET is required');
+  }
+  return value;
 }
 
 /**

@@ -34,6 +34,7 @@ export const apiEndpoints = {
   },
   audit: {
     query: '/audit/query',
+    verifyChain: '/audit/verify-chain',
   },
 } as const;
 

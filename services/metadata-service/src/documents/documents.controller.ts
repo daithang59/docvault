@@ -58,8 +58,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Get a document metadata record by id' })
-  findOne(@Param('docId') docId: string) {
-    return this.documentsService.findOneOrThrow(docId);
+  findOne(@Param('docId') docId: string, @Req() req: any) {
+    return this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post()
@@ -112,7 +116,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List ACL rules for a document' })
-  listAcl(@Param('docId') docId: string) {
+  async listAcl(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.aclService.list(docId);
   }
 
@@ -165,7 +174,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List workflow history for a document' })
-  getWorkflowHistory(@Param('docId') docId: string) {
+  async getWorkflowHistory(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.prisma.documentWorkflowHistory.findMany({
       where: { docId },
       orderBy: { createdAt: 'desc' },
@@ -187,7 +201,7 @@ export class DocumentsController {
 
   @Post(':docId/download-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Authorize a download using metadata status and ACL policy',
   })
@@ -207,7 +221,7 @@ export class DocumentsController {
 
   @Post(':docId/preview-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary:
       'Authorize a document preview using metadata status and ACL policy',
@@ -230,7 +244,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List comments for a document' })
-  listComments(@Param('docId') docId: string) {
+  async listComments(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.commentsService.findByDoc(docId);
   }
 
@@ -238,11 +257,16 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Add a comment to a document' })
-  addComment(
+  async addComment(
     @Param('docId') docId: string,
     @Body() body: { content: string },
     @Req() req: any,
   ) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.commentsService.create(
       docId,
       body.content,

@@ -1,10 +1,8 @@
-PORT=3000
+PORT=3003
 KEYCLOAK_BASE_URL=http://localhost:8080
 KEYCLOAK_REALM=docvault
 KEYCLOAK_AUDIENCE=docvault-gateway
+
 METADATA_SERVICE_URL=http://localhost:3001
-DOCUMENT_SERVICE_URL=http://localhost:3002
-WORKFLOW_SERVICE_URL=http://localhost:3003
 AUDIT_SERVICE_URL=http://localhost:3004
-AUDIT_INGEST_TOKEN=replace-with-strong-internal-audit-ingest-token
 NOTIFICATION_SERVICE_URL=http://localhost:3005

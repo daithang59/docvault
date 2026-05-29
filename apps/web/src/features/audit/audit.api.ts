@@ -2,7 +2,11 @@ import apiClient from '@/lib/api/client';
 import { apiEndpoints } from '@/lib/api/endpoints';
 import { normalizePaginatedResponse, unwrap } from '@/lib/api/response';
 import type { PaginatedResponse } from '@/types/pagination';
-import type { AuditLogEntry, AuditQueryFilters } from './audit.types';
+import type {
+  AuditChainStatus,
+  AuditLogEntry,
+  AuditQueryFilters,
+} from './audit.types';
 
 function toAuditQueryParams(
   filters?: AuditQueryFilters,
@@ -47,4 +51,9 @@ export async function queryAuditLog(
     ...paginated,
     data: paginated.data.map(normalizeAuditLogEntry),
   };
+}
+
+export async function verifyAuditChain(): Promise<AuditChainStatus> {
+  const res = await apiClient.get(apiEndpoints.audit.verifyChain);
+  return unwrap(res) as AuditChainStatus;
 }

@@ -156,6 +156,61 @@ async function main() {
   );
   const docId = createdDocument.id;
 
+  const confidentialDocument = await expectStatus(
+    'editor create confidential document',
+    '/api/metadata/documents',
+    201,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'Confidential policy probe',
+        description: 'Document used to prove guessed metadata is denied',
+        classification: 'CONFIDENTIAL',
+      }),
+    },
+  );
+  const confidentialDocId = confidentialDocument.id;
+
+  await expectStatus(
+    'viewer guessed confidential metadata denied',
+    `/api/metadata/documents/${confidentialDocId}`,
+    403,
+    {
+      headers: authHeaders(viewerToken),
+    },
+  );
+
+  await expectStatus(
+    'viewer guessed confidential workflow history denied',
+    `/api/metadata/documents/${confidentialDocId}/workflow-history`,
+    403,
+    {
+      headers: authHeaders(viewerToken),
+    },
+  );
+
+  await expectStatus(
+    'viewer guessed confidential comments denied',
+    `/api/metadata/documents/${confidentialDocId}/comments`,
+    403,
+    {
+      headers: authHeaders(viewerToken),
+    },
+  );
+
+  await expectStatus(
+    'viewer guessed confidential ACL denied',
+    `/api/metadata/documents/${confidentialDocId}/acl`,
+    403,
+    {
+      headers: authHeaders(viewerToken),
+    },
+  );
+
   const fileBuffer = readFileSync('./README.md');
   const form = new FormData();
   form.append(
@@ -263,6 +318,29 @@ async function main() {
   );
 
   await expectStatus(
+    'compliance officer preview denied',
+    `/api/metadata/documents/${docId}/preview-authorize`,
+    403,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(complianceToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ version: uploadResult.version }),
+    },
+  );
+
+  await expectStatus(
+    'compliance officer direct preview denied',
+    `/api/documents/${docId}/preview?version=${uploadResult.version}`,
+    403,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+
+  await expectStatus(
     'compliance officer download denied',
     `/api/documents/${docId}/presign-download`,
     403,
@@ -287,6 +365,35 @@ async function main() {
 
   await expectStatus('compliance officer audit query', '/api/audit/query', 200, {
     headers: authHeaders(complianceToken),
+  });
+
+  const chainStatus = await expectStatus(
+    'compliance officer audit verify-chain',
+    '/api/audit/verify-chain',
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    typeof chainStatus.valid === 'boolean',
+    'verify-chain should return a boolean valid field',
+  );
+  log(`PASS audit verify-chain valid=${chainStatus.valid}`);
+
+  await expectStatus('viewer audit ingest denied', '/api/audit/events', 403, {
+    method: 'POST',
+    headers: {
+      ...authHeaders(viewerToken),
+      'content-type': 'application/json',
+    },
+    body: JSON.stringify({
+      actorId: 'viewer1',
+      action: 'FAKE_EVENT',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+    }),
   });
 
   await expectStatus('viewer audit query denied', '/api/audit/query', 403, {

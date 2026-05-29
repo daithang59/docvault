@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  ForbiddenException,
   Get,
   Post,
   Query,
@@ -8,6 +9,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { createHash, timingSafeEqual } from 'crypto';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -17,6 +19,33 @@ import {
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
+
+function tokenMatches(providedToken: string, expectedToken: string): boolean {
+  const providedDigest = createHash('sha256')
+    .update(providedToken, 'utf8')
+    .digest();
+  const expectedDigest = createHash('sha256')
+    .update(expectedToken, 'utf8')
+    .digest();
+
+  return timingSafeEqual(providedDigest, expectedDigest);
+}
+
+function assertAuditIngestToken(req: any): string {
+  const expectedToken = process.env.AUDIT_INGEST_TOKEN;
+  const providedToken = req.headers['x-docvault-service-token'];
+
+  if (
+    !expectedToken ||
+    expectedToken.trim().length === 0 ||
+    typeof providedToken !== 'string' ||
+    !tokenMatches(providedToken, expectedToken)
+  ) {
+    throw new ForbiddenException('Invalid audit service token');
+  }
+
+  return providedToken;
+}
 
 @ApiTags('audit-proxy')
 @ApiBearerAuth()
@@ -35,10 +64,14 @@ export class AuditProxyController {
       'Each event is linked to the previous via a SHA-256 hash chain for tamper-evidence.',
   })
   async create(@Req() req: any, @Body() body: any) {
+    const serviceToken = assertAuditIngestToken(req);
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.AUDIT_SERVICE_URL}/audit/events`,
       data: body,
+      headers: {
+        'x-docvault-service-token': serviceToken,
+      },
     });
     return response.data;
   }

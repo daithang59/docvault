@@ -169,6 +169,7 @@ export class DocumentsService {
    */
   async getStreamWithToken(
     docId: string,
+    version: number,
     grantToken: string,
     actorId: string,
   ): Promise<{
@@ -177,6 +178,12 @@ export class DocumentsService {
     stream: StreamableFile;
   }> {
     const grantPayload = verifyGrantToken(grantToken, actorId);
+    if (grantPayload.docId !== docId) {
+      throw new ForbiddenException('Grant token document mismatch');
+    }
+    if (grantPayload.version !== version) {
+      throw new ForbiddenException('Requested version is not authorized');
+    }
 
     const object = await this.storageService.getObjectStream(
       grantPayload.objectKey,

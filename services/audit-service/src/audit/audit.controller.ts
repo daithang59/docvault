@@ -3,11 +3,10 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { ServiceTokenGuard } from '../auth/service-token.guard';
 import { AuditService } from './audit.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
-import { IsOptional, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
 
 @ApiTags('audit')
 @ApiBearerAuth()
@@ -17,10 +16,10 @@ export class AuditController {
 
   /**
    * Append a new audit event to the immutable log.
-   * Called by the gateway audit middleware with a forwarded JWT.
+   * Called by trusted services with the internal audit ingest token.
    */
   @Post('events')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(ServiceTokenGuard)
   @ApiOperation({ summary: 'Append an audit event' })
   create(@Body() body: CreateAuditEventDto) {
     return this.auditService.create(body);
