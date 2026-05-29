@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
 export type PreviewGrantPayload = {
+  kid?: string;
   actorId: string;
   docId: string;
   version: number;
@@ -11,12 +12,33 @@ export type PreviewGrantPayload = {
   classification: string;
 };
 
-function getSecret() {
+function requireEnv(name: string) {
+  const value = process.env[name];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+function getLegacySecret() {
   const value = process.env.PREVIEW_GRANT_SECRET;
   if (!value || value.trim().length === 0) {
     throw new Error('PREVIEW_GRANT_SECRET is required');
   }
   return value;
+}
+
+function getSecretForKid(kid: string) {
+  const acceptedKids = [
+    process.env.GRANT_TOKEN_CURRENT_KID,
+    process.env.GRANT_TOKEN_PREVIOUS_KID,
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  if (!acceptedKids.includes(kid)) {
+    throw new Error('Preview grant token kid is not accepted');
+  }
+
+  return requireEnv(`PREVIEW_GRANT_SECRET_${kid}`);
 }
 
 /**
@@ -37,7 +59,15 @@ export function verifyPreviewGrantToken(
     throw new Error('Invalid preview grant token format');
   }
 
-  const expectedSignature = createHmac('sha256', getSecret())
+  const payload = JSON.parse(
+    Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+  ) as PreviewGrantPayload;
+
+  const secret = payload.kid
+    ? getSecretForKid(payload.kid)
+    : getLegacySecret();
+
+  const expectedSignature = createHmac('sha256', secret)
     .update(encodedPayload)
     .digest('base64url');
   const expectedBuffer = Buffer.from(expectedSignature);
@@ -49,10 +79,6 @@ export function verifyPreviewGrantToken(
   ) {
     throw new Error('Preview grant token signature mismatch');
   }
-
-  const payload = JSON.parse(
-    Buffer.from(encodedPayload, 'base64url').toString('utf8'),
-  ) as PreviewGrantPayload;
 
   if (new Date(payload.expiresAt).getTime() <= Date.now()) {
     throw new Error('Preview grant token expired');

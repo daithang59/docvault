@@ -29,6 +29,18 @@ function requireEnv(name: string): string {
   return value;
 }
 
+function getSigningSecret(baseName: string): { kid?: string; secret: string } {
+  const kid = process.env.GRANT_TOKEN_CURRENT_KID?.trim();
+  if (kid) {
+    return {
+      kid,
+      secret: requireEnv(`${baseName}_${kid}`),
+    };
+  }
+
+  return { secret: requireEnv(baseName) };
+}
+
 @Injectable()
 export class PolicyService {
   private readonly expiresInSeconds = 300;
@@ -438,11 +450,12 @@ export class PolicyService {
     expiresAt: string;
     classification: string;
   }) {
-    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    const signature = createHmac(
-      'sha256',
-      requireEnv('PREVIEW_GRANT_SECRET'),
-    )
+    const signing = getSigningSecret('PREVIEW_GRANT_SECRET');
+    const tokenPayload = signing.kid ? { ...payload, kid: signing.kid } : payload;
+    const encoded = Buffer.from(JSON.stringify(tokenPayload)).toString(
+      'base64url',
+    );
+    const signature = createHmac('sha256', signing.secret)
       .update(encoded)
       .digest('base64url');
 
@@ -566,11 +579,12 @@ export class PolicyService {
     classification: string;
     watermarkRequired: boolean;
   }) {
-    const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
-    const signature = createHmac(
-      'sha256',
-      requireEnv('DOWNLOAD_GRANT_SECRET'),
-    )
+    const signing = getSigningSecret('DOWNLOAD_GRANT_SECRET');
+    const tokenPayload = signing.kid ? { ...payload, kid: signing.kid } : payload;
+    const encoded = Buffer.from(JSON.stringify(tokenPayload)).toString(
+      'base64url',
+    );
+    const signature = createHmac('sha256', signing.secret)
       .update(encoded)
       .digest('base64url');
 

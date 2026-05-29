@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from 'crypto';
 
 export type GrantPayload = {
+  kid?: string;
   actorId: string;
   docId: string;
   version: number;
@@ -12,12 +13,33 @@ export type GrantPayload = {
   watermarkRequired: boolean;
 };
 
-function getSecret() {
+function requireEnv(name: string) {
+  const value = process.env[name];
+  if (!value || value.trim().length === 0) {
+    throw new Error(`${name} is required`);
+  }
+  return value;
+}
+
+function getLegacySecret() {
   const value = process.env.DOWNLOAD_GRANT_SECRET;
   if (!value || value.trim().length === 0) {
     throw new Error('DOWNLOAD_GRANT_SECRET is required');
   }
   return value;
+}
+
+function getSecretForKid(kid: string) {
+  const acceptedKids = [
+    process.env.GRANT_TOKEN_CURRENT_KID,
+    process.env.GRANT_TOKEN_PREVIOUS_KID,
+  ].filter((value): value is string => Boolean(value?.trim()));
+
+  if (!acceptedKids.includes(kid)) {
+    throw new Error('Grant token kid is not accepted');
+  }
+
+  return requireEnv(`DOWNLOAD_GRANT_SECRET_${kid}`);
 }
 
 /**
@@ -38,7 +60,15 @@ export function verifyGrantToken(
     throw new Error('Invalid grant token format');
   }
 
-  const expectedSignature = createHmac('sha256', getSecret())
+  const payload = JSON.parse(
+    Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+  ) as GrantPayload;
+
+  const secret = payload.kid
+    ? getSecretForKid(payload.kid)
+    : getLegacySecret();
+
+  const expectedSignature = createHmac('sha256', secret)
     .update(encodedPayload)
     .digest('base64url');
   const expectedBuffer = Buffer.from(expectedSignature);
@@ -50,10 +80,6 @@ export function verifyGrantToken(
   ) {
     throw new Error('Grant token signature mismatch');
   }
-
-  const payload = JSON.parse(
-    Buffer.from(encodedPayload, 'base64url').toString('utf8'),
-  ) as GrantPayload;
 
   if (new Date(payload.expiresAt).getTime() <= Date.now()) {
     throw new Error('Grant token expired');

@@ -18,6 +18,8 @@ import { PresignDownloadDto } from './dto/presign-download.dto';
 import { verifyGrantToken } from './download-grant.util';
 import { verifyPreviewGrantToken } from './preview-grant.util';
 import { WatermarkService } from '../watermark/watermark.service';
+import { DlpScannerService } from '../security/dlp-scanner.service';
+import { MalwareScannerService } from '../security/malware-scanner.service';
 
 @Injectable()
 export class DocumentsService {
@@ -26,6 +28,8 @@ export class DocumentsService {
     private readonly storageService: StorageService,
     private readonly auditClient: AuditClient,
     private readonly watermarkService: WatermarkService,
+    private readonly malwareScanner: MalwareScannerService,
+    private readonly dlpScanner: DlpScannerService,
   ) {}
 
   async upload(
@@ -42,6 +46,48 @@ export class DocumentsService {
     this.assertCanUpload(document.ownerId, user);
 
     const nextVersion = Number(document.currentVersion ?? 0) + 1;
+    const malwareResult = await this.malwareScanner.scan(file.buffer);
+    if (malwareResult.clean === false) {
+      await this.auditClient.emitEvent(context, {
+        action: 'MALWARE_UPLOAD_BLOCKED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'DENY',
+        reason: malwareResult.threatName,
+        metadata: {
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          version: nextVersion,
+          engine: malwareResult.engine,
+          threatName: malwareResult.threatName,
+        },
+      });
+      throw new BadRequestException('Malware detected in upload');
+    }
+
+    const dlpResult = this.dlpScanner.scan(file.buffer);
+    if (dlpResult.status === 'DETECTED') {
+      await this.auditClient.emitEvent(context, {
+        action: 'DLP_PATTERN_DETECTED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'SUCCESS',
+        metadata: {
+          fileName: file.originalname,
+          mimeType: file.mimetype,
+          size: file.size,
+          version: nextVersion,
+          findingCount: dlpResult.findings.reduce(
+            (total, finding) => total + finding.count,
+            0,
+          ),
+          findings: dlpResult.findings,
+          suggestedClassification: dlpResult.suggestedClassification,
+        },
+      });
+    }
+
     const checksum = sha256Hex(file.buffer);
     const objectKey = this.storageService.buildObjectKey(
       docId,
@@ -84,6 +130,12 @@ export class DocumentsService {
           size: file.size,
           filename: file.originalname,
           contentType: file.mimetype,
+          dlpStatus: dlpResult.status,
+          dlpFindings: dlpResult.findings,
+          dlpSuggestedClassification:
+            dlpResult.status === 'DETECTED'
+              ? dlpResult.suggestedClassification
+              : undefined,
         },
         context,
       );

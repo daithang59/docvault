@@ -57,6 +57,9 @@ model Document {
   description     String?
   ownerId         String
   classification  ClassificationLevel @default(INTERNAL)
+  dlpStatus       String            @default("NOT_SCANNED")
+  dlpFindings     Json?
+  dlpDetectedAt   DateTime?
   tags            String[]          @default([])
   status          DocumentStatus    @default(DRAFT)
   currentVersion  Int               @default(0)
@@ -85,6 +88,8 @@ model DocumentVersion {
   size        Int
   filename    String
   contentType String?
+  dlpStatus   String   @default("NOT_SCANNED")
+  dlpFindings Json?
   createdAt   DateTime @default(now())
   createdBy   String
   document    Document @relation(fields: [docId], references: [id], onDelete: Cascade)

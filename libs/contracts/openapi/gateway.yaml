@@ -89,6 +89,9 @@ components:
         title: { type: string }
         description: { type: string }
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, nullable: true, items: { type: object } }
+        dlpDetectedAt: { type: string, format: date-time, nullable: true }
         status: { $ref: '#/components/schemas/DocumentStatus' }
         currentVersion: { type: integer, nullable: true }
         ownerId: { type: string }
@@ -127,6 +130,8 @@ components:
         size: { type: integer }
         filename: { type: string }
         contentType: { type: string }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, nullable: true, items: { type: object } }
         createdAt: { type: string, format: date-time }
 
     CreateVersion:
@@ -139,6 +144,9 @@ components:
         size: { type: integer }
         filename: { type: string }
         contentType: { type: string }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, items: { type: object } }
+        dlpSuggestedClassification: { $ref: '#/components/schemas/ClassificationLevel' }
 
     # ─── ACL ──────────────────────────────────────────────────────────────────
     AclSubjectType:
@@ -259,6 +267,7 @@ components:
             DOCUMENT_CREATED, DOCUMENT_METADATA_UPDATED,
             DOCUMENT_ACL_UPDATED, DOCUMENT_ACL_DELETED,
             DOCUMENT_SUBMIT, DOCUMENT_APPROVE, DOCUMENT_REJECT, DOCUMENT_ARCHIVE,
+            MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
         resourceType: { type: string }
@@ -290,6 +299,25 @@ components:
         checked: { type: integer }
         firstBrokenIndex: { type: integer, nullable: true }
         message: { type: string, nullable: true }
+
+    SecuritySummary:
+      type: object
+      properties:
+        chain: { $ref: '#/components/schemas/VerifyChainResult' }
+        totals:
+          type: object
+          properties:
+            deniedEvents: { type: integer }
+            malwareBlocked: { type: integer }
+            dlpDetections: { type: integer }
+            downloadDenied: { type: integer }
+        repeatedDenyActors:
+          type: array
+          items:
+            type: object
+            properties:
+              actorId: { type: string }
+              denyCount: { type: integer }
 
     # ─── Notification ─────────────────────────────────────────────────────────
     NotificationRecord:
@@ -752,6 +780,11 @@ paths:
   /documents/{docId}/upload:
     post:
       summary: Upload a document blob and register a version
+      description: |
+        Scans uploads before storage. EICAR malware test content is rejected
+        before MinIO/object creation. DLP detections are persisted on the
+        version and parent document; PUBLIC/INTERNAL documents with DLP hits
+        are escalated to CONFIDENTIAL.
       operationId: uploadDocument
       security:
         - bearerAuth: []
@@ -779,7 +812,7 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentVersion'
         '400':
-          description: Bad request — file required or exceeds size limit
+          description: Bad request — file required, exceeds size limit, or malware detected
         '403':
           description: Forbidden — owner editor or admin
 
@@ -1099,6 +1132,26 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VerifyChainResult'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-summary:
+    get:
+      summary: Summarize security audit evidence
+      operationId: securitySummary
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      responses:
+        '200':
+          description: Security counters and audit chain status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecuritySummary'
         '401':
           description: Unauthorized
         '403':

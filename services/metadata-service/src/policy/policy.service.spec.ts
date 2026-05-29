@@ -1,3 +1,4 @@
+import { createHmac } from 'crypto';
 import { ForbiddenException } from '@nestjs/common';
 import { AclEffect, ClassificationLevel } from '../../generated/prisma';
 import { PolicyService } from './policy.service';
@@ -67,6 +68,10 @@ describe('PolicyService', () => {
   afterEach(() => {
     delete process.env.DOWNLOAD_GRANT_SECRET;
     delete process.env.PREVIEW_GRANT_SECRET;
+    delete process.env.GRANT_TOKEN_CURRENT_KID;
+    delete process.env.GRANT_TOKEN_PREVIOUS_KID;
+    delete process.env.DOWNLOAD_GRANT_SECRET_2026_05;
+    delete process.env.PREVIEW_GRANT_SECRET_2026_05;
   });
 
   it('denies compliance officers from previewing file content', async () => {
@@ -97,6 +102,54 @@ describe('PolicyService', () => {
         },
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('signs download grants with the current kid when rotation env is configured', async () => {
+    delete process.env.DOWNLOAD_GRANT_SECRET;
+    process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
+    process.env.DOWNLOAD_GRANT_SECRET_2026_05 = 'current-download-secret';
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    const [encodedPayload, signature] = result.grantToken.split('.');
+    const tokenPayload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+    );
+    const expectedSignature = createHmac('sha256', 'current-download-secret')
+      .update(encodedPayload)
+      .digest('base64url');
+
+    expect(tokenPayload.kid).toBe('2026_05');
+    expect(signature).toBe(expectedSignature);
+  });
+
+  it('signs preview grants with the current kid when rotation env is configured', async () => {
+    delete process.env.PREVIEW_GRANT_SECRET;
+    process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
+    process.env.PREVIEW_GRANT_SECRET_2026_05 = 'current-preview-secret';
+
+    const result = await service.authorizePreview(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    const [encodedPayload, signature] = result.grantToken.split('.');
+    const tokenPayload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+    );
+    const expectedSignature = createHmac('sha256', 'current-preview-secret')
+      .update(encodedPayload)
+      .digest('base64url');
+
+    expect(tokenPayload.kid).toBe('2026_05');
+    expect(signature).toBe(expectedSignature);
   });
 
   it('allows viewer metadata read for a published public document', async () => {

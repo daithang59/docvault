@@ -39,6 +39,13 @@ export class VersionsService {
       );
     }
 
+    const dlpStatus = dto.dlpStatus ?? 'NOT_SCANNED';
+    const dlpFindings = dto.dlpFindings ?? [];
+    const dlpDetected = dlpStatus === 'DETECTED';
+    const currentClassification = document.classification as string;
+    const shouldEscalateClassification =
+      dlpDetected && ['PUBLIC', 'INTERNAL'].includes(currentClassification);
+
     const versionRecord = await this.prisma.$transaction(async (tx) => {
       const created = await tx.documentVersion.create({
         data: {
@@ -50,12 +57,29 @@ export class VersionsService {
           filename: dto.filename,
           contentType: dto.contentType,
           createdBy: buildActorId(user),
-        },
+          dlpStatus,
+          dlpFindings,
+        } as any,
       });
+
+      const documentUpdateData: Record<string, unknown> = {
+        currentVersion: dto.version,
+      };
+
+      if (dlpDetected) {
+        documentUpdateData.dlpStatus = 'DETECTED';
+        documentUpdateData.dlpFindings = dlpFindings;
+        documentUpdateData.dlpDetectedAt = new Date();
+        if (shouldEscalateClassification) {
+          documentUpdateData.classification = 'CONFIDENTIAL';
+        }
+      } else if ((document as any).dlpStatus !== 'DETECTED') {
+        documentUpdateData.dlpStatus = dlpStatus;
+      }
 
       await tx.document.update({
         where: { id: docId },
-        data: { currentVersion: dto.version },
+        data: documentUpdateData as any,
       });
 
       return created;

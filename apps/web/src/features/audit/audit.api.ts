@@ -6,6 +6,7 @@ import type {
   AuditChainStatus,
   AuditLogEntry,
   AuditQueryFilters,
+  SecuritySummary,
 } from './audit.types';
 
 function toAuditQueryParams(
@@ -56,4 +57,9 @@ export async function queryAuditLog(
 export async function verifyAuditChain(): Promise<AuditChainStatus> {
   const res = await apiClient.get(apiEndpoints.audit.verifyChain);
   return unwrap(res) as AuditChainStatus;
+}
+
+export async function getSecuritySummary(): Promise<SecuritySummary> {
+  const res = await apiClient.get(apiEndpoints.audit.securitySummary);
+  return unwrap(res) as SecuritySummary;
 }

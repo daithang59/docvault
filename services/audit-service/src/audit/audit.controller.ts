@@ -41,4 +41,12 @@ export class AuditController {
     const limit = limitStr ? Math.min(Number(limitStr), 5000) : 1000;
     return this.auditService.verifyChain(limit);
   }
+
+  @Get('security-summary')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Summarize security audit evidence' })
+  securitySummary() {
+    return this.auditService.securitySummary();
+  }
 }

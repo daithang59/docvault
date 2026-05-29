@@ -113,4 +113,21 @@ export class AuditProxyController {
     });
     return response.data;
   }
+
+  /** Summarize security audit evidence for dashboard cards. */
+  @Get('security-summary')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Summarize security audit evidence',
+    description:
+      'Returns hash-chain status and counters for denied requests, malware blocks, DLP detections, and download denials.',
+  })
+  async securitySummary(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.AUDIT_SERVICE_URL}/audit/security-summary`,
+    });
+    return response.data;
+  }
 }

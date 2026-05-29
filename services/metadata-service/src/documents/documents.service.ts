@@ -235,6 +235,28 @@ export class DocumentsService {
       data.description = dto.description;
     }
     if (dto.classification !== undefined) {
+      if (
+        (document as any).dlpStatus === 'DETECTED' &&
+        ['PUBLIC', 'INTERNAL'].includes(dto.classification)
+      ) {
+        await this.auditClient.emitEvent(context, {
+          action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
+          resourceType: 'DOCUMENT',
+          resourceId: id,
+          result: 'DENY',
+          reason:
+            'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+          metadata: {
+            docId: id,
+            currentClassification: document.classification,
+            requestedClassification: dto.classification,
+            dlpStatus: (document as any).dlpStatus,
+          },
+        });
+        throw new ForbiddenException(
+          'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+        );
+      }
       changes.classification = { old: document.classification, new: dto.classification };
       data.classification = dto.classification;
     }

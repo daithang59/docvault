@@ -14,6 +14,9 @@ export interface DocumentSummaryDto {
   description?: string | null;
   status: DocumentStatus;
   classification: ClassificationLevel;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
+  dlpDetectedAt?: string | null;
   ownerId: string;
   ownerDisplay?: string;
   currentVersion: number;
@@ -40,6 +43,8 @@ export interface DocumentVersionDto {
   size: number;
   filename: string;
   contentType?: string | null;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
   createdAt: string;
   createdBy: string;
   versionNumber?: number;
@@ -133,6 +138,8 @@ export interface UploadVersionResponse {
   contentType?: string | null;
   createdAt: string;
   createdBy: string;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
 }
 
 export type SubmitDocumentRequest = Record<string, never>;

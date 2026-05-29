@@ -99,6 +99,44 @@ export class AuditService {
     return { data, total, page, pageSize };
   }
 
+  async securitySummary(): Promise<{
+    chain: Awaited<ReturnType<AuditService['verifyChain']>>;
+    totals: {
+      deniedEvents: number;
+      malwareBlocked: number;
+      dlpDetections: number;
+      downloadDenied: number;
+    };
+    repeatedDenyActors: Array<{ actorId: string; denyCount: number }>;
+  }> {
+    const [
+      chain,
+      deniedEvents,
+      malwareBlocked,
+      dlpDetections,
+      downloadDenied,
+      repeatedDenyActors,
+    ] = await Promise.all([
+      this.verifyChain(1000),
+      this.auditEvent.countDocuments({ result: 'DENY' }),
+      this.auditEvent.countDocuments({ action: 'MALWARE_UPLOAD_BLOCKED' }),
+      this.auditEvent.countDocuments({ action: 'DLP_PATTERN_DETECTED' }),
+      this.auditEvent.countDocuments({ action: 'DOCUMENT_DOWNLOAD_DENIED' }),
+      this.getRepeatedDenyActors(),
+    ]);
+
+    return {
+      chain,
+      totals: {
+        deniedEvents,
+        malwareBlocked,
+        dlpDetections,
+        downloadDenied,
+      },
+      repeatedDenyActors,
+    };
+  }
+
   /**
    * Build a deterministic canonical string from audit event fields.
    * Fields are sorted alphabetically and serialized as key=value pairs.
@@ -138,6 +176,25 @@ export class AuditService {
   ): string {
     const input = `${prevHash ?? ''}|${canonicalPayload}`;
     return createHash('sha256').update(input, 'utf8').digest('hex');
+  }
+
+  private async getRepeatedDenyActors(): Promise<
+    Array<{ actorId: string; denyCount: number }>
+  > {
+    const query = this.auditEvent.aggregate([
+      { $match: { result: 'DENY', actorId: { $ne: null } } },
+      { $group: { _id: '$actorId', denyCount: { $sum: 1 } } },
+      { $match: { denyCount: { $gte: 3 } } },
+      { $sort: { denyCount: -1 } },
+      { $limit: 5 },
+      { $project: { _id: 0, actorId: '$_id', denyCount: 1 } },
+    ]);
+
+    if (typeof (query as any).exec === 'function') {
+      return (query as any).exec();
+    }
+
+    return query as any;
   }
 
   /**

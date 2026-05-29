@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import process from 'node:process';
 import { S3Client, HeadObjectCommand } from '@aws-sdk/client-s3';
 
@@ -111,6 +110,35 @@ async function verifyObjectExists(objectKey) {
   );
 }
 
+async function verifyObjectMissing(objectKey) {
+  const client = new S3Client({
+    region: S3_REGION,
+    endpoint: S3_ENDPOINT,
+    forcePathStyle: true,
+    credentials: {
+      accessKeyId: S3_ACCESS_KEY,
+      secretAccessKey: S3_SECRET_KEY,
+    },
+  });
+
+  try {
+    await client.send(
+      new HeadObjectCommand({
+        Bucket: S3_BUCKET,
+        Key: objectKey,
+      }),
+    );
+  } catch (error) {
+    const statusCode = error?.$metadata?.httpStatusCode;
+    if (statusCode === 404 || error?.name === 'NotFound') {
+      return;
+    }
+    throw error;
+  }
+
+  throw new Error(`Expected object to be absent from MinIO: ${objectKey}`);
+}
+
 async function main() {
   log('Getting access tokens');
   const editorToken = await getToken('editor1');
@@ -211,12 +239,143 @@ async function main() {
     },
   );
 
-  const fileBuffer = readFileSync('./README.md');
+  const malwareDocument = await expectStatus(
+    'editor create malware scan probe',
+    '/api/metadata/documents',
+    201,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'Malware scan probe',
+        description: 'Document used to prove EICAR upload is blocked',
+        classification: 'INTERNAL',
+      }),
+    },
+  );
+  const eicarForm = new FormData();
+  eicarForm.append(
+    'file',
+    new Blob(
+      [
+        Buffer.from(
+          'X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*',
+          'ascii',
+        ),
+      ],
+      { type: 'text/plain' },
+    ),
+    'eicar.txt',
+  );
+
+  await expectStatus(
+    'editor EICAR upload blocked',
+    `/api/documents/${malwareDocument.id}/upload`,
+    400,
+    {
+      method: 'POST',
+      headers: authHeaders(editorToken),
+      body: eicarForm,
+    },
+  );
+  await verifyObjectMissing(`doc/${malwareDocument.id}/v1/eicar.txt`);
+  log('PASS EICAR upload not stored in MinIO');
+  const malwareMetadata = await expectStatus(
+    'malware blocked document has no version',
+    `/api/metadata/documents/${malwareDocument.id}`,
+    200,
+    {
+      headers: authHeaders(editorToken),
+    },
+  );
+  assert(
+    malwareMetadata.currentVersion === 0,
+    'malware blocked document should not create a version',
+  );
+  log('PASS EICAR upload created no version');
+
+  const dlpDocument = await expectStatus(
+    'editor create DLP scan probe',
+    '/api/metadata/documents',
+    201,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        title: 'DLP scan probe',
+        description: 'Document used to prove sensitive text is detected',
+        classification: 'INTERNAL',
+      }),
+    },
+  );
+  const dlpForm = new FormData();
+  dlpForm.append(
+    'file',
+    new Blob(
+      [
+        Buffer.from(
+          'Internal only file. Contact ceo@example.com or 0901234567.',
+          'utf8',
+        ),
+      ],
+      { type: 'text/plain' },
+    ),
+    'sensitive.txt',
+  );
+  await expectStatus(
+    'editor upload sensitive DLP document',
+    `/api/documents/${dlpDocument.id}/upload`,
+    201,
+    {
+      method: 'POST',
+      headers: authHeaders(editorToken),
+      body: dlpForm,
+    },
+  );
+  const dlpMetadata = await expectStatus(
+    'editor DLP metadata escalated',
+    `/api/metadata/documents/${dlpDocument.id}`,
+    200,
+    {
+      headers: authHeaders(editorToken),
+    },
+  );
+  assert(dlpMetadata.dlpStatus === 'DETECTED', 'DLP status should be DETECTED');
+  assert(
+    dlpMetadata.classification === 'CONFIDENTIAL',
+    'DLP detection should escalate classification to CONFIDENTIAL',
+  );
+  log('PASS DLP upload escalated classification');
+
+  await expectStatus(
+    'editor downgrade DLP document denied',
+    `/api/metadata/documents/${dlpDocument.id}`,
+    403,
+    {
+      method: 'PATCH',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ classification: 'PUBLIC' }),
+    },
+  );
+
+  const fileBuffer = Buffer.from(
+    'Regular project handbook for review and approval.',
+    'utf8',
+  );
   const form = new FormData();
   form.append(
     'file',
-    new Blob([fileBuffer], { type: 'text/markdown' }),
-    'README.md',
+    new Blob([fileBuffer], { type: 'text/plain' }),
+    'regular.txt',
   );
 
   const uploadResult = await expectStatus(
@@ -380,6 +539,32 @@ async function main() {
     'verify-chain should return a boolean valid field',
   );
   log(`PASS audit verify-chain valid=${chainStatus.valid}`);
+
+  const securitySummary = await expectStatus(
+    'compliance officer security summary',
+    '/api/audit/security-summary',
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    securitySummary.totals?.malwareBlocked >= 1,
+    'security summary should include malware blocked counter',
+  );
+  assert(
+    securitySummary.totals?.dlpDetections >= 1,
+    'security summary should include DLP detection counter',
+  );
+  assert(
+    securitySummary.totals?.deniedEvents >= 1,
+    'security summary should include denied event counter',
+  );
+  assert(
+    securitySummary.totals?.downloadDenied >= 1,
+    'security summary should include download denied counter',
+  );
+  log('PASS security summary includes malware/DLP/deny evidence');
 
   await expectStatus('viewer audit ingest denied', '/api/audit/events', 403, {
     method: 'POST',

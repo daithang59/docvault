@@ -42,3 +42,17 @@ export interface AuditChainStatus {
   firstBrokenIndex?: number;
   message?: string;
 }
+
+export interface SecuritySummary {
+  chain: AuditChainStatus;
+  totals: {
+    deniedEvents: number;
+    malwareBlocked: number;
+    dlpDetections: number;
+    downloadDenied: number;
+  };
+  repeatedDenyActors: Array<{
+    actorId: string;
+    denyCount: number;
+  }>;
+}

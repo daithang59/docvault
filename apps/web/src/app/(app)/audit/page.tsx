@@ -1,9 +1,14 @@
 'use client';
 
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuditQuery } from '@/lib/hooks/use-audit';
-import { verifyAuditChain } from '@/features/audit/audit.api';
+import {
+  getSecuritySummary,
+  verifyAuditChain,
+} from '@/features/audit/audit.api';
+import { auditKeys } from '@/features/audit/audit.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
@@ -17,7 +22,16 @@ import type {
 } from '@/features/audit/audit.types';
 import { canViewAudit } from '@/lib/auth/guards';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
-import { RefreshCw, Shield, ShieldAlert, ShieldCheck } from 'lucide-react';
+import {
+  Bug,
+  Download,
+  FileWarning,
+  RefreshCw,
+  Shield,
+  ShieldAlert,
+  ShieldCheck,
+  ShieldX,
+} from 'lucide-react';
 
 export default function AuditPage() {
   const { session } = useAuth();
@@ -31,15 +45,48 @@ export default function AuditPage() {
   const hasAccess = canViewAudit(session);
 
   const { data: logs, isLoading, isError, refetch } = useAuditQuery(filters, page, pageSize);
+  const {
+    data: securitySummary,
+    isLoading: isSummaryLoading,
+    refetch: refetchSummary,
+  } = useQuery({
+    queryKey: auditKeys.securitySummary(),
+    queryFn: getSecuritySummary,
+    enabled: hasAccess,
+  });
 
   const total = logs?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
+  const displayedChainStatus = chainStatus ?? securitySummary?.chain ?? null;
+  const summaryCards = [
+    {
+      label: 'Denied events',
+      value: securitySummary?.totals.deniedEvents,
+      icon: ShieldX,
+    },
+    {
+      label: 'Malware blocked',
+      value: securitySummary?.totals.malwareBlocked,
+      icon: Bug,
+    },
+    {
+      label: 'DLP hits',
+      value: securitySummary?.totals.dlpDetections,
+      icon: FileWarning,
+    },
+    {
+      label: 'Download denied',
+      value: securitySummary?.totals.downloadDenied,
+      icon: Download,
+    },
+  ];
 
   async function handleVerifyChain() {
     setIsVerifyingChain(true);
     setVerifyChainError(null);
     try {
       setChainStatus(await verifyAuditChain());
+      await refetchSummary();
     } catch {
       setVerifyChainError('Audit chain verification failed.');
     } finally {
@@ -80,23 +127,23 @@ export default function AuditPage() {
         }}
       >
         <div className="flex items-center gap-3">
-          {chainStatus?.valid === false ? (
+          {displayedChainStatus?.valid === false ? (
             <ShieldAlert className="h-5 w-5 text-red-500" />
           ) : (
             <ShieldCheck className="h-5 w-5 text-emerald-600" />
           )}
           <div>
             <p className="text-sm font-semibold text-[var(--text-strong)]">
-              {chainStatus
-                ? chainStatus.valid
+              {displayedChainStatus
+                ? displayedChainStatus.valid
                   ? 'Audit chain valid'
                   : 'Audit chain invalid'
                 : 'Audit chain'}
             </p>
             <p className="text-xs text-[var(--text-muted)]">
               {verifyChainError ??
-                (chainStatus
-                  ? `${chainStatus.checked} events checked${chainStatus.message ? ` - ${chainStatus.message}` : ''}`
+                (displayedChainStatus
+                  ? `${displayedChainStatus.checked} events checked${displayedChainStatus.message ? ` - ${displayedChainStatus.message}` : ''}`
                   : 'Not checked')}
             </p>
           </div>
@@ -113,6 +160,56 @@ export default function AuditPage() {
           Verify Chain
         </button>
       </div>
+
+      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {summaryCards.map((card) => {
+          const Icon = card.icon;
+          return (
+            <div
+              key={card.label}
+              className="rounded-lg border p-4"
+              style={{
+                background: 'var(--bg-card)',
+                borderColor: 'var(--border-soft)',
+              }}
+            >
+              <div className="flex items-center justify-between gap-3">
+                <p className="text-sm font-medium text-[var(--text-muted)]">
+                  {card.label}
+                </p>
+                <Icon className="h-4 w-4 text-[var(--text-faint)]" />
+              </div>
+              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+                {isSummaryLoading ? '...' : (card.value ?? 0)}
+              </p>
+            </div>
+          );
+        })}
+      </div>
+
+      {securitySummary?.repeatedDenyActors.length ? (
+        <div
+          className="mb-5 rounded-lg border p-4"
+          style={{
+            background: 'var(--bg-card)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <p className="text-sm font-semibold text-[var(--text-strong)]">
+            Repeated deny actors
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {securitySummary.repeatedDenyActors.map((actor) => (
+              <span
+                key={actor.actorId}
+                className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 text-xs text-[var(--text-muted)]"
+              >
+                {actor.actorId}: {actor.denyCount}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
       <div className="animate-in delay-2">
         <AuditFilters
