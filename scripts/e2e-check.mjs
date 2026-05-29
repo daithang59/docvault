@@ -145,6 +145,7 @@ async function main() {
   const approverToken = await getToken('approver1');
   const viewerToken = await getToken('viewer1');
   const complianceToken = await getToken('co1');
+  const adminToken = await getToken('admin1');
 
   await expectStatus('no token metadata list', '/api/metadata/documents', 401);
 
@@ -430,7 +431,16 @@ async function main() {
     publishedDocument.status === 'PUBLISHED',
     'approve should set status=PUBLISHED',
   );
+  assert(
+    typeof publishedDocument.retentionClass === 'string',
+    'approve should set retentionClass',
+  );
+  assert(
+    typeof publishedDocument.retentionUntil === 'string',
+    'approve should set retentionUntil',
+  );
   log('PASS approve status=PUBLISHED');
+  log('PASS approve stamped retention evidence');
 
   await expectStatus(
     'approve same document twice conflict',
@@ -475,6 +485,28 @@ async function main() {
       headers: authHeaders(complianceToken),
     },
   );
+
+  const retentionEvidence = await expectStatus(
+    'compliance officer retention evidence',
+    '/api/metadata/retention/documents',
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  const retentionRecord = retentionEvidence.records?.find(
+    (record) => record.docId === docId,
+  );
+  assert(retentionRecord, 'retention evidence should include published document');
+  assert(
+    retentionRecord.retentionClass === publishedDocument.retentionClass,
+    'retention evidence should expose retentionClass',
+  );
+  assert(
+    retentionRecord.retentionUntil === publishedDocument.retentionUntil,
+    'retention evidence should expose retentionUntil',
+  );
+  log('PASS retention evidence includes published record');
 
   await expectStatus(
     'compliance officer preview denied',
@@ -522,9 +554,74 @@ async function main() {
     },
   );
 
+  const futureAsOf = '2030-01-01T00:00:00.000Z';
+  const retentionRun = await expectStatus(
+    'admin run retention future clock',
+    `/api/metadata/retention/run?asOf=${encodeURIComponent(futureAsOf)}`,
+    200,
+    {
+      method: 'POST',
+      headers: authHeaders(adminToken),
+    },
+  );
+  assert(
+    retentionRun.archived >= 1,
+    'future retention run should archive at least one due record',
+  );
+  log('PASS retention run archived due records');
+
+  const archivedMetadata = await expectStatus(
+    'retention archived document metadata',
+    `/api/metadata/documents/${docId}`,
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    archivedMetadata.status === 'ARCHIVED',
+    'retention run should archive the published document',
+  );
+  log('PASS retention run sets status=ARCHIVED');
+
+  const retentionHistory = await expectStatus(
+    'retention workflow history',
+    `/api/metadata/documents/${docId}/workflow-history`,
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    retentionHistory.some(
+      (entry) =>
+        entry.action === 'RETENTION' && entry.actorId === 'system:retention',
+    ),
+    'workflow history should include RETENTION by system:retention',
+  );
+  log('PASS retention workflow history actor=system:retention');
+
   await expectStatus('compliance officer audit query', '/api/audit/query', 200, {
     headers: authHeaders(complianceToken),
   });
+
+  const retentionAudit = await expectStatus(
+    'compliance officer retention audit query',
+    `/api/audit/query?action=DOCUMENT_AUTO_ARCHIVED&resourceId=${docId}`,
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    retentionAudit.data?.some(
+      (event) =>
+        event.action === 'DOCUMENT_AUTO_ARCHIVED' &&
+        event.resourceId === docId,
+    ),
+    'audit query should include DOCUMENT_AUTO_ARCHIVED for retained document',
+  );
+  log('PASS retention audit event DOCUMENT_AUTO_ARCHIVED');
 
   const chainStatus = await expectStatus(
     'compliance officer audit verify-chain',

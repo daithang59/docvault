@@ -12,6 +12,7 @@ const ACTION_CONFIG = {
   APPROVE: { icon: CheckCircle, color: 'text-[var(--status-published-text)]', bg: 'bg-[var(--stat-published-bg)]', label: 'Approved' },
   REJECT: { icon: XCircle, color: 'text-[var(--state-error-text)]', bg: 'bg-[var(--state-error-bg)]', label: 'Rejected' },
   ARCHIVE: { icon: Archive, color: 'text-[var(--text-muted)]', bg: 'bg-[var(--bg-muted)]', label: 'Archived' },
+  RETENTION: { icon: Archive, color: 'text-[var(--text-muted)]', bg: 'bg-[var(--bg-muted)]', label: 'Retention archived' },
 };
 
 interface DocumentWorkflowTimelineProps {

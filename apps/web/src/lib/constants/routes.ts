@@ -8,5 +8,6 @@ export const ROUTES = {
   APPROVALS: '/approvals',
   MY_DOCUMENTS: '/my-documents',
   AUDIT: '/audit',
+  RETENTION: '/retention',
   PROFILE: '/profile',
 } as const;

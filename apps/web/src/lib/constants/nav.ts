@@ -5,6 +5,7 @@ import {
   FilePlus,
   CheckSquare,
   Shield,
+  Archive,
 } from 'lucide-react';
 import { UserRole } from '@/types/auth';
 import { ROUTES } from './routes';
@@ -52,6 +53,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Audit',
     href: ROUTES.AUDIT,
     icon: Shield,
+    roles: ['compliance_officer', 'admin'],
+  },
+  {
+    label: 'Retention',
+    href: ROUTES.RETENTION,
+    icon: Archive,
     roles: ['compliance_officer', 'admin'],
   },
 ];

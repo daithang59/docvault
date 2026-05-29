@@ -17,6 +17,9 @@ export interface DocumentSummaryDto {
   dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
   dlpFindings?: Array<Record<string, unknown>> | null;
   dlpDetectedAt?: string | null;
+  retentionClass?: string | null;
+  retentionUntil?: string | null;
+  retentionReason?: string | null;
   ownerId: string;
   ownerDisplay?: string;
   currentVersion: number;

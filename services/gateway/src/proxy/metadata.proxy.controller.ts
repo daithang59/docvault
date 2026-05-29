@@ -6,6 +6,7 @@ import {
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -44,6 +45,45 @@ export class MetadataProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents${queryString}`,
+    });
+    return response.data;
+  }
+
+  @Get('retention/documents')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'List retention evidence',
+    description:
+      'Returns records-management evidence for published and archived documents, including retention class, retention deadline, and computed status.',
+  })
+  async listRetention(@Req() req: any, @Query('asOf') _asOf?: string) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/retention/documents${queryString}`,
+    });
+    return response.data;
+  }
+
+  @Post('retention/run')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Run retention auto-archive',
+    description:
+      'Admin-only demo endpoint that runs the retention job. Optional `asOf` query parameter can be used as a deterministic demo clock.',
+  })
+  async runRetention(@Req() req: any, @Query('asOf') _asOf?: string) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/retention/run${queryString}`,
     });
     return response.data;
   }

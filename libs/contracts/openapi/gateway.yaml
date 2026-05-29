@@ -92,6 +92,9 @@ components:
         dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
         dlpFindings: { type: array, nullable: true, items: { type: object } }
         dlpDetectedAt: { type: string, format: date-time, nullable: true }
+        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionUntil: { type: string, format: date-time, nullable: true }
+        retentionReason: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/DocumentStatus' }
         currentVersion: { type: integer, nullable: true }
         ownerId: { type: string }
@@ -201,6 +204,49 @@ components:
         action: { type: string }
         reason: { type: string }
 
+    RetentionStatus:
+      type: string
+      enum: [ACTIVE, DUE_SOON, OVERDUE, ARCHIVED, UNSET]
+
+    RetentionEvidence:
+      type: object
+      properties:
+        docId: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        archivedAt: { type: string, format: date-time, nullable: true }
+        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionUntil: { type: string, format: date-time, nullable: true }
+        retentionReason: { type: string, nullable: true }
+        retentionStatus: { $ref: '#/components/schemas/RetentionStatus' }
+        daysRemaining: { type: integer, nullable: true }
+
+    RetentionEvidenceResult:
+      type: object
+      properties:
+        checkedAt: { type: string, format: date-time }
+        summary:
+          type: object
+          properties:
+            tracked: { type: integer }
+            active: { type: integer }
+            dueSoon: { type: integer }
+            overdue: { type: integer }
+            archived: { type: integer }
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetentionEvidence'
+
+    RetentionRunResult:
+      type: object
+      properties:
+        archived: { type: integer }
+        skipped: { type: integer }
+        checkedAt: { type: string, format: date-time }
+
     RejectWorkflow:
       type: object
       properties:
@@ -267,6 +313,7 @@ components:
             DOCUMENT_CREATED, DOCUMENT_METADATA_UPDATED,
             DOCUMENT_ACL_UPDATED, DOCUMENT_ACL_DELETED,
             DOCUMENT_SUBMIT, DOCUMENT_APPROVE, DOCUMENT_REJECT, DOCUMENT_ARCHIVE,
+            DOCUMENT_AUTO_ARCHIVED,
             MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
@@ -537,6 +584,63 @@ paths:
           description: Unauthorized
         '403':
           description: Forbidden — editor or admin required
+
+  /metadata/retention/documents:
+    get:
+      summary: List retention evidence
+      operationId: listRetentionEvidence
+      description: |
+        Returns records-management evidence for PUBLISHED and ARCHIVED documents.
+        Compliance officers and admins can inspect retention class, retention deadline,
+        computed retention status, and days remaining.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Retention]
+      parameters:
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+          description: Optional demo clock for deterministic retention status calculation.
+      responses:
+        '200':
+          description: Retention evidence records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionEvidenceResult'
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /metadata/retention/run:
+    post:
+      summary: Run retention auto-archive
+      operationId: runRetention
+      description: |
+        Admin-only endpoint that runs the retention auto-archive job. The optional
+        `asOf` query parameter is intended for local demo evidence.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Retention]
+      parameters:
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+          description: Optional demo clock. Records due on or before this time are archived.
+      responses:
+        '200':
+          description: Retention run completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionRunResult'
+        '403':
+          description: Forbidden — admin required
 
   /metadata/documents/{docId}:
     get:

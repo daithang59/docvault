@@ -60,6 +60,9 @@ model Document {
   dlpStatus       String            @default("NOT_SCANNED")
   dlpFindings     Json?
   dlpDetectedAt   DateTime?
+  retentionClass  String?
+  retentionUntil  DateTime?
+  retentionReason String?
   tags            String[]          @default([])
   status          DocumentStatus    @default(DRAFT)
   currentVersion  Int               @default(0)
@@ -75,6 +78,8 @@ model Document {
 
   @@index([ownerId])
   @@index([status])
+  @@index([retentionUntil])
+  @@index([status, retentionUntil])
   @@index([tags], type: Gin)
   @@map("documents")
 }

@@ -17,6 +17,10 @@ export const apiEndpoints = {
       downloadAuthorize: (docId: string) => `/metadata/documents/${docId}/download-authorize`,
       comments: (docId: string) => `/metadata/documents/${docId}/comments`,
     },
+    retention: {
+      documents: '/metadata/retention/documents',
+      run: '/metadata/retention/run',
+    },
   },
   documents: {
     upload: (docId: string) => `/documents/${docId}/upload`,

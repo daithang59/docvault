@@ -13,6 +13,7 @@ import {
   ServiceUser,
   buildActorId,
 } from '../common/request-context';
+import { buildRetentionEvidence } from '../common/classification.constants';
 
 /**
  * MVP transition map:
@@ -83,7 +84,12 @@ export class StatusService {
     const updateData: Record<string, any> = { status: transition.to };
 
     if (dto.action === 'APPROVE') {
-      updateData.publishedAt = new Date();
+      const publishedAt = new Date();
+      updateData.publishedAt = publishedAt;
+      Object.assign(
+        updateData,
+        buildRetentionEvidence(document.classification as any, publishedAt),
+      );
     }
     if (dto.action === 'ARCHIVE') {
       updateData.archivedAt = new Date();
