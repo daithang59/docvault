@@ -279,17 +279,20 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Update a comment' })
-  updateComment(
+  async updateComment(
     @Param('docId') docId: string,
     @Param('commentId') commentId: string,
     @Body() body: { content: string },
     @Req() req: any,
   ) {
+    const context = buildRequestContext(req);
+    await this.policyService.assertCanReadMetadata(docId, req.user, context);
     return this.commentsService.update(
+      docId,
       commentId,
       body.content,
       req.user,
-      buildRequestContext(req),
+      context,
     );
   }
 
@@ -297,11 +300,13 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Delete a comment' })
-  deleteComment(
+  async deleteComment(
     @Param('docId') docId: string,
     @Param('commentId') commentId: string,
     @Req() req: any,
   ) {
-    return this.commentsService.delete(commentId, req.user, buildRequestContext(req));
+    const context = buildRequestContext(req);
+    await this.policyService.assertCanReadMetadata(docId, req.user, context);
+    return this.commentsService.delete(docId, commentId, req.user, context);
   }
 }

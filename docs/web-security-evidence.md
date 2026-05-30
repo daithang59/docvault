@@ -31,8 +31,12 @@ Covered routes:
 - `GET /metadata/documents/:docId/workflow-history`
 - `GET /metadata/documents/:docId/comments`
 - `GET /metadata/documents/:docId/acl`
+- `PUT /metadata/documents/:docId/comments/:commentId`
+- `DELETE /metadata/documents/:docId/comments/:commentId`
 
 Denied metadata reads emit `DOCUMENT_METADATA_READ_DENIED`.
+
+Comment update/delete also validates the route `docId` and `commentId` as a pair before mutation. A comment author cannot update or delete their previous comment after document visibility is revoked, and a guessed comment id under the wrong document id returns not found before mutation.
 
 ### Grant Token Secrets
 
@@ -44,6 +48,17 @@ Denied metadata reads emit `DOCUMENT_METADATA_READ_DENIED`.
 - Metadata-service signs new grants with the current `kid`; document-service accepts only current or previous `kid` values.
 
 Legacy single-secret dev mode is still supported when `GRANT_TOKEN_CURRENT_KID` is not set.
+
+Rotation runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
+
+### MFA Demo Posture
+
+- The Keycloak realm enables the `CONFIGURE_TOTP` required action.
+- `co-mfa-demo` and `admin-mfa-demo` are dedicated MFA demo users and require OTP enrollment on first interactive login.
+- `co1` and `admin1` intentionally remain non-MFA automation users so password-grant smoke tests and E2E evidence can run without manual OTP enrollment.
+- Production posture should require MFA for all human admin and compliance officer accounts while keeping non-human automation on separate service accounts.
+
+Runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
 
 ### Download Posture and At-Rest Evidence
 
@@ -58,10 +73,13 @@ Legacy single-secret dev mode is still supported when `GRANT_TOKEN_CURRENT_KID` 
 
 - Document-service scans uploads before MinIO writes.
 - EICAR test payloads are rejected with `MALWARE_UPLOAD_BLOCKED`.
+- Malware scanning supports `local-eicar` deterministic demo mode and an optional `clamav` daemon-backed mode via `MALWARE_SCANNER_MODE=clamav`.
+- ClamAV mode defaults to fail-closed when the daemon is unavailable; local development can explicitly set `MALWARE_SCANNER_FAILURE_POLICY=fail-open`.
 - Blocked malware uploads do not create a MinIO object and do not register a metadata version.
 - DLP scan detects email, phone/national-id-like values, and sensitive keywords such as `secret`, `confidential`, and `internal only`.
 - DLP detections emit `DLP_PATTERN_DETECTED`, persist DLP state on metadata/version records, and escalate `PUBLIC`/`INTERNAL` documents to `CONFIDENTIAL`.
 - DLP-detected documents cannot be downgraded below `CONFIDENTIAL`; denied downgrade emits `DLP_CLASSIFICATION_DOWNGRADE_DENIED`.
+- Web document detail shows DLP status, suggested classification, scan source, detection time, and finding category/count/severity without exposing raw matched sensitive values.
 
 ### Audit Ingestion Boundary
 
@@ -78,6 +96,8 @@ Legacy single-secret dev mode is still supported when `GRANT_TOKEN_CURRENT_KID` 
 - Gateway proxies security summary to `GET /api/audit/security-summary`.
 - Web Audit page has a Verify Chain action, valid/invalid status, and security cards for deny, malware, DLP, and download-denied counters.
 - The hash chain is tamper-evident, not immutable storage. If an old audit event is edited directly in storage, verification should return `valid: false`.
+- Local/dev tamper demo script: `pnpm --filter audit-service audit:tamper-demo -- --dry-run` previews the target event, and `pnpm --filter audit-service audit:tamper-demo -- --apply` mutates one non-head event after `DOCVAULT_ALLOW_AUDIT_TAMPER_DEMO=true` is set.
+- The tamper demo refuses to run against non-local MongoDB hosts unless `DOCVAULT_ALLOW_NONLOCAL_AUDIT_TAMPER_DEMO=true` is also set.
 
 ### Retention / Records Management Evidence
 
@@ -140,6 +160,19 @@ pnpm test:e2e
 ```
 
 `pnpm test:e2e` requires the local DocVault stack to be running.
+
+Latest baseline before Web gap-closure implementation on 2026-05-30:
+
+- `pnpm --filter metadata-service test`: 7 suites passed, 33 tests passed.
+- `pnpm --filter document-service test`: 6 suites passed, 25 tests passed.
+- `pnpm --filter audit-service test`: 3 suites passed, 11 tests passed.
+
+Gap-closure targeted evidence on 2026-05-30:
+
+- Comment mutation policy: `pnpm --filter metadata-service test -- documents.controller.spec.ts comments.service.spec.ts` passed with 2 suites and 8 tests.
+- Malware scanner adapter: `pnpm --filter document-service test -- malware-scanner.service.spec.ts` passed with 1 suite and 4 tests.
+- Audit tamper demo: `pnpm --filter audit-service audit:tamper-demo:test` passed with 4 script-level tests, and guard checks refused missing demo flag / non-local MongoDB URL before connection.
+- Web DLP findings UI: `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web lint`, and `pnpm --filter web build` passed. Lint retained 7 existing warnings reported by the tool.
 
 Latest local Sprint 4A E2E evidence on 2026-05-30:
 

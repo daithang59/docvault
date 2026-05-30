@@ -54,22 +54,14 @@ export class CommentsService {
   }
 
   async update(
+    docId: string,
     commentId: string,
     content: string,
     user: ServiceUser,
     context: RequestContext,
   ) {
     const actorId = buildActorId(user);
-    const authorRoles = user.roles ?? [];
-    const isAdmin = authorRoles.includes('admin');
-
-    const comment = await this.prisma.documentComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
+    const comment = await this.findCommentForDocument(docId, commentId);
 
     if (comment.authorId !== actorId) {
       await this.auditClient.emitEvent(context, {
@@ -112,6 +104,7 @@ export class CommentsService {
   }
 
   async delete(
+    docId: string,
     commentId: string,
     user: ServiceUser,
     context: RequestContext,
@@ -120,13 +113,7 @@ export class CommentsService {
     const authorRoles = user.roles ?? [];
     const isAdmin = authorRoles.includes('admin');
 
-    const comment = await this.prisma.documentComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
+    const comment = await this.findCommentForDocument(docId, commentId);
 
     if (comment.authorId !== actorId && !isAdmin) {
       await this.auditClient.emitEvent(context, {
@@ -169,5 +156,17 @@ export class CommentsService {
       where: { docId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  private async findCommentForDocument(docId: string, commentId: string) {
+    const comment = await this.prisma.documentComment.findFirst({
+      where: { id: commentId, docId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    return comment;
   }
 }

@@ -11,7 +11,9 @@
     "start:prod": "node -r tsconfig-paths/register dist/main",
     "lint": "eslint \"{src,test}/**/*.ts\" --fix",
     "test": "jest --passWithNoTests",
-    "migrate:to-mongo": "ts-node -r dotenv/config scripts/migrate-to-mongo.ts"
+    "migrate:to-mongo": "ts-node -r dotenv/config scripts/migrate-to-mongo.ts",
+    "audit:tamper-demo": "ts-node -r dotenv/config scripts/audit-tamper-demo.ts",
+    "audit:tamper-demo:test": "ts-node scripts/audit-tamper-demo.test.ts"
   },
   "dependencies": {
     "@nestjs/common": "^10.0.0",

@@ -6,6 +6,7 @@ import { useDocumentDetail } from '@/lib/hooks/use-document-detail';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DocumentHeader } from '@/components/documents/document-header';
+import { DocumentDlpFindingsCard } from '@/components/documents/document-dlp-findings-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
@@ -55,6 +56,10 @@ export default function DocumentDetailPage({ params }: Props) {
     <div>
       <div className="animate-in delay-1">
         <DocumentHeader doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentDlpFindingsCard doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">
