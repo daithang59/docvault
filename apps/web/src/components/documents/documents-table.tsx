@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useState, useRef, useCallback, useMemo, type ComponentType } from 'react';
 import {
   useReactTable,
   getCoreRowModel,
@@ -19,7 +19,15 @@ import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
-import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/permissions';
+import {
+  canEditDocument,
+  canSubmitDocument,
+  canApproveDocument,
+  canRejectDocument,
+  canArchiveDocument,
+  canDeleteDocument,
+  getExplainableDocumentAccessDecision,
+} from '@/lib/auth/permissions';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
 
@@ -211,6 +219,7 @@ export function DocumentsTable({
       cell: ({ row }) => {
         const doc = row.original;
         const isMenuOpen = activeMenu === doc.id;
+        const downloadDecision = getExplainableDocumentAccessDecision(session, doc, 'download');
 
         return (
           <div className="relative">
@@ -250,8 +259,15 @@ export function DocumentsTable({
                   {canArchiveDocument(session, doc) && onArchive && (
                     <ActionMenuItem icon={Archive} label="Archive" onClick={() => { setActiveMenu(null); onArchive(doc); }} />
                   )}
-                  {canDownloadDocument(session, doc) && onDownload && (
+                  {downloadDecision.allowed && onDownload && (
                     <ActionMenuItem icon={Download} label="Download" onClick={() => { setActiveMenu(null); onDownload(doc); }} />
+                  )}
+                  {!downloadDecision.allowed && onDownload && downloadDecision.reason && (
+                    <DisabledActionMenuItem
+                      icon={Download}
+                      label="Download"
+                      reason={downloadDecision.reason}
+                    />
                   )}
                   {canDeleteDocument(session, doc) && onDelete && (
                     <ActionMenuItem icon={Trash2} label="Delete" onClick={() => { setActiveMenu(null); onDelete(doc); }} />
@@ -411,13 +427,41 @@ function SortableHeader({ label, column }: { label: string; column: { getIsSorte
   );
 }
 
+function DisabledActionMenuItem({
+  icon: Icon,
+  label,
+  reason,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="mx-1.5 first:mt-1.5 last:mb-1.5 flex w-[calc(100%-0.75rem)] cursor-not-allowed items-start gap-2.5 rounded-xl px-3 py-2 text-left text-sm opacity-75"
+      title={reason}
+      aria-label={`${label} unavailable: ${reason}`}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
+      <span className="min-w-0">
+        <span className="block text-[var(--text-muted)]">{label}</span>
+        <span className="block truncate text-[10px] leading-tight text-[var(--text-faint)]">
+          {reason}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function ActionMenuItem({
   icon: Icon,
   label,
   href,
   onClick,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   href?: string;
   onClick?: () => void;

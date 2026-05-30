@@ -11,6 +11,8 @@ interface DocumentPreviewDialogProps {
   docId: string;
   version: DocumentVersion | null;
   onClose: () => void;
+  canDownload?: boolean;
+  downloadDeniedReason?: string;
 }
 
 type ViewerState =
@@ -82,6 +84,8 @@ export function DocumentPreviewDialog({
   docId,
   version,
   onClose,
+  canDownload = true,
+  downloadDeniedReason,
 }: DocumentPreviewDialogProps) {
   const [viewerState, setViewerState] = useState<ViewerState>('loading');
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
@@ -108,6 +112,10 @@ export function DocumentPreviewDialog({
 
   function handleDownload() {
     if (!version) return;
+    if (!canDownload) {
+      if (downloadDeniedReason) toast.error(downloadDeniedReason);
+      return;
+    }
     download.download(docId);
   }
 
@@ -341,6 +349,18 @@ export function DocumentPreviewDialog({
             >
               v{version.versionNumber ?? version.version}
             </span>
+            {!canDownload && downloadDeniedReason && (
+              <span
+                className="hidden max-w-[16rem] truncate rounded-md px-2 py-1 text-xs font-medium sm:inline"
+                style={{
+                  background: 'var(--status-pending-bg)',
+                  color: 'var(--status-pending-text)',
+                }}
+                title={downloadDeniedReason}
+              >
+                Download unavailable
+              </span>
+            )}
           </div>
 
           {(viewerState === 'pdf' || viewerState === 'image' || viewerState === 'text' || viewerState === 'docx' || viewerState === 'markdown') && (
@@ -435,15 +455,12 @@ export function DocumentPreviewDialog({
                 >
                   Close
                 </button>
-                <button
-                  onClick={handleDownload}
-                  disabled={download.isDownloading}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
-                  style={{ background: 'var(--color-primary)' }}
-                >
-                  <Download className="h-4 w-4" />
-                  {download.isDownloading ? 'Downloading...' : 'Download file'}
-                </button>
+                <DownloadFallbackAction
+                  canDownload={canDownload}
+                  deniedReason={downloadDeniedReason}
+                  isDownloading={download.isDownloading}
+                  onDownload={handleDownload}
+                />
               </div>
             </div>
           )}
@@ -471,15 +488,12 @@ export function DocumentPreviewDialog({
                 >
                   Close
                 </button>
-                <button
-                  onClick={handleDownload}
-                  disabled={download.isDownloading}
-                  className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition hover:brightness-110"
-                  style={{ background: 'var(--color-primary)' }}
-                >
-                  <Download className="h-4 w-4" />
-                  {download.isDownloading ? 'Downloading...' : 'Download file'}
-                </button>
+                <DownloadFallbackAction
+                  canDownload={canDownload}
+                  deniedReason={downloadDeniedReason}
+                  isDownloading={download.isDownloading}
+                  onDownload={handleDownload}
+                />
               </div>
             </div>
           )}
@@ -558,7 +572,6 @@ export function DocumentPreviewDialog({
                 .docx-preview ul, .docx-preview ol { padding-left: 1.5em; margin-bottom: 0.75em; }
                 .docx-preview img { max-width: 100%; height: auto; }
               `}</style>
-              {/* eslint-disable-next-line react/no-danger */}
               <div className="docx-preview" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             </div>
           )}
@@ -584,12 +597,63 @@ export function DocumentPreviewDialog({
                 .md-preview ul, .md-preview ol { padding-left: 1.5em; margin-bottom: 0.75em; }
                 .md-preview a { color: var(--color-primary); text-decoration: underline; }
               `}</style>
-              {/* eslint-disable-next-line react/no-danger */}
               <div className="md-preview" dangerouslySetInnerHTML={{ __html: renderedHtml }} />
             </div>
           )}
         </div>
       </div>
     </div>
+  );
+}
+
+function DownloadFallbackAction({
+  canDownload,
+  deniedReason,
+  isDownloading,
+  onDownload,
+}: {
+  canDownload: boolean;
+  deniedReason?: string;
+  isDownloading: boolean;
+  onDownload: () => void;
+}) {
+  if (!canDownload) {
+    const label = deniedReason ? `Download unavailable: ${deniedReason}` : 'Download unavailable';
+
+    return (
+      <div className="flex max-w-xs flex-col items-start gap-1">
+        <button
+          type="button"
+          disabled
+          title={deniedReason}
+          aria-label={label}
+          className="flex cursor-not-allowed items-center gap-2 rounded-xl border border-[var(--input-border)] px-4 py-2 text-sm font-medium opacity-70"
+          style={{
+            background: 'var(--bg-muted)',
+            color: 'var(--text-muted)',
+          }}
+        >
+          <Download className="h-4 w-4" />
+          Download unavailable
+        </button>
+        {deniedReason && (
+          <span className="text-left text-xs leading-snug" style={{ color: 'var(--text-muted)' }}>
+            {deniedReason}
+          </span>
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <button
+      onClick={onDownload}
+      disabled={isDownloading}
+      className="flex items-center gap-2 rounded-xl px-4 py-2 text-sm font-medium text-white transition hover:brightness-110 disabled:cursor-wait disabled:opacity-70"
+      style={{ background: 'var(--color-primary)' }}
+    >
+      <Download className="h-4 w-4" />
+      {isDownloading ? 'Downloading...' : 'Download file'}
+    </button>
   );
 }

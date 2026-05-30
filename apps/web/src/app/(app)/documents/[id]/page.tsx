@@ -15,7 +15,7 @@ import { DocumentActionPanel } from '@/components/documents/document-action-pane
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { canDownloadDocument, canManageAcl, canPreviewDocument, canReadAcl } from '@/lib/auth/permissions';
+import { canManageAcl, canReadAcl, getDocumentAccessDecision } from '@/lib/auth/permissions';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
@@ -40,8 +40,8 @@ export default function DocumentDetailPage({ params }: Props) {
   if (isLoading) return <LoadingState label="Loading document..." />;
   if (isError || !doc) return <ErrorState message="Failed to load document." onRetry={refetch} />;
 
-  const canDl = canDownloadDocument(session, doc);
-  const canPrev = canPreviewDocument(session, doc);
+  const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
+  const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
   const canAcl = canManageAcl(session, doc);
   const canShowAcl = canReadAcl(session) || canAcl;
   const aclEntries = canShowAcl ? (doc.aclEntries ?? doc.acl ?? []) : [];
@@ -69,9 +69,11 @@ export default function DocumentDetailPage({ params }: Props) {
             <DocumentVersionsCard
               docId={id}
               versions={doc.versions ?? []}
-              canDownload={canDl}
+              canDownload={downloadDecision.allowed}
               onDownload={() => download(id)}
-              canPreview={canPrev}
+              downloadDeniedReason={downloadDecision.reason}
+              canPreview={previewDecision.allowed}
+              previewDeniedReason={previewDecision.reason}
               onPreview={(_docId, v) => setPreviewVersion(v)}
             />
           </div>
@@ -112,6 +114,8 @@ export default function DocumentDetailPage({ params }: Props) {
         docId={id}
         version={previewVersion}
         onClose={() => setPreviewVersion(null)}
+        canDownload={downloadDecision.allowed}
+        downloadDeniedReason={downloadDecision.reason}
       />
     </div>
   );

@@ -9,11 +9,10 @@ import {
   canApproveDocument,
   canRejectDocument,
   canArchiveDocument,
-  canDownloadDocument,
-  canPreviewDocument,
   canManageAcl,
   canDeleteDocument,
   canViewComplianceEvidencePacket,
+  getDocumentAccessDecision,
 } from '@/lib/auth/permissions';
 import {
   useSubmitDocument,
@@ -60,6 +59,8 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   const { download, isDownloading } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
+  const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
+  const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
 
   async function handleSubmit() {
     try {
@@ -153,10 +154,10 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
     canApproveDocument(session, doc) ||
     canRejectDocument(session, doc) ||
     canArchiveDocument(session, doc) ||
-    canDownloadDocument(session, doc) ||
-    canPreviewDocument(session, doc) ||
+    Boolean(onPreview) ||
     canViewComplianceEvidencePacket(session) ||
-    canDeleteDocument(session, doc);
+    canDeleteDocument(session, doc) ||
+    Boolean(downloadDecision.reason);
 
   if (!hasAnyAction) return null;
 
@@ -256,7 +257,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </button>
         )}
 
-        {canPreviewDocument(session, doc) && onPreview && (
+        {onPreview && previewDecision.allowed && (
           <button
             onClick={onPreview}
             className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
@@ -265,8 +266,15 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
             Preview
           </button>
         )}
+        {onPreview && !previewDecision.allowed && previewDecision.reason && (
+          <DisabledActionButton
+            icon={Eye}
+            label="Preview"
+            reason={previewDecision.reason}
+          />
+        )}
 
-        {canDownloadDocument(session, doc) && (
+        {downloadDecision.allowed && (
           <button
             onClick={() => download(doc.id)}
             disabled={isDownloading}
@@ -275,6 +283,13 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
             <Download className="h-4 w-4 text-[var(--text-muted)]" />
             {isDownloading ? 'Preparing download...' : 'Download'}
           </button>
+        )}
+        {!downloadDecision.allowed && downloadDecision.reason && (
+          <DisabledActionButton
+            icon={Download}
+            label="Download"
+            reason={downloadDecision.reason}
+          />
         )}
 
         {canViewComplianceEvidencePacket(session) && (
@@ -354,5 +369,33 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
         }}
       />
     </div>
+  );
+}
+
+function DisabledActionButton({
+  icon: Icon,
+  label,
+  reason,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      title={reason}
+      aria-label={`${label} unavailable: ${reason}`}
+      className="flex w-full items-start gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--bg-muted)]/45 px-4 py-2.5 text-left text-sm font-medium text-[var(--text-muted)] opacity-80"
+    >
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-faint)]" />
+      <span className="min-w-0">
+        <span className="block text-[var(--text-muted)]">{label}</span>
+        <span className="mt-0.5 block break-words text-xs font-normal leading-relaxed text-[var(--text-faint)]">
+          {reason}
+        </span>
+      </span>
+    </button>
   );
 }

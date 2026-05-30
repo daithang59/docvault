@@ -62,6 +62,21 @@ function getAclEntries(doc: DocumentContext): AclContextEntry[] {
   return doc.aclEntries ?? doc.acl ?? [];
 }
 
+function hasAclContext(doc: DocumentContext): boolean {
+  return (
+    Object.prototype.hasOwnProperty.call(doc, 'aclEntries') ||
+    Object.prototype.hasOwnProperty.call(doc, 'acl')
+  );
+}
+
+function isAclDependentDenial(reason: string): boolean {
+  return (
+    reason.includes('explicit READ ACL allow') ||
+    reason.includes('explicit DOWNLOAD ACL allow') ||
+    reason.includes('denied by classification policy')
+  );
+}
+
 function matchesAcl(
   session: Session | null,
   doc: DocumentContext,
@@ -231,6 +246,24 @@ export function getDocumentAccessDecision(
   if (action === 'metadata') return getMetadataAccessDecision(session, doc);
   if (action === 'download') return getDownloadAccessDecision(session, doc);
   return getPreviewAccessDecision(session, doc);
+}
+
+export function getExplainableDocumentAccessDecision(
+  session: Session | null,
+  doc: DocumentContext,
+  action: DocumentAccessAction,
+): DocumentAccessDecision {
+  const decision = getDocumentAccessDecision(session, doc, action);
+
+  if (decision.allowed || !decision.reason || hasAclContext(doc)) {
+    return decision;
+  }
+
+  if (isAclDependentDenial(decision.reason)) {
+    return { allowed: false };
+  }
+
+  return decision;
 }
 
 // ── Document list / creation ──────────────────────────────────────────────────

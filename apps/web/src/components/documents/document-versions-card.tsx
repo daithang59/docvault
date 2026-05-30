@@ -14,9 +14,20 @@ interface DocumentVersionsCardProps {
   onPreview?: (docId: string, version: DocumentVersion) => void;
   canDownload: boolean;
   canPreview: boolean;
+  downloadDeniedReason?: string;
+  previewDeniedReason?: string;
 }
 
-export function DocumentVersionsCard({ docId, versions, onDownload, onPreview, canDownload, canPreview }: DocumentVersionsCardProps) {
+export function DocumentVersionsCard({
+  docId,
+  versions,
+  onDownload,
+  onPreview,
+  canDownload,
+  canPreview,
+  downloadDeniedReason,
+  previewDeniedReason,
+}: DocumentVersionsCardProps) {
   const sorted = [...versions].sort(
     (a, b) => (b.versionNumber ?? b.version ?? 0) - (a.versionNumber ?? a.version ?? 0)
   );
@@ -26,6 +37,12 @@ export function DocumentVersionsCard({ docId, versions, onDownload, onPreview, c
       <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
         <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>Version History</h3>
         <p className="text-xs mt-0.5" style={{ color: 'var(--text-faint)' }}>{versions.length} version{versions.length !== 1 ? 's' : ''}</p>
+        {versions.length > 0 && (previewDeniedReason || downloadDeniedReason) && (
+          <div className="mt-3 space-y-1.5">
+            {previewDeniedReason && <PolicyNote label="Preview" reason={previewDeniedReason} />}
+            {downloadDeniedReason && <PolicyNote label="Download" reason={downloadDeniedReason} />}
+          </div>
+        )}
       </div>
 
       {sorted.length === 0 ? (
@@ -79,6 +96,13 @@ export function DocumentVersionsCard({ docId, versions, onDownload, onPreview, c
                     <Eye className="h-4 w-4" />
                   </button>
                 )}
+                {!canPreview && previewDeniedReason && (
+                  <DisabledIconButton
+                    icon={Eye}
+                    label="Preview"
+                    reason={previewDeniedReason}
+                  />
+                )}
                 {canDownload && onDownload && (
                   <button
                     onClick={() => onDownload()}
@@ -89,11 +113,56 @@ export function DocumentVersionsCard({ docId, versions, onDownload, onPreview, c
                     <Download className="h-4 w-4" />
                   </button>
                 )}
+                {!canDownload && downloadDeniedReason && (
+                  <DisabledIconButton
+                    icon={Download}
+                    label="Download"
+                    reason={downloadDeniedReason}
+                  />
+                )}
               </div>
             </div>
           ))}
         </div>
       )}
     </div>
+  );
+}
+
+function PolicyNote({ label, reason }: { label: string; reason: string }) {
+  return (
+    <p
+      className="rounded-lg border px-2.5 py-1.5 text-xs leading-relaxed"
+      style={{
+        borderColor: 'var(--input-border)',
+        background: 'var(--bg-muted)',
+        color: 'var(--text-muted)',
+      }}
+    >
+      <span className="font-medium">{label} blocked:</span> {reason}
+    </p>
+  );
+}
+
+function DisabledIconButton({
+  icon: Icon,
+  label,
+  reason,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      title={reason}
+      aria-label={`${label} unavailable: ${reason}`}
+      className="cursor-not-allowed rounded-lg p-1.5 opacity-45"
+      style={{ color: 'var(--text-faint)' }}
+    >
+      <Icon className="h-4 w-4" />
+    </button>
   );
 }

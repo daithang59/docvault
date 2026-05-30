@@ -6,6 +6,7 @@ import {
   canPreviewDocument,
   canViewDocumentDetail,
   getDocumentAccessDecision,
+  getExplainableDocumentAccessDecision,
 } from './permissions';
 
 type TestDocument = {
@@ -108,6 +109,27 @@ describe('document access decisions', () => {
 
     expect(canDownloadDocument(session(['editor']), target)).toBe(false);
     expect(canDownloadDocument(session(['editor'], { groups: ['/finance-team'] }), target)).toBe(true);
+  });
+
+  it('does not surface ACL-dependent download denial reasons from partial list rows', () => {
+    expect(
+      getExplainableDocumentAccessDecision(
+        session(['editor']),
+        doc({ classification: 'CONFIDENTIAL' }),
+        'download',
+      ),
+    ).toEqual({ allowed: false });
+
+    expect(
+      getExplainableDocumentAccessDecision(
+        session(['editor']),
+        doc({ classification: 'CONFIDENTIAL', aclEntries: [] }),
+        'download',
+      ),
+    ).toEqual({
+      allowed: false,
+      reason: 'CONFIDENTIAL documents require ownership or explicit DOWNLOAD ACL allow.',
+    });
   });
 
   it('blocks compliance preview and lets read deny ACL override approver preview', () => {
