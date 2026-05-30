@@ -58,3 +58,61 @@ describe('DocumentsService DLP downgrade guard', () => {
     );
   });
 });
+
+describe('DocumentsService access-controlled list visibility', () => {
+  const mockDocumentFindMany = jest.fn();
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockDocumentFindMany.mockResolvedValue([]);
+    service = new DocumentsService(
+      {
+        document: {
+          findMany: mockDocumentFindMany,
+        },
+      } as any,
+      { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
+    );
+  });
+
+  it('includes GROUP READ ALLOW subjects in list visibility and does not grant visibility from deny-only ACL', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'viewer-1',
+        roles: ['viewer'],
+        groups: ['finance-team'],
+      } as any,
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"subjectType":"GROUP"');
+    expect(queryText).toContain('"subjectId":"finance-team"');
+    expect(queryText).toContain('"subjectId":"/finance-team"');
+    expect(queryText).toContain('"permission":"READ"');
+    expect(queryText).toContain('"effect":"ALLOW"');
+    expect(queryText).toContain('"NOT"');
+    expect(queryText).toContain('"effect":"DENY"');
+  });
+
+  it('applies READ DENY filtering to admin list visibility', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'admin-1',
+        roles: ['admin'],
+        groups: ['blocked-team'],
+      } as any,
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"subjectType":"GROUP"');
+    expect(queryText).toContain('"subjectId":"blocked-team"');
+    expect(queryText).toContain('"subjectId":"/blocked-team"');
+    expect(queryText).toContain('"NOT"');
+    expect(queryText).toContain('"effect":"DENY"');
+  });
+});

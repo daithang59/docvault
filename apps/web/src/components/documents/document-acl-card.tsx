@@ -106,8 +106,10 @@ function AclAddForm({
   const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit() {
-    const normalizedSubjectId =
-      form.subjectType === 'ALL' ? undefined : form.subjectId?.trim();
+    const normalizedSubjectId = normalizeSubjectId(
+      form.subjectType,
+      form.subjectId,
+    );
 
     if (form.subjectType !== 'ALL' && !normalizedSubjectId) {
       setError('Subject ID is required unless subject type is ALL.');
@@ -124,13 +126,13 @@ function AclAddForm({
   return (
     <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)', background: 'var(--bg-subtle)' }}>
       <div className="grid grid-cols-2 gap-3 mb-3">
-        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'ALL']} onChange={(v) => setForm({ ...form, subjectType: v as SubjectType })} />
+        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'GROUP', 'ALL']} onChange={(v) => setForm({ ...form, subjectType: v as SubjectType })} />
         <div>
           <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Subject ID</label>
           <input
             value={form.subjectId ?? ''}
             onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
-            placeholder={form.subjectType === 'ALL' ? 'Not required for ALL' : 'User/Role/Group ID'}
+            placeholder={form.subjectType === 'ALL' ? 'Not required for ALL' : 'User ID, role name, or Keycloak group name'}
             disabled={form.subjectType === 'ALL'}
             className="w-full px-3 py-1.5 text-sm rounded-lg outline-none transition"
             style={{
@@ -164,6 +166,22 @@ function AclAddForm({
       </div>
     </div>
   );
+}
+
+function normalizeSubjectId(
+  subjectType: SubjectType,
+  subjectId?: string,
+): string | undefined {
+  if (subjectType === 'ALL') {
+    return undefined;
+  }
+
+  const trimmed = subjectId?.trim();
+  if (!trimmed) {
+    return undefined;
+  }
+
+  return subjectType === 'GROUP' ? trimmed.replace(/^\/+/, '') : trimmed;
 }
 
 function Select({ label, value, options, onChange }: { label: string; value: string; options: string[]; onChange: (v: string) => void }) {

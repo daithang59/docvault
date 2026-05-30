@@ -239,7 +239,7 @@ Title, description, classification badge, status badge, tags, owner info, create
 #### ✅ Test 4: ACL Card (nếu có quyền)
 
 - `canReadAcl` (`editor`, `approver`, `compliance_officer`, `admin`) → thấy ACL card
-- Owner hoặc admin → thấy nút **"Add Access"**
+- Owner hoặc admin → thấy form/nút **"Add Rule"**
 
 #### ✅ Test 5: Action Panel (theo status & role)
 

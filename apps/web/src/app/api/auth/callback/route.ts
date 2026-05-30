@@ -11,7 +11,19 @@ interface JwtPayload {
   preferred_username?: string;
   username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
+}
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
 }
 
 export async function GET(req: NextRequest) {
@@ -63,6 +75,7 @@ export async function GET(req: NextRequest) {
       username: payload.preferred_username ?? payload.username,
       email: payload.email,
       roles: payload.realm_access?.roles ?? [],
+      groups: normalizeGroups(payload.groups),
     };
 
     const response = NextResponse.redirect(`${FRONTEND_URL}/login?auth=ok`);

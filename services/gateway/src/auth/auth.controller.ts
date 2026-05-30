@@ -22,6 +22,17 @@ function parseCookies(raw: string): Record<string, string> {
   );
 }
 
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
+}
+
 @ApiTags('auth')
 @Controller('auth')
 export class AuthController {
@@ -156,6 +167,7 @@ export class AuthController {
             .join(' ') ||
             undefined),
         roles: payload.realm_access?.roles ?? [],
+        groups: normalizeGroups(payload.groups),
       };
 
       // Set session cookies on the gateway origin

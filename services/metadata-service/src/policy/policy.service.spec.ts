@@ -1,6 +1,11 @@
 import { createHmac } from 'crypto';
 import { ForbiddenException } from '@nestjs/common';
-import { AclEffect, ClassificationLevel } from '../../generated/prisma';
+import {
+  AclEffect,
+  AclSubjectType,
+  ClassificationLevel,
+  DocumentPermission,
+} from '../../generated/prisma';
 import { PolicyService } from './policy.service';
 
 const mockDocumentFindUnique = jest.fn();
@@ -205,5 +210,137 @@ describe('PolicyService', () => {
         },
       ),
     ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('allows confidential metadata read through a matching GROUP READ allow', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'finance-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['finance-team'] } as any,
+        { ...baseContext, groups: ['finance-team'] } as any,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('denies metadata read through a matching GROUP READ deny', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.INTERNAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'blocked-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.DENY,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['blocked-team'] } as any,
+        { ...baseContext, groups: ['blocked-team'] } as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies admin metadata read through a matching GROUP READ deny', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.INTERNAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'blocked-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.DENY,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'admin-1', roles: ['admin'], groups: ['blocked-team'] } as any,
+        {
+          ...baseContext,
+          actorId: 'admin-1',
+          roles: ['admin'],
+          groups: ['blocked-team'],
+        } as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('matches slash-prefixed GROUP READ allow ACL subject ids', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: '/finance-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['finance-team'] } as any,
+        { ...baseContext, groups: ['finance-team'] } as any,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('allows confidential download through a matching GROUP DOWNLOAD allow when role policy also matches', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'finance-team',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'editor-1', roles: ['editor'], groups: ['finance-team'] } as any,
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+        groups: ['finance-team'],
+      } as any,
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
   });
 });

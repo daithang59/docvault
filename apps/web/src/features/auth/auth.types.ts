@@ -11,6 +11,7 @@ export interface UserInfo {
   lastName?: string;
   displayName?: string;          // Computed full name: name ?? firstName+lastName
   roles: UserRole[];
+  groups?: string[];
 }
 
 /** Full auth session stored in localStorage and context */
@@ -30,6 +31,7 @@ export interface CurrentUserDto {
   lastName?: string;
   displayName?: string;
   roles: UserRole[];
+  groups?: string[];
   raw?: Record<string, unknown>;
 }
 

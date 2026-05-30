@@ -91,6 +91,24 @@ function makeExpiredLikeToken() {
   return `${header}.${payload}.expired-signature`;
 }
 
+function decodeJwtPayload(token) {
+  const payload = token.split('.')[1];
+  if (!payload) {
+    return {};
+  }
+  return JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+}
+
+function normalizeGroups(groups) {
+  return [
+    ...new Set(
+      (Array.isArray(groups) ? groups : [])
+        .map((group) => group.trim().replace(/^\/+/, ''))
+        .filter(Boolean),
+    ),
+  ];
+}
+
 async function verifyObjectExists(objectKey) {
   const client = new S3Client({
     region: S3_REGION,
@@ -146,6 +164,7 @@ async function main() {
   const viewerToken = await getToken('viewer1');
   const complianceToken = await getToken('co1');
   const adminToken = await getToken('admin1');
+  const editorGroups = normalizeGroups(decodeJwtPayload(editorToken).groups);
 
   await expectStatus('no token metadata list', '/api/metadata/documents', 401);
 
@@ -239,6 +258,80 @@ async function main() {
       headers: authHeaders(viewerToken),
     },
   );
+
+  if (editorGroups.includes('finance-team')) {
+    const groupAclDocument = await expectStatus(
+      'admin create group ACL confidential document',
+      '/api/metadata/documents',
+      201,
+      {
+        method: 'POST',
+        headers: {
+          ...authHeaders(adminToken),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          title: 'Group ACL confidential probe',
+          description: 'Document used to prove GROUP ACL metadata access',
+          classification: 'CONFIDENTIAL',
+        }),
+      },
+    );
+    const groupAclDocId = groupAclDocument.id;
+
+    await expectStatus(
+      'editor group ACL metadata denied before grant',
+      `/api/metadata/documents/${groupAclDocId}`,
+      403,
+      {
+        headers: authHeaders(editorToken),
+      },
+    );
+
+    const groupAclEntry = await expectStatus(
+      'admin add GROUP READ ACL',
+      `/api/metadata/documents/${groupAclDocId}/acl`,
+      201,
+      {
+        method: 'POST',
+        headers: {
+          ...authHeaders(adminToken),
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          subjectType: 'GROUP',
+          subjectId: 'finance-team',
+          permission: 'READ',
+          effect: 'ALLOW',
+        }),
+      },
+    );
+    assert(groupAclEntry.subjectType === 'GROUP', 'ACL subjectType should be GROUP');
+    assert(groupAclEntry.subjectId === 'finance-team', 'GROUP ACL subjectId should be normalized group name');
+    log('PASS GROUP ACL stored with normalized group name');
+
+    await expectStatus(
+      'editor GROUP READ ACL metadata access',
+      `/api/metadata/documents/${groupAclDocId}`,
+      200,
+      {
+        headers: authHeaders(editorToken),
+      },
+    );
+
+    await expectStatus(
+      'viewer GROUP ACL metadata denied',
+      `/api/metadata/documents/${groupAclDocId}`,
+      403,
+      {
+        headers: authHeaders(viewerToken),
+      },
+    );
+  } else {
+    log(
+      'SKIP GROUP ACL live evidence: editor1 token does not include finance-team; reimport Keycloak realm to enable this probe.',
+    );
+  }
 
   const malwareDocument = await expectStatus(
     'editor create malware scan probe',

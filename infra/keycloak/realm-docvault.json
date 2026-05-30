@@ -16,6 +16,13 @@
     ]
   },
 
+  "groups": [
+    {
+      "name": "finance-team",
+      "path": "/finance-team"
+    }
+  ],
+
   "requiredActions": [
     {
       "alias": "UPDATE_PASSWORD",
@@ -71,7 +78,23 @@
       "attributes": {
         "access.token.lifespan": "900"
       },
-      "fullScopeAllowed": true
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     }
   ],
 
@@ -95,6 +118,7 @@
       "lastName": "One",
       "email": "editor1@docvault.local",
       "requiredActions": [],
+      "groups": ["/finance-team"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["editor"]
     },

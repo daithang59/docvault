@@ -18,6 +18,7 @@ import {
   RequestContext,
   ServiceUser,
   buildActorId,
+  normalizeGroups,
 } from '../common/request-context';
 import { CLASSIFICATION_WATERMARK_LEVELS } from '../common/classification.constants';
 
@@ -67,6 +68,7 @@ export class PolicyService {
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];
+    const groups = this.getActorGroups(user, context);
     const requestedVersion = dto.version ?? document.currentVersion;
     const deniedReason = this.getDeniedReason(document.status, roles);
 
@@ -91,7 +93,7 @@ export class PolicyService {
       throw new ForbiddenException(deniedReason);
     }
 
-    if (this.matchesAcl(document.aclEntries, actorId, roles, AclEffect.DENY)) {
+    if (this.matchesAcl(document.aclEntries, actorId, roles, groups, AclEffect.DENY)) {
       throw new ForbiddenException('Download denied by ACL');
     }
 
@@ -99,6 +101,7 @@ export class PolicyService {
       document.aclEntries,
       actorId,
       roles,
+      groups,
       AclEffect.ALLOW,
     );
 
@@ -135,6 +138,7 @@ export class PolicyService {
         checksum: versionRecord.checksum,
         actorId,
         roles,
+        groups,
         expiresAt: expiresAt.toISOString(),
       },
     });
@@ -186,6 +190,7 @@ export class PolicyService {
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];
+    const groups = this.getActorGroups(user, context);
     const requestedVersion = dto.version ?? document.currentVersion;
 
     if (roles.includes('compliance_officer')) {
@@ -221,6 +226,7 @@ export class PolicyService {
         document.aclEntries,
         actorId,
         roles,
+        groups,
         AclEffect.DENY,
       )
     ) {
@@ -231,6 +237,7 @@ export class PolicyService {
       document.aclEntries,
       actorId,
       roles,
+      groups,
       AclEffect.ALLOW,
     );
 
@@ -262,6 +269,7 @@ export class PolicyService {
         contentType: versionRecord.contentType ?? null,
         actorId,
         roles,
+        groups,
         expiresAt: expiresAt.toISOString(),
       },
     });
@@ -307,6 +315,7 @@ export class PolicyService {
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? context.roles ?? [];
+    const groups = this.getActorGroups(user, context);
 
     const deny = async (reason: string) => {
       await this.auditClient.emitEvent(context, {
@@ -321,30 +330,33 @@ export class PolicyService {
           status: document.status,
           actorId,
           roles,
+          groups,
         },
       });
       throw new ForbiddenException(reason);
     };
-
-    if (roles.includes('admin')) {
-      return document;
-    }
 
     if (
       this.matchesPreviewAcl(
         document.aclEntries,
         actorId,
         roles,
+        groups,
         AclEffect.DENY,
       )
     ) {
       return deny('Metadata read denied by ACL');
     }
 
+    if (roles.includes('admin')) {
+      return document;
+    }
+
     const hasExplicitReadAllow = this.matchesPreviewAcl(
       document.aclEntries,
       actorId,
       roles,
+      groups,
       AclEffect.ALLOW,
     );
 
@@ -409,6 +421,10 @@ export class PolicyService {
     return null;
   }
 
+  private getActorGroups(user: ServiceUser, context: RequestContext): string[] {
+    return normalizeGroups([...(user.groups ?? []), ...(context.groups ?? [])]);
+  }
+
   private matchesPreviewAcl(
     aclEntries: Array<{
       subjectType: AclSubjectType;
@@ -418,6 +434,7 @@ export class PolicyService {
     }>,
     actorId: string,
     roles: string[],
+    groups: string[],
     effect: AclEffect,
   ) {
     return aclEntries.some((entry) => {
@@ -435,6 +452,9 @@ export class PolicyService {
       }
       if (entry.subjectType === AclSubjectType.ROLE) {
         return entry.subjectId ? roles.includes(entry.subjectId) : false;
+      }
+      if (entry.subjectType === AclSubjectType.GROUP) {
+        return this.matchesGroupSubject(entry.subjectId, groups);
       }
       return false;
     });
@@ -546,6 +566,7 @@ export class PolicyService {
     }>,
     actorId: string,
     roles: string[],
+    groups: string[],
     effect: AclEffect,
   ) {
     return aclEntries.some((entry) => {
@@ -564,8 +585,19 @@ export class PolicyService {
       if (entry.subjectType === AclSubjectType.ROLE) {
         return entry.subjectId ? roles.includes(entry.subjectId) : false;
       }
+      if (entry.subjectType === AclSubjectType.GROUP) {
+        return this.matchesGroupSubject(entry.subjectId, groups);
+      }
       return false;
     });
+  }
+
+  private matchesGroupSubject(
+    subjectId: string | null,
+    groups: string[],
+  ): boolean {
+    const normalizedSubject = normalizeGroups(subjectId ? [subjectId] : [])[0];
+    return normalizedSubject ? groups.includes(normalizedSubject) : false;
   }
 
   private createGrantToken(payload: {

@@ -13,6 +13,7 @@ import {
   RequestContext,
   ServiceUser,
   buildActorId,
+  normalizeGroups,
 } from '../common/request-context';
 
 @Injectable()
@@ -34,6 +35,7 @@ export class DocumentsService {
   findAll(userOrContext?: ServiceUser | RequestContext, searchQuery?: string) {
     let actorId: string;
     let roles: string[];
+    let groups: string[];
     let isAdmin: boolean;
 
     if (!userOrContext) {
@@ -45,9 +47,11 @@ export class DocumentsService {
     if (isServiceUser) {
       actorId = buildActorId(userOrContext);
       roles = userOrContext.roles ?? [];
+      groups = normalizeGroups(userOrContext.groups);
     } else {
       actorId = userOrContext.actorId;
       roles = userOrContext.roles ?? [];
+      groups = normalizeGroups(userOrContext.groups);
     }
 
     isAdmin = roles.includes('admin');
@@ -63,11 +67,53 @@ export class DocumentsService {
         }
       : undefined;
 
+    const groupSubjectIds = [
+      ...new Set(groups.flatMap((group) => [group, `/${group}`])),
+    ];
+
+    const aclSubjects = [
+      {
+        subjectType: 'ALL' as const,
+        subjectId: null,
+      },
+      {
+        subjectType: 'USER' as const,
+        subjectId: actorId,
+      },
+      ...roles.map((role) => ({
+        subjectType: 'ROLE' as const,
+        subjectId: role,
+      })),
+      ...groupSubjectIds.map((group) => ({
+        subjectType: 'GROUP' as const,
+        subjectId: group,
+      })),
+    ];
+
+    const matchingReadAcl = {
+      permission: 'READ' as const,
+      OR: aclSubjects,
+    };
+
+    const readDenyFilter = {
+      NOT: {
+        aclEntries: {
+          some: {
+            ...matchingReadAcl,
+            effect: 'DENY' as const,
+          },
+        },
+      },
+    };
+
     if (isAdmin) {
       return this.prisma.document.findMany({
         where: {
-          ...searchFilter,
-          status: { not: 'DELETED' as const },
+          AND: [
+            ...(searchFilter ? [searchFilter] : []),
+            { status: { not: 'DELETED' as const } },
+            readDenyFilter,
+          ],
         },
         orderBy: { createdAt: 'desc' },
       });
@@ -80,17 +126,22 @@ export class DocumentsService {
           ...(searchFilter ? [searchFilter] : []),
           // Always exclude DELETED documents
           { status: { not: 'DELETED' as const } },
+          // Explicit ACL DENY overrides baseline role/classification visibility.
+          readDenyFilter,
           // Visibility filter (role + classification based)
           {
             OR: [
           // Documents the user owns (always visible regardless of classification)
           { ownerId: actorId },
-          // Documents where user has explicit ACL entry (DOWNLOAD permission)
-          { aclEntries: { some: { subjectId: actorId } } },
-          // Documents where user's role has ACL entry
-          ...(roles.length > 0
-            ? [{ aclEntries: { some: { subjectId: { in: roles } } } }]
-            : []),
+          // Documents where user/role/group/all has explicit READ allow.
+          {
+            aclEntries: {
+              some: {
+                ...matchingReadAcl,
+                effect: 'ALLOW' as const,
+              },
+            },
+          },
           // compliance_officer sees ALL published + archived documents (any classification) for audit
           ...(roles.includes('compliance_officer')
             ? [

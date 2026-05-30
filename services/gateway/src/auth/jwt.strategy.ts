@@ -7,6 +7,7 @@ type TokenPayload = {
   sub: string;
   preferred_username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   resource_access?: Record<string, { roles?: string[] }>;
   aud?: string | string[];
@@ -33,6 +34,17 @@ function extractToken(req: any): string | undefined {
   const rawCookies = req.headers.cookie ?? '';
   const cookies = parseCookies(rawCookies);
   return cookies['dv_access_token'];
+}
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
 }
 
 @Injectable()
@@ -94,6 +106,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         ([payload.given_name, payload.family_name].filter(Boolean).join(' ') ||
           undefined),
       roles: Array.from(roles),
+      groups: normalizeGroups(payload.groups),
       raw: payload,
     };
   }

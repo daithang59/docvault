@@ -123,7 +123,7 @@ npm run lint  → Exit code: 0 (4 warnings, 0 errors) ✅
 | Risk | Severity | Notes |
 |------|----------|-------|
 | No refresh token handling | Medium | Session expires → 401 → redirect login. User must login again. Acceptable for MVP. |
-| ACL editing UI is read-only | Medium | Can view ACLs but no in-app editor. Admin must use API directly. |
+| ACL mutation UI is owner/admin scoped | Low | Owners/admins can add ACL rules in-app; delete/edit flows are still API-only. |
 | Client-side pagination/filter | Low | For large datasets, could be slow. Server-side pagination not implemented. |
 | ownerDisplay field dependency | Low | `document-header.tsx` shows `ownerDisplay` if backend returns it, else falls back to ownerId slice. |
 | Upload progress bar absent | Low | Only show loading spinner, no % progress. |

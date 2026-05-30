@@ -97,10 +97,41 @@ Navigate to: **http://localhost:3100**
 
 1. Sign out → Demo Login as `co1`, role: **Compliance Officer**
 2. Go to **Audit** in sidebar
-3. ✅ Should see audit log table with all events from the demo flow above
-4. Try filtering by action type or date
-5. Navigate to a document detail page
-6. ✅ No **Download** button visible (compliance_officer is blocked)
+3. ✅ Should see security cards for denied events, malware blocked, DLP hits, and download denied
+4. Click **Verify Chain**
+5. ✅ Should see audit chain status and checked event count
+6. Try filtering by action type or date
+7. Navigate to a document detail page
+8. ✅ No **Preview** or **Download** button visible (compliance_officer can audit metadata/events, not file content)
+
+---
+
+## Step 8 — Compliance/Admin: Retention Evidence
+
+1. While signed in as `co1`, go to **Retention** in sidebar
+2. ✅ Should see tracked records, due soon, overdue, and archived counters
+3. Open a record and verify the document detail shows retention class and retention deadline
+4. Sign out → sign in as `admin1`
+5. Go to **Retention** and click **Run Retention**
+6. ✅ Due records move to **Archived**
+7. Open the archived document workflow timeline
+8. ✅ Should show `Retention archived` by `system:retention`
+9. Go to **Audit** and filter action `DOCUMENT_AUTO_ARCHIVED`
+10. ✅ Should see the retention audit event
+
+---
+
+## Security Evidence Probes
+
+Use the backend E2E command below to demonstrate the automated controls:
+
+- `GROUP` ACL uses normalized Keycloak group names such as `finance-team`; if the local token contains that claim, E2E proves group metadata access.
+- EICAR upload is blocked before MinIO storage.
+- Sensitive text upload records DLP evidence and escalates classification to `CONFIDENTIAL`.
+- DLP-detected document downgrade to `PUBLIC` is denied.
+- Compliance officer can view `/audit/security-summary`.
+- Compliance officer can view `/metadata/retention/documents`.
+- Admin can run `/metadata/retention/run` and produce `DOCUMENT_AUTO_ARCHIVED`.
 
 ---
 

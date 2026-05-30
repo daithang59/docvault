@@ -3,6 +3,7 @@ import { env } from '@/config/env';
 import { loadSession } from './session';
 import type { Session } from '@/types/auth';
 import type { UserInfo } from '@/features/auth/auth.types';
+import { normalizeGroups } from './token';
 /**
  * Attempt to refresh the session by querying the gateway /me endpoint.
  * Falls back to the current token if refresh fails.
@@ -31,6 +32,7 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
       lastName?: string;
       displayName?: string;
       roles: string[];
+      groups?: string[];
     }>(`${env.API_BASE_URL}/me`, {
       headers: {
         Authorization: `Bearer ${session.accessToken}`,
@@ -49,6 +51,7 @@ export async function refreshSessionIfNeeded(): Promise<Session | null> {
       lastName: data.lastName,
       displayName: data.displayName,
       roles: (data.roles ?? []) as UserInfo['roles'],
+      groups: normalizeGroups(data.groups),
     };
 
     return {

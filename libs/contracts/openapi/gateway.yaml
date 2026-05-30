@@ -154,11 +154,11 @@ components:
     # ─── ACL ──────────────────────────────────────────────────────────────────
     AclSubjectType:
       type: string
-      enum: [USER, ROLE, ALL]
+      enum: [USER, ROLE, GROUP, ALL]
 
     AclPermission:
       type: string
-      enum: [DOWNLOAD]
+      enum: [READ, DOWNLOAD, WRITE, APPROVE]
 
     AclEffect:
       type: string
@@ -170,7 +170,7 @@ components:
         id: { type: string }
         docId: { type: string }
         subjectType: { $ref: '#/components/schemas/AclSubjectType' }
-        subjectId: { type: string, nullable: true, description: User ID or role name. null for ALL }
+        subjectId: { type: string, nullable: true, description: User ID, role name, or normalized Keycloak group name. null for ALL }
         permission: { $ref: '#/components/schemas/AclPermission' }
         effect: { $ref: '#/components/schemas/AclEffect' }
 
@@ -179,7 +179,7 @@ components:
       required: [subjectType, permission, effect]
       properties:
         subjectType: { $ref: '#/components/schemas/AclSubjectType' }
-        subjectId: { type: string, nullable: true }
+        subjectId: { type: string, nullable: true, description: User ID, role name, or normalized Keycloak group name. null for ALL }
         permission: { $ref: '#/components/schemas/AclPermission' }
         effect: { $ref: '#/components/schemas/AclEffect' }
 
@@ -425,6 +425,10 @@ components:
         lastName: { type: string, nullable: true }
         displayName: { type: string, nullable: true }
         roles: { type: array, items: { type: string } }
+        groups:
+          type: array
+          items: { type: string }
+          description: Normalized Keycloak group names, for example finance-team.
         raw: { type: object, description: 'Full JWT payload from Keycloak' }
 
     UserProfile:

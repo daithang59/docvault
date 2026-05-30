@@ -115,9 +115,10 @@ Trang login hiện hỗ trợ 2 chế độ:
 - proxy request xuống các service phía sau
 - forward các header:
   - `authorization`
-  - `x-request-id`
-  - `x-user-id`
-  - `x-roles`
+- `x-request-id`
+- `x-user-id`
+- `x-roles`
+- `x-groups`
 
 Các nhóm route đang được proxy:
 
@@ -452,21 +453,26 @@ Hệ quả có thể xảy ra:
 
 - workflow timeline trên web có thể lỗi khi đi qua gateway
 
-### 2. ACL `GROUP` có trong schema và UI nhưng policy download chưa evaluate
+### 2. ACL `GROUP` đã được evaluate trong policy runtime
 
 Trạng thái quan sát được:
 
 - Prisma schema hỗ trợ `GROUP`
 - form ACL trên frontend cho chọn `GROUP`
 - DTO cho phép `GROUP`
-- `PolicyService.matchesAcl()` hiện chỉ xử lý:
+- Keycloak `groups` claim được normalize, ví dụ `/finance-team` thành `finance-team`
+- gateway forward `x-groups` xuống metadata-service
+- `PolicyService.matchesAcl()` và metadata read policy xử lý:
   - `ALL`
   - `USER`
   - `ROLE`
+  - `GROUP`
 
-Hệ quả có thể xảy ra:
+Hệ quả hiện tại:
 
-- rule download theo group có thể tạo được nhưng không có tác dụng khi authorize
+- rule metadata/download theo group có tác dụng khi authorize
+- `READ DENY` override baseline visibility, kể cả list/detail metadata
+- local E2E sẽ chạy live GROUP probe khi Keycloak realm đã được reimport để token của `editor1` có group `finance-team`
 
 ### 3. Kiểm tra owner ở frontend đang lệch với cách backend lưu owner
 

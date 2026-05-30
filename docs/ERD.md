@@ -145,7 +145,7 @@ This document describes the Entity-Relationship Diagram of DocVault, aligned wit
 **`AclSubjectType`**:
 - `USER` — a specific user (subjectId = Keycloak user ID)
 - `ROLE` — a role (subjectId = role name)
-- `GROUP` — a Keycloak group (subjectId = group ID)
+- `GROUP` — a Keycloak group (subjectId = normalized group name, e.g. `/finance-team` -> `finance-team`)
 - `ALL` — everyone (subjectId = NULL)
 
 **`DocumentPermission`**:
