@@ -75,6 +75,20 @@ export class AuditService {
     if (dto.resourceType) filter.resourceType = dto.resourceType;
     if (dto.resourceId) filter.resourceId = dto.resourceId;
     if (dto.result) filter.result = dto.result;
+    if (dto.documentId) {
+      const documentScope = {
+        $or: [
+          { resourceType: 'DOCUMENT', resourceId: dto.documentId },
+          { 'metadata.docId': dto.documentId },
+        ],
+      };
+
+      if (Object.keys(filter).length === 0) {
+        Object.assign(filter, documentScope);
+      } else {
+        filter.$and = [documentScope];
+      }
+    }
 
     if (dto.from || dto.to) {
       filter.timestamp = {};

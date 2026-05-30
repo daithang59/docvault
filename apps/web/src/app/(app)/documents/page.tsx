@@ -65,7 +65,7 @@ export default function DocumentsPage() {
     }
     if (filters.status) result = result.filter((d) => d.status === filters.status);
     if (filters.classification) result = result.filter(
-      (d) => (d.classificationLevel ?? d.classification) === filters.classification
+      (d) => d.classification === filters.classification
     );
     result.sort((a, b) => {
       const valA: string | number = a[filters.sort as keyof DocumentListItem] as string ?? '';

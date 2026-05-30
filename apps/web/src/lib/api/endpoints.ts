@@ -11,6 +11,7 @@ export const apiEndpoints = {
       list: '/metadata/documents',
       create: '/metadata/documents',
       detail: (docId: string) => `/metadata/documents/${docId}`,
+      evidencePacket: (docId: string) => `/metadata/documents/${docId}/evidence-packet`,
       update: (docId: string) => `/metadata/documents/${docId}`,
       workflowHistory: (docId: string) => `/metadata/documents/${docId}/workflow-history`,
       acl: (docId: string) => `/metadata/documents/${docId}/acl`,

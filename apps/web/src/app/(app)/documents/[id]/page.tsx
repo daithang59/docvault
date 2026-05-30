@@ -15,7 +15,7 @@ import { DocumentActionPanel } from '@/components/documents/document-action-pane
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { canDownloadDocument, canManageAcl, canPreviewDocument, canReadAcl } from '@/lib/auth/guards';
+import { canDownloadDocument, canManageAcl, canPreviewDocument, canReadAcl } from '@/lib/auth/permissions';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';

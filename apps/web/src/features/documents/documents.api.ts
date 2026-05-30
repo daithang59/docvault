@@ -14,15 +14,12 @@ import type {
   PresignedDownloadResult,
   UploadVersionResponse,
   PreviewAuthorizationResult,
+  ComplianceEvidencePacket,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
 
 function normalizeDocumentSummary(document: DocumentListItem): DocumentListItem {
-  return {
-    ...document,
-    classificationLevel: document.classification,
-    currentVersionNumber: document.currentVersion,
-  };
+  return document;
 }
 
 function normalizeDocumentAclEntry(entry: AclEntry): AclEntry {
@@ -74,7 +71,6 @@ export async function getDocuments(
       if (filters?.status && document.status !== filters.status) return false;
       if (filters?.ownerId && document.ownerId !== filters.ownerId) return false;
       if (filters?.classification && document.classification !== filters.classification) return false;
-      if (filters?.classificationLevel && document.classification !== filters.classificationLevel) return false;
       if (filters?.tags?.length && !filters.tags.every((tag) => document.tags.includes(tag))) return false;
 
       return true;
@@ -85,6 +81,13 @@ export async function getDocuments(
 export async function getDocument(id: string): Promise<DocumentDetail> {
   const res = await apiClient.get<DocumentDetail>(apiEndpoints.metadata.documents.detail(id));
   return normalizeDocumentDetail(unwrap(res));
+}
+
+export async function getComplianceEvidencePacket(id: string): Promise<ComplianceEvidencePacket> {
+  const res = await apiClient.get<ComplianceEvidencePacket>(
+    apiEndpoints.metadata.documents.evidencePacket(id),
+  );
+  return unwrap(res);
 }
 
 export async function createDocument(dto: CreateDocumentDto): Promise<DocumentDetail> {

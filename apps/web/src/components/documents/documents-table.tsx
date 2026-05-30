@@ -19,7 +19,7 @@ import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
-import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
+import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/permissions';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
 
@@ -175,7 +175,7 @@ export function DocumentsTable({
     {
       accessorKey: 'classification',
       header: 'Classification',
-      cell: ({ row }) => <ClassificationBadge classification={(row.original.classificationLevel ?? row.original.classification) as import('@/types/enums').ClassificationLevel} />,
+      cell: ({ row }) => <ClassificationBadge classification={row.original.classification} />,
     },
     {
       accessorKey: 'status',

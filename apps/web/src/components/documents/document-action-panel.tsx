@@ -11,10 +11,10 @@ import {
   canArchiveDocument,
   canDownloadDocument,
   canPreviewDocument,
-  canUploadVersion,
   canManageAcl,
   canDeleteDocument,
-} from '@/lib/auth/guards';
+  canViewComplianceEvidencePacket,
+} from '@/lib/auth/permissions';
 import {
   useSubmitDocument,
   useApproveDocument,
@@ -24,10 +24,11 @@ import {
   useDeleteDocument,
 } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
+import { useExportComplianceEvidencePacket } from '@/features/documents/documents.hooks';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
 import {
-  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2
+  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2, FileJson
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
@@ -55,6 +56,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   const archive = useArchiveDocument(doc.id);
   const upload = useUploadDocument(doc.id);
   const deleteDoc = useDeleteDocument(doc.id);
+  const exportEvidencePacket = useExportComplianceEvidencePacket(doc.id);
   const { download, isDownloading } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
@@ -153,6 +155,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
     canArchiveDocument(session, doc) ||
     canDownloadDocument(session, doc) ||
     canPreviewDocument(session, doc) ||
+    canViewComplianceEvidencePacket(session) ||
     canDeleteDocument(session, doc);
 
   if (!hasAnyAction) return null;
@@ -174,7 +177,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </Link>
         )}
 
-        {canUploadVersion(session, doc) && (
+        {canEditDocument(session, doc) && (
           <>
             <button
               onClick={() => setShowUpload(!showUpload)}
@@ -271,6 +274,17 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           >
             <Download className="h-4 w-4 text-[var(--text-muted)]" />
             {isDownloading ? 'Preparing download...' : 'Download'}
+          </button>
+        )}
+
+        {canViewComplianceEvidencePacket(session) && (
+          <button
+            onClick={() => exportEvidencePacket.mutate()}
+            disabled={exportEvidencePacket.isPending}
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)] disabled:opacity-50"
+          >
+            <FileJson className="h-4 w-4 text-[var(--text-muted)]" />
+            {exportEvidencePacket.isPending ? 'Preparing evidence...' : 'Export Evidence Packet'}
           </button>
         )}
 

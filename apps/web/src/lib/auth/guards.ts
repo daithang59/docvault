@@ -22,6 +22,7 @@ export {
   canPreviewDocument,
   canReadAcl,
   canViewAudit,
+  canViewComplianceEvidencePacket,
   canViewApprovals,
 } from './permissions';
 
@@ -44,14 +45,3 @@ export function canManageAcl(
 
   return _canManageAcl(session, doc);
 }
-
-/** @deprecated Use canEditDocument(session, doc) instead */
-export function canUploadVersion(
-  session: Session | null,
-  doc: { status: string; ownerId: string },
-): boolean {
-  return canEditDocument(session, doc as { status: import('@/types/enums').DocumentStatus; ownerId?: string });
-}
-
-// Direct re-import for use in canUploadVersion
-import { canEditDocument } from './permissions';

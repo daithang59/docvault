@@ -833,6 +833,61 @@ async function main() {
   );
   log(`PASS audit verify-chain valid=${chainStatus.valid}`);
 
+  const evidencePacket = await expectStatus(
+    'compliance officer evidence packet',
+    `/api/metadata/documents/${docId}/evidence-packet`,
+    200,
+    {
+      headers: authHeaders(complianceToken),
+    },
+  );
+  assert(
+    evidencePacket.scope?.documentId === docId,
+    'evidence packet should be scoped to the requested document',
+  );
+  assert(
+    evidencePacket.document?.id === docId,
+    'evidence packet should include document metadata',
+  );
+  assert(
+    evidencePacket.versions?.some(
+      (version) => version.checksum === uploadResult.checksum,
+    ),
+    'evidence packet should include version checksums',
+  );
+  assert(
+    evidencePacket.workflowHistory?.some(
+      (entry) => entry.action === 'RETENTION',
+    ),
+    'evidence packet should include workflow history',
+  );
+  assert(
+    evidencePacket.retention?.record?.docId === docId,
+    'evidence packet should include retention evidence',
+  );
+  assert(
+    typeof evidencePacket.audit?.chain?.valid === 'boolean',
+    'evidence packet should include audit hash-chain status',
+  );
+  assert(
+    Array.isArray(evidencePacket.audit?.events),
+    'evidence packet should include related audit events',
+  );
+  assert(
+    !JSON.stringify(evidencePacket).includes('grantToken'),
+    'evidence packet must not include file grant tokens',
+  );
+  log('PASS evidence packet includes metadata/version/workflow/retention/audit evidence');
+
+  await expectStatus(
+    'viewer evidence packet denied',
+    `/api/metadata/documents/${docId}/evidence-packet`,
+    403,
+    {
+      headers: authHeaders(viewerToken),
+    },
+  );
+
   const securitySummary = await expectStatus(
     'compliance officer security summary',
     '/api/audit/security-summary',

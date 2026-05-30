@@ -6,6 +6,7 @@ import { documentsKeys } from './documents.keys';
 import {
   getDocuments,
   getDocument,
+  getComplianceEvidencePacket,
   createDocument,
   updateDocument,
   uploadDocumentFile,
@@ -50,6 +51,14 @@ export function useDocumentAcl(id: string) {
     queryKey: documentsKeys.acl(id),
     queryFn: () => getDocumentAcl(id),
     enabled: Boolean(id),
+  });
+}
+
+export function useComplianceEvidencePacket(id: string, enabled = false) {
+  return useQuery({
+    queryKey: documentsKeys.complianceEvidencePacket(id),
+    queryFn: () => getComplianceEvidencePacket(id),
+    enabled: Boolean(id) && enabled,
   });
 }
 
@@ -128,4 +137,31 @@ export function useDownloadDocument() {
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+}
+
+export function useExportComplianceEvidencePacket(id: string) {
+  return useMutation({
+    mutationFn: async () => {
+      const packet = await getComplianceEvidencePacket(id);
+      const blob = new Blob([JSON.stringify(packet, null, 2)], {
+        type: 'application/json',
+      });
+      const blobUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(blobUrl, buildEvidencePacketFilename(packet.document.title, id));
+      setTimeout(() => revokeObjectUrl(blobUrl), 5000);
+      return packet;
+    },
+    onSuccess: () => toast.success('Evidence packet exported'),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+function buildEvidencePacketFilename(title: string | undefined, docId: string) {
+  const base = (title ?? `document-${docId}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return `docvault-evidence-${base || docId}.json`;
 }

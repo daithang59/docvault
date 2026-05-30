@@ -101,11 +101,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           <div className="px-5 pt-5 pb-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
             <div className="flex items-center gap-2 flex-wrap mb-2">
               <StatusBadge status={doc.status} />
-              <ClassificationBadge
-                classification={
-                  (doc.classificationLevel ?? doc.classification) as import('@/types/enums').ClassificationLevel
-                }
-              />
+              <ClassificationBadge classification={doc.classification} />
             </div>
             <h3 className="text-base font-semibold leading-snug mb-1.5" style={{ color: 'var(--text-strong)' }}>
               {doc.title}

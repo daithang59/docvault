@@ -104,6 +104,102 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Get('documents/:docId/evidence-packet')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Export document compliance evidence packet',
+    description:
+      'Builds a document-scoped JSON packet with metadata, versions, ACL, workflow history, retention evidence, audit hash-chain status, and related audit events.',
+  })
+  async getEvidencePacket(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Query('asOf') asOf?: string,
+  ) {
+    const documentResponse = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,
+    });
+    const document = documentResponse.data ?? {};
+
+    const [workflowResponse, retentionResponse, chainResponse, auditResponse] =
+      await Promise.all([
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/workflow-history`,
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/retention/documents`,
+          ...(asOf ? { params: { asOf } } : {}),
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.AUDIT_SERVICE_URL}/audit/verify-chain`,
+          params: { limit: 5000 },
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.AUDIT_SERVICE_URL}/audit/query`,
+          params: { documentId: docId, pageSize: 200 },
+        }),
+      ]);
+
+    const {
+      versions = [],
+      aclEntries,
+      acl,
+      workflowHistory: _embeddedWorkflowHistory,
+      ...documentMetadata
+    } = document;
+    const retentionRecords = Array.isArray(retentionResponse.data?.records)
+      ? retentionResponse.data.records
+      : [];
+    const auditEvents = Array.isArray(auditResponse.data?.data)
+      ? auditResponse.data.data
+      : [];
+
+    return {
+      generatedAt: new Date().toISOString(),
+      generatedBy: {
+        id: req.user?.sub ?? req.user?.username ?? null,
+        username: req.user?.username ?? null,
+        roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      },
+      scope: {
+        type: 'DOCUMENT',
+        documentId: docId,
+        asOf: asOf ?? null,
+      },
+      document: documentMetadata,
+      versions,
+      aclEntries: aclEntries ?? acl ?? [],
+      workflowHistory: Array.isArray(workflowResponse.data)
+        ? workflowResponse.data
+        : [],
+      retention: {
+        checkedAt: retentionResponse.data?.checkedAt ?? null,
+        summary: retentionResponse.data?.summary ?? null,
+        record:
+          retentionRecords.find((record: any) => record.docId === docId) ??
+          null,
+        fields: {
+          retentionClass: document.retentionClass ?? null,
+          retentionUntil: document.retentionUntil ?? null,
+          retentionReason: document.retentionReason ?? null,
+        },
+      },
+      audit: {
+        chain: chainResponse.data,
+        events: auditEvents,
+        total: auditResponse.data?.total ?? auditEvents.length,
+        page: auditResponse.data?.page ?? 1,
+        pageSize: auditResponse.data?.pageSize ?? auditEvents.length,
+      },
+    };
+  }
+
   @Post('documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')

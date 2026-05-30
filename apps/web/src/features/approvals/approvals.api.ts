@@ -6,11 +6,7 @@ import type { ApprovalQueueItem, ApprovalQueueFilters } from './approvals.types'
 import type { DocumentListItem } from '@/features/documents/documents.types';
 
 function normalizeApprovalItem(document: DocumentListItem): ApprovalQueueItem {
-  return {
-    ...document,
-    classificationLevel: document.classification,
-    currentVersionNumber: document.currentVersion,
-  };
+  return document;
 }
 
 /** Fetch pending documents (approval queue) */

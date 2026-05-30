@@ -8,5 +8,6 @@ export const documentsKeys = {
   detail: (id: string) => [...documentsKeys.details(), id] as const,
   workflowHistory: (id: string) => [...documentsKeys.detail(id), 'workflow-history'] as const,
   acl: (id: string) => [...documentsKeys.detail(id), 'acl'] as const,
+  complianceEvidencePacket: (id: string) => [...documentsKeys.detail(id), 'evidence-packet'] as const,
   versions: (id: string) => [...documentsKeys.detail(id), 'versions'] as const,
 };

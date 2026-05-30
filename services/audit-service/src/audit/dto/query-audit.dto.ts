@@ -27,6 +27,10 @@ export class QueryAuditDto {
 
   @IsOptional()
   @IsString()
+  documentId?: string;
+
+  @IsOptional()
+  @IsString()
   result?: string;
 
   @IsOptional()

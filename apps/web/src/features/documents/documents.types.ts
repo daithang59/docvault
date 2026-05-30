@@ -6,6 +6,7 @@ import type {
   AclSubjectType,
   WorkflowAction,
 } from '@/types/enums';
+import type { AuditChainStatus, AuditLogEntry } from '@/features/audit/audit.types';
 import type { PaginationParams } from '@/types/pagination';
 
 export interface DocumentSummaryDto {
@@ -31,8 +32,6 @@ export interface DocumentSummaryDto {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  classificationLevel?: ClassificationLevel;
-  currentVersionNumber?: number;
 }
 
 export type DocumentListItem = DocumentSummaryDto;
@@ -118,7 +117,6 @@ export interface DocumentListFilters extends PaginationParams {
   q?: string;
   status?: DocumentStatus;
   classification?: ClassificationLevel;
-  classificationLevel?: ClassificationLevel;
   ownerId?: string;
   tags?: string[];
 }
@@ -186,4 +184,53 @@ export interface PreviewAuthorizationResult {
   expiresInSeconds: number;
   expiresAt: string;
   grantToken: string;
+}
+
+export interface RetentionEvidenceRecord {
+  docId: string;
+  title?: string;
+  status?: DocumentStatus;
+  classification?: ClassificationLevel;
+  publishedAt?: string | null;
+  archivedAt?: string | null;
+  retentionClass?: string | null;
+  retentionUntil?: string | null;
+  retentionReason?: string | null;
+  retentionStatus?: 'ACTIVE' | 'DUE_SOON' | 'OVERDUE' | 'ARCHIVED' | 'UNSET';
+  daysRemaining?: number | null;
+}
+
+export interface ComplianceEvidencePacket {
+  generatedAt: string;
+  generatedBy: {
+    id: string | null;
+    username: string | null;
+    roles: string[];
+  };
+  scope: {
+    type: 'DOCUMENT';
+    documentId: string;
+    asOf?: string | null;
+  };
+  document: Omit<DocumentDetailDto, 'versions' | 'aclEntries' | 'acl' | 'workflowHistory'>;
+  versions: DocumentVersionDto[];
+  aclEntries: DocumentAclEntryDto[];
+  workflowHistory: WorkflowHistoryItemDto[];
+  retention: {
+    checkedAt?: string | null;
+    summary?: Record<string, number> | null;
+    record?: RetentionEvidenceRecord | null;
+    fields: {
+      retentionClass?: string | null;
+      retentionUntil?: string | null;
+      retentionReason?: string | null;
+    };
+  };
+  audit: {
+    chain: AuditChainStatus;
+    events: AuditLogEntry[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
 }

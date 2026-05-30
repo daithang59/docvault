@@ -10,7 +10,7 @@ import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { EmptyState } from '@/components/common/empty-state';
 import { useAuth } from '@/lib/auth/auth-context';
-import { canEditDocument } from '@/lib/auth/guards';
+import { canEditDocument } from '@/lib/auth/permissions';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
