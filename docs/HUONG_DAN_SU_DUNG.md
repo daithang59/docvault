@@ -384,7 +384,7 @@ Sau khi tất cả service đang chạy:
 pnpm test:e2e
 ```
 
-Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log...
+Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log, GROUP ACL, confidential stream-only posture, malware block, DLP escalation, retention evidence và audit security summary.
 
 ### Mở Swagger UI (tài liệu API)
 

@@ -259,6 +259,109 @@ async function main() {
     },
   );
 
+  const confidentialFileBuffer = Buffer.from(
+    'Board packet for protected download posture evidence.',
+    'utf8',
+  );
+  const confidentialForm = new FormData();
+  confidentialForm.append(
+    'file',
+    new Blob([confidentialFileBuffer], { type: 'text/plain' }),
+    'protected.txt',
+  );
+
+  const confidentialUpload = await expectStatus(
+    'editor upload confidential posture document',
+    `/api/documents/${confidentialDocId}/upload`,
+    201,
+    {
+      method: 'POST',
+      headers: authHeaders(editorToken),
+      body: confidentialForm,
+    },
+  );
+  await verifyObjectExists(confidentialUpload.objectKey);
+  log('PASS confidential upload stored in MinIO');
+
+  const confidentialPending = await expectStatus(
+    'editor submit confidential posture document',
+    `/api/workflow/${confidentialDocId}/submit`,
+    201,
+    {
+      method: 'POST',
+      headers: authHeaders(editorToken),
+    },
+  );
+  assert(
+    confidentialPending.status === 'PENDING',
+    'confidential submit should set status=PENDING',
+  );
+
+  const confidentialPublished = await expectStatus(
+    'approver approve confidential posture document',
+    `/api/workflow/${confidentialDocId}/approve`,
+    201,
+    {
+      method: 'POST',
+      headers: authHeaders(approverToken),
+    },
+  );
+  assert(
+    confidentialPublished.status === 'PUBLISHED',
+    'confidential approve should set status=PUBLISHED',
+  );
+
+  await expectStatus(
+    'viewer confidential presign denied',
+    `/api/documents/${confidentialDocId}/presign-download`,
+    403,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(viewerToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ version: confidentialUpload.version }),
+    },
+  );
+
+  const confidentialPresign = await expectStatus(
+    'editor confidential presign returns stream-only response',
+    `/api/documents/${confidentialDocId}/presign-download`,
+    200,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ version: confidentialUpload.version }),
+    },
+  );
+  assert(
+    confidentialPresign.url === null,
+    'confidential presign should not expose a direct URL',
+  );
+  assert(
+    confidentialPresign.watermarkRequired === true,
+    'confidential presign should require watermark streaming',
+  );
+  assert(
+    typeof confidentialPresign.streamingEndpoint === 'string',
+    'confidential presign should expose a streaming endpoint',
+  );
+  log('PASS confidential presign withheld direct URL');
+
+  await expectStatus(
+    'editor confidential stream download',
+    `/api/documents/${confidentialDocId}/versions/${confidentialUpload.version}/stream`,
+    200,
+    {
+      headers: authHeaders(editorToken),
+    },
+  );
+  log('PASS confidential stream download uses controlled path');
+
   if (editorGroups.includes('finance-team')) {
     const groupAclDocument = await expectStatus(
       'admin create group ACL confidential document',

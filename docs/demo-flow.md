@@ -126,6 +126,7 @@ Navigate to: **http://localhost:3100**
 Use the backend E2E command below to demonstrate the automated controls:
 
 - `GROUP` ACL uses normalized Keycloak group names such as `finance-team`; if the local token contains that claim, E2E proves group metadata access.
+- `CONFIDENTIAL` download posture withholds direct presigned URL and returns a stream-only/watermark path.
 - EICAR upload is blocked before MinIO storage.
 - Sensitive text upload records DLP evidence and escalates classification to `CONFIDENTIAL`.
 - DLP-detected document downgrade to `PUBLIC` is denied.
@@ -138,7 +139,7 @@ Use the backend E2E command below to demonstrate the automated controls:
 ## Quick Backend E2E (no browser needed)
 
 ```bash
-node scripts/e2e-check.mjs
+pnpm test:e2e
 ```
 
 Covers all flows automatically. See [README.md](../README.md#e2e-checks-covered) for what is tested.

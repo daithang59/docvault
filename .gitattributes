@@ -1,3 +1,4 @@
 # Keep shell scripts executable inside Linux containers from Windows checkouts.
 .gitattributes text eol=lf
 *.sh text eol=lf
+*.mjs text eol=lf

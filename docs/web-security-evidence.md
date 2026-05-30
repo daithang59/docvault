@@ -45,6 +45,15 @@ Denied metadata reads emit `DOCUMENT_METADATA_READ_DENIED`.
 
 Legacy single-secret dev mode is still supported when `GRANT_TOKEN_CURRENT_KID` is not set.
 
+### Download Posture and At-Rest Evidence
+
+- MinIO bucket initialization enables SSE-S3 for the local bucket in `infra/minio/init.sh`.
+- Published `PUBLIC`/`INTERNAL` documents can receive a short-lived presigned URL after metadata-service authorizes download.
+- `CONFIDENTIAL` and `SECRET` downloads are marked `watermarkRequired`.
+- When `watermarkRequired=true`, document-service returns `url: null` and a `streamingEndpoint` instead of a direct presigned URL.
+- The stream path re-authorizes or verifies the grant token, reads from MinIO, and applies watermarking before returning content.
+- Compliance officer remains blocked from preview, stream, presign, and download regardless of metadata visibility.
+
 ### Upload Malware and DLP Controls
 
 - Document-service scans uploads before MinIO writes.
@@ -96,7 +105,11 @@ The root E2E script covers:
 - Approver approve allowed.
 - Viewer download published document allowed.
 - Viewer guessed confidential detail/history/comments/ACL denied.
-- GROUP ACL read/download behavior covered by metadata unit tests; the root E2E script records live GROUP READ metadata evidence when the local Keycloak token exposes the `finance-team` group claim.
+- Confidential upload stored, approved, and protected from direct presigned URL exposure.
+- Viewer confidential presign denied.
+- Editor confidential presign returns `url: null`, `watermarkRequired: true`, and a stream endpoint.
+- Editor confidential stream download allowed through the controlled path.
+- GROUP ACL read behavior is covered by metadata unit tests and live E2E evidence with `finance-team`.
 - EICAR upload blocked and no object/version created.
 - Sensitive text upload creates DLP evidence and escalates classification.
 - DLP-detected document downgrade to `PUBLIC` denied.
@@ -127,3 +140,12 @@ pnpm test:e2e
 ```
 
 `pnpm test:e2e` requires the local DocVault stack to be running.
+
+Latest local Sprint 4A E2E evidence on 2026-05-30:
+
+- `PASS editor confidential presign returns stream-only response: 200`
+- `PASS confidential presign withheld direct URL`
+- `PASS editor confidential stream download: 200`
+- `PASS GROUP ACL stored with normalized group name`
+- `PASS security summary includes malware/DLP/deny evidence`
+- `All required E2E checks passed.`

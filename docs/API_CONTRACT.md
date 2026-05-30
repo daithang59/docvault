@@ -351,13 +351,25 @@ Upload security behavior:
 ```
 If `grantToken` is omitted, document-service re-authorizes through metadata-service before issuing a presigned URL.
 
-**Response `200`:**
+**Response `200` for non-watermarked documents:**
 ```jsonc
 {
   "url": "https://minio.example.com/docvault/doc/{docId}/v1/file.pdf?X-Amz-...",
   "expiresAt": "ISO8601"
 }
 ```
+
+**Response `200` for `CONFIDENTIAL` / `SECRET` documents:**
+```jsonc
+{
+  "url": null,
+  "watermarkRequired": true,
+  "streamingEndpoint": "/documents/{docId}/versions/{version}/stream",
+  "expiresAt": "ISO8601"
+}
+```
+
+Sensitive documents do not expose a direct presigned URL; the frontend should use the stream endpoint so document-service can apply the controlled download/watermark path.
 
 ---
 
