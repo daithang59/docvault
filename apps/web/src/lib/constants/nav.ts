@@ -4,6 +4,7 @@ import {
   FolderOpen,
   FilePlus,
   CheckSquare,
+  ShieldAlert,
   Shield,
   Archive,
 } from 'lucide-react';
@@ -48,6 +49,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.APPROVALS,
     icon: CheckSquare,
     roles: ['approver', 'admin'],
+  },
+  {
+    label: 'Security',
+    href: ROUTES.SECURITY,
+    icon: ShieldAlert,
+    roles: ['compliance_officer', 'admin'],
   },
   {
     label: 'Audit',

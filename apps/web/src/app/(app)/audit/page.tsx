@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuditQuery } from '@/lib/hooks/use-audit';
@@ -9,6 +9,7 @@ import {
   verifyAuditChain,
 } from '@/features/audit/audit.api';
 import { auditKeys } from '@/features/audit/audit.keys';
+import { buildSecurityDashboardModel } from '@/features/audit/security-dashboard';
 import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
@@ -44,7 +45,38 @@ export default function AuditPage() {
 
   const hasAccess = canViewAudit(session);
 
-  const { data: logs, isLoading, isError, refetch } = useAuditQuery(filters, page, pageSize);
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const nextFilters: AuditQueryFilters = {};
+
+    const result = params.get('result');
+    const action = params.get('action');
+    const actorId = params.get('actorId');
+    const resourceType = params.get('resourceType');
+    const resourceId = params.get('resourceId');
+    const documentId = params.get('documentId');
+
+    if (result === 'SUCCESS' || result === 'DENY' || result === 'ERROR' || result === 'CONFLICT') {
+      nextFilters.result = result;
+    }
+    if (action) nextFilters.action = action;
+    if (actorId) nextFilters.actorId = actorId;
+    if (resourceType) nextFilters.resourceType = resourceType;
+    if (resourceId) nextFilters.resourceId = resourceId;
+    if (documentId) nextFilters.documentId = documentId;
+
+    if (Object.keys(nextFilters).length > 0) {
+      setFilters(nextFilters);
+      setPage(1);
+    }
+  }, []);
+
+  const { data: logs, isLoading, isError, refetch } = useAuditQuery(
+    filters,
+    page,
+    pageSize,
+    hasAccess,
+  );
   const {
     data: securitySummary,
     isLoading: isSummaryLoading,
@@ -58,6 +90,10 @@ export default function AuditPage() {
   const total = logs?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
   const displayedChainStatus = chainStatus ?? securitySummary?.chain ?? null;
+  const securityDashboardModel = useMemo(
+    () => buildSecurityDashboardModel(securitySummary),
+    [securitySummary],
+  );
   const summaryCards = [
     {
       label: 'Denied events',
@@ -92,6 +128,11 @@ export default function AuditPage() {
     } finally {
       setIsVerifyingChain(false);
     }
+  }
+
+  function applyQuickFilter(nextFilters: AuditQueryFilters) {
+    setFilters(nextFilters);
+    setPage(1);
   }
 
   if (!hasAccess) {
@@ -212,6 +253,51 @@ export default function AuditPage() {
       ) : null}
 
       <div className="animate-in delay-2">
+        <div
+          className="mb-5 rounded-lg border p-4"
+          style={{
+            background: 'var(--bg-card)',
+            borderColor: 'var(--border-soft)',
+          }}
+        >
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <p className="text-sm font-semibold text-[var(--text-strong)]">
+                Quick investigations
+              </p>
+              <p className="text-xs text-[var(--text-muted)]">
+                Jump directly to high-signal security event classes.
+              </p>
+            </div>
+          </div>
+          <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+            {securityDashboardModel.quickFilters.map((item) => {
+              const active =
+                filters.result === item.filters.result &&
+                filters.action === item.filters.action;
+
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => applyQuickFilter(item.filters)}
+                  className="rounded-lg border px-3 py-2 text-left transition hover:bg-[var(--bg-subtle)]"
+                  style={{
+                    borderColor: active ? 'var(--color-primary)' : 'var(--border-soft)',
+                    background: active ? 'var(--color-primary-bg)' : 'transparent',
+                  }}
+                >
+                  <span className="block text-xs font-semibold text-[var(--text-main)]">
+                    {item.label}
+                  </span>
+                  <span className="mt-0.5 block text-[11px] leading-snug text-[var(--text-faint)]">
+                    {item.description}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
         <AuditFilters
           filters={filters}
           onChange={(f) => { setFilters(f); setPage(1); }}

@@ -9,6 +9,21 @@ import type {
   SecuritySummary,
 } from './audit.types';
 
+const DEFAULT_AUDIT_WINDOW_PAGE_SIZE = 100;
+const DEFAULT_AUDIT_WINDOW_MAX_PAGES = 100;
+
+export type AuditLogPageFetcher = (
+  filters?: AuditQueryFilters,
+  page?: number,
+  pageSize?: number,
+) => Promise<PaginatedResponse<AuditLogEntry>>;
+
+export interface AuditLogWindowOptions {
+  pageSize?: number;
+  maxPages?: number;
+  fetchPage?: AuditLogPageFetcher;
+}
+
 function toAuditQueryParams(
   filters?: AuditQueryFilters,
   page?: number,
@@ -52,6 +67,40 @@ export async function queryAuditLog(
   return {
     ...paginated,
     data: paginated.data.map(normalizeAuditLogEntry),
+  };
+}
+
+export async function queryAuditLogWindow(
+  filters?: AuditQueryFilters,
+  options: AuditLogWindowOptions = {},
+): Promise<PaginatedResponse<AuditLogEntry>> {
+  const pageSize = options.pageSize ?? DEFAULT_AUDIT_WINDOW_PAGE_SIZE;
+  const maxPages = options.maxPages ?? DEFAULT_AUDIT_WINDOW_MAX_PAGES;
+  const fetchPage = options.fetchPage ?? queryAuditLog;
+  const data: AuditLogEntry[] = [];
+
+  let page = 1;
+  let total = 0;
+  let totalPages = 1;
+
+  while (page <= totalPages) {
+    if (page > maxPages) {
+      throw new Error(`Audit window exceeds ${maxPages} pages`);
+    }
+
+    const batch = await fetchPage(filters, page, pageSize);
+    data.push(...batch.data);
+    total = batch.total;
+    totalPages = batch.totalPages;
+    page += 1;
+  }
+
+  return {
+    data,
+    total,
+    page: 1,
+    pageSize,
+    totalPages,
   };
 }
 
