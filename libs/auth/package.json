@@ -2,16 +2,33 @@
   "name": "@docvault/auth",
   "version": "0.1.0",
   "description": "Shared auth primitives for DocVault services (JWT strategy, roles guard, decorators)",
-  "main": "src/index.ts",
-  "types": "src/index.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "typesVersions": {
+    "*": {
+      "rbac": ["dist/rbac.d.ts"],
+      "*": ["dist/*"]
+    }
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./rbac": {
+      "types": "./dist/rbac.d.ts",
+      "default": "./dist/rbac.js"
+    }
+  },
   "scripts": {
-    "build": "tsc --noEmit",
+    "build": "tsc --build tsconfig.json",
     "lint": "eslint src --fix"
   },
   "peerDependencies": {
     "@nestjs/common": "^10.0.0",
     "@nestjs/passport": "^11.0.5",
     "@nestjs/core": "^10.0.0",
+    "jwks-rsa": "^4.0.1",
     "passport": "^0.7.0",
     "passport-jwt": "^4.0.1"
   },

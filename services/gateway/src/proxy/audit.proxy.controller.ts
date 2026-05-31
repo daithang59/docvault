@@ -121,7 +121,7 @@ export class AuditProxyController {
   @ApiOperation({
     summary: 'Summarize security audit evidence',
     description:
-      'Returns hash-chain status and counters for denied requests, malware blocks, DLP detections, and download denials.',
+      'Returns hash-chain status, security counters, repeated deny actors, and deterministic document risk scoring from audit metadata.',
   })
   async securitySummary(@Req() req: any) {
     const response = await this.proxyService.forward(req, {

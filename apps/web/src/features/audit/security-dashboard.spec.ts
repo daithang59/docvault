@@ -18,6 +18,7 @@ function summary(overrides?: Partial<SecuritySummary>): SecuritySummary {
       downloadDenied: 0,
     },
     repeatedDenyActors: [],
+    riskyDocuments: [],
     ...overrides,
   };
 }
@@ -113,6 +114,43 @@ describe('buildSecurityDashboardModel', () => {
       description: 'No elevated security counters in the current audit summary.',
     });
     expect(model.alerts).toEqual([]);
+    expect(model.riskScoring.riskyDocuments).toEqual([]);
+  });
+
+  it('exposes risk scoring rows with audit deep links', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        riskyDocuments: [
+          {
+            documentId: 'doc-secret',
+            classification: 'SECRET',
+            accessCount: 4,
+            actorCount: 2,
+            latestAccessAt: '2026-05-30T10:15:00.000Z',
+            riskScore: 95,
+            reasons: [
+              'SECRET classification',
+              '4 successful preview/download grants',
+              '2 distinct actors',
+              '2 download grants',
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(model.riskScoring.riskyDocuments[0]).toMatchObject({
+      documentId: 'doc-secret',
+      classification: 'SECRET',
+      accessCount: 4,
+      actorCount: 2,
+      riskScore: 95,
+      riskBand: 'critical',
+      auditFilters: { documentId: 'doc-secret' },
+    });
+    expect(
+      buildAuditFilterQuery(model.riskScoring.riskyDocuments[0].auditFilters),
+    ).toBe('documentId=doc-secret');
   });
 
   it('defines quick investigation filters for the required security event classes', () => {

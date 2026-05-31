@@ -6,6 +6,30 @@ import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
 
+const AUTHORIZED_CONTENT_ACTIONS = [
+  'DOCUMENT_DOWNLOAD_AUTHORIZED',
+  'DOCUMENT_PREVIEW_AUTHORIZED',
+] as const;
+
+export interface RiskyDocumentSummary {
+  documentId: string;
+  classification: string;
+  accessCount: number;
+  actorCount: number;
+  latestAccessAt: string;
+  riskScore: number;
+  reasons: string[];
+}
+
+interface RiskBucket {
+  documentId: string;
+  classification: string;
+  accessCount: number;
+  actors: Set<string>;
+  downloadCount: number;
+  latestAccessAt: Date;
+}
+
 @Injectable()
 export class AuditService {
   constructor(
@@ -122,6 +146,7 @@ export class AuditService {
       downloadDenied: number;
     };
     repeatedDenyActors: Array<{ actorId: string; denyCount: number }>;
+    riskyDocuments: RiskyDocumentSummary[];
   }> {
     const [
       chain,
@@ -130,6 +155,7 @@ export class AuditService {
       dlpDetections,
       downloadDenied,
       repeatedDenyActors,
+      riskyDocuments,
     ] = await Promise.all([
       this.verifyChain(1000),
       this.auditEvent.countDocuments({ result: 'DENY' }),
@@ -137,6 +163,7 @@ export class AuditService {
       this.auditEvent.countDocuments({ action: 'DLP_PATTERN_DETECTED' }),
       this.auditEvent.countDocuments({ action: 'DOCUMENT_DOWNLOAD_DENIED' }),
       this.getRepeatedDenyActors(),
+      this.getRiskyDocuments(),
     ]);
 
     return {
@@ -148,6 +175,7 @@ export class AuditService {
         downloadDenied,
       },
       repeatedDenyActors,
+      riskyDocuments,
     };
   }
 
@@ -209,6 +237,172 @@ export class AuditService {
     }
 
     return query as any;
+  }
+
+  private async getRiskyDocuments(): Promise<RiskyDocumentSummary[]> {
+    const events = await this.auditEvent
+      .find(
+        {
+          action: { $in: [...AUTHORIZED_CONTENT_ACTIONS] },
+          result: 'SUCCESS',
+        },
+        {
+          _id: 0,
+          action: 1,
+          actorId: 1,
+          metadata: 1,
+          resourceId: 1,
+          resourceType: 1,
+          timestamp: 1,
+        },
+      )
+      .sort({ timestamp: -1 })
+      .limit(500)
+      .lean();
+
+    const buckets = new Map<string, RiskBucket>();
+
+    for (const event of events as any[]) {
+      const documentId = this.extractDocumentId(event);
+      if (!documentId) continue;
+
+      const classification = this.extractClassification(event.metadata);
+      const timestamp = this.toEventDate(event.timestamp);
+      const bucket = buckets.get(documentId) ?? {
+        documentId,
+        classification,
+        accessCount: 0,
+        actors: new Set<string>(),
+        downloadCount: 0,
+        latestAccessAt: timestamp,
+      };
+
+      bucket.accessCount += 1;
+      if (typeof event.actorId === 'string' && event.actorId.length > 0) {
+        bucket.actors.add(event.actorId);
+      }
+      if (event.action === 'DOCUMENT_DOWNLOAD_AUTHORIZED') {
+        bucket.downloadCount += 1;
+      }
+      if (timestamp.getTime() > bucket.latestAccessAt.getTime()) {
+        bucket.latestAccessAt = timestamp;
+      }
+      if (
+        this.classificationWeight(classification) >
+        this.classificationWeight(bucket.classification)
+      ) {
+        bucket.classification = classification;
+      }
+
+      buckets.set(documentId, bucket);
+    }
+
+    return Array.from(buckets.values())
+      .map((bucket) => this.buildRiskyDocumentSummary(bucket))
+      .filter((document) => document.riskScore > 0)
+      .sort((a, b) => {
+        if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+        return (
+          new Date(b.latestAccessAt).getTime() -
+          new Date(a.latestAccessAt).getTime()
+        );
+      })
+      .slice(0, 5);
+  }
+
+  private buildRiskyDocumentSummary(
+    bucket: RiskBucket,
+  ): RiskyDocumentSummary {
+    const actorCount = bucket.actors.size;
+    const riskScore = Math.min(
+      100,
+      this.classificationWeight(bucket.classification) +
+        Math.min(bucket.accessCount * 8, 30) +
+        Math.min(Math.max(actorCount - 1, 0) * 10, 20) +
+        Math.min(bucket.downloadCount * 5, 15),
+    );
+    const reasons: string[] = [];
+
+    if (this.classificationWeight(bucket.classification) > 0) {
+      reasons.push(`${bucket.classification} classification`);
+    }
+    if (bucket.accessCount >= 2) {
+      reasons.push(
+        `${bucket.accessCount} successful preview/download grants`,
+      );
+    }
+    if (actorCount >= 2) {
+      reasons.push(`${actorCount} distinct actors`);
+    }
+    if (bucket.downloadCount > 0) {
+      reasons.push(
+        `${bucket.downloadCount} download grant${bucket.downloadCount === 1 ? '' : 's'}`,
+      );
+    }
+
+    return {
+      documentId: bucket.documentId,
+      classification: bucket.classification,
+      accessCount: bucket.accessCount,
+      actorCount,
+      latestAccessAt: bucket.latestAccessAt.toISOString(),
+      riskScore,
+      reasons,
+    };
+  }
+
+  private extractDocumentId(event: {
+    metadata?: Record<string, unknown>;
+    resourceId?: unknown;
+    resourceType?: unknown;
+  }): string | undefined {
+    const metadataDocId = event.metadata?.docId;
+    if (typeof metadataDocId === 'string' && metadataDocId.length > 0) {
+      return metadataDocId;
+    }
+    if (
+      event.resourceType === 'DOCUMENT' &&
+      typeof event.resourceId === 'string' &&
+      event.resourceId.length > 0
+    ) {
+      return event.resourceId;
+    }
+    return undefined;
+  }
+
+  private extractClassification(metadata?: Record<string, unknown>): string {
+    const classification = String(metadata?.classification ?? '').toUpperCase();
+    if (
+      classification === 'SECRET' ||
+      classification === 'CONFIDENTIAL' ||
+      classification === 'INTERNAL' ||
+      classification === 'PUBLIC'
+    ) {
+      return classification;
+    }
+    return 'UNKNOWN';
+  }
+
+  private classificationWeight(classification: string): number {
+    switch (classification) {
+      case 'SECRET':
+        return 45;
+      case 'CONFIDENTIAL':
+        return 30;
+      case 'INTERNAL':
+        return 10;
+      default:
+        return 0;
+    }
+  }
+
+  private toEventDate(timestamp: unknown): Date {
+    if (timestamp instanceof Date) return timestamp;
+    if (typeof timestamp === 'string' || typeof timestamp === 'number') {
+      const date = new Date(timestamp);
+      if (!Number.isNaN(date.getTime())) return date;
+    }
+    return new Date(0);
   }
 
   /**

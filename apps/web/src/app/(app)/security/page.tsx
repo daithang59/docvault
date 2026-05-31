@@ -252,6 +252,10 @@ export default function SecurityPage() {
         />
         <RepeatedActorsPanel actors={model.repeatedDenyActors} />
       </section>
+
+      <section className="mt-4">
+        <RiskScoringPanel riskScoring={model.riskScoring} />
+      </section>
     </div>
   );
 }
@@ -608,6 +612,111 @@ function RepeatedActorsPanel({
   );
 }
 
+function RiskScoringPanel({
+  riskScoring,
+}: {
+  riskScoring: ReturnType<typeof buildSecurityDashboardModel>['riskScoring'];
+}) {
+  const documents = riskScoring.riskyDocuments;
+
+  return (
+    <div
+      className="rounded-lg border p-5"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text-strong)]">
+            Document risk scoring
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Deterministic score from classification, authorized access volume,
+            actor spread, and download grants.
+          </p>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          Audit metadata only
+        </span>
+      </div>
+
+      {documents.length === 0 ? (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          No elevated document access risk returned by the audit summary.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {documents.map((document) => {
+            const tone = getRiskTone(document.riskBand);
+            return (
+              <div
+                key={document.documentId}
+                className="rounded-lg border p-4"
+                style={{
+                  borderColor: tone.border,
+                  background: tone.bg,
+                }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                        style={{ color: tone.text, background: tone.badgeBg }}
+                      >
+                        {document.riskLabel}
+                      </span>
+                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                        {document.classification}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
+                      {truncateMiddle(document.documentId, 34)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      {document.accessCount} access grant{document.accessCount === 1 ? '' : 's'} ·{' '}
+                      {document.actorCount} actor{document.actorCount === 1 ? '' : 's'} · latest{' '}
+                      {formatDateTime(document.latestAccessAt)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-left sm:text-right">
+                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                      {document.riskScore}
+                    </p>
+                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                      risk score
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                      Reasons
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                      {document.reasons.join(' · ')}
+                    </p>
+                  </div>
+                  <Link
+                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                  >
+                    Open audit
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
 function mergeRecentEvents(...groups: AuditLogEntry[][]): AuditLogEntry[] {
   return groups
     .flat()
@@ -617,4 +726,31 @@ function mergeRecentEvents(...groups: AuditLogEntry[][]): AuditLogEntry[] {
 
 function getClassificationLabel(event: AuditLogEntry): string {
   return String(event.metadata?.classification ?? 'UNKNOWN').toUpperCase();
+}
+
+function getRiskTone(riskBand: 'critical' | 'warning' | 'watch') {
+  if (riskBand === 'critical') {
+    return {
+      bg: 'var(--state-error-bg)',
+      border: 'var(--state-error-border)',
+      text: 'var(--state-error-text)',
+      badgeBg: 'var(--bg-card)',
+    };
+  }
+
+  if (riskBand === 'warning') {
+    return {
+      bg: 'var(--status-pending-bg)',
+      border: 'var(--status-pending-border)',
+      text: 'var(--status-pending-text)',
+      badgeBg: 'var(--bg-card)',
+    };
+  }
+
+  return {
+    bg: 'var(--bg-card)',
+    border: 'var(--border-soft)',
+    text: 'var(--text-muted)',
+    badgeBg: 'var(--bg-subtle)',
+  };
 }

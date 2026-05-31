@@ -44,6 +44,16 @@ export interface AuditChainStatus {
   message?: string;
 }
 
+export interface RiskyDocumentSummary {
+  documentId: string;
+  classification: string;
+  accessCount: number;
+  actorCount: number;
+  latestAccessAt: string;
+  riskScore: number;
+  reasons: string[];
+}
+
 export interface SecuritySummary {
   chain: AuditChainStatus;
   totals: {
@@ -56,4 +66,5 @@ export interface SecuritySummary {
     actorId: string;
     denyCount: number;
   }>;
+  riskyDocuments: RiskyDocumentSummary[];
 }

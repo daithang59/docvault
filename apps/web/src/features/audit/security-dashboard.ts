@@ -1,7 +1,13 @@
-import type { AuditLogEntry, AuditQueryFilters, SecuritySummary } from './audit.types';
+import type {
+  AuditLogEntry,
+  AuditQueryFilters,
+  RiskyDocumentSummary,
+  SecuritySummary,
+} from './audit.types';
 
 export type SecurityPostureLevel = 'healthy' | 'warning' | 'critical';
 export type SecurityAlertSeverity = 'info' | 'warning' | 'critical';
+export type SecurityRiskBand = 'critical' | 'warning' | 'watch';
 
 export interface SecurityDashboardMetric {
   key: keyof SecuritySummary['totals'];
@@ -15,6 +21,12 @@ export interface SecurityDashboardAlert {
   title: string;
   description: string;
   action: string;
+}
+
+export interface SecurityRiskScoringRow extends RiskyDocumentSummary {
+  riskBand: SecurityRiskBand;
+  riskLabel: string;
+  auditFilters: AuditQueryFilters;
 }
 
 export interface SecurityDashboardModel {
@@ -34,6 +46,9 @@ export interface SecurityDashboardModel {
     downloadAuthorizedTotal: number;
     sensitiveAccessCount: number;
     sensitiveAccessEvents: AuditLogEntry[];
+  };
+  riskScoring: {
+    riskyDocuments: SecurityRiskScoringRow[];
   };
   quickFilters: Array<{
     label: string;
@@ -61,6 +76,7 @@ export function buildSecurityDashboardModel(
     isSensitiveAccessEvent,
   );
   const downloadAuthorizedTotal = activity?.downloadAuthorizedTotal ?? 0;
+  const riskyDocuments = buildRiskScoringRows(summary?.riskyDocuments ?? []);
 
   if (summary?.chain.valid === false) {
     alerts.push({
@@ -116,6 +132,15 @@ export function buildSecurityDashboardModel(
     });
   }
 
+  if (riskyDocuments.some((document) => document.riskBand === 'critical')) {
+    alerts.push({
+      severity: 'warning',
+      title: 'High-risk document activity',
+      description: 'One or more sensitive documents have elevated access frequency or actor spread.',
+      action: 'Review the risk scoring panel and open document-scoped audit evidence.',
+    });
+  }
+
   return {
     posture: buildPosture(summary, alerts),
     metrics: [
@@ -153,6 +178,9 @@ export function buildSecurityDashboardModel(
       downloadAuthorizedTotal,
       sensitiveAccessCount: sensitiveAccessEvents.length,
       sensitiveAccessEvents,
+    },
+    riskScoring: {
+      riskyDocuments,
     },
     quickFilters: [
       {
@@ -212,6 +240,33 @@ export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
 
   const classification = String(event.metadata?.classification ?? '').toUpperCase();
   return classification === 'CONFIDENTIAL' || classification === 'SECRET';
+}
+
+function buildRiskScoringRows(
+  documents: RiskyDocumentSummary[],
+): SecurityRiskScoringRow[] {
+  return documents.map((document) => {
+    const riskBand = getRiskBand(document.riskScore);
+
+    return {
+      ...document,
+      riskBand,
+      riskLabel: getRiskLabel(riskBand),
+      auditFilters: { documentId: document.documentId },
+    };
+  });
+}
+
+function getRiskBand(riskScore: number): SecurityRiskBand {
+  if (riskScore >= 80) return 'critical';
+  if (riskScore >= 50) return 'warning';
+  return 'watch';
+}
+
+function getRiskLabel(riskBand: SecurityRiskBand): string {
+  if (riskBand === 'critical') return 'Critical risk';
+  if (riskBand === 'warning') return 'Elevated risk';
+  return 'Watch';
 }
 
 function buildPosture(

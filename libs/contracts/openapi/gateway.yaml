@@ -49,7 +49,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Keycloak-issued RS256 JWT token passed as `Authorization: Bearer <token>`
+      description: "Keycloak-issued RS256 JWT token passed as `Authorization: Bearer <token>`"
     cookieAuth:
       type: apiKey
       in: cookie
@@ -110,7 +110,10 @@ components:
       properties:
         title: { type: string, maxLength: 255 }
         description: { type: string, maxLength: 1000 }
-        classification: { type: string, default: INTERNAL }
+        classification:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationLevel'
+          default: INTERNAL
         tags: { type: array, items: { type: string } }
 
     UpdateDocument:
@@ -118,7 +121,7 @@ components:
       properties:
         title: { type: string, maxLength: 255 }
         description: { type: string, maxLength: 1000 }
-        classification: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
         tags: { type: array, items: { type: string } }
 
     # ─── Versions ──────────────────────────────────────────────────────────────
@@ -256,10 +259,9 @@ components:
     DownloadAuthorize:
       type: object
       properties:
-        version: { type: integer, description: Specific version to authorize }
         grantToken: { type: string, description: HMAC-signed grant token }
         docId: { type: string }
-        version: { type: integer }
+        version: { type: integer, description: Specific version to authorize }
         filename: { type: string }
         contentType: { type: string }
         expiresInSeconds: { type: integer }
@@ -282,10 +284,9 @@ components:
     PreviewAuthorize:
       type: object
       properties:
-        version: { type: integer, description: Specific version to authorize }
         grantToken: { type: string, description: HMAC-signed preview grant token }
         docId: { type: string }
-        version: { type: integer }
+        version: { type: integer, description: Specific version to authorize }
         filename: { type: string }
         contentType: { type: string }
         expiresInSeconds: { type: integer }
@@ -348,6 +349,19 @@ components:
         firstBrokenIndex: { type: integer, nullable: true }
         message: { type: string, nullable: true }
 
+    RiskyDocumentSummary:
+      type: object
+      properties:
+        documentId: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        accessCount: { type: integer }
+        actorCount: { type: integer }
+        latestAccessAt: { type: string, format: date-time }
+        riskScore: { type: integer, minimum: 0, maximum: 100 }
+        reasons:
+          type: array
+          items: { type: string }
+
     SecuritySummary:
       type: object
       properties:
@@ -366,6 +380,10 @@ components:
             properties:
               actorId: { type: string }
               denyCount: { type: integer }
+        riskyDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskyDocumentSummary'
 
     ComplianceEvidencePacket:
       type: object
@@ -977,6 +995,52 @@ paths:
                 items:
                   $ref: '#/components/schemas/WorkflowHistory'
 
+  /metadata/documents/{docId}/comments:
+    get:
+      summary: List comments for a document
+      operationId: listDocumentComments
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+    post:
+      summary: Add a comment to a document
+      operationId: addDocumentComment
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+
   # ─── Documents — Blob Storage ───────────────────────────────────────────────
   /documents/{docId}/upload:
     post:
@@ -1209,6 +1273,28 @@ paths:
         '409':
           description: Conflict — only PUBLISHED documents can be archived
 
+  /workflow/{docId}:
+    delete:
+      summary: Delete a DRAFT document (soft delete)
+      operationId: deleteDraftDocument
+      description: |
+        Permanently deletes a DRAFT document. Only the document owner or admin
+        may delete. Deleted documents are removed from all views but retained in
+        the database.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Workflow]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Deleted
+        '403':
+          description: Forbidden — owner editor or admin
+        '409':
+          description: Conflict — only DRAFT documents can be deleted
+
   # ─── Audit ─────────────────────────────────────────────────────────────────
   /audit/events:
     post:
@@ -1244,6 +1330,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditEvent'
+        '401':
+          description: Unauthorized
+
+  /users/batch:
+    post:
+      summary: Batch-fetch user profiles by IDs
+      operationId: getUserProfilesBatch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Map of user IDs to display names and usernames
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    displayName: { type: string }
+                    username: { type: string }
         '401':
           description: Unauthorized
 
