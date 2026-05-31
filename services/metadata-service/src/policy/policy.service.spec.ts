@@ -1,5 +1,5 @@
 import { createHmac } from 'crypto';
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   AclEffect,
   AclSubjectType,
@@ -342,5 +342,146 @@ describe('PolicyService', () => {
     );
 
     expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('blocks AI content operations for compliance officers while allowing metadata-only AI context', async () => {
+    const guardrails = await service.getAiGuardrails(
+      'doc-1',
+      { sub: 'co-1', roles: ['compliance_officer'] },
+      {
+        ...baseContext,
+        actorId: 'co-1',
+        roles: ['compliance_officer'],
+      },
+    );
+
+    expect(guardrails).toMatchObject({
+      documentId: 'doc-1',
+      actorId: 'co-1',
+      canUseMetadata: true,
+      canUseContent: false,
+      allowedOperations: ['METADATA_CLASSIFICATION', 'METADATA_TAGGING'],
+    });
+    expect(guardrails.deniedOperations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          operation: 'CONTENT_SUMMARIZATION',
+          reason: 'Compliance officers cannot use file content for AI operations',
+        }),
+        expect.objectContaining({
+          operation: 'CONTENT_QA',
+          reason: 'Compliance officers cannot use file content for AI operations',
+        }),
+      ]),
+    );
+    expect(JSON.stringify(guardrails)).not.toContain('grantToken');
+    expect(JSON.stringify(guardrails)).not.toContain('objectKey');
+  });
+
+  it('allows AI content operations for an owner who can preview the document content', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.CONFIDENTIAL,
+      }),
+    );
+
+    const guardrails = await service.getAiGuardrails(
+      'doc-1',
+      { sub: 'editor-1', roles: ['editor'] },
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+      },
+    );
+
+    expect(guardrails.canUseContent).toBe(true);
+    expect(guardrails.allowedOperations).toEqual([
+      'METADATA_CLASSIFICATION',
+      'METADATA_TAGGING',
+      'CONTENT_SUMMARIZATION',
+      'CONTENT_QA',
+    ]);
+    expect(guardrails.deniedOperations).toEqual([]);
+  });
+
+  it('simulates classification impact without exposing file grants or object keys', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'admin-1',
+        classification: ClassificationLevel.CONFIDENTIAL,
+        dlpStatus: 'DETECTED',
+      }),
+    );
+
+    const impact = await service.getAccessImpactPreview(
+      'doc-1',
+      { classification: ClassificationLevel.PUBLIC },
+      { sub: 'admin-1', roles: ['admin'] },
+      {
+        ...baseContext,
+        actorId: 'admin-1',
+        roles: ['admin'],
+      },
+    );
+
+    expect(impact).toMatchObject({
+      documentId: 'doc-1',
+      current: {
+        classification: ClassificationLevel.CONFIDENTIAL,
+        watermarkRequired: true,
+      },
+      proposed: {
+        classification: ClassificationLevel.PUBLIC,
+        watermarkRequired: false,
+      },
+      changes: {
+        accessExpanded: true,
+        watermarkReduced: true,
+        dlpOverrideRequired: true,
+      },
+    });
+    expect(impact.roleImpacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'viewer',
+          download: { current: false, proposed: true },
+        }),
+      ]),
+    );
+    expect(JSON.stringify(impact)).not.toContain('grantToken');
+    expect(JSON.stringify(impact)).not.toContain('objectKey');
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'admin-1' }),
+      expect.objectContaining({
+        action: 'DOCUMENT_ACCESS_IMPACT_SIMULATED',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-1',
+        result: 'SUCCESS',
+      }),
+    );
+  });
+
+  it('requires a proposed classification before simulating access impact', async () => {
+    await expect(
+      service.getAccessImpactPreview(
+        'doc-1',
+        {} as any,
+        { sub: 'admin-1', roles: ['admin'] },
+        {
+          ...baseContext,
+          actorId: 'admin-1',
+          roles: ['admin'],
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockEmitEvent).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'DOCUMENT_ACCESS_IMPACT_SIMULATED',
+      }),
+    );
   });
 });

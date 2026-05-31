@@ -7,6 +7,7 @@ import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DocumentHeader } from '@/components/documents/document-header';
 import { DocumentDlpFindingsCard } from '@/components/documents/document-dlp-findings-card';
+import { DocumentAiGuardrailsCard } from '@/components/documents/document-ai-guardrails-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
@@ -19,6 +20,7 @@ import { canManageAcl, canReadAcl, getDocumentAccessDecision } from '@/lib/auth/
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
+import { useDocumentAiGuardrails } from '@/features/documents/documents.hooks';
 import { toast } from 'sonner';
 import type { DocumentVersion } from '@/features/documents/documents.types';
 
@@ -33,6 +35,11 @@ export default function DocumentDetailPage({ params }: Props) {
 
   const { data: doc, isLoading, isError, refetch } = useDocumentDetail(id);
   const { data: history = [] } = useWorkflowHistory(id);
+  const {
+    data: aiGuardrails,
+    isLoading: isAiGuardrailsLoading,
+    isError: isAiGuardrailsError,
+  } = useDocumentAiGuardrails(id);
   const { download } = useDownloadDocument({ onError: (msg) => toast.error(msg) });
 
   const [previewVersion, setPreviewVersion] = useState<DocumentVersion | null>(null);
@@ -60,6 +67,14 @@ export default function DocumentDetailPage({ params }: Props) {
 
       <div className="animate-in delay-2 mb-5">
         <DocumentDlpFindingsCard doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentAiGuardrailsCard
+          guardrails={aiGuardrails}
+          isLoading={isAiGuardrailsLoading}
+          isError={isAiGuardrailsError}
+        />
       </div>
 
       <div className="grid lg:grid-cols-3 gap-5">

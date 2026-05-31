@@ -7,6 +7,8 @@ import {
   getDocuments,
   getDocument,
   getComplianceEvidencePacket,
+  getDocumentAiGuardrails,
+  previewDocumentAccessImpact,
   createDocument,
   updateDocument,
   uploadDocumentFile,
@@ -16,6 +18,7 @@ import {
   authorizeDownload,
   presignDownload,
 } from './documents.api';
+import type { ClassificationLevel } from '@/types/enums';
 import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto } from './documents.types';
 import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
@@ -59,6 +62,29 @@ export function useComplianceEvidencePacket(id: string, enabled = false) {
     queryKey: documentsKeys.complianceEvidencePacket(id),
     queryFn: () => getComplianceEvidencePacket(id),
     enabled: Boolean(id) && enabled,
+  });
+}
+
+export function useDocumentAiGuardrails(id: string, enabled = true) {
+  return useQuery({
+    queryKey: documentsKeys.aiGuardrails(id),
+    queryFn: () => getDocumentAiGuardrails(id),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
+export function useDocumentAccessImpact(
+  id: string,
+  classification: ClassificationLevel,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: documentsKeys.accessImpact(id, classification),
+    queryFn: () => previewDocumentAccessImpact(id, { classification }),
+    enabled: Boolean(id) && enabled,
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 

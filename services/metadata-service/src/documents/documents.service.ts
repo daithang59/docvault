@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   Logger,
@@ -290,23 +291,63 @@ export class DocumentsService {
         (document as any).dlpStatus === 'DETECTED' &&
         ['PUBLIC', 'INTERNAL'].includes(dto.classification)
       ) {
+        const overrideReason = dto.classificationOverrideReason?.trim();
+        const isAdmin = context.roles.includes('admin');
+
+        if (!isAdmin) {
+          await this.auditClient.emitEvent(context, {
+            action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
+            resourceType: 'DOCUMENT',
+            resourceId: id,
+            result: 'DENY',
+            reason:
+              'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+            metadata: {
+              docId: id,
+              currentClassification: document.classification,
+              requestedClassification: dto.classification,
+              dlpStatus: (document as any).dlpStatus,
+            },
+          });
+          throw new ForbiddenException(
+            'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+          );
+        }
+
+        if (!overrideReason) {
+          await this.auditClient.emitEvent(context, {
+            action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
+            resourceType: 'DOCUMENT',
+            resourceId: id,
+            result: 'DENY',
+            reason:
+              'Admin override reason is required for DLP classification downgrade',
+            metadata: {
+              docId: id,
+              currentClassification: document.classification,
+              requestedClassification: dto.classification,
+              dlpStatus: (document as any).dlpStatus,
+            },
+          });
+          throw new BadRequestException(
+            'Admin override reason is required for DLP classification downgrade',
+          );
+        }
+
         await this.auditClient.emitEvent(context, {
-          action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
+          action: 'DLP_CLASSIFICATION_OVERRIDE_APPROVED',
           resourceType: 'DOCUMENT',
           resourceId: id,
-          result: 'DENY',
-          reason:
-            'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+          result: 'SUCCESS',
+          reason: overrideReason,
           metadata: {
             docId: id,
             currentClassification: document.classification,
             requestedClassification: dto.classification,
             dlpStatus: (document as any).dlpStatus,
+            overrideReason,
           },
         });
-        throw new ForbiddenException(
-          'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
-        );
       }
       changes.classification = { old: document.classification, new: dto.classification };
       data.classification = dto.classification;

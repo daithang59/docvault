@@ -107,11 +107,50 @@ export interface UpdateDocumentRequest {
   title?: string;
   description?: string;
   classification?: ClassificationLevel;
+  classificationOverrideReason?: string;
   tags?: string[];
 }
 
 export type CreateDocumentDto = CreateDocumentRequest;
 export type UpdateDocumentDto = UpdateDocumentRequest;
+
+export interface DocumentAccessImpactRequest {
+  classification: ClassificationLevel;
+}
+
+export interface DocumentAccessImpact {
+  documentId: string;
+  current: {
+    classification: ClassificationLevel;
+    status: DocumentStatus;
+    watermarkRequired: boolean;
+  };
+  proposed: {
+    classification: ClassificationLevel;
+    status: DocumentStatus;
+    watermarkRequired: boolean;
+  };
+  changes: {
+    accessExpanded: boolean;
+    accessReduced: boolean;
+    watermarkReduced: boolean;
+    dlpOverrideRequired: boolean;
+    warnings: string[];
+  };
+  roleImpacts: Array<{
+    role: string;
+    metadata: {
+      current: boolean;
+      proposed: boolean;
+    };
+    download: {
+      current: boolean;
+      proposed: boolean;
+    };
+    notes: string[];
+  }>;
+  guardrails: string[];
+}
 
 export interface DocumentListFilters extends PaginationParams {
   q?: string;
@@ -233,4 +272,27 @@ export interface ComplianceEvidencePacket {
     page: number;
     pageSize: number;
   };
+}
+
+export type DocumentAiOperation =
+  | 'METADATA_CLASSIFICATION'
+  | 'METADATA_TAGGING'
+  | 'CONTENT_SUMMARIZATION'
+  | 'CONTENT_QA';
+
+export interface DocumentAiDeniedOperation {
+  operation: DocumentAiOperation;
+  reason: string;
+}
+
+export interface DocumentAiGuardrails {
+  documentId: string;
+  actorId: string;
+  classification: ClassificationLevel;
+  status: DocumentStatus;
+  canUseMetadata: boolean;
+  canUseContent: boolean;
+  allowedOperations: DocumentAiOperation[];
+  deniedOperations: DocumentAiDeniedOperation[];
+  guardrails: string[];
 }

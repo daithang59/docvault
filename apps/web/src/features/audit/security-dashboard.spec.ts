@@ -19,6 +19,7 @@ function summary(overrides?: Partial<SecuritySummary>): SecuritySummary {
     },
     repeatedDenyActors: [],
     riskyDocuments: [],
+    behaviorSignals: [],
     ...overrides,
   };
 }
@@ -151,6 +152,51 @@ describe('buildSecurityDashboardModel', () => {
     expect(
       buildAuditFilterQuery(model.riskScoring.riskyDocuments[0].auditFilters),
     ).toBe('documentId=doc-secret');
+  });
+
+  it('exposes behavior anomaly rows with actor-scoped audit deep links', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        behaviorSignals: [
+          {
+            signalId: 'MASS_CONTENT_ACCESS:editor-1',
+            type: 'MASS_CONTENT_ACCESS',
+            severity: 'critical',
+            actorId: 'editor-1',
+            actionCount: 5,
+            documentCount: 5,
+            windowStartedAt: '2026-05-30T10:00:00.000Z',
+            windowEndedAt: '2026-05-30T10:08:00.000Z',
+            riskScore: 100,
+            reasons: [
+              '5 successful preview/download grants',
+              '5 distinct documents',
+              '3 sensitive document grants',
+            ],
+          },
+        ],
+      }),
+    );
+
+    expect(model.behaviorAnomalies.signals[0]).toMatchObject({
+      signalId: 'MASS_CONTENT_ACCESS:editor-1',
+      typeLabel: 'Mass content access',
+      riskBand: 'critical',
+      riskLabel: 'Critical risk',
+      auditFilters: { actorId: 'editor-1' },
+    });
+    expect(model.alerts.map((alert) => alert.title)).toContain(
+      'Behavior anomaly detected',
+    );
+    expect(
+      buildAuditFilterQuery(model.behaviorAnomalies.signals[0].auditFilters),
+    ).toBe('actorId=editor-1');
+  });
+
+  it('returns empty behavior anomaly rows when summary has no behavior signals', () => {
+    const model = buildSecurityDashboardModel(summary());
+
+    expect(model.behaviorAnomalies.signals).toEqual([]);
   });
 
   it('defines quick investigation filters for the required security event classes', () => {

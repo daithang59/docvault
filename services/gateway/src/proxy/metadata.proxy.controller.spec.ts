@@ -136,3 +136,84 @@ describe('MetadataProxyController evidence packet', () => {
     });
   });
 });
+
+describe('MetadataProxyController AI guardrails', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies document AI guardrails without assembling content grants', async () => {
+    const aiGuardrails = {
+      documentId: 'doc-1',
+      actorId: 'co-1',
+      canUseMetadata: true,
+      canUseContent: false,
+      allowedOperations: ['METADATA_CLASSIFICATION', 'METADATA_TAGGING'],
+      deniedOperations: [
+        {
+          operation: 'CONTENT_SUMMARIZATION',
+          reason: 'Compliance officers cannot use file content for AI operations',
+        },
+      ],
+    };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: aiGuardrails }),
+    } as unknown as ProxyService;
+    const controller = new MetadataProxyController(proxyService);
+
+    const result = await (controller as any).getAiGuardrails('doc-1', {
+      user: {
+        sub: 'co-1',
+        roles: ['compliance_officer'],
+      },
+    });
+
+    expect(result).toBe(aiGuardrails);
+    expect(proxyService.forward).toHaveBeenCalledWith(expect.anything(), {
+      method: 'GET',
+      url: `${metadataUrl}/documents/doc-1/ai-guardrails`,
+    });
+  });
+});
+
+describe('MetadataProxyController access impact preview', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies document access impact preview without assembling content grants', async () => {
+    const preview = {
+      documentId: 'doc-1',
+      current: { classification: 'CONFIDENTIAL', watermarkRequired: true },
+      proposed: { classification: 'PUBLIC', watermarkRequired: false },
+      changes: { accessExpanded: true, watermarkReduced: true },
+      roleImpacts: [],
+    };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: preview }),
+    } as unknown as ProxyService;
+    const controller = new MetadataProxyController(proxyService);
+
+    const result = await (controller as any).getAccessImpactPreview(
+      'doc-1',
+      {
+        user: {
+          sub: 'admin-1',
+          roles: ['admin'],
+        },
+      },
+      { classification: 'PUBLIC' },
+    );
+
+    expect(result).toBe(preview);
+    expect(proxyService.forward).toHaveBeenCalledWith(expect.anything(), {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/access-impact`,
+      data: { classification: 'PUBLIC' },
+    });
+  });
+});

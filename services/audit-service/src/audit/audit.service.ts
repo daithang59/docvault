@@ -11,12 +11,43 @@ const AUTHORIZED_CONTENT_ACTIONS = [
   'DOCUMENT_PREVIEW_AUTHORIZED',
 ] as const;
 
+const BEHAVIOR_SIGNAL_ACTIONS = [
+  ...AUTHORIZED_CONTENT_ACTIONS,
+  'DOCUMENT_DOWNLOAD_DENIED',
+  'DOCUMENT_METADATA_READ_DENIED',
+  'DOCUMENT_ACL_DELETED',
+  'DOCUMENT_ARCHIVE',
+  'DOCUMENT_AUTO_ARCHIVED',
+  'DOCUMENT_METADATA_UPDATED',
+  'DOCUMENT_UPLOADED',
+] as const;
+
 export interface RiskyDocumentSummary {
   documentId: string;
   classification: string;
   accessCount: number;
   actorCount: number;
   latestAccessAt: string;
+  riskScore: number;
+  reasons: string[];
+}
+
+export type BehaviorSignalType =
+  | 'MASS_CONTENT_ACCESS'
+  | 'DENY_BURST'
+  | 'DESTRUCTIVE_ACTIVITY';
+
+export type BehaviorSignalSeverity = 'critical' | 'warning' | 'watch';
+
+export interface BehaviorSignalSummary {
+  signalId: string;
+  type: BehaviorSignalType;
+  severity: BehaviorSignalSeverity;
+  actorId: string;
+  actionCount: number;
+  documentCount: number;
+  windowStartedAt: string;
+  windowEndedAt: string;
   riskScore: number;
   reasons: string[];
 }
@@ -28,6 +59,20 @@ interface RiskBucket {
   actors: Set<string>;
   downloadCount: number;
   latestAccessAt: Date;
+}
+
+interface BehaviorBucket {
+  actorId: string;
+  contentAccessCount: number;
+  downloadCount: number;
+  sensitiveAccessCount: number;
+  denyCount: number;
+  destructiveCount: number;
+  contentDocuments: Set<string>;
+  denyDocuments: Set<string>;
+  destructiveDocuments: Set<string>;
+  windowStartedAt: Date;
+  windowEndedAt: Date;
 }
 
 @Injectable()
@@ -147,6 +192,7 @@ export class AuditService {
     };
     repeatedDenyActors: Array<{ actorId: string; denyCount: number }>;
     riskyDocuments: RiskyDocumentSummary[];
+    behaviorSignals: BehaviorSignalSummary[];
   }> {
     const [
       chain,
@@ -156,6 +202,7 @@ export class AuditService {
       downloadDenied,
       repeatedDenyActors,
       riskyDocuments,
+      behaviorSignals,
     ] = await Promise.all([
       this.verifyChain(1000),
       this.auditEvent.countDocuments({ result: 'DENY' }),
@@ -164,6 +211,7 @@ export class AuditService {
       this.auditEvent.countDocuments({ action: 'DOCUMENT_DOWNLOAD_DENIED' }),
       this.getRepeatedDenyActors(),
       this.getRiskyDocuments(),
+      this.getBehaviorSignals(),
     ]);
 
     return {
@@ -176,6 +224,7 @@ export class AuditService {
       },
       repeatedDenyActors,
       riskyDocuments,
+      behaviorSignals,
     };
   }
 
@@ -308,6 +357,237 @@ export class AuditService {
         );
       })
       .slice(0, 5);
+  }
+
+  private async getBehaviorSignals(): Promise<BehaviorSignalSummary[]> {
+    const events = await this.auditEvent
+      .find(
+        {
+          action: { $in: [...BEHAVIOR_SIGNAL_ACTIONS] },
+        },
+        {
+          _id: 0,
+          action: 1,
+          actorId: 1,
+          metadata: 1,
+          resourceId: 1,
+          resourceType: 1,
+          result: 1,
+          timestamp: 1,
+        },
+      )
+      .sort({ timestamp: -1 })
+      .limit(1000)
+      .lean();
+
+    const buckets = new Map<string, BehaviorBucket>();
+
+    for (const event of events as any[]) {
+      if (typeof event.actorId !== 'string' || event.actorId.length === 0) {
+        continue;
+      }
+
+      const timestamp = this.toEventDate(event.timestamp);
+      const bucket = buckets.get(event.actorId) ?? {
+        actorId: event.actorId,
+        contentAccessCount: 0,
+        downloadCount: 0,
+        sensitiveAccessCount: 0,
+        denyCount: 0,
+        destructiveCount: 0,
+        contentDocuments: new Set<string>(),
+        denyDocuments: new Set<string>(),
+        destructiveDocuments: new Set<string>(),
+        windowStartedAt: timestamp,
+        windowEndedAt: timestamp,
+      };
+      const documentId = this.extractDocumentId(event);
+
+      if (timestamp.getTime() < bucket.windowStartedAt.getTime()) {
+        bucket.windowStartedAt = timestamp;
+      }
+      if (timestamp.getTime() > bucket.windowEndedAt.getTime()) {
+        bucket.windowEndedAt = timestamp;
+      }
+
+      if ((AUTHORIZED_CONTENT_ACTIONS as readonly string[]).includes(event.action)) {
+        bucket.contentAccessCount += 1;
+        if (documentId) bucket.contentDocuments.add(documentId);
+        if (event.action === 'DOCUMENT_DOWNLOAD_AUTHORIZED') {
+          bucket.downloadCount += 1;
+        }
+        const classification = this.extractClassification(event.metadata);
+        if (classification === 'SECRET' || classification === 'CONFIDENTIAL') {
+          bucket.sensitiveAccessCount += 1;
+        }
+      }
+
+      if (this.isDeniedSecurityEvent(event)) {
+        bucket.denyCount += 1;
+        if (documentId) bucket.denyDocuments.add(documentId);
+      }
+
+      if (this.isDestructiveAction(event.action)) {
+        bucket.destructiveCount += 1;
+        if (documentId) bucket.destructiveDocuments.add(documentId);
+      }
+
+      buckets.set(event.actorId, bucket);
+    }
+
+    return Array.from(buckets.values())
+      .flatMap((bucket) => this.buildBehaviorSignals(bucket))
+      .sort((a, b) => {
+        if (b.riskScore !== a.riskScore) return b.riskScore - a.riskScore;
+        return (
+          new Date(b.windowEndedAt).getTime() -
+          new Date(a.windowEndedAt).getTime()
+        );
+      })
+      .slice(0, 5);
+  }
+
+  private buildBehaviorSignals(bucket: BehaviorBucket): BehaviorSignalSummary[] {
+    const signals: BehaviorSignalSummary[] = [];
+
+    if (
+      bucket.contentAccessCount >= 5 ||
+      (bucket.contentAccessCount >= 3 && bucket.contentDocuments.size >= 5)
+    ) {
+      const riskScore = Math.min(
+        100,
+        30 +
+          Math.min(bucket.contentAccessCount * 8, 40) +
+          Math.min(bucket.contentDocuments.size * 6, 30) +
+          Math.min(bucket.sensitiveAccessCount * 8, 24) +
+          Math.min(bucket.downloadCount * 4, 12),
+      );
+      const reasons = [
+        `${bucket.contentAccessCount} successful preview/download grants`,
+        `${bucket.contentDocuments.size} distinct documents`,
+      ];
+
+      if (bucket.sensitiveAccessCount > 0) {
+        reasons.push(`${bucket.sensitiveAccessCount} sensitive document grants`);
+      }
+      if (bucket.downloadCount > 0) {
+        reasons.push(
+          `${bucket.downloadCount} download grant${bucket.downloadCount === 1 ? '' : 's'}`,
+        );
+      }
+
+      signals.push(
+        this.createBehaviorSignal(
+          'MASS_CONTENT_ACCESS',
+          bucket.actorId,
+          bucket.contentAccessCount,
+          bucket.contentDocuments.size,
+          bucket.windowStartedAt,
+          bucket.windowEndedAt,
+          riskScore,
+          reasons,
+        ),
+      );
+    }
+
+    if (bucket.denyCount >= 3) {
+      const riskScore = Math.min(
+        100,
+        25 + bucket.denyCount * 7 + bucket.denyDocuments.size * 4,
+      );
+      const reasons = [
+        `${bucket.denyCount} denied security events`,
+        `${bucket.denyDocuments.size} distinct documents`,
+      ];
+
+      signals.push(
+        this.createBehaviorSignal(
+          'DENY_BURST',
+          bucket.actorId,
+          bucket.denyCount,
+          bucket.denyDocuments.size,
+          bucket.windowStartedAt,
+          bucket.windowEndedAt,
+          riskScore,
+          reasons,
+        ),
+      );
+    }
+
+    if (bucket.destructiveCount >= 2) {
+      const riskScore = Math.min(
+        100,
+        45 + bucket.destructiveCount * 15 + bucket.destructiveDocuments.size * 5,
+      );
+      const reasons = [
+        `${bucket.destructiveCount} destructive document events`,
+        `${bucket.destructiveDocuments.size} distinct documents`,
+      ];
+
+      signals.push(
+        this.createBehaviorSignal(
+          'DESTRUCTIVE_ACTIVITY',
+          bucket.actorId,
+          bucket.destructiveCount,
+          bucket.destructiveDocuments.size,
+          bucket.windowStartedAt,
+          bucket.windowEndedAt,
+          riskScore,
+          reasons,
+        ),
+      );
+    }
+
+    return signals;
+  }
+
+  private createBehaviorSignal(
+    type: BehaviorSignalType,
+    actorId: string,
+    actionCount: number,
+    documentCount: number,
+    windowStartedAt: Date,
+    windowEndedAt: Date,
+    riskScore: number,
+    reasons: string[],
+  ): BehaviorSignalSummary {
+    return {
+      signalId: `${type}:${actorId}`,
+      type,
+      severity: this.behaviorSeverity(riskScore),
+      actorId,
+      actionCount,
+      documentCount,
+      windowStartedAt: windowStartedAt.toISOString(),
+      windowEndedAt: windowEndedAt.toISOString(),
+      riskScore,
+      reasons,
+    };
+  }
+
+  private behaviorSeverity(riskScore: number): BehaviorSignalSeverity {
+    if (riskScore >= 80) return 'critical';
+    if (riskScore >= 50) return 'warning';
+    return 'watch';
+  }
+
+  private isDeniedSecurityEvent(event: {
+    action?: unknown;
+    result?: unknown;
+  }): boolean {
+    return (
+      event.result === 'DENY' ||
+      event.action === 'DOCUMENT_DOWNLOAD_DENIED' ||
+      event.action === 'DOCUMENT_METADATA_READ_DENIED'
+    );
+  }
+
+  private isDestructiveAction(action: unknown): boolean {
+    return (
+      action === 'DOCUMENT_ACL_DELETED' ||
+      action === 'DOCUMENT_ARCHIVE' ||
+      action === 'DOCUMENT_AUTO_ARCHIVED'
+    );
   }
 
   private buildRiskyDocumentSummary(

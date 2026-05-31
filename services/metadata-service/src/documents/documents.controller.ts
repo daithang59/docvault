@@ -28,6 +28,7 @@ import { UpdateStatusDto } from '../status/dto/update-status.dto';
 import { PolicyService } from '../policy/policy.service';
 import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from '../policy/dto/preview-authorize.dto';
+import { AccessImpactDto } from '../policy/dto/access-impact.dto';
 import { CommentsService } from '../comments/comments.service';
 import { buildRequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -61,6 +62,44 @@ export class DocumentsController {
   findOne(@Param('docId') docId: string, @Req() req: any) {
     return this.policyService.assertCanReadMetadata(
       docId,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Get(':docId/ai-guardrails')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Get AI-ready access guardrails for a document',
+    description:
+      'Returns metadata/content policy decisions for future AI classification, tagging, summarization, and QA. It never returns file content, object keys, presigned URLs, preview grants, or download grants.',
+  })
+  getAiGuardrails(@Param('docId') docId: string, @Req() req: any) {
+    return this.policyService.getAiGuardrails(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Post(':docId/access-impact')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview access impact for a proposed metadata policy change',
+    description:
+      'Simulates baseline role access changes for a proposed document classification without returning file content, object keys, presigned URLs, or grant tokens.',
+  })
+  getAccessImpactPreview(
+    @Param('docId') docId: string,
+    @Body() body: AccessImpactDto,
+    @Req() req: any,
+  ) {
+    return this.policyService.getAccessImpactPreview(
+      docId,
+      body,
       req.user,
       buildRequestContext(req),
     );

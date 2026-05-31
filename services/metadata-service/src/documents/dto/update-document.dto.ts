@@ -28,6 +28,16 @@ export class UpdateDocumentDto {
   classification?: string;
 
   @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  @ApiPropertyOptional({
+    maxLength: 500,
+    description:
+      'Required when an admin overrides a DLP-detected document downgrade to PUBLIC or INTERNAL.',
+  })
+  classificationOverrideReason?: string;
+
+  @IsOptional()
   @IsArray()
   @IsString({ each: true })
   @ArrayMaxSize(50)

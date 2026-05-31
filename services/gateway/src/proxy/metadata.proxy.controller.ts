@@ -200,6 +200,44 @@ export class MetadataProxyController {
     };
   }
 
+  @Get('documents/:docId/ai-guardrails')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Get AI-ready access guardrails for a document',
+    description:
+      'Returns policy decisions for future AI classification, tagging, summarization, and QA without exposing file content, object keys, presigned URLs, or grant tokens.',
+  })
+  async getAiGuardrails(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/ai-guardrails`,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/access-impact')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview access impact for a proposed metadata policy change',
+    description:
+      'Proxies metadata-service policy simulation without exposing file content, object keys, presigned URLs, or grant tokens.',
+  })
+  async getAccessImpactPreview(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/access-impact`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Post('documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')

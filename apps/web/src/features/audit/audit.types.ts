@@ -54,6 +54,24 @@ export interface RiskyDocumentSummary {
   reasons: string[];
 }
 
+export type BehaviorSignalType =
+  | 'MASS_CONTENT_ACCESS'
+  | 'DENY_BURST'
+  | 'DESTRUCTIVE_ACTIVITY';
+
+export interface BehaviorSignalSummary {
+  signalId: string;
+  type: BehaviorSignalType;
+  severity: 'critical' | 'warning' | 'watch';
+  actorId: string;
+  actionCount: number;
+  documentCount: number;
+  windowStartedAt: string;
+  windowEndedAt: string;
+  riskScore: number;
+  reasons: string[];
+}
+
 export interface SecuritySummary {
   chain: AuditChainStatus;
   totals: {
@@ -67,4 +85,5 @@ export interface SecuritySummary {
     denyCount: number;
   }>;
   riskyDocuments: RiskyDocumentSummary[];
+  behaviorSignals: BehaviorSignalSummary[];
 }

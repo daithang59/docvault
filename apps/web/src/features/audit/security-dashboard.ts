@@ -1,6 +1,7 @@
 import type {
   AuditLogEntry,
   AuditQueryFilters,
+  BehaviorSignalSummary,
   RiskyDocumentSummary,
   SecuritySummary,
 } from './audit.types';
@@ -29,6 +30,13 @@ export interface SecurityRiskScoringRow extends RiskyDocumentSummary {
   auditFilters: AuditQueryFilters;
 }
 
+export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
+  typeLabel: string;
+  riskBand: SecurityRiskBand;
+  riskLabel: string;
+  auditFilters: AuditQueryFilters;
+}
+
 export interface SecurityDashboardModel {
   posture: {
     level: SecurityPostureLevel;
@@ -49,6 +57,9 @@ export interface SecurityDashboardModel {
   };
   riskScoring: {
     riskyDocuments: SecurityRiskScoringRow[];
+  };
+  behaviorAnomalies: {
+    signals: SecurityBehaviorSignalRow[];
   };
   quickFilters: Array<{
     label: string;
@@ -77,6 +88,9 @@ export function buildSecurityDashboardModel(
   );
   const downloadAuthorizedTotal = activity?.downloadAuthorizedTotal ?? 0;
   const riskyDocuments = buildRiskScoringRows(summary?.riskyDocuments ?? []);
+  const behaviorSignals = buildBehaviorSignalRows(
+    summary?.behaviorSignals ?? [],
+  );
 
   if (summary?.chain.valid === false) {
     alerts.push({
@@ -141,6 +155,18 @@ export function buildSecurityDashboardModel(
     });
   }
 
+  if (behaviorSignals.length > 0) {
+    const criticalSignals = behaviorSignals.filter(
+      (signal) => signal.riskBand === 'critical',
+    ).length;
+    alerts.push({
+      severity: criticalSignals > 0 ? 'critical' : 'warning',
+      title: 'Behavior anomaly detected',
+      description: `${behaviorSignals.length} actor behavior signal${behaviorSignals.length === 1 ? '' : 's'} matched ransomware-oriented audit patterns.`,
+      action: 'Review behavior anomalies and actor-scoped audit evidence.',
+    });
+  }
+
   return {
     posture: buildPosture(summary, alerts),
     metrics: [
@@ -181,6 +207,9 @@ export function buildSecurityDashboardModel(
     },
     riskScoring: {
       riskyDocuments,
+    },
+    behaviorAnomalies: {
+      signals: behaviorSignals,
     },
     quickFilters: [
       {
@@ -240,6 +269,33 @@ export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
 
   const classification = String(event.metadata?.classification ?? '').toUpperCase();
   return classification === 'CONFIDENTIAL' || classification === 'SECRET';
+}
+
+function buildBehaviorSignalRows(
+  signals: BehaviorSignalSummary[],
+): SecurityBehaviorSignalRow[] {
+  return signals.map((signal) => {
+    const riskBand = getRiskBand(signal.riskScore);
+
+    return {
+      ...signal,
+      typeLabel: getBehaviorSignalLabel(signal.type),
+      riskBand,
+      riskLabel: getRiskLabel(riskBand),
+      auditFilters: { actorId: signal.actorId },
+    };
+  });
+}
+
+function getBehaviorSignalLabel(type: BehaviorSignalSummary['type']): string {
+  switch (type) {
+    case 'MASS_CONTENT_ACCESS':
+      return 'Mass content access';
+    case 'DENY_BURST':
+      return 'Denied access burst';
+    case 'DESTRUCTIVE_ACTIVITY':
+      return 'Destructive activity';
+  }
 }
 
 function buildRiskScoringRows(

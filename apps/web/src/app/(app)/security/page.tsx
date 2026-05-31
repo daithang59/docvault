@@ -253,8 +253,9 @@ export default function SecurityPage() {
         <RepeatedActorsPanel actors={model.repeatedDenyActors} />
       </section>
 
-      <section className="mt-4">
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1fr_1fr]">
         <RiskScoringPanel riskScoring={model.riskScoring} />
+        <BehaviorAnomaliesPanel behaviorAnomalies={model.behaviorAnomalies} />
       </section>
     </div>
   );
@@ -702,6 +703,111 @@ function RiskScoringPanel({
                   </div>
                   <Link
                     href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                  >
+                    Open audit
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function BehaviorAnomaliesPanel({
+  behaviorAnomalies,
+}: {
+  behaviorAnomalies: ReturnType<typeof buildSecurityDashboardModel>['behaviorAnomalies'];
+}) {
+  const signals = behaviorAnomalies.signals;
+
+  return (
+    <div
+      className="rounded-lg border p-5"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text-strong)]">
+            Behavior anomalies
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Ransomware-oriented signals from actor activity, denied access,
+            document spread, and destructive audit events.
+          </p>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          Audit metadata only
+        </span>
+      </div>
+
+      {signals.length === 0 ? (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          No actor crossed the behavior anomaly thresholds.
+        </p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {signals.map((signal) => {
+            const tone = getRiskTone(signal.riskBand);
+            return (
+              <div
+                key={signal.signalId}
+                className="rounded-lg border p-4"
+                style={{
+                  borderColor: tone.border,
+                  background: tone.bg,
+                }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                        style={{ color: tone.text, background: tone.badgeBg }}
+                      >
+                        {signal.riskLabel}
+                      </span>
+                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                        {signal.typeLabel}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
+                      {truncateMiddle(signal.actorId, 34)}
+                    </p>
+                    <p className="mt-1 text-xs text-[var(--text-muted)]">
+                      {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}
+                      {signal.documentCount} document{signal.documentCount === 1 ? '' : 's'} ·{' '}
+                      {formatDateTime(signal.windowStartedAt)} - {formatDateTime(signal.windowEndedAt)}
+                    </p>
+                  </div>
+                  <div className="shrink-0 text-left sm:text-right">
+                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                      {signal.riskScore}
+                    </p>
+                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                      anomaly score
+                    </p>
+                  </div>
+                </div>
+
+                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                      Reasons
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                      {signal.reasons.join(' · ')}
+                    </p>
+                  </div>
+                  <Link
+                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
                     className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
                   >
                     Open audit

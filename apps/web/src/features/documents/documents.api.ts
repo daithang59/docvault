@@ -15,6 +15,9 @@ import type {
   UploadVersionResponse,
   PreviewAuthorizationResult,
   ComplianceEvidencePacket,
+  DocumentAiGuardrails,
+  DocumentAccessImpact,
+  DocumentAccessImpactRequest,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
 
@@ -86,6 +89,24 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
 export async function getComplianceEvidencePacket(id: string): Promise<ComplianceEvidencePacket> {
   const res = await apiClient.get<ComplianceEvidencePacket>(
     apiEndpoints.metadata.documents.evidencePacket(id),
+  );
+  return unwrap(res);
+}
+
+export async function getDocumentAiGuardrails(id: string): Promise<DocumentAiGuardrails> {
+  const res = await apiClient.get<DocumentAiGuardrails>(
+    apiEndpoints.metadata.documents.aiGuardrails(id),
+  );
+  return unwrap(res);
+}
+
+export async function previewDocumentAccessImpact(
+  id: string,
+  dto: DocumentAccessImpactRequest,
+): Promise<DocumentAccessImpact> {
+  const res = await apiClient.post<DocumentAccessImpact>(
+    apiEndpoints.metadata.documents.accessImpact(id),
+    dto,
   );
   return unwrap(res);
 }

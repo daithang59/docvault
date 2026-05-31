@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -14,6 +15,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
 import { DownloadAuthorizeDto } from './dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from './dto/preview-authorize.dto';
+import { AccessImpactDto } from './dto/access-impact.dto';
 import {
   RequestContext,
   ServiceUser,
@@ -21,6 +23,27 @@ import {
   normalizeGroups,
 } from '../common/request-context';
 import { CLASSIFICATION_WATERMARK_LEVELS } from '../common/classification.constants';
+
+type AiGuardrailOperation =
+  | 'METADATA_CLASSIFICATION'
+  | 'METADATA_TAGGING'
+  | 'CONTENT_SUMMARIZATION'
+  | 'CONTENT_QA';
+
+type SimulatedRole =
+  | 'viewer'
+  | 'editor'
+  | 'approver'
+  | 'compliance_officer'
+  | 'admin';
+
+const SIMULATED_ROLES: SimulatedRole[] = [
+  'viewer',
+  'editor',
+  'approver',
+  'compliance_officer',
+  'admin',
+];
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -406,6 +429,200 @@ export class PolicyService {
     return deny('Metadata read denied by classification policy');
   }
 
+  async getAiGuardrails(
+    docId: string,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    const document = await this.assertCanReadMetadata(docId, user, context);
+    const actorId = buildActorId(user);
+    const roles = user.roles ?? context.roles ?? [];
+    const groups = this.getActorGroups(user, context);
+    const allowedOperations: AiGuardrailOperation[] = [
+      'METADATA_CLASSIFICATION',
+      'METADATA_TAGGING',
+    ];
+    const deniedOperations: Array<{
+      operation: AiGuardrailOperation;
+      reason: string;
+    }> = [];
+
+    const contentDeniedReason = this.getAiContentDeniedReason(
+      document,
+      roles,
+      actorId,
+      groups,
+    );
+
+    if (contentDeniedReason) {
+      deniedOperations.push(
+        {
+          operation: 'CONTENT_SUMMARIZATION',
+          reason: contentDeniedReason,
+        },
+        {
+          operation: 'CONTENT_QA',
+          reason: contentDeniedReason,
+        },
+      );
+    } else {
+      allowedOperations.push('CONTENT_SUMMARIZATION', 'CONTENT_QA');
+    }
+
+    const result = {
+      documentId: docId,
+      actorId,
+      classification: document.classification,
+      status: document.status,
+      canUseMetadata: true,
+      canUseContent: !contentDeniedReason,
+      allowedOperations,
+      deniedOperations,
+      guardrails: [
+        'Build AI context only after metadata policy allows the document.',
+        'Never include file content when canUseContent is false.',
+        'Do not expose object keys, presigned URLs, preview grants, or download grants to AI prompts.',
+        'AI answers must carry an audit event before they are shown to users.',
+      ],
+    };
+
+    await this.auditClient.emitEvent(context, {
+      action: 'AI_GUARDRAILS_EVALUATED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+      metadata: {
+        docId,
+        actorId,
+        roles,
+        groups,
+        classification: document.classification,
+        status: document.status,
+        canUseContent: result.canUseContent,
+        allowedOperations,
+        deniedOperations,
+      },
+    });
+
+    return result;
+  }
+
+  async getAccessImpactPreview(
+    docId: string,
+    dto: AccessImpactDto,
+    user: ServiceUser,
+    context: RequestContext,
+  ) {
+    if (!dto.classification) {
+      throw new BadRequestException(
+        'classification is required for access impact preview',
+      );
+    }
+
+    const document = await this.assertCanReadMetadata(docId, user, context);
+    const actorId = buildActorId(user);
+    const roles = user.roles ?? context.roles ?? [];
+
+    if (
+      !roles.includes('admin') &&
+      (actorId !== document.ownerId || !roles.includes('editor'))
+    ) {
+      throw new ForbiddenException(
+        'Only the owner editor or admin can simulate access impact',
+      );
+    }
+
+    const currentClassification = document.classification as ClassificationLevel;
+    const proposedClassification = dto.classification as ClassificationLevel;
+    const current = this.buildAccessImpactState(
+      document.status,
+      currentClassification,
+    );
+    const proposed = this.buildAccessImpactState(
+      document.status,
+      proposedClassification,
+    );
+    const roleImpacts = SIMULATED_ROLES.map((role) =>
+      this.buildRoleImpact(
+        role,
+        document.status,
+        currentClassification,
+        proposedClassification,
+      ),
+    );
+    const currentAccessCount = roleImpacts.reduce(
+      (count, impact) =>
+        count +
+        Number(impact.metadata.current) +
+        Number(impact.download.current),
+      0,
+    );
+    const proposedAccessCount = roleImpacts.reduce(
+      (count, impact) =>
+        count +
+        Number(impact.metadata.proposed) +
+        Number(impact.download.proposed),
+      0,
+    );
+    const accessExpanded = proposedAccessCount > currentAccessCount;
+    const accessReduced = proposedAccessCount < currentAccessCount;
+    const watermarkReduced =
+      current.watermarkRequired && !proposed.watermarkRequired;
+    const dlpOverrideRequired =
+      (document as any).dlpStatus === 'DETECTED' &&
+      ['PUBLIC', 'INTERNAL'].includes(proposedClassification);
+    const warnings = [
+      ...(accessExpanded
+        ? ['Proposed classification expands baseline access.']
+        : []),
+      ...(accessReduced
+        ? ['Proposed classification reduces baseline access.']
+        : []),
+      ...(watermarkReduced
+        ? ['Watermarking would no longer be required.']
+        : []),
+      ...(dlpOverrideRequired
+        ? ['DLP-detected downgrade requires admin override reason.']
+        : []),
+    ];
+
+    const result = {
+      documentId: docId,
+      current,
+      proposed,
+      changes: {
+        accessExpanded,
+        accessReduced,
+        watermarkReduced,
+        dlpOverrideRequired,
+        warnings,
+      },
+      roleImpacts,
+      guardrails: [
+        'This is a policy simulation only; backend authorization remains authoritative.',
+        'Baseline role impact does not enumerate real users or expose file content.',
+        'ACL DENY entries and final mutation guards still apply at execution time.',
+      ],
+    };
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_ACCESS_IMPACT_SIMULATED',
+      resourceType: 'DOCUMENT',
+      resourceId: docId,
+      result: 'SUCCESS',
+      metadata: {
+        docId,
+        actorId,
+        roles,
+        currentClassification,
+        proposedClassification,
+        changes: result.changes,
+      },
+    });
+
+    return result;
+  }
+
   private getDeniedReason(status: string, roles: string[]): string | null {
     if (roles.includes('compliance_officer')) {
       return 'Compliance officers are never allowed to download files';
@@ -423,6 +640,104 @@ export class PolicyService {
 
   private getActorGroups(user: ServiceUser, context: RequestContext): string[] {
     return normalizeGroups([...(user.groups ?? []), ...(context.groups ?? [])]);
+  }
+
+  private buildAccessImpactState(
+    status: string,
+    classification: ClassificationLevel,
+  ) {
+    return {
+      classification,
+      status,
+      watermarkRequired: CLASSIFICATION_WATERMARK_LEVELS[classification],
+    };
+  }
+
+  private buildRoleImpact(
+    role: SimulatedRole,
+    status: string,
+    currentClassification: ClassificationLevel,
+    proposedClassification: ClassificationLevel,
+  ) {
+    const metadata = {
+      current: this.canBaselineReadMetadata(status, currentClassification, role),
+      proposed: this.canBaselineReadMetadata(status, proposedClassification, role),
+    };
+    const download = {
+      current: this.canBaselineDownload(status, currentClassification, role),
+      proposed: this.canBaselineDownload(status, proposedClassification, role),
+    };
+    const notes = [
+      ...this.buildImpactNotes(role, 'Metadata', metadata),
+      ...this.buildImpactNotes(role, 'Download', download),
+    ];
+
+    return {
+      role,
+      metadata,
+      download,
+      notes,
+    };
+  }
+
+  private buildImpactNotes(
+    role: SimulatedRole,
+    label: 'Metadata' | 'Download',
+    impact: { current: boolean; proposed: boolean },
+  ): string[] {
+    if (!impact.current && impact.proposed) {
+      return [`${label} becomes allowed for baseline ${role} role.`];
+    }
+    if (impact.current && !impact.proposed) {
+      return [`${label} becomes denied for baseline ${role} role.`];
+    }
+    return [];
+  }
+
+  private canBaselineReadMetadata(
+    status: string,
+    classification: ClassificationLevel,
+    role: SimulatedRole,
+  ): boolean {
+    if (role === 'admin') {
+      return true;
+    }
+    if (role === 'compliance_officer') {
+      return ['PUBLISHED', 'ARCHIVED'].includes(status);
+    }
+    if (role === 'approver') {
+      return ['PENDING', 'PUBLISHED', 'ARCHIVED'].includes(status);
+    }
+    if (status !== 'PUBLISHED') {
+      return false;
+    }
+    if (classification === 'PUBLIC') {
+      return true;
+    }
+    if (classification === 'INTERNAL') {
+      return role === 'viewer' || role === 'editor';
+    }
+    return false;
+  }
+
+  private canBaselineDownload(
+    status: string,
+    classification: ClassificationLevel,
+    role: SimulatedRole,
+  ): boolean {
+    const roles = [role];
+    const statusReason = this.getDeniedReason(status, roles);
+    if (statusReason) {
+      return false;
+    }
+
+    return !this.getClassificationDeniedReason(
+      classification,
+      roles,
+      `simulation:${role}`,
+      'simulation:owner',
+      false,
+    );
   }
 
   private matchesPreviewAcl(
@@ -480,6 +795,64 @@ export class PolicyService {
       .digest('base64url');
 
     return `${encoded}.${signature}`;
+  }
+
+  private getAiContentDeniedReason(
+    document: {
+      status: string;
+      classification: ClassificationLevel | string;
+      ownerId: string;
+      currentVersion?: number | null;
+      aclEntries: Array<{
+        subjectType: AclSubjectType;
+        subjectId: string | null;
+        permission: DocumentPermission;
+        effect: AclEffect;
+      }>;
+    },
+    roles: string[],
+    actorId: string,
+    groups: string[],
+  ): string | null {
+    if (roles.includes('compliance_officer')) {
+      return 'Compliance officers cannot use file content for AI operations';
+    }
+
+    if (document.status === 'DELETED') {
+      return 'Deleted documents cannot be used for AI content operations';
+    }
+
+    if (!document.currentVersion || document.currentVersion < 1) {
+      return 'Document has no uploaded version';
+    }
+
+    if (
+      this.matchesPreviewAcl(
+        document.aclEntries,
+        actorId,
+        roles,
+        groups,
+        AclEffect.DENY,
+      )
+    ) {
+      return 'AI content access denied by ACL';
+    }
+
+    const hasExplicitAllow = this.matchesPreviewAcl(
+      document.aclEntries,
+      actorId,
+      roles,
+      groups,
+      AclEffect.ALLOW,
+    );
+
+    return this.getPreviewClassificationDeniedReason(
+      document.classification as ClassificationLevel,
+      roles,
+      actorId,
+      document.ownerId,
+      hasExplicitAllow,
+    );
   }
 
   private getPreviewClassificationDeniedReason(

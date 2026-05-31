@@ -122,6 +122,10 @@ components:
         title: { type: string, maxLength: 255 }
         description: { type: string, maxLength: 1000 }
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        classificationOverrideReason:
+          type: string
+          maxLength: 500
+          description: Required for admin override when downgrading a DLP-detected document to PUBLIC or INTERNAL.
         tags: { type: array, items: { type: string } }
 
     # ─── Versions ──────────────────────────────────────────────────────────────
@@ -293,6 +297,96 @@ components:
         expiresAt: { type: string, format: date-time }
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
 
+    AiGuardrails:
+      type: object
+      description: |
+        AI-ready policy decision for future classification, tagging,
+        summarization, and Q&A. This response intentionally excludes file
+        content, object keys, presigned URLs, preview grants, and download grants.
+      properties:
+        documentId: { type: string }
+        actorId: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        canUseMetadata: { type: boolean }
+        canUseContent: { type: boolean }
+        allowedOperations:
+          type: array
+          items:
+            type: string
+            enum: [METADATA_CLASSIFICATION, METADATA_TAGGING, CONTENT_SUMMARIZATION, CONTENT_QA]
+        deniedOperations:
+          type: array
+          items:
+            type: object
+            properties:
+              operation:
+                type: string
+                enum: [METADATA_CLASSIFICATION, METADATA_TAGGING, CONTENT_SUMMARIZATION, CONTENT_QA]
+              reason: { type: string }
+        guardrails:
+          type: array
+          items: { type: string }
+
+    AccessImpactRequest:
+      type: object
+      required: [classification]
+      properties:
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+
+    AccessImpact:
+      type: object
+      description: |
+        What-if access impact for a proposed document classification change.
+        This response intentionally excludes file content, object keys,
+        presigned URLs, preview grants, and download grants.
+      properties:
+        documentId: { type: string }
+        current:
+          type: object
+          properties:
+            classification: { $ref: '#/components/schemas/ClassificationLevel' }
+            status: { $ref: '#/components/schemas/DocumentStatus' }
+            watermarkRequired: { type: boolean }
+        proposed:
+          type: object
+          properties:
+            classification: { $ref: '#/components/schemas/ClassificationLevel' }
+            status: { $ref: '#/components/schemas/DocumentStatus' }
+            watermarkRequired: { type: boolean }
+        changes:
+          type: object
+          properties:
+            accessExpanded: { type: boolean }
+            accessReduced: { type: boolean }
+            watermarkReduced: { type: boolean }
+            dlpOverrideRequired: { type: boolean }
+            warnings:
+              type: array
+              items: { type: string }
+        roleImpacts:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [viewer, editor, approver, compliance_officer, admin] }
+              metadata:
+                type: object
+                properties:
+                  current: { type: boolean }
+                  proposed: { type: boolean }
+              download:
+                type: object
+                properties:
+                  current: { type: boolean }
+                  proposed: { type: boolean }
+              notes:
+                type: array
+                items: { type: string }
+        guardrails:
+          type: array
+          items: { type: string }
+
     # ─── Audit ────────────────────────────────────────────────────────────────
     AuditEventResult:
       type: string
@@ -316,6 +410,8 @@ components:
             DOCUMENT_SUBMIT, DOCUMENT_APPROVE, DOCUMENT_REJECT, DOCUMENT_ARCHIVE,
             DOCUMENT_AUTO_ARCHIVED,
             MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
+            DLP_CLASSIFICATION_OVERRIDE_APPROVED,
+            DOCUMENT_ACCESS_IMPACT_SIMULATED, AI_GUARDRAILS_EVALUATED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
         resourceType: { type: string }
@@ -362,6 +458,26 @@ components:
           type: array
           items: { type: string }
 
+    BehaviorSignalSummary:
+      type: object
+      properties:
+        signalId: { type: string }
+        type:
+          type: string
+          enum: [MASS_CONTENT_ACCESS, DENY_BURST, DESTRUCTIVE_ACTIVITY]
+        severity:
+          type: string
+          enum: [critical, warning, watch]
+        actorId: { type: string }
+        actionCount: { type: integer }
+        documentCount: { type: integer }
+        windowStartedAt: { type: string, format: date-time }
+        windowEndedAt: { type: string, format: date-time }
+        riskScore: { type: integer, minimum: 0, maximum: 100 }
+        reasons:
+          type: array
+          items: { type: string }
+
     SecuritySummary:
       type: object
       properties:
@@ -384,6 +500,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/RiskyDocumentSummary'
+        behaviorSignals:
+          type: array
+          items:
+            $ref: '#/components/schemas/BehaviorSignalSummary'
 
     ComplianceEvidencePacket:
       type: object
@@ -803,6 +923,72 @@ paths:
           description: Unauthorized
         '403':
           description: Forbidden — compliance_officer or admin required
+        '404':
+          description: Document not found
+
+  /metadata/documents/{docId}/ai-guardrails:
+    get:
+      summary: Get AI-ready access guardrails for a document
+      operationId: getDocumentAiGuardrails
+      description: |
+        Returns policy decisions for future AI classification, tagging,
+        summarization, and Q&A. Metadata access must pass first. Content AI
+        operations are blocked when the user cannot preview file content, and
+        compliance officers are always metadata-only. The response never
+        includes file content, object keys, presigned URLs, preview grants, or
+        download grants.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/DocId'
+      responses:
+        '200':
+          description: AI guardrails for the current actor and document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiGuardrails'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden by metadata policy
+        '404':
+          description: Document not found
+
+  /metadata/documents/{docId}/access-impact:
+    post:
+      summary: Preview access impact for a proposed classification change
+      operationId: previewDocumentAccessImpact
+      description: |
+        Simulates baseline role access and watermark impact before an editor or
+        admin submits a metadata classification change. The response does not
+        enumerate real users and never includes file content, object keys,
+        presigned URLs, preview grants, or download grants.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessImpactRequest'
+      responses:
+        '200':
+          description: Access impact preview for the proposed metadata change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessImpact'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — owner editor or admin required
         '404':
           description: Document not found
 

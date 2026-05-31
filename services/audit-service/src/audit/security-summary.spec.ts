@@ -35,6 +35,7 @@ describe('AuditService security summary', () => {
       },
       repeatedDenyActors: [{ actorId: 'viewer-1', denyCount: 5 }],
       riskyDocuments: [],
+      behaviorSignals: [],
     });
 
     expect(countDocuments).toHaveBeenCalledWith({ result: 'DENY' });
@@ -157,5 +158,166 @@ describe('AuditService security summary', () => {
     );
     expect(riskFindSort).toHaveBeenCalledWith({ timestamp: -1 });
     expect(riskFindLimit).toHaveBeenCalledWith(500);
+  });
+
+  it('detects ransomware-like behavior signals from audit event bursts', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(0);
+    const aggregateExec = jest.fn().mockResolvedValue([]);
+    const riskFindLean = jest.fn().mockResolvedValue([]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:00:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret-1' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-2',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:02:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret-2' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-confidential-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:04:00.000Z'),
+        metadata: { classification: 'CONFIDENTIAL', docId: 'doc-confidential-1' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-internal-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:06:00.000Z'),
+        metadata: { classification: 'INTERNAL', docId: 'doc-internal-1' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-internal-2',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:08:00.000Z'),
+        metadata: { classification: 'INTERNAL', docId: 'doc-internal-2' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-1',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:01:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret-1' },
+      },
+      {
+        action: 'DOCUMENT_METADATA_READ_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-2',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:02:00.000Z'),
+        metadata: { docId: 'doc-secret-2' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-3',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:03:00.000Z'),
+        metadata: { docId: 'doc-secret-3' },
+      },
+    ]);
+    const makeFindChain = (lean: jest.Mock) => {
+      const limit = jest.fn().mockReturnValue({ lean });
+      const sort = jest.fn().mockReturnValue({ limit });
+      return { sort, limit };
+    };
+    const riskFind = makeFindChain(riskFindLean);
+    const behaviorFind = makeFindChain(behaviorFindLean);
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(riskFind)
+      .mockReturnValueOnce(behaviorFind);
+    const service = new AuditService({
+      countDocuments,
+      find,
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    jest
+      .spyOn(service, 'verifyChain')
+      .mockResolvedValue({ valid: true, checked: 42 });
+
+    const result = await service.securitySummary();
+
+    expect(result.behaviorSignals).toEqual([
+      {
+        signalId: 'MASS_CONTENT_ACCESS:editor-1',
+        type: 'MASS_CONTENT_ACCESS',
+        severity: 'critical',
+        actorId: 'editor-1',
+        actionCount: 5,
+        documentCount: 5,
+        windowStartedAt: '2026-05-30T10:00:00.000Z',
+        windowEndedAt: '2026-05-30T10:08:00.000Z',
+        riskScore: 100,
+        reasons: [
+          '5 successful preview/download grants',
+          '5 distinct documents',
+          '3 sensitive document grants',
+          '3 download grants',
+        ],
+      },
+      {
+        signalId: 'DENY_BURST:viewer-1',
+        type: 'DENY_BURST',
+        severity: 'warning',
+        actorId: 'viewer-1',
+        actionCount: 3,
+        documentCount: 3,
+        windowStartedAt: '2026-05-30T10:01:00.000Z',
+        windowEndedAt: '2026-05-30T10:03:00.000Z',
+        riskScore: 58,
+        reasons: ['3 denied security events', '3 distinct documents'],
+      },
+    ]);
+    expect(find).toHaveBeenNthCalledWith(
+      2,
+      {
+        action: {
+          $in: [
+            'DOCUMENT_DOWNLOAD_AUTHORIZED',
+            'DOCUMENT_PREVIEW_AUTHORIZED',
+            'DOCUMENT_DOWNLOAD_DENIED',
+            'DOCUMENT_METADATA_READ_DENIED',
+            'DOCUMENT_ACL_DELETED',
+            'DOCUMENT_ARCHIVE',
+            'DOCUMENT_AUTO_ARCHIVED',
+            'DOCUMENT_METADATA_UPDATED',
+            'DOCUMENT_UPLOADED',
+          ],
+        },
+      },
+      {
+        _id: 0,
+        action: 1,
+        actorId: 1,
+        metadata: 1,
+        resourceId: 1,
+        resourceType: 1,
+        result: 1,
+        timestamp: 1,
+      },
+    );
   });
 });

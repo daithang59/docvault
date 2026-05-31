@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useDocumentDetail } from '@/lib/hooks/use-document-detail';
 import { useUpdateDocument } from '@/lib/hooks/use-documents';
 import { DocumentForm, DocumentFormValues } from '@/components/documents/document-form';
+import { DocumentAccessImpactCard } from '@/components/documents/document-access-impact-card';
 import { PageHeader } from '@/components/common/page-header';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -15,6 +16,8 @@ import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage } from '@/lib/api/errors';
+import { useDocumentAccessImpact } from '@/features/documents/documents.hooks';
+import type { ClassificationLevel } from '@/types/enums';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 
@@ -58,6 +61,7 @@ export default function EditDocumentPage({ params }: Props) {
         title: values.title,
         description: values.description || undefined,
         classification: values.classification as import('@/types/enums').ClassificationLevel,
+        classificationOverrideReason: values.classificationOverrideReason || undefined,
         tags: values.tags,
       });
       toast.success(TOAST_MESSAGES.DOCUMENT_UPDATED);
@@ -100,6 +104,15 @@ export default function EditDocumentPage({ params }: Props) {
               onSubmit={handleSubmit}
               submitLabel="Save Changes"
               isLoading={update.isPending}
+              dlpStatus={doc.dlpStatus}
+              isAdmin={session?.user.roles.includes('admin') ?? false}
+              classificationSlot={(selectedClassification) => (
+                <AccessImpactPreview
+                  docId={id}
+                  currentClassification={doc.classification}
+                  selectedClassification={selectedClassification}
+                />
+              )}
             >
               <Link
                 href={ROUTES.DOCUMENT_DETAIL(id)}
@@ -113,5 +126,34 @@ export default function EditDocumentPage({ params }: Props) {
         </div>
       </div>
     </div>
+  );
+}
+
+function AccessImpactPreview({
+  docId,
+  currentClassification,
+  selectedClassification,
+}: {
+  docId: string;
+  currentClassification: ClassificationLevel;
+  selectedClassification: ClassificationLevel;
+}) {
+  const changed = selectedClassification !== currentClassification;
+  const { data, isLoading, isError } = useDocumentAccessImpact(
+    docId,
+    selectedClassification,
+    changed,
+  );
+
+  if (!changed) {
+    return null;
+  }
+
+  return (
+    <DocumentAccessImpactCard
+      impact={data}
+      isLoading={isLoading}
+      isError={isError}
+    />
   );
 }

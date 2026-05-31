@@ -1,4 +1,4 @@
-import { ForbiddenException } from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 
 describe('DocumentsService DLP downgrade guard', () => {
@@ -54,6 +54,71 @@ describe('DocumentsService DLP downgrade guard', () => {
         action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
         result: 'DENY',
         reason: 'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+      }),
+    );
+  });
+
+  it('requires an admin override reason before downgrading a DLP-detected document', async () => {
+    await expect(
+      service.update(
+        'doc-1',
+        { classification: 'PUBLIC' },
+        { sub: 'admin-1', roles: ['admin'] } as any,
+        { ...context, actorId: 'admin-1', roles: ['admin'] } as any,
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockDocumentUpdate).not.toHaveBeenCalled();
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'admin-1', roles: ['admin'] }),
+      expect.objectContaining({
+        action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
+        result: 'DENY',
+        reason: 'Admin override reason is required for DLP classification downgrade',
+      }),
+    );
+  });
+
+  it('allows an admin to downgrade a DLP-detected document when an override reason is audited', async () => {
+    mockDocumentUpdate.mockResolvedValue({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      title: 'DLP doc',
+      description: null,
+      tags: [],
+      classification: 'PUBLIC',
+      dlpStatus: 'DETECTED',
+      updatedAt: new Date('2026-05-31T02:00:00.000Z'),
+    });
+
+    const result = await service.update(
+      'doc-1',
+      {
+        classification: 'PUBLIC',
+        classificationOverrideReason: 'False positive from legacy sample',
+      } as any,
+      { sub: 'admin-1', roles: ['admin'] } as any,
+      { ...context, actorId: 'admin-1', roles: ['admin'] } as any,
+    );
+
+    expect(result).toEqual(expect.objectContaining({ classification: 'PUBLIC' }));
+    expect(mockDocumentUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: { classification: 'PUBLIC' },
+    });
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'admin-1', roles: ['admin'] }),
+      expect.objectContaining({
+        action: 'DLP_CLASSIFICATION_OVERRIDE_APPROVED',
+        result: 'SUCCESS',
+        reason: 'False positive from legacy sample',
+        metadata: expect.objectContaining({
+          docId: 'doc-1',
+          currentClassification: 'CONFIDENTIAL',
+          requestedClassification: 'PUBLIC',
+          dlpStatus: 'DETECTED',
+          overrideReason: 'False positive from legacy sample',
+        }),
       }),
     );
   });
