@@ -72,6 +72,26 @@ export interface BehaviorSignalSummary {
   reasons: string[];
 }
 
+export type SecurityRecommendationType =
+  | 'AUDIT_CHAIN_REVIEW'
+  | 'DLP_CLASSIFICATION_REVIEW'
+  | 'MALWARE_UPLOAD_REVIEW'
+  | 'DOCUMENT_ACCESS_REVIEW'
+  | 'ACTOR_ACCESS_REVIEW';
+
+export interface SecurityRecommendationSummary {
+  id: string;
+  type: SecurityRecommendationType;
+  severity: 'critical' | 'warning' | 'info';
+  title: string;
+  reason: string;
+  recommendedAction: string;
+  evidence: string[];
+  affectedDocumentIds: string[];
+  affectedActorIds: string[];
+  auditFilters: AuditQueryFilters;
+}
+
 export interface SecuritySummary {
   chain: AuditChainStatus;
   totals: {
@@ -86,4 +106,5 @@ export interface SecuritySummary {
   }>;
   riskyDocuments: RiskyDocumentSummary[];
   behaviorSignals: BehaviorSignalSummary[];
+  recommendations: SecurityRecommendationSummary[];
 }

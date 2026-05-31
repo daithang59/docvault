@@ -3,6 +3,7 @@ import type {
   AuditQueryFilters,
   BehaviorSignalSummary,
   RiskyDocumentSummary,
+  SecurityRecommendationSummary,
   SecuritySummary,
 } from './audit.types';
 
@@ -37,6 +38,12 @@ export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
   auditFilters: AuditQueryFilters;
 }
 
+export interface SecurityRecommendationRow extends SecurityRecommendationSummary {
+  severityLabel: string;
+  typeLabel: string;
+  auditFilters: AuditQueryFilters;
+}
+
 export interface SecurityDashboardModel {
   posture: {
     level: SecurityPostureLevel;
@@ -60,6 +67,9 @@ export interface SecurityDashboardModel {
   };
   behaviorAnomalies: {
     signals: SecurityBehaviorSignalRow[];
+  };
+  recommendations: {
+    items: SecurityRecommendationRow[];
   };
   quickFilters: Array<{
     label: string;
@@ -90,6 +100,9 @@ export function buildSecurityDashboardModel(
   const riskyDocuments = buildRiskScoringRows(summary?.riskyDocuments ?? []);
   const behaviorSignals = buildBehaviorSignalRows(
     summary?.behaviorSignals ?? [],
+  );
+  const recommendations = buildRecommendationRows(
+    summary?.recommendations ?? [],
   );
 
   if (summary?.chain.valid === false) {
@@ -211,6 +224,9 @@ export function buildSecurityDashboardModel(
     behaviorAnomalies: {
       signals: behaviorSignals,
     },
+    recommendations: {
+      items: recommendations,
+    },
     quickFilters: [
       {
         label: 'DENY',
@@ -285,6 +301,52 @@ function buildBehaviorSignalRows(
       auditFilters: { actorId: signal.actorId },
     };
   });
+}
+
+function buildRecommendationRows(
+  recommendations: SecurityRecommendationSummary[],
+): SecurityRecommendationRow[] {
+  return [...recommendations]
+    .sort((a, b) => getSeverityRank(b.severity) - getSeverityRank(a.severity))
+    .map((recommendation) => ({
+      ...recommendation,
+      severityLabel: getRecommendationSeverityLabel(recommendation.severity),
+      typeLabel: getRecommendationTypeLabel(recommendation.type),
+      auditFilters: recommendation.auditFilters ?? {},
+    }));
+}
+
+function getSeverityRank(
+  severity: SecurityRecommendationSummary['severity'],
+): number {
+  if (severity === 'critical') return 3;
+  if (severity === 'warning') return 2;
+  return 1;
+}
+
+function getRecommendationSeverityLabel(
+  severity: SecurityRecommendationSummary['severity'],
+): string {
+  if (severity === 'critical') return 'Critical';
+  if (severity === 'warning') return 'Warning';
+  return 'Info';
+}
+
+function getRecommendationTypeLabel(
+  type: SecurityRecommendationSummary['type'],
+): string {
+  switch (type) {
+    case 'AUDIT_CHAIN_REVIEW':
+      return 'Audit integrity';
+    case 'DLP_CLASSIFICATION_REVIEW':
+      return 'DLP classification';
+    case 'MALWARE_UPLOAD_REVIEW':
+      return 'Malware review';
+    case 'DOCUMENT_ACCESS_REVIEW':
+      return 'Document access';
+    case 'ACTOR_ACCESS_REVIEW':
+      return 'Actor activity';
+  }
 }
 
 function getBehaviorSignalLabel(type: BehaviorSignalSummary['type']): string {

@@ -20,6 +20,7 @@ function summary(overrides?: Partial<SecuritySummary>): SecuritySummary {
     repeatedDenyActors: [],
     riskyDocuments: [],
     behaviorSignals: [],
+    recommendations: [],
     ...overrides,
   };
 }
@@ -191,6 +192,64 @@ describe('buildSecurityDashboardModel', () => {
     expect(
       buildAuditFilterQuery(model.behaviorAnomalies.signals[0].auditFilters),
     ).toBe('actorId=editor-1');
+  });
+
+  it('exposes prioritized security recommendations with audit deep links', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          {
+            id: 'document-access-review:doc-secret',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'critical',
+            title: 'Tighten access for high-risk SECRET document',
+            reason:
+              'Document doc-secret reached risk score 95 from classification and access metadata.',
+            recommendedAction:
+              'Review ACLs, confirm business need for recent grants, and keep watermark-required delivery for sensitive content.',
+            evidence: [
+              'SECRET classification',
+              '4 successful preview/download grants',
+            ],
+            affectedDocumentIds: ['doc-secret'],
+            affectedActorIds: [],
+            auditFilters: { documentId: 'doc-secret' },
+          },
+          {
+            id: 'actor-access-review:DENY_BURST:viewer-1',
+            type: 'ACTOR_ACCESS_REVIEW',
+            severity: 'warning',
+            title: 'Investigate denied access burst for viewer-1',
+            reason:
+              'Actor viewer-1 triggered DENY_BURST with score 58 across 3 document(s).',
+            recommendedAction:
+              'Inspect role, group membership, and ACL assignments before broadening access.',
+            evidence: ['3 denied security events'],
+            affectedDocumentIds: [],
+            affectedActorIds: ['viewer-1'],
+            auditFilters: { actorId: 'viewer-1' },
+          },
+        ],
+      }),
+    );
+
+    expect(model.recommendations.items).toEqual([
+      expect.objectContaining({
+        id: 'document-access-review:doc-secret',
+        severity: 'critical',
+        severityLabel: 'Critical',
+        auditFilters: { documentId: 'doc-secret' },
+      }),
+      expect.objectContaining({
+        id: 'actor-access-review:DENY_BURST:viewer-1',
+        severity: 'warning',
+        severityLabel: 'Warning',
+        auditFilters: { actorId: 'viewer-1' },
+      }),
+    ]);
+    expect(
+      buildAuditFilterQuery(model.recommendations.items[0].auditFilters),
+    ).toBe('documentId=doc-secret');
   });
 
   it('returns empty behavior anomaly rows when summary has no behavior signals', () => {

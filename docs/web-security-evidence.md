@@ -55,7 +55,7 @@ Comment update/delete also validates the route `docId` and `commentId` as a pair
 
 - Non-gateway services now keep their local `roles.decorator.ts` / `roles.guard.ts` compatibility wrappers, but re-export `Roles`, `ROLES_KEY`, and `RolesGuard` from `@docvault/auth/rbac`.
 - JWT strategies remain service-local for now because runtime behavior still differs: gateway supports the `dv_access_token` cookie path, while downstream services use service-specific JWT validation tolerance.
-- `libs/contracts/openapi/gateway.yaml` is aligned with runtime routes for document comments, draft workflow delete, users batch lookup, classification enum refs, and security summary risk scoring.
+- `libs/contracts/openapi/gateway.yaml` is aligned with runtime routes for document comments, draft workflow delete, users batch lookup, classification enum refs, security summary risk scoring, behavior anomaly signals, AI guardrails, and access impact preview.
 - OpenAPI YAML parsing is covered with an offline `js-yaml` parse check.
 
 ### Grant Token Secrets
@@ -98,7 +98,8 @@ Runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
 - Blocked malware uploads do not create a MinIO object and do not register a metadata version.
 - DLP scan detects email, phone/national-id-like values, and sensitive keywords such as `secret`, `confidential`, and `internal only`.
 - DLP detections emit `DLP_PATTERN_DETECTED`, persist DLP state on metadata/version records, and escalate `PUBLIC`/`INTERNAL` documents to `CONFIDENTIAL`.
-- DLP-detected documents cannot be downgraded below `CONFIDENTIAL`; denied downgrade emits `DLP_CLASSIFICATION_DOWNGRADE_DENIED`.
+- DLP-detected documents cannot be downgraded below `CONFIDENTIAL` by non-admin users; denied downgrade emits `DLP_CLASSIFICATION_DOWNGRADE_DENIED`.
+- Admin downgrade override to `PUBLIC` / `INTERNAL` requires `classificationOverrideReason`; missing reasons are denied and approved overrides emit `DLP_CLASSIFICATION_OVERRIDE_APPROVED` with the audited reason.
 - Web document detail shows DLP status, suggested classification, scan source, detection time, and finding category/count/severity without exposing raw matched sensitive values.
 
 ### Audit Ingestion Boundary
@@ -118,6 +119,9 @@ Runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
 - Web Security page at `/security` gives compliance/admin a dashboard for audit-chain posture, deny/download-deny/malware/DLP counters, high-volume download grants, sensitive preview/download grants, alert cards, repeated deny actors, and recent DENY/DLP events.
 - Security dashboard quick investigations deep-link into Audit filters for `DENY`, `ERROR`, `DOCUMENT_DOWNLOAD_DENIED`, `DLP_PATTERN_DETECTED`, `DOCUMENT_DOWNLOAD_AUTHORIZED`, and `DOCUMENT_PREVIEW_AUTHORIZED`.
 - Security dashboard now includes deterministic document risk scoring from audit metadata only. It scores recent preview/download authorization events by classification, access frequency, distinct actors, and download grants, then deep-links each risky document to Audit with `documentId` filtering.
+- Security dashboard now includes deterministic behavior anomaly signals from audit metadata only. It flags ransomware-oriented patterns such as mass content access, denied-access bursts, and destructive document activity, then deep-links each actor signal to Audit with `actorId` filtering.
+- Security dashboard now includes a deterministic Security Recommendation Engine. It converts audit-chain failures, DLP detections, malware blocks, risky document activity, and behavior anomaly signals into prioritized recommended actions with evidence and Audit deep-links; it uses audit metadata only and does not expose file content, object keys, presigned URLs, preview grants, or download grants.
+- Viewing security recommendations emits `SECURITY_RECOMMENDATIONS_VIEWED` with recommendation ids/counts/types and audit filters only, so recommendation access is auditable without storing file content or grant data.
 - The hash chain is tamper-evident, not immutable storage. If an old audit event is edited directly in storage, verification should return `valid: false`.
 - Local/dev tamper demo script: `pnpm --filter audit-service audit:tamper-demo -- --dry-run` previews the target event, and `pnpm --filter audit-service audit:tamper-demo -- --apply` mutates one non-head event after `DOCVAULT_ALLOW_AUDIT_TAMPER_DEMO=true` is set.
 - The tamper demo refuses to run against non-local MongoDB hosts unless `DOCVAULT_ALLOW_NONLOCAL_AUDIT_TAMPER_DEMO=true` is also set.
@@ -146,6 +150,27 @@ Runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
 - Related audit events are fetched with `documentId=:docId`, so both direct document audit events and comment events with `metadata.docId` are included.
 - The packet intentionally excludes file content, presigned URLs, preview grants, and download grant tokens. Compliance officers remain blocked from file content access.
 - Viewer/editor/approver roles cannot call the packet endpoint unless they also have compliance/admin role.
+
+### AI-Ready Guardrails
+
+- Metadata-service exposes `GET /metadata/documents/:docId/ai-guardrails`.
+- Gateway proxies it at the same path.
+- The endpoint first applies `PolicyService.assertCanReadMetadata(...)`; users who cannot read metadata do not receive AI context decisions.
+- The response separates metadata-safe operations (`METADATA_CLASSIFICATION`, `METADATA_TAGGING`) from content operations (`CONTENT_SUMMARIZATION`, `CONTENT_QA`).
+- Compliance officers remain metadata-only for AI; content summarization and Q&A are denied because they would require file content access.
+- The response intentionally excludes file content, object keys, presigned URLs, preview grants, and download grants.
+- A successful guardrail evaluation emits `AI_GUARDRAILS_EVALUATED`.
+- Web document detail shows an AI guardrails card beside the DLP evidence so future AI features have visible RBAC/ACL/content boundaries before any LLM integration.
+
+### Policy Simulation and Access Impact
+
+- Metadata-service exposes `POST /documents/:docId/access-impact`.
+- Gateway proxies it at `POST /metadata/documents/:docId/access-impact` for owner editors and admins.
+- The endpoint simulates baseline role impact for a proposed classification change before metadata is mutated.
+- The response shows current/proposed classification, watermark posture, access expansion/reduction warnings, DLP override requirements, and role-level metadata/download deltas.
+- The response intentionally excludes real user enumeration, file content, object keys, presigned URLs, preview grants, and download grants.
+- A successful simulation emits `DOCUMENT_ACCESS_IMPACT_SIMULATED`.
+- Web document edit shows an access impact preview when the selected classification differs from the current classification, so risky downgrades are visible before submit. Backend authorization and DLP override enforcement remain authoritative.
 
 ## Demo Evidence Matrix
 
@@ -220,6 +245,8 @@ Gap-closure targeted evidence on 2026-05-30:
 - Audit pagination regression: `pnpm --filter web test -- audit.api.spec.ts` passed with 1 file and 2 tests after first failing because `queryAuditLogWindow` did not exist.
 - Shared auth/contracts cleanup: `pnpm --filter @docvault/auth build`, affected service builds for document/metadata/audit/workflow/notification, `pnpm --filter document-service test -- shared-rbac.spec.ts`, `pnpm --filter audit-service test`, `pnpm --filter metadata-service test -- app.controller.spec.ts`, gateway build/test, and OpenAPI `js-yaml` parse check passed.
 - W-P3 document risk scoring: `pnpm --filter audit-service test -- security-summary.spec.ts` first failed on missing `riskyDocuments`, then passed with 2 tests; `pnpm --filter web test -- security-dashboard.spec.ts` first failed on missing `riskScoring`, then passed with 7 tests. `pnpm --filter audit-service test`, `pnpm --filter audit-service build`, `pnpm --filter web test`, `pnpm --filter web exec tsc --noEmit`, and `pnpm --filter web build` passed.
+- W-P3 behavior anomaly detection: `pnpm --filter audit-service test -- security-summary.spec.ts` first failed on missing `behaviorSignals`, then passed with 3 tests; `pnpm --filter web test -- security-dashboard.spec.ts` first failed on missing `behaviorAnomalies`, then passed with 9 tests.
+- W-P3 AI-ready guardrails: `pnpm --filter metadata-service test -- policy.service.spec.ts` first failed on missing `getAiGuardrails`, `pnpm --filter gateway test -- metadata.proxy.controller.spec.ts` first failed on missing proxy method, and `pnpm --filter web test -- document-ai-guardrails-card.spec.ts` first failed on the missing component. After implementation all three targeted commands passed.
 
 Follow-up verification on 2026-05-31:
 
@@ -228,6 +255,9 @@ Follow-up verification on 2026-05-31:
 - Current focused verification passed: `pnpm --filter audit-service test -- security-summary.spec.ts`, `pnpm --filter web test -- security-dashboard.spec.ts`, OpenAPI `js-yaml` parse check, `pnpm --filter web exec tsc --noEmit`, affected service builds for metadata/audit/document/gateway/workflow/notification, and `pnpm --filter web build`.
 - `pnpm --filter web lint` passed with 0 errors and 5 existing warnings in data table, document form/table, `use-documents.ts`, and `auth-provider.tsx`.
 - `git diff --check` passed; Git only reported line-ending conversion warnings.
+- Behavior anomaly verification passed: `pnpm --filter audit-service test`, `pnpm --filter audit-service build`, `pnpm --filter web test`, `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web lint`, `pnpm --filter web build`, OpenAPI `js-yaml` parse check, and `pnpm test:e2e`. Web lint retained the same 5 existing warnings.
+- DLP admin override verification passed: `pnpm --filter metadata-service test`, `pnpm --filter metadata-service build`, `pnpm --filter web test`, `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web lint`, `pnpm --filter web build`, OpenAPI `js-yaml` parse check, and `git diff --check`. Web lint retained the same 5 existing warnings.
+- Access impact preview verification passed: `pnpm --filter metadata-service test -- policy.service.spec.ts`, `pnpm --filter gateway test -- metadata.proxy.controller.spec.ts`, and `pnpm --filter web test -- document-access-impact-card.spec.ts` first failed on missing methods/component, then passed after implementation. Follow-up checks passed: `pnpm --filter metadata-service test`, `pnpm --filter metadata-service build`, `pnpm --filter gateway test`, `pnpm --filter gateway build`, `pnpm --filter web test`, `pnpm --filter web exec tsc --noEmit`, `pnpm --filter web lint`, `pnpm --filter web build`, OpenAPI `js-yaml` parse check, and `git diff --check`. Web lint retained the same 5 existing warnings.
 
 Latest local Sprint 4A E2E evidence on 2026-05-30:
 

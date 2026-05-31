@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
@@ -46,7 +46,12 @@ export class AuditController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('compliance_officer', 'admin')
   @ApiOperation({ summary: 'Summarize security audit evidence' })
-  securitySummary() {
-    return this.auditService.securitySummary();
+  securitySummary(@Req() req: any) {
+    return this.auditService.securitySummary({
+      actorId: req.user?.username ?? req.user?.sub,
+      roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      ip: req.ip,
+      traceId: req.headers?.['x-trace-id'],
+    });
   }
 }

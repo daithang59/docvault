@@ -25,7 +25,9 @@ describe('AuditService security summary', () => {
       .spyOn(service, 'verifyChain')
       .mockResolvedValue({ valid: true, checked: 42 });
 
-    await expect(service.securitySummary()).resolves.toEqual({
+    const result = await service.securitySummary();
+
+    expect(result).toMatchObject({
       chain: { valid: true, checked: 42 },
       totals: {
         deniedEvents: 7,
@@ -37,6 +39,11 @@ describe('AuditService security summary', () => {
       riskyDocuments: [],
       behaviorSignals: [],
     });
+    expect(result.recommendations.map((recommendation) => recommendation.id)).toEqual([
+      'actor-access-review:repeated-deny:viewer-1',
+      'dlp-classification-review',
+      'malware-upload-review',
+    ]);
 
     expect(countDocuments).toHaveBeenCalledWith({ result: 'DENY' });
     expect(countDocuments).toHaveBeenCalledWith({
@@ -319,5 +326,252 @@ describe('AuditService security summary', () => {
         timestamp: 1,
       },
     );
+  });
+
+  it('generates deterministic recommendations from audit chain, DLP, risk, and anomaly evidence', async () => {
+    const countDocuments = jest.fn((filter: Record<string, unknown>) => {
+      if (filter.result === 'DENY') return Promise.resolve(4);
+      if (filter.action === 'MALWARE_UPLOAD_BLOCKED') return Promise.resolve(1);
+      if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(2);
+      if (filter.action === 'DOCUMENT_DOWNLOAD_DENIED') return Promise.resolve(3);
+      return Promise.resolve(0);
+    });
+    const aggregateExec = jest.fn().mockResolvedValue([
+      { actorId: 'viewer-1', denyCount: 4 },
+    ]);
+    const riskFindLean = jest.fn().mockResolvedValue([
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:00:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'approver-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:05:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:10:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:15:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret' },
+      },
+    ]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([
+      {
+        action: 'DOCUMENT_DOWNLOAD_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:01:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret' },
+      },
+      {
+        action: 'DOCUMENT_METADATA_READ_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-2',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:02:00.000Z'),
+        metadata: { docId: 'doc-secret-2' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_DENIED',
+        actorId: 'viewer-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-3',
+        result: 'DENY',
+        timestamp: new Date('2026-05-30T10:03:00.000Z'),
+        metadata: { docId: 'doc-secret-3' },
+      },
+    ]);
+    const makeFindChain = (lean: jest.Mock) => {
+      const limit = jest.fn().mockReturnValue({ lean });
+      const sort = jest.fn().mockReturnValue({ limit });
+      return { sort, limit };
+    };
+    const riskFind = makeFindChain(riskFindLean);
+    const behaviorFind = makeFindChain(behaviorFindLean);
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(riskFind)
+      .mockReturnValueOnce(behaviorFind);
+    const service = new AuditService({
+      countDocuments,
+      find,
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    jest.spyOn(service, 'verifyChain').mockResolvedValue({
+      valid: false,
+      checked: 12,
+      firstBrokenIndex: 11,
+      message: 'Hash mismatch at event index 11',
+    });
+
+    const result = await service.securitySummary();
+
+    expect(result.recommendations).toEqual([
+      {
+        id: 'audit-chain-review',
+        type: 'AUDIT_CHAIN_REVIEW',
+        severity: 'critical',
+        title: 'Verify audit-chain integrity before exporting evidence',
+        reason: 'Hash mismatch at event index 11',
+        recommendedAction:
+          'Run tamper-evidence verification, isolate the audit store, and compare the broken event with trusted backups.',
+        evidence: ['12 audit events checked'],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: {},
+      },
+      {
+        id: 'document-access-review:doc-secret',
+        type: 'DOCUMENT_ACCESS_REVIEW',
+        severity: 'critical',
+        title: 'Tighten access for high-risk SECRET document',
+        reason:
+          'Document doc-secret reached risk score 95 from classification and access metadata.',
+        recommendedAction:
+          'Review ACLs, confirm business need for recent grants, and keep watermark-required delivery for sensitive content.',
+        evidence: [
+          'SECRET classification',
+          '4 successful preview/download grants',
+          '2 distinct actors',
+          '2 download grants',
+        ],
+        affectedDocumentIds: ['doc-secret'],
+        affectedActorIds: [],
+        auditFilters: { documentId: 'doc-secret' },
+      },
+      {
+        id: 'actor-access-review:DENY_BURST:viewer-1',
+        type: 'ACTOR_ACCESS_REVIEW',
+        severity: 'warning',
+        title: 'Investigate denied access burst for viewer-1',
+        reason:
+          'Actor viewer-1 triggered DENY_BURST with score 58 across 3 documents.',
+        recommendedAction:
+          'Inspect role, group membership, and ACL assignments before broadening access.',
+        evidence: ['3 denied security events', '3 distinct documents'],
+        affectedDocumentIds: [],
+        affectedActorIds: ['viewer-1'],
+        auditFilters: { actorId: 'viewer-1' },
+      },
+      {
+        id: 'dlp-classification-review',
+        type: 'DLP_CLASSIFICATION_REVIEW',
+        severity: 'warning',
+        title: 'Review DLP-driven classification controls',
+        reason: '2 DLP detection events were recorded in the audit summary.',
+        recommendedAction:
+          'Confirm classification escalation, verify override reasons, and block unsafe downgrade paths.',
+        evidence: ['2 DLP detection events'],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+      },
+      {
+        id: 'malware-upload-review',
+        type: 'MALWARE_UPLOAD_REVIEW',
+        severity: 'warning',
+        title: 'Review blocked malware upload attempts',
+        reason: '1 malware upload attempt was blocked before object storage.',
+        recommendedAction:
+          'Review source actor, checksum, filename, and endpoint context for the blocked upload.',
+        evidence: ['1 malware upload blocked'],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+      },
+    ]);
+  });
+
+  it('audits recommendation views without exposing file content or grant data', async () => {
+    const countDocuments = jest.fn((filter: Record<string, unknown>) => {
+      if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(1);
+      return Promise.resolve(0);
+    });
+    const aggregateExec = jest.fn().mockResolvedValue([]);
+    const riskFindLean = jest.fn().mockResolvedValue([]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([]);
+    const makeFindChain = (lean: jest.Mock) => {
+      const limit = jest.fn().mockReturnValue({ lean });
+      const sort = jest.fn().mockReturnValue({ limit });
+      return { sort, limit };
+    };
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(makeFindChain(riskFindLean))
+      .mockReturnValueOnce(makeFindChain(behaviorFindLean));
+    const create = jest.fn().mockResolvedValue({
+      toObject: () => ({ eventId: 'event-recommendations-viewed' }),
+    });
+    const service = new AuditService({
+      countDocuments,
+      find,
+      findOne: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ hash: 'previous-hash' }),
+        }),
+      }),
+      create,
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    const createEvent = jest.spyOn(service, 'create');
+    jest
+      .spyOn(service, 'verifyChain')
+      .mockResolvedValue({ valid: true, checked: 42 });
+
+    await service.securitySummary({
+      actorId: 'co1',
+      roles: ['compliance_officer'],
+      ip: '127.0.0.1',
+      traceId: 'trace-1',
+    });
+
+    expect(createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'co1',
+        actorRoles: ['compliance_officer'],
+        action: 'SECURITY_RECOMMENDATIONS_VIEWED',
+        resourceType: 'AUDIT',
+        result: 'SUCCESS',
+        timestamp: expect.any(String),
+        ip: '127.0.0.1',
+        traceId: 'trace-1',
+        metadata: expect.objectContaining({
+          recommendationCount: 1,
+          recommendationIds: ['dlp-classification-review'],
+          criticalCount: 0,
+          warningCount: 1,
+        }),
+      }),
+    );
+    const metadata = create.mock.calls[0][0].metadata;
+    expect(JSON.stringify(metadata)).not.toContain('objectKey');
+    expect(JSON.stringify(metadata)).not.toContain('grantToken');
+    expect(JSON.stringify(metadata)).not.toContain('presigned');
+    expect(JSON.stringify(metadata)).not.toContain('content');
   });
 });

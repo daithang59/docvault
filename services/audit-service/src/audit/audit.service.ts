@@ -52,6 +52,42 @@ export interface BehaviorSignalSummary {
   reasons: string[];
 }
 
+export type SecurityRecommendationType =
+  | 'AUDIT_CHAIN_REVIEW'
+  | 'DLP_CLASSIFICATION_REVIEW'
+  | 'MALWARE_UPLOAD_REVIEW'
+  | 'DOCUMENT_ACCESS_REVIEW'
+  | 'ACTOR_ACCESS_REVIEW';
+
+export type SecurityRecommendationSeverity = 'critical' | 'warning' | 'info';
+
+export interface SecurityRecommendationSummary {
+  id: string;
+  type: SecurityRecommendationType;
+  severity: SecurityRecommendationSeverity;
+  title: string;
+  reason: string;
+  recommendedAction: string;
+  evidence: string[];
+  affectedDocumentIds: string[];
+  affectedActorIds: string[];
+  auditFilters: {
+    actorId?: string;
+    action?: string;
+    result?: string;
+    resourceType?: string;
+    resourceId?: string;
+    documentId?: string;
+  };
+}
+
+export interface SecuritySummaryViewer {
+  actorId?: string;
+  roles?: string[];
+  ip?: string;
+  traceId?: string;
+}
+
 interface RiskBucket {
   documentId: string;
   classification: string;
@@ -182,7 +218,7 @@ export class AuditService {
     return { data, total, page, pageSize };
   }
 
-  async securitySummary(): Promise<{
+  async securitySummary(viewer?: SecuritySummaryViewer): Promise<{
     chain: Awaited<ReturnType<AuditService['verifyChain']>>;
     totals: {
       deniedEvents: number;
@@ -193,6 +229,7 @@ export class AuditService {
     repeatedDenyActors: Array<{ actorId: string; denyCount: number }>;
     riskyDocuments: RiskyDocumentSummary[];
     behaviorSignals: BehaviorSignalSummary[];
+    recommendations: SecurityRecommendationSummary[];
   }> {
     const [
       chain,
@@ -214,7 +251,7 @@ export class AuditService {
       this.getBehaviorSignals(),
     ]);
 
-    return {
+    const summary = {
       chain,
       totals: {
         deniedEvents,
@@ -225,7 +262,23 @@ export class AuditService {
       repeatedDenyActors,
       riskyDocuments,
       behaviorSignals,
+      recommendations: this.buildSecurityRecommendations({
+        chain,
+        totals: {
+          deniedEvents,
+          malwareBlocked,
+          dlpDetections,
+          downloadDenied,
+        },
+        repeatedDenyActors,
+        riskyDocuments,
+        behaviorSignals,
+      }),
     };
+
+    await this.recordRecommendationView(viewer, summary.recommendations);
+
+    return summary;
   }
 
   /**
@@ -569,6 +622,222 @@ export class AuditService {
     if (riskScore >= 80) return 'critical';
     if (riskScore >= 50) return 'warning';
     return 'watch';
+  }
+
+  private buildSecurityRecommendations(input: {
+    chain: Awaited<ReturnType<AuditService['verifyChain']>>;
+    totals: {
+      deniedEvents: number;
+      malwareBlocked: number;
+      dlpDetections: number;
+      downloadDenied: number;
+    };
+    repeatedDenyActors: Array<{ actorId: string; denyCount: number }>;
+    riskyDocuments: RiskyDocumentSummary[];
+    behaviorSignals: BehaviorSignalSummary[];
+  }): SecurityRecommendationSummary[] {
+    const recommendations: SecurityRecommendationSummary[] = [];
+
+    if (input.chain.valid === false) {
+      recommendations.push({
+        id: 'audit-chain-review',
+        type: 'AUDIT_CHAIN_REVIEW',
+        severity: 'critical',
+        title: 'Verify audit-chain integrity before exporting evidence',
+        reason:
+          input.chain.message ??
+          'Audit hash-chain verification reported an integrity mismatch.',
+        recommendedAction:
+          'Run tamper-evidence verification, isolate the audit store, and compare the broken event with trusted backups.',
+        evidence: [
+          `${input.chain.checked} audit ${this.plural(input.chain.checked, 'event')} checked`,
+        ],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: {},
+      });
+    }
+
+    for (const document of input.riskyDocuments) {
+      if (document.riskScore < 50) continue;
+
+      const severity: SecurityRecommendationSeverity =
+        document.riskScore >= 80 ? 'critical' : 'warning';
+      recommendations.push({
+        id: `document-access-review:${document.documentId}`,
+        type: 'DOCUMENT_ACCESS_REVIEW',
+        severity,
+        title:
+          severity === 'critical'
+            ? `Tighten access for high-risk ${document.classification} document`
+            : `Review access for elevated-risk ${document.classification} document`,
+        reason: `Document ${document.documentId} reached risk score ${document.riskScore} from classification and access metadata.`,
+        recommendedAction:
+          'Review ACLs, confirm business need for recent grants, and keep watermark-required delivery for sensitive content.',
+        evidence: document.reasons,
+        affectedDocumentIds: [document.documentId],
+        affectedActorIds: [],
+        auditFilters: { documentId: document.documentId },
+      });
+    }
+
+    const actorRecommendationKeys = new Set<string>();
+
+    for (const signal of input.behaviorSignals) {
+      if (signal.riskScore < 50) continue;
+
+      actorRecommendationKeys.add(`${signal.type}:${signal.actorId}`);
+      recommendations.push({
+        id: `actor-access-review:${signal.type}:${signal.actorId}`,
+        type: 'ACTOR_ACCESS_REVIEW',
+        severity:
+          signal.severity === 'critical'
+            ? 'critical'
+            : signal.severity === 'warning'
+              ? 'warning'
+              : 'info',
+        title: this.getBehaviorRecommendationTitle(signal),
+        reason: `Actor ${signal.actorId} triggered ${signal.type} with score ${signal.riskScore} across ${signal.documentCount} ${this.plural(signal.documentCount, 'document')}.`,
+        recommendedAction: this.getBehaviorRecommendationAction(signal.type),
+        evidence: signal.reasons,
+        affectedDocumentIds: [],
+        affectedActorIds: [signal.actorId],
+        auditFilters: { actorId: signal.actorId },
+      });
+    }
+
+    for (const actor of input.repeatedDenyActors) {
+      if (actorRecommendationKeys.has(`DENY_BURST:${actor.actorId}`)) continue;
+
+      recommendations.push({
+        id: `actor-access-review:repeated-deny:${actor.actorId}`,
+        type: 'ACTOR_ACCESS_REVIEW',
+        severity: 'warning',
+        title: `Review repeated denied access for ${actor.actorId}`,
+        reason: `Actor ${actor.actorId} has ${actor.denyCount} denied audit events.`,
+        recommendedAction:
+          'Inspect role, group membership, and ACL assignments before broadening access.',
+        evidence: [
+          `${actor.denyCount} denied ${this.plural(actor.denyCount, 'event')}`,
+        ],
+        affectedDocumentIds: [],
+        affectedActorIds: [actor.actorId],
+        auditFilters: { actorId: actor.actorId },
+      });
+    }
+
+    if (input.totals.dlpDetections > 0) {
+      recommendations.push({
+        id: 'dlp-classification-review',
+        type: 'DLP_CLASSIFICATION_REVIEW',
+        severity: 'warning',
+        title: 'Review DLP-driven classification controls',
+        reason: `${input.totals.dlpDetections} DLP detection ${this.plural(input.totals.dlpDetections, 'event')} ${this.wasWere(input.totals.dlpDetections)} recorded in the audit summary.`,
+        recommendedAction:
+          'Confirm classification escalation, verify override reasons, and block unsafe downgrade paths.',
+        evidence: [
+          `${input.totals.dlpDetections} DLP detection ${this.plural(input.totals.dlpDetections, 'event')}`,
+        ],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+      });
+    }
+
+    if (input.totals.malwareBlocked > 0) {
+      recommendations.push({
+        id: 'malware-upload-review',
+        type: 'MALWARE_UPLOAD_REVIEW',
+        severity: 'warning',
+        title: 'Review blocked malware upload attempts',
+        reason: `${input.totals.malwareBlocked} malware upload ${this.plural(input.totals.malwareBlocked, 'attempt')} ${input.totals.malwareBlocked === 1 ? 'was' : 'were'} blocked before object storage.`,
+        recommendedAction:
+          'Review source actor, checksum, filename, and endpoint context for the blocked upload.',
+        evidence: [
+          `${input.totals.malwareBlocked} malware ${this.plural(input.totals.malwareBlocked, 'upload')} blocked`,
+        ],
+        affectedDocumentIds: [],
+        affectedActorIds: [],
+        auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+      });
+    }
+
+    return recommendations.slice(0, 8);
+  }
+
+  private async recordRecommendationView(
+    viewer: SecuritySummaryViewer | undefined,
+    recommendations: SecurityRecommendationSummary[],
+  ): Promise<void> {
+    if (!viewer?.actorId) return;
+
+    const recommendationIds = recommendations.map(
+      (recommendation) => recommendation.id,
+    );
+    const criticalCount = recommendations.filter(
+      (recommendation) => recommendation.severity === 'critical',
+    ).length;
+    const warningCount = recommendations.filter(
+      (recommendation) => recommendation.severity === 'warning',
+    ).length;
+
+    await this.create({
+      timestamp: new Date().toISOString(),
+      actorId: viewer.actorId,
+      actorRoles: viewer.roles ?? [],
+      action: 'SECURITY_RECOMMENDATIONS_VIEWED',
+      resourceType: 'AUDIT',
+      result: 'SUCCESS',
+      ip: viewer.ip,
+      traceId: viewer.traceId,
+      metadata: {
+        recommendationCount: recommendations.length,
+        recommendationIds,
+        criticalCount,
+        warningCount,
+        recommendationTypes: Array.from(
+          new Set(
+            recommendations.map((recommendation) => recommendation.type),
+          ),
+        ),
+        auditFilters: recommendations.map((recommendation) => ({
+          id: recommendation.id,
+          filters: recommendation.auditFilters,
+        })),
+      },
+    });
+  }
+
+  private getBehaviorRecommendationTitle(signal: BehaviorSignalSummary): string {
+    switch (signal.type) {
+      case 'MASS_CONTENT_ACCESS':
+        return `Review mass content access by ${signal.actorId}`;
+      case 'DENY_BURST':
+        return `Investigate denied access burst for ${signal.actorId}`;
+      case 'DESTRUCTIVE_ACTIVITY':
+        return `Review destructive document activity by ${signal.actorId}`;
+    }
+  }
+
+  private getBehaviorRecommendationAction(
+    type: BehaviorSignalType,
+  ): string {
+    switch (type) {
+      case 'MASS_CONTENT_ACCESS':
+        return 'Confirm business need, inspect document spread, and tighten ACLs for sensitive documents.';
+      case 'DENY_BURST':
+        return 'Inspect role, group membership, and ACL assignments before broadening access.';
+      case 'DESTRUCTIVE_ACTIVITY':
+        return 'Review workflow history, validate retention intent, and restore documents if activity was unauthorized.';
+    }
+  }
+
+  private plural(count: number, singular: string): string {
+    return count === 1 ? singular : `${singular}s`;
+  }
+
+  private wasWere(count: number): string {
+    return count === 1 ? 'was' : 'were';
   }
 
   private isDeniedSecurityEvent(event: {

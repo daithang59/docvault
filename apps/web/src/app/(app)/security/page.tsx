@@ -10,6 +10,7 @@ import {
   Eye,
   ExternalLink,
   FileWarning,
+  Lightbulb,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -244,6 +245,10 @@ export default function SecurityPage() {
         />
       </section>
 
+      <section className="mt-4">
+        <RecommendationsPanel recommendations={model.recommendations} />
+      </section>
+
       <section className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
         <AccessActivityPanel
           activity={model.activity}
@@ -257,6 +262,133 @@ export default function SecurityPage() {
         <RiskScoringPanel riskScoring={model.riskScoring} />
         <BehaviorAnomaliesPanel behaviorAnomalies={model.behaviorAnomalies} />
       </section>
+    </div>
+  );
+}
+
+function RecommendationsPanel({
+  recommendations,
+}: {
+  recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
+}) {
+  const items = recommendations.items;
+
+  return (
+    <div
+      className="rounded-lg border p-5"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex items-center gap-2">
+            <Lightbulb className="h-4 w-4 text-[var(--text-faint)]" />
+            <p className="text-sm font-semibold text-[var(--text-strong)]">
+              Security recommendations
+            </p>
+          </div>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Deterministic actions from audit-chain, DLP, malware, risk scoring,
+            and behavior anomaly evidence.
+          </p>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          No file content
+        </span>
+      </div>
+
+      {items.length === 0 ? (
+        <p className="mt-4 text-sm text-[var(--text-muted)]">
+          No recommendation is raised by the current security summary.
+        </p>
+      ) : (
+        <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          {items.map((item) => {
+            const tone = getRecommendationTone(item.severity);
+            return (
+              <div
+                key={item.id}
+                className="rounded-lg border p-4"
+                style={{
+                  borderColor: tone.border,
+                  background: tone.bg,
+                }}
+              >
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="min-w-0">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span
+                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                        style={{ color: tone.text, background: tone.badgeBg }}
+                      >
+                        {item.severityLabel}
+                      </span>
+                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                        {item.typeLabel}
+                      </span>
+                    </div>
+                    <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                      {item.title}
+                    </h3>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                      {item.reason}
+                    </p>
+                  </div>
+                  <Link
+                    href={buildRecommendationAuditHref(item.auditFilters)}
+                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                  >
+                    Open audit
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </div>
+
+                <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                      Recommended action
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                      {item.recommendedAction}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                      Evidence
+                    </p>
+                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                      {item.evidence.join(' · ')}
+                    </p>
+                  </div>
+                </div>
+
+                {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
+                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+                    {item.affectedDocumentIds.map((docId) => (
+                      <span
+                        key={docId}
+                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                      >
+                        doc {truncateMiddle(docId, 18)}
+                      </span>
+                    ))}
+                    {item.affectedActorIds.map((actorId) => (
+                      <span
+                        key={actorId}
+                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                      >
+                        actor {truncateMiddle(actorId, 18)}
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 }
@@ -859,4 +991,38 @@ function getRiskTone(riskBand: 'critical' | 'warning' | 'watch') {
     text: 'var(--text-muted)',
     badgeBg: 'var(--bg-subtle)',
   };
+}
+
+function getRecommendationTone(severity: 'critical' | 'warning' | 'info') {
+  if (severity === 'critical') {
+    return {
+      bg: 'var(--state-error-bg)',
+      border: 'var(--state-error-border)',
+      text: 'var(--state-error-text)',
+      badgeBg: 'var(--bg-card)',
+    };
+  }
+
+  if (severity === 'warning') {
+    return {
+      bg: 'var(--status-pending-bg)',
+      border: 'var(--status-pending-border)',
+      text: 'var(--status-pending-text)',
+      badgeBg: 'var(--bg-card)',
+    };
+  }
+
+  return {
+    bg: 'var(--bg-card)',
+    border: 'var(--border-soft)',
+    text: 'var(--text-muted)',
+    badgeBg: 'var(--bg-subtle)',
+  };
+}
+
+function buildRecommendationAuditHref(
+  filters: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number]['auditFilters'],
+): string {
+  const query = buildAuditFilterQuery(filters);
+  return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
 }

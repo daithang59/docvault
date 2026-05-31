@@ -411,7 +411,8 @@ components:
             DOCUMENT_AUTO_ARCHIVED,
             MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
             DLP_CLASSIFICATION_OVERRIDE_APPROVED,
-            DOCUMENT_ACCESS_IMPACT_SIMULATED, AI_GUARDRAILS_EVALUATED,
+            DOCUMENT_ACCESS_IMPACT_SIMULATED, SECURITY_RECOMMENDATIONS_VIEWED,
+            AI_GUARDRAILS_EVALUATED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
         resourceType: { type: string }
@@ -478,6 +479,45 @@ components:
           type: array
           items: { type: string }
 
+    SecurityRecommendationSummary:
+      type: object
+      description: Deterministic, audit-metadata-only security recommendation.
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum:
+            - AUDIT_CHAIN_REVIEW
+            - DLP_CLASSIFICATION_REVIEW
+            - MALWARE_UPLOAD_REVIEW
+            - DOCUMENT_ACCESS_REVIEW
+            - ACTOR_ACCESS_REVIEW
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        title: { type: string }
+        reason: { type: string }
+        recommendedAction: { type: string }
+        evidence:
+          type: array
+          items: { type: string }
+        affectedDocumentIds:
+          type: array
+          items: { type: string }
+        affectedActorIds:
+          type: array
+          items: { type: string }
+        auditFilters:
+          type: object
+          description: Audit query filters for opening scoped evidence without exposing file content.
+          properties:
+            actorId: { type: string }
+            action: { type: string }
+            result: { $ref: '#/components/schemas/AuditEventResult' }
+            resourceType: { type: string }
+            resourceId: { type: string }
+            documentId: { type: string }
+
     SecuritySummary:
       type: object
       properties:
@@ -504,6 +544,10 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/BehaviorSignalSummary'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SecurityRecommendationSummary'
 
     ComplianceEvidencePacket:
       type: object
