@@ -1,7 +1,24 @@
-import { describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaginatedResponse } from '@/types/pagination';
 import type { AuditLogEntry, AuditQueryFilters } from './audit.types';
-import { queryAuditLogWindow } from './audit.api';
+import {
+  queryAuditLogWindow,
+  updateSecurityRecommendationWorkflow,
+} from './audit.api';
+
+const apiClientMock = vi.hoisted(() => ({
+  get: vi.fn(),
+  patch: vi.fn(),
+}));
+
+vi.mock('@/lib/api/client', () => ({
+  default: apiClientMock,
+}));
+
+beforeEach(() => {
+  apiClientMock.get.mockReset();
+  apiClientMock.patch.mockReset();
+});
 
 function auditEvent(eventId: string): AuditLogEntry {
   return {
@@ -71,5 +88,36 @@ describe('queryAuditLogWindow', () => {
         },
       ),
     ).rejects.toThrow('Audit window exceeds 2 pages');
+  });
+});
+
+describe('updateSecurityRecommendationWorkflow', () => {
+  it('patches the recommendation workflow endpoint and unwraps the audit event', async () => {
+    apiClientMock.patch.mockResolvedValue({
+      data: {
+        eventId: 'event-recommendation-updated',
+        action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+      },
+    });
+
+    const result = await updateSecurityRecommendationWorkflow(
+      'actor-access-review:DENY_BURST:viewer-1',
+      {
+        status: 'INVESTIGATING',
+        note: 'Checking role and group membership',
+      },
+    );
+
+    expect(apiClientMock.patch).toHaveBeenCalledWith(
+      '/audit/security-recommendations/actor-access-review%3ADENY_BURST%3Aviewer-1/workflow',
+      {
+        status: 'INVESTIGATING',
+        note: 'Checking role and group membership',
+      },
+    );
+    expect(result).toEqual({
+      eventId: 'event-recommendation-updated',
+      action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+    });
   });
 });

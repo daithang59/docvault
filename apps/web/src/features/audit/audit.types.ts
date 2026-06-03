@@ -79,6 +79,29 @@ export type SecurityRecommendationType =
   | 'DOCUMENT_ACCESS_REVIEW'
   | 'ACTOR_ACCESS_REVIEW';
 
+export type SecurityRecommendationWorkflowStatus =
+  | 'OPEN'
+  | 'INVESTIGATING'
+  | 'REVIEWED'
+  | 'RESOLVED';
+
+export interface SecurityRecommendationWorkflow {
+  status: SecurityRecommendationWorkflowStatus;
+  note?: string | null;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
+}
+
+export type SecurityRecommendationWorkflowSummary = SecurityRecommendationWorkflow;
+
+export interface SecurityRecommendationWorkflowRequest {
+  status: SecurityRecommendationWorkflowStatus;
+  note?: string;
+}
+
+export type UpdateSecurityRecommendationWorkflowRequest =
+  SecurityRecommendationWorkflowRequest;
+
 export interface SecurityRecommendationSummary {
   id: string;
   type: SecurityRecommendationType;
@@ -90,6 +113,7 @@ export interface SecurityRecommendationSummary {
   affectedDocumentIds: string[];
   affectedActorIds: string[];
   auditFilters: AuditQueryFilters;
+  workflow?: SecurityRecommendationWorkflow;
 }
 
 export interface SecuritySummary {

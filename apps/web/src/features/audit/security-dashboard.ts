@@ -3,6 +3,7 @@ import type {
   AuditQueryFilters,
   BehaviorSignalSummary,
   RiskyDocumentSummary,
+  SecurityRecommendationWorkflow,
   SecurityRecommendationSummary,
   SecuritySummary,
 } from './audit.types';
@@ -38,7 +39,9 @@ export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
   auditFilters: AuditQueryFilters;
 }
 
-export interface SecurityRecommendationRow extends SecurityRecommendationSummary {
+export interface SecurityRecommendationRow
+  extends Omit<SecurityRecommendationSummary, 'workflow'> {
+  workflow: SecurityRecommendationWorkflow;
   severityLabel: string;
   typeLabel: string;
   auditFilters: AuditQueryFilters;
@@ -313,6 +316,7 @@ function buildRecommendationRows(
       severityLabel: getRecommendationSeverityLabel(recommendation.severity),
       typeLabel: getRecommendationTypeLabel(recommendation.type),
       auditFilters: recommendation.auditFilters ?? {},
+      workflow: recommendation.workflow ?? { status: 'OPEN' },
     }));
 }
 

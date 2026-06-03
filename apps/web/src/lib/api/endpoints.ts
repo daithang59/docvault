@@ -43,6 +43,8 @@ export const apiEndpoints = {
     query: '/audit/query',
     verifyChain: '/audit/verify-chain',
     securitySummary: '/audit/security-summary',
+    securityRecommendationWorkflow: (id: string) =>
+      `/audit/security-recommendations/${encodeURIComponent(id)}/workflow`,
   },
 } as const;
 

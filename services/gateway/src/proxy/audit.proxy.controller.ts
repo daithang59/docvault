@@ -3,6 +3,8 @@ import {
   Controller,
   ForbiddenException,
   Get,
+  Param,
+  Patch,
   Post,
   Query,
   Req,
@@ -127,6 +129,28 @@ export class AuditProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.AUDIT_SERVICE_URL}/audit/security-summary`,
+    });
+    return response.data;
+  }
+
+  /** Update recommendation investigation workflow state. */
+  @Patch('security-recommendations/:id/workflow')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Update security recommendation workflow state',
+    description:
+      'Appends an audit event for recommendation status and investigation note updates. File content, object keys, presigned URLs, and grant tokens must not be included.',
+  })
+  async updateSecurityRecommendationWorkflow(
+    @Req() req: any,
+    @Param('id') id: string,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'PATCH',
+      url: `${process.env.AUDIT_SERVICE_URL}/audit/security-recommendations/${encodeURIComponent(id)}/workflow`,
+      data: body,
     });
     return response.data;
   }

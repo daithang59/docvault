@@ -1,76 +1,76 @@
-# Tong hop Web Runtime da trien khai va huong dan kiem thu
+# Tổng hợp Web Runtime đã triển khai và hướng dẫn kiểm thử
 
-Ngay lap: 2026-05-31
+Ngày lập: 2026-05-31
 
-Pham vi: tai lieu nay chi tong hop cac cai tien **Web App / runtime security** cua DocVault. Khong bao gom DevSecOps pipeline, GitOps, registry, Kubernetes policy, Jenkins, ArgoCD hay cac hang muc ha tang pipeline.
+Phạm vi: tài liệu này chỉ tổng hợp các cải tiến Web App / runtime security của DocVault. Không bao gồm DevSecOps pipeline, GitOps, registry, Kubernetes policy, Jenkins, ArgoCD hay các hạng mục hạ tầng pipeline.
 
-Nguon doi chieu:
+Nguồn đối chiếu:
 
 - `docs/ke_hoach_uu_tien_cai_thien_docvault_theo_gop_y_gvhd.md`
 - `docs/tong_hop_gop_y_docvault_webapp_devsecops_v2.md`
 - `docs/web-security-evidence.md`
 - `docs/web-key-rotation-and-mfa-runbook.md`
 
-## 1. Tong quan ket qua
+## 1. Tổng quan kết quả
 
-DocVault da duoc nang cap tu mot web app quan ly tai lieu co upload/download thanh mot he thong quan ly tai lieu bao mat co cac lop kiem soat sau:
+DocVault đã được nâng cấp từ một web app quản lý tài liệu có upload/download thành một hệ thống quản lý tài liệu bảo mật có các lớp kiểm soát sau:
 
-- Kiem soat truy cap theo RBAC + ACL + trang thai tai lieu + classification.
-- Compliance Officer co the kiem toan metadata/audit nhung khong duoc xem noi dung file.
-- Download/preview nhay cam di qua grant token ngan han, co ho tro key rotation bang `kid`.
-- Audit event co trust boundary service-to-service va hash-chain de phat hien sua log.
-- Upload file co malware scan va DLP scan truoc/sau khi luu metadata.
-- Tai lieu nhay cam bi han che presigned URL truc tiep, uu tien stream qua service de watermark.
-- Retention/records management co truong du lieu, endpoint, audit va workflow history.
-- Security dashboard tong hop deny, malware, DLP, audit-chain, risk scoring, behavior anomaly va recommendation.
-- AI-ready guardrails xac dinh ro metadata-safe va content-denied operations truoc khi tich hop LLM that.
-- Access impact preview giup thay doi classification co canh bao truoc khi submit.
-- One-click compliance evidence packet de xuat goi bang chung cho tung document.
+- Kiểm soát truy cập theo RBAC + ACL + trạng thái tài liệu + classification.
+- Compliance Officer có thể kiểm toán metadata/audit nhưng không được xem nội dung file.
+- Download/preview nhạy cảm đi qua grant token ngắn hạn, có hỗ trợ key rotation bằng `kid`.
+- Audit event có trust boundary service-to-service và hash-chain để phát hiện sửa log.
+- Upload file có malware scan và DLP scan trước/sau khi lưu metadata.
+- Tài liệu nhạy cảm bị hạn chế presigned URL trực tiếp, ưu tiên stream qua service để watermark.
+- Retention/records management có trường dữ liệu, endpoint, audit và workflow history.
+- Security dashboard tổng hợp deny, malware, DLP, audit-chain, risk scoring, behavior anomaly và recommendation.
+- AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
+- Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
+- One-click compliance evidence packet để xuất gói bằng chứng cho từng document.
 
-Uoc luong theo ke hoach Web App: **khoang 90-93% hoan thanh**. Cac hang muc bat buoc cho demo bao mat web app da co code va test; phan con lai chu yeu la chup evidence, polish bao cao va cac nang cap AI/enterprise that su.
+Ước lượng theo kế hoạch Web App: khoảng 90-93% hoàn thành. Các hạng mục bắt buộc cho demo bảo mật web app đã có code và test; phần còn lại chủ yếu là chụp evidence, polish báo cáo và các nâng cấp AI/enterprise thật sự.
 
-## 2. Bang doi chieu hang muc da lam
+## 2. Bảng đối chiếu hạng mục đã làm
 
-| Ma muc | Noi dung | Trang thai | Bang chung chinh |
-| --- | --- | --- | --- |
-| W-P0.1 | Secret/key lifecycle, MFA, grant token rotation | Gan xong | `docs/web-key-rotation-and-mfa-runbook.md`, grant token env `GRANT_TOKEN_CURRENT_KID` / `GRANT_TOKEN_PREVIOUS_KID` |
-| W-P0.2 | RBAC + ACL + status + classification policy | Gan xong | `services/metadata-service/src/policy/policy.service.ts`, `apps/web/src/lib/auth/permissions.ts` |
+| Mã mục | Nội dung | Trạng thái | Bằng chứng chính |
+|---|---|---|---|
+| W-P0.1 | Secret/key lifecycle, MFA, grant token rotation | Gần xong | `docs/web-key-rotation-and-mfa-runbook.md`, grant token env `GRANT_TOKEN_CURRENT_KID` / `GRANT_TOKEN_PREVIOUS_KID` |
+| W-P0.2 | RBAC + ACL + status + classification policy | Gần xong | `services/metadata-service/src/policy/policy.service.ts`, `apps/web/src/lib/auth/permissions.ts` |
 | W-P0.3 | Audit ingestion trust boundary | Xong | `services/audit-service/src/auth/service-token.guard.ts` |
-| W-P0.4 | Audit hash-chain tamper evidence | Gan xong | `GET /audit/verify-chain`, audit tamper demo script |
-| W-P0.5 | E2E security evidence | Gan xong | `scripts/e2e-check.mjs`, `pnpm test:e2e` |
-| W-P1.1 | Malware scan upload | Gan xong | `services/document-service/src/security/malware-scanner.service.ts` |
-| W-P1.2 | DLP va classification policy | Gan xong | DLP state, downgrade guard, admin override audit |
-| W-P1.3 | Encryption at rest va presigned URL posture | Du cho MVP | MinIO SSE, sensitive stream-only download |
+| W-P0.4 | Audit hash-chain tamper evidence | Gần xong | `GET /audit/verify-chain`, audit tamper demo script |
+| W-P0.5 | E2E security evidence | Gần xong | `scripts/e2e-check.mjs`, `pnpm test:e2e` |
+| W-P1.1 | Malware scan upload | Gần xong | `services/document-service/src/security/malware-scanner.service.ts` |
+| W-P1.2 | DLP và classification policy | Gần xong | DLP state, downgrade guard, admin override audit |
+| W-P1.3 | Encryption at rest và presigned URL posture | Đủ cho MVP | MinIO SSE, sensitive stream-only download |
 | W-P1.4 | Security dashboard | Xong | `apps/web/src/app/(app)/security/page.tsx` |
-| W-P1.5 | Retention / records management | Gan xong | `/metadata/retention/documents`, `/metadata/retention/run` |
-| W-P2.1 | Shared auth/contracts | Mot phan lon | `@docvault/auth/rbac`, OpenAPI gateway contract |
-| W-P3 | AI-ready / future security intelligence | AI-ready da manh, chua co LLM that | AI guardrails, access impact, risk scoring, anomaly, recommendation |
+| W-P1.5 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
+| W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
+| W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
-## 3. Cac tinh nang moi va y nghia
+## 3. Các tính năng mới và ý nghĩa
 
-### 3.1. Secret, grant token va key rotation
+### 3.1. Secret, grant token và key rotation
 
-**Da lam**
+**Đã làm**
 
-- `DOWNLOAD_GRANT_SECRET` va `PREVIEW_GRANT_SECRET` khong con fallback hard-code.
-- Metadata-service ky grant token cho download/preview.
-- Document-service verify grant token truoc khi stream/download.
-- Co co che zero-downtime rotation bang:
+- `DOWNLOAD_GRANT_SECRET` và `PREVIEW_GRANT_SECRET` không còn fallback hard-code.
+- Metadata-service ký grant token cho download/preview.
+- Document-service verify grant token trước khi stream/download.
+- Có cơ chế zero-downtime rotation bằng:
   - `GRANT_TOKEN_CURRENT_KID`
   - `GRANT_TOKEN_PREVIOUS_KID`
   - `DOWNLOAD_GRANT_SECRET_<kid>`
   - `PREVIEW_GRANT_SECRET_<kid>`
-- Co runbook MFA va key rotation tai `docs/web-key-rotation-and-mfa-runbook.md`.
+- Có runbook MFA và key rotation tại `docs/web-key-rotation-and-mfa-runbook.md`.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Neu secret bi lo, co the rotate key ma khong lam logout/deny tat ca grant dang con TTL.
-- Grant token chi song ngan han, giam rui ro neu token bi copy.
-- Tach download grant va preview grant giup han che anh huong khi mot loai secret gap su co.
+- Nếu secret bị lộ, có thể rotate key mà không làm logout/deny tất cả grant đang còn TTL.
+- Grant token chỉ sống ngắn hạn, giảm rủi ro nếu token bị copy.
+- Tách download grant và preview grant giúp hạn chế ảnh hưởng khi một loại secret gặp sự cố.
 
-**Cach su dung / kiem tra**
+**Cách sử dụng / kiểm tra**
 
-1. Dam bao `services/metadata-service/.env` va `services/document-service/.env` co cung bo secret.
+1. Đảm bảo `services/metadata-service/.env` và `services/document-service/.env` có cùng bộ secret.
 2. Legacy dev mode:
 
 ```env
@@ -89,71 +89,71 @@ PREVIEW_GRANT_SECRET_2026_05=replace-with-current-preview-grant-secret
 PREVIEW_GRANT_SECRET_2026_04=replace-with-previous-preview-grant-secret
 ```
 
-4. Chay unit test lien quan:
+4. Chạy unit test liên quan:
 
-```powershell
+```bash
 pnpm --filter metadata-service test -- policy.service.spec.ts
 pnpm --filter document-service test -- download-grant.util.spec.ts preview-grant.util.spec.ts
 ```
 
 ### 3.2. MFA demo posture
 
-**Da lam**
+**Đã làm**
 
-- Keycloak realm co required action `CONFIGURE_TOTP`.
-- Co tai khoan demo MFA rieng cho admin/compliance:
+- Keycloak realm có required action `CONFIGURE_TOTP`.
+- Có tài khoản demo MFA riêng cho admin/compliance:
   - `co-mfa-demo`
   - `admin-mfa-demo`
-- Cac tai khoan automation nhu `co1`, `admin1` van giu khong bat OTP de E2E/password-grant chay duoc.
+- Các tài khoản automation như `co1`, `admin1` vẫn giữ không bật OTP để E2E/password-grant chạy được.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Bao cao co the tra loi gop y ve MFA/2FA ma khong lam hong automation test.
-- Tach human admin/compliance va automation service account la cach trinh bay dung hon ve production posture.
+- Báo cáo có thể trả lời góp ý về MFA/2FA mà không làm hỏng automation test.
+- Tách human admin/compliance và automation service account là cách trình bày đúng hơn về production posture.
 
-**Cach kiem tra thu cong**
+**Cách kiểm tra thủ công**
 
-1. Mo Keycloak local: `http://localhost:8080`.
-2. Dang nhap realm `docvault`.
-3. Kiem tra user `co-mfa-demo` hoac `admin-mfa-demo`.
-4. Xac nhan user co required action `CONFIGURE_TOTP`.
-5. Dang nhap interactive de thay yeu cau cau hinh OTP.
+1. Mở Keycloak local: `http://localhost:8080`.
+2. Đăng nhập realm `docvault`.
+3. Kiểm tra user `co-mfa-demo` hoặc `admin-mfa-demo`.
+4. Xác nhận user có required action `CONFIGURE_TOTP`.
+5. Đăng nhập interactive để thấy yêu cầu cấu hình OTP.
 
-### 3.3. Authorization policy thong nhat
+### 3.3. Authorization policy thống nhất
 
-**Da lam**
+**Đã làm**
 
-- Metadata detail, workflow history, comments va ACL list cung di qua policy read metadata.
-- Download/preview phan biet ro:
+- Metadata detail, workflow history, comments và ACL list cùng đi qua policy read metadata.
+- Download/preview phân biệt rõ:
   - metadata read
   - preview file content
   - download/presign/stream file content
-- ACL ho tro `USER`, `ROLE`, `GROUP`, `ALL`.
-- `GROUP` ACL normalize group Keycloak, vi du `/finance-team` thanh `finance-team`.
-- `DENY` ACL uu tien cao hon baseline allow.
-- Compliance Officer bi chan preview, stream, presign va download file content.
-- Frontend action visibility dung helper `getDocumentAccessDecision(...)` de hien ly do bi chan.
+- ACL hỗ trợ `USER`, `ROLE`, `GROUP`, `ALL`.
+- GROUP ACL normalize group Keycloak, ví dụ `/finance-team` thành `finance-team`.
+- DENY ACL ưu tiên cao hơn baseline allow.
+- Compliance Officer bị chặn preview, stream, presign và download file content.
+- Frontend action visibility dùng helper `getDocumentAccessDecision(...)` để hiện lý do bị chặn.
 
-**Y nghia**
+**Ý nghĩa**
 
-- He thong khong con chi check role don gian.
-- Nguoi dung khong the doan `docId` de xem detail/history/comment/ACL khi khong co quyen.
-- Compliance Officer dung vai tro kiem toan: xem audit/metadata theo policy, khong xem noi dung file.
+- Hệ thống không còn chỉ check role đơn giản.
+- Người dùng không thể đoán docId để xem detail/history/comment/ACL khi không có quyền.
+- Compliance Officer đúng vai trò kiểm toán: xem audit/metadata theo policy, không xem nội dung file.
 
-**Cach kiem tra thu cong**
+**Cách kiểm tra thủ công**
 
-1. Dang nhap `editor1`, tao document va upload file.
+1. Đăng nhập `editor1`, tạo document và upload file.
 2. Submit document sang Pending.
-3. Dang nhap `approver1`, approve document thanh Published.
-4. Dang nhap `viewer1`, thu xem/download document Published neu ACL cho phep.
-5. Dang nhap `co1`, vao detail/audit de kiem tra metadata/audit, sau do thu preview/download:
-   - Ket qua dung: preview/download bi deny.
-6. Tao document `CONFIDENTIAL` hoac `SECRET`, thu download bang viewer khong co ACL:
-   - Ket qua dung: deny hoac khong co direct presigned URL.
+3. Đăng nhập `approver1`, approve document thành Published.
+4. Đăng nhập `viewer1`, thử xem/download document Published nếu ACL cho phép.
+5. Đăng nhập `co1`, vào detail/audit để kiểm tra metadata/audit, sau đó thử preview/download:
+   - Kết quả đúng: preview/download bị deny.
+6. Tạo document `CONFIDENTIAL` hoặc `SECRET`, thử download bằng viewer không có ACL:
+   - Kết quả đúng: deny hoặc không có direct presigned URL.
 
-**Lenh test lien quan**
+**Lệnh test liên quan**
 
-```powershell
+```bash
 pnpm --filter metadata-service test
 pnpm --filter web test -- permissions.spec.ts document-preview-dialog.spec.ts
 pnpm test:e2e
@@ -161,201 +161,201 @@ pnpm test:e2e
 
 ### 3.4. Audit ingestion boundary
 
-**Da lam**
+**Đã làm**
 
-- `POST /audit/events` la endpoint internal.
-- Muon ghi audit event phai co header `x-docvault-service-token`.
-- Token nay duoc validate bang `AUDIT_INGEST_TOKEN`.
-- Gateway va audit-service cung chan user JWT thuong append audit gia.
+- `POST /audit/events` là endpoint internal.
+- Muốn ghi audit event phải có header `x-docvault-service-token`.
+- Token này được validate bằng `AUDIT_INGEST_TOKEN`.
+- Gateway và audit-service cùng chặn user JWT thường append audit giả.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Audit trail dang tin cay hon vi user thuong khong the tu tao event "gia".
-- Hash-chain audit chi co y nghia khi nguon ghi event bi kiem soat.
+- Audit trail đáng tin cậy hơn vì user thường không thể tự tạo event "giả".
+- Hash-chain audit chỉ có ý nghĩa khi nguồn ghi event bị kiểm soát.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-1. Dam bao `AUDIT_INGEST_TOKEN` giong nhau trong:
+1. Đảm bảo `AUDIT_INGEST_TOKEN` giống nhau trong:
    - `services/gateway/.env`
    - `services/metadata-service/.env`
    - `services/document-service/.env`
    - `services/audit-service/.env`
-2. Chay:
+2. Chạy:
 
-```powershell
+```bash
 pnpm --filter audit-service test -- service-token.guard.spec.ts
 pnpm --filter gateway test
 pnpm test:e2e
 ```
 
-3. Trong E2E, viewer thuong goi audit ingest phai bi deny.
+3. Trong E2E, viewer thường gọi audit ingest phải bị deny.
 
-### 3.5. Audit hash-chain va tamper evidence
+### 3.5. Audit hash-chain và tamper evidence
 
-**Da lam**
+**Đã làm**
 
-- Moi audit event co `prevHash` va `hash`.
-- Co endpoint verify-chain:
+- Mỗi audit event có `prevHash` và `hash`.
+- Có endpoint verify-chain:
   - Backend: `GET /audit/verify-chain`
   - Gateway/API: `/api/audit/verify-chain`
-- Web Audit page co action verify chain.
-- Co script demo sua event cu trong MongoDB de chain invalid.
-- Evidence packet ghi lai audit-chain status tai thoi diem export.
+- Web Audit page có action verify chain.
+- Có script demo sửa event cũ trong MongoDB để chain invalid.
+- Evidence packet ghi lại audit-chain status tại thời điểm export.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Audit log la tamper-evident: neu ai do sua event cu trong storage, verify-chain se bao invalid.
-- Day khong phai blockchain va khong lam log bat bien tuyet doi; no dung de phat hien log bi sua.
+- Audit log là tamper-evident: nếu ai đó sửa event cũ trong storage, verify-chain sẽ báo invalid.
+- Đây không phải blockchain và không làm log bất biến tuyệt đối; nó dùng để phát hiện log bị sửa.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-```powershell
+```bash
 pnpm --filter audit-service test -- audit-hash.spec.ts
 pnpm --filter audit-service audit:tamper-demo:test
 ```
 
-Demo local an toan:
+Demo local an toàn:
 
-```powershell
+```bash
 pnpm --filter audit-service audit:tamper-demo -- --dry-run
 ```
 
-Chi khi muon co tinh sua du lieu demo local moi chay:
+Chỉ khi muốn cố tình sửa dữ liệu demo local mới chạy:
 
 ```powershell
 $env:DOCVAULT_ALLOW_AUDIT_TAMPER_DEMO='true'
 pnpm --filter audit-service audit:tamper-demo -- --apply
 ```
 
-Sau do mo trang Audit va bam Verify Chain. Ket qua ky vong: `valid=false`.
+Sau đó mở trang Audit và bấm Verify Chain. Kết quả kỳ vọng: `valid=false`.
 
 ### 3.6. Malware scan khi upload
 
-**Da lam**
+**Đã làm**
 
-- Document-service scan file upload truoc khi ghi MinIO.
-- Che do demo mac dinh `local-eicar` chan EICAR payload.
-- Co che do optional `clamav`.
-- Neu malware bi phat hien:
-  - khong ghi object vao MinIO
-  - khong tao metadata version chinh thuc
+- Document-service scan file upload trước khi ghi MinIO.
+- Chế độ demo mặc định `local-eicar` chặn EICAR payload.
+- Có chế độ optional `clamav`.
+- Nếu malware bị phát hiện:
+  - không ghi object vào MinIO
+  - không tạo metadata version chính thức
   - emit audit `MALWARE_UPLOAD_BLOCKED`
 
-**Y nghia**
+**Ý nghĩa**
 
-- DocVault co lop threat protection nhu cac DMS enterprise.
-- Demo bang EICAR giup chung minh flow chan malware ma khong can file doc hai that.
+- DocVault có lớp threat protection như các DMS enterprise.
+- Demo bằng EICAR giúp chứng minh flow chặn malware mà không cần file độc hại thật.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-1. Dat mode demo:
+1. Đặt mode demo:
 
 ```env
 MALWARE_SCANNER_MODE=local-eicar
 ```
 
-2. Tao file EICAR test va upload qua UI hoac E2E.
-3. Ket qua dung:
-   - upload bi deny
-   - khong co version moi
-   - audit co `MALWARE_UPLOAD_BLOCKED`
+2. Tạo file EICAR test và upload qua UI hoặc E2E.
+3. Kết quả đúng:
+   - upload bị deny
+   - không có version mới
+   - audit có `MALWARE_UPLOAD_BLOCKED`
 
 Unit test:
 
-```powershell
+```bash
 pnpm --filter document-service test -- malware-scanner.service.spec.ts documents.service.spec.ts
 ```
 
-### 3.7. DLP va classification guard
+### 3.7. DLP và classification guard
 
-**Da lam**
+**Đã làm**
 
-- DLP scan phat hien:
+- DLP scan phát hiện:
   - email
   - phone/national-id-like values
   - keyword `secret`, `confidential`, `internal only`
-- Neu tai lieu `PUBLIC` / `INTERNAL` co DLP hit, he thong escalate len `CONFIDENTIAL`.
-- Non-admin khong duoc downgrade tai lieu co DLP hit xuong `PUBLIC`.
-- Admin downgrade override phai nhap `classificationOverrideReason`.
-- Audit event lien quan:
+- Nếu tài liệu `PUBLIC` / `INTERNAL` có DLP hit, hệ thống escalate lên `CONFIDENTIAL`.
+- Non-admin không được downgrade tài liệu có DLP hit xuống `PUBLIC`.
+- Admin downgrade override phải nhập `classificationOverrideReason`.
+- Audit event liên quan:
   - `DLP_PATTERN_DETECTED`
   - `DLP_CLASSIFICATION_DOWNGRADE_DENIED`
   - `DLP_CLASSIFICATION_OVERRIDE_APPROVED`
-- Web document detail hien DLP evidence nhung khong hien raw sensitive value.
+- Web document detail hiện DLP evidence nhưng không hiện raw sensitive value.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Tranh public hoa tai lieu co du lieu nhay cam.
-- Admin van co duong override co ly do va co audit, phu hop voi compliance workflow.
-- UI chi hien count/category/severity, khong ro ri noi dung sensitive.
+- Tránh public hóa tài liệu có dữ liệu nhạy cảm.
+- Admin vẫn có đường override có lý do và có audit, phù hợp với compliance workflow.
+- UI chỉ hiện count/category/severity, không rò rỉ nội dung sensitive.
 
-**Cach kiem tra thu cong**
+**Cách kiểm tra thủ công**
 
-1. Dang nhap `editor1`.
-2. Tao/upload file co noi dung vi du:
+1. Đăng nhập `editor1`.
+2. Tạo/upload file có nội dung ví dụ:
 
 ```text
 confidential internal only contact test@example.com
 ```
 
-3. Kiem tra document detail:
-   - classification bi goi y/escalate len `CONFIDENTIAL`
-   - DLP evidence hien category/count/severity
-4. Thu edit classification xuong `PUBLIC` bang editor:
-   - Ket qua dung: bi deny.
-5. Dang nhap admin, thu downgrade va nhap override reason:
-   - Ket qua dung: duoc chap nhan va co audit override.
+3. Kiểm tra document detail:
+   - classification bị gợi ý/escalate lên `CONFIDENTIAL`
+   - DLP evidence hiện category/count/severity
+4. Thử edit classification xuống `PUBLIC` bằng editor:
+   - Kết quả đúng: bị deny.
+5. Đăng nhập admin, thử downgrade và nhập override reason:
+   - Kết quả đúng: được chấp nhận và có audit override.
 
 Test:
 
-```powershell
+```bash
 pnpm --filter metadata-service test -- documents.service.spec.ts
 pnpm --filter document-service test -- documents.service.spec.ts
 pnpm --filter web test
 ```
 
-### 3.8. Encryption at rest va download posture
+### 3.8. Encryption at rest và download posture
 
-**Da lam**
+**Đã làm**
 
-- MinIO local bucket init co SSE-S3.
-- `PUBLIC` / `INTERNAL` Published co the nhan presigned URL ngan han neu policy cho phep.
-- `CONFIDENTIAL` / `SECRET` danh dau `watermarkRequired=true`.
-- Khi `watermarkRequired=true`, response khong tra direct `url`, chi tra `streamingEndpoint`.
-- Stream path re-authorize/verify grant token va watermark truoc khi tra file.
-- Compliance Officer luon bi chan preview/stream/presign/download.
+- MinIO local bucket init có SSE-S3.
+- `PUBLIC` / `INTERNAL` Published có thể nhận presigned URL ngắn hạn nếu policy cho phép.
+- `CONFIDENTIAL` / `SECRET` đánh dấu `watermarkRequired=true`.
+- Khi `watermarkRequired=true`, response không trả direct `url`, chỉ trả `streamingEndpoint`.
+- Stream path re-authorize/verify grant token và watermark trước khi trả file.
+- Compliance Officer luôn bị chặn preview/stream/presign/download.
 
-**Y nghia**
+**Ý nghĩa**
 
-- File nhay cam khong lo direct presigned URL de tai thang tu object storage.
-- Luong stream qua service cho phep enforce watermark va audit.
-- Co cau tra loi ro cho cau hoi "file duoc ma hoa va tai ve an toan nhu the nao".
+- File nhạy cảm không lộ direct presigned URL để tải thẳng từ object storage.
+- Luồng stream qua service cho phép enforce watermark và audit.
+- Có câu trả lời rõ cho câu hỏi "file được mã hóa và tải về an toàn như thế nào".
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-1. Tao tai lieu `CONFIDENTIAL`, approve thanh `PUBLISHED`.
-2. Goi download authorize bang editor/owner.
-3. Ket qua dung:
+1. Tạo tài liệu `CONFIDENTIAL`, approve thành `PUBLISHED`.
+2. Gọi download authorize bằng editor/owner.
+3. Kết quả đúng:
    - `url: null`
    - `watermarkRequired: true`
-   - co `streamingEndpoint`
-4. Mo streaming endpoint de tai file qua controlled path.
-5. Thu cung thao tac bang `co1`:
-   - Ket qua dung: deny.
+   - có `streamingEndpoint`
+4. Mở streaming endpoint để tải file qua controlled path.
+5. Thử cùng thao tác bằng `co1`:
+   - Kết quả đúng: deny.
 
-E2E da cover:
+E2E đã cover:
 
-```powershell
+```bash
 pnpm test:e2e
 ```
 
-### 3.9. Security dashboard va recommendation engine
+### 3.9. Security dashboard và recommendation engine
 
-**Da lam**
+**Đã làm**
 
 - Web page: `/security`.
-- Chi Compliance Officer/Admin duoc xem.
-- Dashboard hien:
+- Chỉ Compliance Officer/Admin được xem.
+- Dashboard hiện:
   - audit-chain posture
   - deny counters
   - malware blocked
@@ -367,36 +367,52 @@ pnpm test:e2e
   - risky documents
   - behavior anomaly signals
   - prioritized security recommendations
-- Recommendation engine tao action deterministic tu audit metadata, khong dung file content.
-- Khi xem recommendation, audit event `SECURITY_RECOMMENDATIONS_VIEWED` duoc ghi voi ids/counts/types/filter, khong ghi token hay noi dung file.
+- Recommendation engine tạo action deterministic từ audit metadata, không dùng file content.
+- Khi xem recommendation, audit event `SECURITY_RECOMMENDATIONS_VIEWED` được ghi với ids/counts/types/filter, không ghi token hay nội dung file.
+- Recommendation có workflow trạng thái qua `PATCH /audit/security-recommendations/:id/workflow`.
+- Enum workflow: `OPEN`, `INVESTIGATING`, `REVIEWED`, `RESOLVED`; security summary overlay `recommendation.workflow`, mặc định `OPEN` nếu chưa có event workflow.
+- Khi cập nhật workflow, audit event `SECURITY_RECOMMENDATION_STATUS_UPDATED` được ghi với `resourceType=SECURITY_RECOMMENDATION`, `resourceId` là recommendation id.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Day la diem vuot len web quan ly tai lieu thong thuong: compliance/admin co man hinh an ninh tong hop va co hanh dong goi y.
-- Recommendation deterministic giup demo on dinh, khong phu thuoc LLM.
-- Khong dua file content/object key/presigned URL/grant token vao recommendation metadata.
+- Đây là điểm vượt lên web quản lý tài liệu thông thường: compliance/admin có màn hình an ninh tổng hợp và có hành động gợi ý.
+- Recommendation deterministic giúp demo ổn định, không phụ thuộc LLM.
+- Không đưa file content/object key/presigned URL/grant token vào recommendation metadata.
+- Workflow recommendation giúp compliance/admin ghi nhận điều tra/review/resolve mà vẫn giữ audit trail metadata-safe.
 
-**Cach su dung**
+**Cách sử dụng**
 
-1. Chay web:
+1. Chạy web:
 
-```powershell
+```bash
 pnpm --filter web dev
 ```
 
-2. Mo:
+2. Mở:
 
 ```text
 http://localhost:3006/security
 ```
 
-3. Dang nhap bang `co1` hoac `admin1`.
-4. Bam cac link `Open audit` trong quick filters, risky documents, behavior anomalies hoac recommendations.
-5. Kiem tra trang Audit duoc mo voi filter tuong ung.
+3. Đăng nhập bằng `co1` hoặc `admin1`.
+4. Bấm các link Open audit trong quick filters, risky documents, behavior anomalies hoặc recommendations.
+5. Kiểm tra trang Audit được mở với filter tương ứng.
+6. Cập nhật workflow cho một recommendation qua UI hoặc API:
 
-**Cach test**
+```json
+{
+  "status": "INVESTIGATING",
+  "note": "Đang kiểm tra chuỗi deny liên quan."
+}
+```
 
-```powershell
+7. Gọi lại `GET /audit/security-summary` và kiểm tra recommendation tương ứng có `workflow.status`.
+8. Mở Audit và lọc `action=SECURITY_RECOMMENDATION_STATUS_UPDATED`, `resourceType=SECURITY_RECOMMENDATION`, `resourceId=<recommendation-id>`.
+9. Kiểm tra metadata audit chỉ có dữ liệu như `recommendationId`, `status`, `note`; không có file content, object key, presigned URL hoặc grant token.
+
+**Cách test**
+
+```bash
 pnpm --filter audit-service test -- security-summary.spec.ts
 pnpm --filter web test -- security-dashboard.spec.ts
 pnpm --filter audit-service build
@@ -404,15 +420,15 @@ pnpm --filter web exec tsc --noEmit
 pnpm --filter web build
 ```
 
-### 3.10. Retention va records management
+### 3.10. Retention và records management
 
-**Da lam**
+**Đã làm**
 
-- Metadata-service luu:
+- Metadata-service lưu:
   - `retentionClass`
   - `retentionUntil`
   - `retentionReason`
-- Khi document duoc approve/publish, retention duoc tinh theo classification:
+- Khi document được approve/publish, retention được tính theo classification:
   - `PUBLIC_730D`
   - `INTERNAL_365D`
   - `CONFIDENTIAL_180D`
@@ -420,42 +436,42 @@ pnpm --filter web build
 - Endpoint:
   - `GET /metadata/retention/documents`
   - `POST /metadata/retention/run`
-- Due records duoc auto-archive thanh `ARCHIVED`.
+- Due records được auto-archive thành `ARCHIVED`.
 - Workflow history ghi `action=RETENTION`, `actorId=system:retention`.
 - Audit ghi `DOCUMENT_AUTO_ARCHIVED`.
 - Web page: `/retention`.
 
-**Y nghia**
+**Ý nghĩa**
 
-- DocVault co records management/compliance lifecycle, khong chi la CRUD document.
-- Co bang chung document duoc luu giu theo classification va auto-archive khi qua han.
+- DocVault có records management/compliance lifecycle, không chỉ là CRUD document.
+- Có bằng chứng document được lưu giữ theo classification và auto-archive khi quá hạn.
 
-**Cach su dung**
+**Cách sử dụng**
 
-1. Dang nhap `co1` hoac `admin1`.
-2. Mo:
+1. Đăng nhập `co1` hoặc `admin1`.
+2. Mở:
 
 ```text
 http://localhost:3006/retention
 ```
 
-3. Xem cac cot retention class, deadline, status, days remaining.
-4. Admin co the chay retention demo endpoint neu UI/action co ho tro trong flow local.
+3. Xem các cột retention class, deadline, status, days remaining.
+4. Admin có thể chạy retention demo endpoint nếu UI/action có hỗ trợ trong flow local.
 
-**Cach test**
+**Cách test**
 
-```powershell
+```bash
 pnpm --filter metadata-service test
 pnpm test:e2e
 ```
 
 ### 3.11. One-click compliance evidence packet
 
-**Da lam**
+**Đã làm**
 
-- Compliance/admin co the export evidence packet theo document:
+- Compliance/admin có thể export evidence packet theo document:
   - `GET /metadata/documents/:docId/evidence-packet`
-- Packet gom:
+- Packet gồm:
   - metadata
   - version checksum
   - ACL
@@ -463,115 +479,115 @@ pnpm test:e2e
   - retention evidence
   - audit hash-chain status
   - related audit events
-- Packet khong gom:
+- Packet không gồm:
   - file content
   - object key
   - presigned URL
   - preview grant
   - download grant token
-- Viewer/editor/approver khong co role compliance/admin se bi deny.
+- Viewer/editor/approver không có role compliance/admin sẽ bị deny.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Rat huu ich khi bao cao/demo: mot endpoint gom du bang chung compliance cho tai lieu.
-- Bao dam compliance officer xem du evidence nhung van khong xem noi dung file.
+- Rất hữu ích khi báo cáo/demo: một endpoint gom đủ bằng chứng compliance cho tài liệu.
+- Bảo đảm compliance officer xem đủ evidence nhưng vẫn không xem nội dung file.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-1. Dang nhap `co1`.
-2. Mo document detail co quyen metadata.
-3. Chon action export evidence packet neu UI hien.
-4. Kiem tra JSON khong co grant token/presigned URL/file content.
-5. Dang nhap `viewer1` va goi cung endpoint:
-   - Ket qua dung: 403.
+1. Đăng nhập `co1`.
+2. Mở document detail có quyền metadata.
+3. Chọn action export evidence packet nếu UI hiện.
+4. Kiểm tra JSON không có grant token/presigned URL/file content.
+5. Đăng nhập `viewer1` và gọi cùng endpoint:
+   - Kết quả đúng: 403.
 
 Test:
 
-```powershell
+```bash
 pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm test:e2e
 ```
 
 ### 3.12. AI-ready guardrails
 
-**Da lam**
+**Đã làm**
 
 - Endpoint:
   - `GET /metadata/documents/:docId/ai-guardrails`
-- Truoc khi tra AI context decision, endpoint check `assertCanReadMetadata(...)`.
-- Response tach ro:
+- Trước khi trả AI context decision, endpoint check `assertCanReadMetadata(...)`.
+- Response tách rõ:
   - metadata-safe operations: classification/tagging
   - content operations: summarization/Q&A
-- Compliance Officer chi duoc metadata-only, bi deny content operations.
-- Response khong tra file content, object key, presigned URL hay grant token.
+- Compliance Officer chỉ được metadata-only, bị deny content operations.
+- Response không trả file content, object key, presigned URL hay grant token.
 - Audit event: `AI_GUARDRAILS_EVALUATED`.
-- Web document detail co card AI guardrails.
+- Web document detail có card AI guardrails.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Day la nen tang dung de tich hop LLM sau nay ma khong pha policy hien tai.
-- AI khong duoc doc noi dung ma user khong co quyen doc.
-- Compliance Officer khong duoc dung AI de "di vong" vao noi dung file.
+- Đây là nền tảng đúng để tích hợp LLM sau này mà không phá policy hiện tại.
+- AI không được đọc nội dung mà user không có quyền đọc.
+- Compliance Officer không được dùng AI để "đi vòng" vào nội dung file.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-```powershell
+```bash
 pnpm --filter metadata-service test -- policy.service.spec.ts
 pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm --filter web test -- document-ai-guardrails-card.spec.ts
 ```
 
-Kiem tra thu cong:
+Kiểm tra thủ công:
 
-1. Mo document detail.
+1. Mở document detail.
 2. Xem AI guardrails card.
-3. Dang nhap `co1` va xac nhan content summarization/Q&A bi deny.
+3. Đăng nhập `co1` và xác nhận content summarization/Q&A bị deny.
 
 ### 3.13. Access impact preview
 
-**Da lam**
+**Đã làm**
 
 - Endpoint:
   - `POST /metadata/documents/:docId/access-impact`
 - Gateway proxy:
   - `POST /metadata/documents/:docId/access-impact`
-- Web edit document hien access impact card khi classification moi khac classification hien tai.
-- Response cho biet:
+- Web edit document hiện access impact card khi classification mới khác classification hiện tại.
+- Response cho biết:
   - current/proposed classification
   - watermark posture
   - access expansion/reduction warning
   - DLP override requirement
   - role-level metadata/download delta
-- Khong enumerate user that va khong tra file content/grant/object key.
+- Không enumerate user thật và không trả file content/grant/object key.
 - Audit event: `DOCUMENT_ACCESS_IMPACT_SIMULATED`.
 
-**Y nghia**
+**Ý nghĩa**
 
-- Truoc khi ha classification, editor/admin thay duoc rui ro mo rong truy cap.
-- Day la tinh nang enterprise-like vi no giai thich tac dong policy truoc khi mutate metadata.
+- Trước khi hạ classification, editor/admin thấy được rủi ro mở rộng truy cập.
+- Đây là tính năng enterprise-like vì nó giải thích tác động policy trước khi mutate metadata.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-1. Dang nhap owner editor hoac admin.
-2. Mo document edit.
-3. Doi classification, vi du `CONFIDENTIAL` -> `PUBLIC`.
+1. Đăng nhập owner editor hoặc admin.
+2. Mở document edit.
+3. Đổi classification, ví dụ `CONFIDENTIAL -> PUBLIC`.
 4. Xem access impact card.
-5. Neu document co DLP hit, kiem tra UI canh bao override requirement.
+5. Nếu document có DLP hit, kiểm tra UI cảnh báo override requirement.
 
 Test:
 
-```powershell
+```bash
 pnpm --filter metadata-service test -- policy.service.spec.ts
 pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm --filter web test -- document-access-impact-card.spec.ts
 ```
 
-### 3.14. Shared auth/contracts va OpenAPI alignment
+### 3.14. Shared auth/contracts và OpenAPI alignment
 
-**Da lam**
+**Đã làm**
 
-- Cac service downstream re-export `Roles`, `ROLES_KEY`, `RolesGuard` tu `@docvault/auth/rbac`.
-- OpenAPI gateway contract duoc cap nhat cho:
+- Các service downstream re-export `Roles`, `ROLES_KEY`, `RolesGuard` từ `@docvault/auth/rbac`.
+- OpenAPI gateway contract được cập nhật cho:
   - comments
   - retention
   - evidence packet
@@ -583,53 +599,53 @@ pnpm --filter web test -- document-access-impact-card.spec.ts
   - access impact
   - malware/DLP upload behavior
 
-**Y nghia**
+**Ý nghĩa**
 
-- Giam drift giua frontend/backend/contract.
-- Swagger/OpenAPI dung hon voi runtime, tien cho bao cao va demo API.
+- Giảm drift giữa frontend/backend/contract.
+- Swagger/OpenAPI đúng hơn với runtime, tiện cho báo cáo và demo API.
 
-**Cach kiem tra**
+**Cách kiểm tra**
 
-```powershell
+```bash
 pnpm --filter @docvault/auth build
 pnpm --filter gateway build
 pnpm --filter gateway test
-node -e "const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('libs/contracts/openapi/gateway.yaml','utf8')); console.log('openapi ok')"
+node -e "const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('libs/contracts
 ```
 
-## 4. Huong dan chay local de demo cac tinh nang
+## 4. Hướng dẫn chạy local để demo các tính năng
 
-### 4.1. Chuan bi
+### 4.1. Chuẩn bị
 
-Yeu cau:
+Yêu cầu:
 
 - Node.js 20+
 - pnpm 9+
 - Docker Desktop / Docker Engine
 
-Cai dependency:
+Cài dependency:
 
-```powershell
+```bash
 pnpm install
 ```
 
 Start infra local:
 
-```powershell
+```bash
 docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
 ```
 
-Chay migration metadata:
+Chạy migration metadata:
 
-```powershell
+```bash
 pnpm --filter metadata-service prisma:deploy
 ```
 
-### 4.2. Chay backend
+### 4.2. Chạy backend
 
-Cach de theo doi log ro nhat la mo tung terminal:
+Cách dễ theo dõi log nhất là mở từng terminal:
 
-```powershell
+```bash
 pnpm --filter metadata-service start:dev
 pnpm --filter audit-service start:dev
 pnpm --filter document-service start:dev
@@ -638,74 +654,74 @@ pnpm --filter workflow-service start:dev
 pnpm --filter gateway start:dev
 ```
 
-Hoac dung script root neu moi truong local da cau hinh on dinh:
+Hoặc dùng script root nếu môi trường local đã cấu hình ổn định:
 
-```powershell
+```bash
 pnpm start:sequential
 ```
 
-### 4.3. Chay frontend
+### 4.3. Chạy frontend
 
-Package web hien cau hinh mac dinh port `3006`:
+Package web hiện cấu hình mặc định port `3006`:
 
-```powershell
+```bash
 pnpm --filter web dev
 ```
 
-Mo:
+Mở:
 
 ```text
 http://localhost:3006
 ```
 
-API base mac dinh:
+API base mặc định:
 
 ```env
 NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api
 ```
 
-### 4.4. Tai khoan demo
+### 4.4. Tài khoản demo
 
-Password seed mac dinh: `Passw0rd!`
+Password seed mặc định: `Passw0rd!`
 
-| Username | Role | Muc dich demo |
-| --- | --- | --- |
-| `viewer1` | `viewer` | Xem/download tai lieu Published neu policy cho phep |
-| `editor1` | `editor` | Tao document, upload, submit, edit metadata |
+| Username | Role | Mục đích demo |
+|---|---|---|
+| `viewer1` | `viewer` | Xem/download tài liệu Published nếu policy cho phép |
+| `editor1` | `editor` | Tạo document, upload, submit, edit metadata |
 | `approver1` | `approver` | Approve/reject Pending document |
-| `co1` | `compliance_officer` | Xem audit/security/retention/evidence, khong xem file content |
-| `admin1` | `admin` | Thao tac admin va override co audit reason |
+| `co1` | `compliance_officer` | Xem audit/security/retention/evidence, không xem file content |
+| `admin1` | `admin` | Thao tác admin và override có audit reason |
 
-## 5. Checklist test nhanh theo muc tieu demo
+## 5. Checklist test nhanh theo mục tiêu demo
 
-### 5.1. Test tu dong day du nhat
+### 5.1. Test tự động đầy đủ nhất
 
-Sau khi local stack dang chay:
+Sau khi local stack đang chạy:
 
-```powershell
+```bash
 pnpm test:e2e
 ```
 
-Ket qua ky vong:
+Kết quả kỳ vọng:
 
-- Unauthorized/expired token bi reject.
-- Viewer khong tao document duoc.
-- Editor tao/upload/submit duoc.
-- Approver approve duoc.
-- Viewer download Published document khi policy cho phep.
-- Confidential/Secret khong lo direct presigned URL.
-- Compliance Officer preview/download/stream bi deny.
-- Compliance Officer audit query/verify-chain/security summary duoc allow.
-- Malware EICAR upload bi chan.
+- Unauthorized/expired token bị reject.
+- Viewer không tạo document được.
+- Editor tạo/upload/submit được.
+- Approver approve được.
+- Viewer download Published document khi policy cho phép.
+- Confidential/Secret không lộ direct presigned URL.
+- Compliance Officer preview/download/stream bị deny.
+- Compliance Officer audit query/verify-chain/security summary được allow.
+- Malware EICAR upload bị chặn.
 - DLP upload escalate classification.
-- DLP downgrade bi chan neu khong co override hop le.
-- Evidence packet co metadata/version/workflow/retention/audit evidence.
-- Viewer bi deny evidence packet/audit ingest.
-- Retention auto-archive tao workflow history va audit.
+- DLP downgrade bị chặn nếu không có override hợp lệ.
+- Evidence packet có metadata/version/workflow/retention/audit evidence.
+- Viewer bị deny evidence packet/audit ingest.
+- Retention auto-archive tạo workflow history và audit.
 
 ### 5.2. Test backend theo service
 
-```powershell
+```bash
 pnpm --filter metadata-service test
 pnpm --filter document-service test
 pnpm --filter audit-service test
@@ -714,107 +730,113 @@ pnpm --filter gateway test
 
 ### 5.3. Test frontend
 
-```powershell
+```bash
 pnpm --filter web test
 pnpm --filter web exec tsc --noEmit
 pnpm --filter web lint
 pnpm --filter web build
 ```
 
-Luu y: lan verify gan nhat co `web lint` pass voi 0 error va con mot so warning san co o cac component/hook cu.
+Lưu ý: lần verify gần nhất có web lint pass với 0 error và còn một số warning sẵn có ở các component/hook cũ.
 
 ### 5.4. Test OpenAPI
 
-```powershell
-node -e "const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('libs/contracts/openapi/gateway.yaml','utf8')); console.log('openapi ok')"
+```bash
+node -e "const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('libs/contracts
 ```
 
 ### 5.5. Test tamper audit local
 
-```powershell
+```bash
 pnpm --filter audit-service audit:tamper-demo:test
 pnpm --filter audit-service audit:tamper-demo -- --dry-run
 ```
 
-Chi sua du lieu local khi can demo tamper:
+Chỉ sửa dữ liệu local khi cần demo tamper:
 
 ```powershell
 $env:DOCVAULT_ALLOW_AUDIT_TAMPER_DEMO='true'
 pnpm --filter audit-service audit:tamper-demo -- --apply
 ```
 
-Sau do mo `/audit` va verify chain.
+Sau đó mở `/audit` và verify chain.
 
-## 6. Checklist su dung tren UI
+## 6. Checklist sử dụng trên UI
 
-| Trang | URL local | Role nen dung | Kiem tra |
-| --- | --- | --- | --- |
+| Trang | URL local | Role nên dùng | Kiểm tra |
+|---|---|---|---|
 | Documents | `http://localhost:3006/documents` | viewer/editor/admin | List, detail, preview/download button policy |
-| New Document | `http://localhost:3006/documents/new` | editor/admin | Tao document va upload file |
+| New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | DLP evidence, AI guardrails, evidence packet |
-| Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi doi classification |
+| Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
 | Approvals | `http://localhost:3006/approvals` | approver/admin | Approve/reject Pending document |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
 | Security | `http://localhost:3006/security` | compliance/admin | Counters, alerts, risk scoring, anomalies, recommendations |
-| Retention | `http://localhost:3006/retention` | compliance/admin | Retention status va records evidence |
+| Retention | `http://localhost:3006/retention` | compliance/admin | Retention status và records evidence |
 
-## 7. Demo flow de trinh bay voi giang vien
+## 7. Demo flow để trình bày với giảng viên
 
-1. Dang nhap `editor1`.
-2. Tao document moi, upload file binh thuong.
+1. Đăng nhập `editor1`.
+2. Tạo document mới, upload file bình thường.
 3. Submit document.
-4. Dang nhap `approver1`, approve document.
-5. Dang nhap `viewer1`, mo document va download neu policy cho phep.
-6. Tao/upload tai lieu co noi dung nhay cam, vi du co email va keyword `confidential`.
-7. Chi ra DLP evidence va classification escalation.
-8. Tao/upload EICAR test file de chung minh malware bị chan.
-9. Dang nhap `co1`.
-10. Vao `/audit`, query event va verify hash-chain.
-11. Thu preview/download document bang `co1` va chi ra bi deny.
-12. Vao `/security`, trinh bay:
+4. Đăng nhập `approver1`, approve document.
+5. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
+6. Tạo/upload tài liệu có nội dung nhạy cảm, ví dụ có email và keyword `confidential`.
+7. Chỉ ra DLP evidence và classification escalation.
+8. Tạo/upload EICAR test file để chứng minh malware bị chặn.
+9. Đăng nhập `co1`.
+10. Vào `/audit`, query event và verify hash-chain.
+11. Thử preview/download document bằng `co1` và chỉ ra bị deny.
+12. Vào `/security`, trình bày:
     - deny/malware/DLP counters
     - risky documents
     - behavior anomaly
     - security recommendations
-13. Vao document detail, export evidence packet va chi ra packet khong co file content/token.
-14. Vao `/retention`, trinh bay retention class/deadline/status.
-15. Vao edit document, doi classification de xem access impact preview.
+13. Vào document detail, export evidence packet và chỉ ra packet không có file content/token.
+14. Vào `/retention`, trình bày retention class/deadline/status.
+15. Vào edit document, đổi classification để xem access impact preview.
 
-## 8. Diem can noi ro trong bao cao
+## 8. Điểm cần nói rõ trong báo cáo
 
-- Hash-chain la **tamper-evident**, khong phai blockchain va khong thay the immutable storage.
-- AI hien tai la **AI-ready guardrails / deterministic security intelligence**, chua phai LLM summarization/QA that.
-- Malware scanning local dung EICAR deterministic mode; ClamAV la optional mode.
-- MinIO SSE la encryption-at-rest MVP; huong nang cao la Vault/KMS/client-side encryption/E2EE.
-- Compliance Officer co the xem audit/metadata/evidence theo policy, nhung khong duoc xem file content.
-- Security Recommendation Engine chi dung audit metadata, khong dua noi dung file, object key, presigned URL hay grant token vao output/audit.
+- Hash-chain là tamper-evident, không phải blockchain và không thay thế immutable storage.
+- AI hiện tại là AI-ready guardrails / deterministic security intelligence, chưa phải LLM summarization/QA thật.
+- Malware scanning local dùng EICAR deterministic mode; ClamAV là optional mode.
+- MinIO SSE là encryption-at-rest MVP; hướng nâng cao là Vault/KMS/client-side encryption/E2EE.
+- Compliance Officer có thể xem audit/metadata/evidence theo policy, nhưng không được xem file content.
+- Security Recommendation Engine chỉ dùng audit metadata, không đưa nội dung file, object key, presigned URL hay grant token vào output/audit.
 
-## 9. Verification da ghi nhan gan nhat
+## 9. Verification đã ghi nhận gần nhất
 
-Theo evidence hien tai, cac lenh sau da duoc chay va pass trong dot verify gan nhat:
+Theo evidence hiện tại, các lệnh sau đã được chạy và pass trong đợt verify gần nhất:
 
-- `pnpm --filter audit-service test`
-- `pnpm --filter audit-service build`
-- `pnpm --filter gateway test`
-- `pnpm --filter gateway build`
-- `pnpm --filter web test`
-- `pnpm --filter web exec tsc --noEmit`
-- `pnpm --filter web lint`
-- `pnpm --filter web build`
-- OpenAPI YAML parse check: `openapi ok`
-- `git diff --check`
-- `pnpm test:e2e`
+```bash
+pnpm --filter audit-service test
+pnpm --filter audit-service build
+pnpm --filter gateway test
+pnpm --filter gateway build
+pnpm --filter web test
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
 
-Ghi chu:
+OpenAPI YAML parse check: openapi ok
 
-- `web lint` pass voi 0 error va con 5 warning san co.
-- `git diff --check` pass, Git chi canh bao line-ending conversion.
-- `pnpm test:e2e` can local stack dang chay.
+```bash
+git diff --check
+pnpm test:e2e
+```
 
-## 10. Viec con nen lam neu muon polish them
+Ghi chú:
 
-1. Chup anh UI cac trang `/security`, `/audit`, `/retention`, document detail va access impact preview de dua vao bao cao.
-2. Tao bang completion matrix ngan trong slide: W-P item, status, file evidence, command test.
-3. Neu can nang cao hon nua, them workflow "mark recommendation as reviewed" hoac "investigation note" cho security recommendation.
-4. Neu muon claim AI that, can bo sung LLM summarization/QA co enforcement policy; hien tai nen claim la AI-ready.
-5. Neu muon production-like encryption, bo sung Vault/KMS hoac client-side encryption trong future work.
+- web lint pass với 0 error và còn 5 warning sẵn có.
+- git diff --check pass, Git chỉ cảnh báo line-ending conversion.
+- pnpm test:e2e cần local stack đang chạy.
+
+## 10. Việc còn nên làm nếu muốn polish thêm
+
+1. Chụp ảnh UI các trang `/security`, `/audit`, `/retention`, document detail và access impact preview để đưa vào báo cáo.
+2. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
+3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED` và audit event tương ứng.
+4. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+5. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

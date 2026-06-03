@@ -412,6 +412,7 @@ components:
             MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
             DLP_CLASSIFICATION_OVERRIDE_APPROVED,
             DOCUMENT_ACCESS_IMPACT_SIMULATED, SECURITY_RECOMMENDATIONS_VIEWED,
+            SECURITY_RECOMMENDATION_STATUS_UPDATED,
             AI_GUARDRAILS_EVALUATED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
@@ -479,6 +480,31 @@ components:
           type: array
           items: { type: string }
 
+    SecurityRecommendationWorkflowStatus:
+      type: string
+      enum: [OPEN, INVESTIGATING, REVIEWED, RESOLVED]
+
+    SecurityRecommendationWorkflowSummary:
+      type: object
+      properties:
+        status:
+          allOf:
+            - $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus'
+          default: OPEN
+        note: { type: string, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedBy: { type: string, nullable: true }
+
+    UpdateSecurityRecommendationWorkflow:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus' }
+        note:
+          type: string
+          maxLength: 500
+          description: Optional investigation/review note. Must not contain file content, object keys, presigned URLs, or grant tokens.
+
     SecurityRecommendationSummary:
       type: object
       description: Deterministic, audit-metadata-only security recommendation.
@@ -517,6 +543,8 @@ components:
             resourceType: { type: string }
             resourceId: { type: string }
             documentId: { type: string }
+        workflow:
+          $ref: '#/components/schemas/SecurityRecommendationWorkflowSummary'
 
     SecuritySummary:
       type: object
@@ -1705,6 +1733,47 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/SecuritySummary'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-recommendations/{id}/workflow:
+    patch:
+      summary: Update security recommendation workflow state
+      operationId: updateSecurityRecommendationWorkflow
+      description: |
+        Updates the workflow state for a deterministic security recommendation.
+        Emits audit action SECURITY_RECOMMENDATION_STATUS_UPDATED with
+        resourceType SECURITY_RECOMMENDATION and resourceId equal to the
+        recommendation id. Audit metadata stores recommendationId/status/note
+        only and must not include file content, object keys, presigned URLs, or
+        grant tokens.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Security recommendation ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSecurityRecommendationWorkflow'
+      responses:
+        '200':
+          description: Workflow update audit event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEvent'
+        '400':
+          description: Invalid workflow status or note
         '401':
           description: Unauthorized
         '403':

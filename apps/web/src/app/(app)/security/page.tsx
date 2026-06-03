@@ -1,8 +1,9 @@
 'use client';
 
 import Link from 'next/link';
-import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import type { FormEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   AlertTriangle,
   Bug,
@@ -12,6 +13,7 @@ import {
   FileWarning,
   Lightbulb,
   RefreshCw,
+  Save,
   ShieldAlert,
   ShieldCheck,
   ShieldX,
@@ -30,9 +32,14 @@ import {
   getSecuritySummary,
   queryAuditLog,
   queryAuditLogWindow,
+  updateSecurityRecommendationWorkflow,
   verifyAuditChain,
 } from '@/features/audit/audit.api';
-import type { AuditLogEntry } from '@/features/audit/audit.types';
+import type {
+  AuditLogEntry,
+  SecurityRecommendationWorkflowRequest,
+  SecurityRecommendationWorkflowStatus,
+} from '@/features/audit/audit.types';
 import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
@@ -47,12 +54,32 @@ const metricIcons: Record<SecurityDashboardMetric['key'], typeof ShieldX> = {
 };
 
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
+const recommendationWorkflowOptions: Array<{
+  value: SecurityRecommendationWorkflowStatus;
+  label: string;
+}> = [
+  { value: 'OPEN', label: 'Open' },
+  { value: 'INVESTIGATING', label: 'Investigating' },
+  { value: 'REVIEWED', label: 'Reviewed' },
+  { value: 'RESOLVED', label: 'Resolved' },
+];
+
+type RecommendationWorkflowMutation = {
+  id: string;
+  payload: SecurityRecommendationWorkflowRequest;
+};
 
 export default function SecurityPage() {
   const { session } = useAuth();
   const hasAccess = canViewAudit(session);
+  const queryClient = useQueryClient();
   const [isVerifyingChain, setIsVerifyingChain] = useState(false);
   const [verifyChainError, setVerifyChainError] = useState<string | null>(null);
+  const [pendingRecommendationId, setPendingRecommendationId] = useState<string | null>(null);
+  const [workflowError, setWorkflowError] = useState<{
+    id: string;
+    message: string;
+  } | null>(null);
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -121,6 +148,16 @@ export default function SecurityPage() {
     downloadAuthorizedQuery.isLoading || previewAuthorizedQuery.isLoading;
   const isActivityError =
     downloadAuthorizedQuery.isError || previewAuthorizedQuery.isError;
+  const workflowMutation = useMutation({
+    mutationFn: ({ id, payload }: RecommendationWorkflowMutation) =>
+      updateSecurityRecommendationWorkflow(id, payload),
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: auditKeys.securitySummary() }),
+        queryClient.invalidateQueries({ queryKey: auditKeys.queries() }),
+      ]);
+    },
+  });
 
   async function refreshSecurityData() {
     await Promise.all([
@@ -142,6 +179,29 @@ export default function SecurityPage() {
       setVerifyChainError('Audit chain verification failed.');
     } finally {
       setIsVerifyingChain(false);
+    }
+  }
+
+  async function saveRecommendationWorkflow(
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) {
+    if (pendingRecommendationId) {
+      return;
+    }
+
+    setPendingRecommendationId(id);
+    setWorkflowError(null);
+
+    try {
+      await workflowMutation.mutateAsync({ id, payload });
+    } catch {
+      setWorkflowError({
+        id,
+        message: 'Failed to update recommendation workflow.',
+      });
+    } finally {
+      setPendingRecommendationId(null);
     }
   }
 
@@ -246,7 +306,12 @@ export default function SecurityPage() {
       </section>
 
       <section className="mt-4">
-        <RecommendationsPanel recommendations={model.recommendations} />
+        <RecommendationsPanel
+          recommendations={model.recommendations}
+          pendingRecommendationId={pendingRecommendationId}
+          workflowError={workflowError}
+          onSaveWorkflow={saveRecommendationWorkflow}
+        />
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[0.9fr_1.1fr]">
@@ -268,8 +333,17 @@ export default function SecurityPage() {
 
 function RecommendationsPanel({
   recommendations,
+  pendingRecommendationId,
+  workflowError,
+  onSaveWorkflow,
 }: {
   recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
+  pendingRecommendationId: string | null;
+  workflowError: { id: string; message: string } | null;
+  onSaveWorkflow: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
 }) {
   const items = recommendations.items;
 
@@ -384,12 +458,143 @@ function RecommendationsPanel({
                     ))}
                   </div>
                 ) : null}
+
+                <RecommendationWorkflowControls
+                  item={item}
+                  isPending={pendingRecommendationId === item.id}
+                  isDisabled={pendingRecommendationId !== null}
+                  error={workflowError?.id === item.id ? workflowError.message : null}
+                  onSave={onSaveWorkflow}
+                />
               </div>
             );
           })}
         </div>
       )}
     </div>
+  );
+}
+
+function RecommendationWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
+  const [status, setStatus] = useState<SecurityRecommendationWorkflowStatus>(
+    item.workflow.status,
+  );
+  const [note, setNote] = useState(item.workflow.note ?? '');
+
+  useEffect(() => {
+    setStatus(item.workflow.status);
+    setNote(item.workflow.note ?? '');
+  }, [item.id, item.workflow.note, item.workflow.status]);
+
+  const trimmedNote = note.trim();
+  const savedNote = (item.workflow.note ?? '').trim();
+  const hasChanges = status !== item.workflow.status || trimmedNote !== savedNote;
+
+  async function submitWorkflow(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!hasChanges || isDisabled) {
+      return;
+    }
+
+    await onSave(item.id, {
+      status,
+      ...(trimmedNote ? { note: trimmedNote } : {}),
+    });
+  }
+
+  return (
+    <form
+      onSubmit={submitWorkflow}
+      className="mt-3 border-t border-[var(--border-soft)] pt-3"
+    >
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Workflow
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Current status:{' '}
+            <span className="font-semibold text-[var(--text-main)]">
+              {getRecommendationWorkflowLabel(item.workflow.status)}
+            </span>
+          </p>
+          {item.workflow.updatedAt || item.workflow.updatedBy ? (
+            <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+              {item.workflow.updatedAt
+                ? `Updated ${formatDateTime(item.workflow.updatedAt)}`
+                : 'Updated'}{' '}
+              {item.workflow.updatedBy
+                ? `by ${truncateMiddle(item.workflow.updatedBy, 18)}`
+                : ''}
+            </p>
+          ) : null}
+        </div>
+      </div>
+
+      <div className="mt-3 grid gap-3 md:grid-cols-[minmax(150px,0.7fr)_minmax(0,1.6fr)_auto] md:items-end">
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Status
+          <select
+            value={status}
+            onChange={(event) =>
+              setStatus(event.target.value as SecurityRecommendationWorkflowStatus)
+            }
+            disabled={isDisabled}
+            className="mt-1 h-9 w-full rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 text-sm text-[var(--text-main)] outline-none transition focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            {recommendationWorkflowOptions.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </label>
+
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Note
+          <textarea
+            value={note}
+            onChange={(event) => setNote(event.target.value)}
+            disabled={isDisabled}
+            maxLength={500}
+            rows={2}
+            placeholder="Add review note"
+            className="mt-1 min-h-[2.25rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <button
+          type="submit"
+          disabled={isDisabled || !hasChanges}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {isPending ? 'Saving' : 'Save'}
+        </button>
+      </div>
+
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-[var(--state-error-text)]">
+          {error}
+        </p>
+      ) : null}
+    </form>
   );
 }
 
@@ -1018,6 +1223,21 @@ function getRecommendationTone(severity: 'critical' | 'warning' | 'info') {
     text: 'var(--text-muted)',
     badgeBg: 'var(--bg-subtle)',
   };
+}
+
+function getRecommendationWorkflowLabel(
+  status: SecurityRecommendationWorkflowStatus,
+): string {
+  switch (status) {
+    case 'OPEN':
+      return 'Open';
+    case 'INVESTIGATING':
+      return 'Investigating';
+    case 'REVIEWED':
+      return 'Reviewed';
+    case 'RESOLVED':
+      return 'Resolved';
+  }
 }
 
 function buildRecommendationAuditHref(

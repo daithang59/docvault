@@ -214,6 +214,12 @@ describe('buildSecurityDashboardModel', () => {
             affectedDocumentIds: ['doc-secret'],
             affectedActorIds: [],
             auditFilters: { documentId: 'doc-secret' },
+            workflow: {
+              status: 'INVESTIGATING',
+              note: 'Checking ACL evidence',
+              updatedAt: '2026-05-31T11:00:00.000Z',
+              updatedBy: 'co1',
+            },
           },
           {
             id: 'actor-access-review:DENY_BURST:viewer-1',
@@ -228,6 +234,7 @@ describe('buildSecurityDashboardModel', () => {
             affectedDocumentIds: [],
             affectedActorIds: ['viewer-1'],
             auditFilters: { actorId: 'viewer-1' },
+            workflow: { status: 'OPEN' },
           },
         ],
       }),
@@ -239,12 +246,19 @@ describe('buildSecurityDashboardModel', () => {
         severity: 'critical',
         severityLabel: 'Critical',
         auditFilters: { documentId: 'doc-secret' },
+        workflow: {
+          status: 'INVESTIGATING',
+          note: 'Checking ACL evidence',
+          updatedAt: '2026-05-31T11:00:00.000Z',
+          updatedBy: 'co1',
+        },
       }),
       expect.objectContaining({
         id: 'actor-access-review:DENY_BURST:viewer-1',
         severity: 'warning',
         severityLabel: 'Warning',
         auditFilters: { actorId: 'viewer-1' },
+        workflow: { status: 'OPEN' },
       }),
     ]);
     expect(
@@ -256,6 +270,30 @@ describe('buildSecurityDashboardModel', () => {
     const model = buildSecurityDashboardModel(summary());
 
     expect(model.behaviorAnomalies.signals).toEqual([]);
+  });
+
+  it('defaults recommendation workflow to open when the backend omits it', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          {
+            id: 'malware-upload-review',
+            type: 'MALWARE_UPLOAD_REVIEW',
+            severity: 'warning',
+            title: 'Review blocked malware upload attempts',
+            reason: '1 malware upload attempt was blocked before object storage.',
+            recommendedAction:
+              'Review source actor, checksum, filename, and endpoint context for the blocked upload.',
+            evidence: ['1 malware upload blocked'],
+            affectedDocumentIds: [],
+            affectedActorIds: [],
+            auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+          },
+        ],
+      }),
+    );
+
+    expect(model.recommendations.items[0].workflow).toEqual({ status: 'OPEN' });
   });
 
   it('defines quick investigation filters for the required security event classes', () => {

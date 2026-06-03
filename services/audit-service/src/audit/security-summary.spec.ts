@@ -1,4 +1,31 @@
+import { BadRequestException } from '@nestjs/common';
 import { AuditService } from './audit.service';
+
+function makeFindChain(lean: jest.Mock) {
+  const limit = jest.fn().mockReturnValue({ lean });
+  const sort = jest.fn().mockReturnValue({ limit });
+  return { sort, limit };
+}
+
+function makeFindOneChain(result: unknown) {
+  return {
+    sort: jest.fn().mockReturnValue({
+      lean: jest.fn().mockResolvedValue(result),
+    }),
+  };
+}
+
+function makeWorkflowFindOne(
+  eventsByRecommendationId: Record<string, unknown | undefined> = {},
+) {
+  return jest.fn((filter: Record<string, unknown>) => {
+    const resourceId =
+      typeof filter.resourceId === 'string' ? filter.resourceId : undefined;
+    return makeFindOneChain(
+      resourceId ? (eventsByRecommendationId[resourceId] ?? null) : null,
+    );
+  });
+}
 
 describe('AuditService security summary', () => {
   it('aggregates security evidence counters and repeated deny actors', async () => {
@@ -13,12 +40,12 @@ describe('AuditService security summary', () => {
       { actorId: 'viewer-1', denyCount: 5 },
     ]);
     const riskFindLean = jest.fn().mockResolvedValue([]);
-    const riskFindLimit = jest.fn().mockReturnValue({ lean: riskFindLean });
-    const riskFindSort = jest.fn().mockReturnValue({ limit: riskFindLimit });
-    const find = jest.fn().mockReturnValue({ sort: riskFindSort });
+    const riskFind = makeFindChain(riskFindLean);
+    const find = jest.fn().mockReturnValue(riskFind);
     const service = new AuditService({
       countDocuments,
       find,
+      findOne: makeWorkflowFindOne(),
       aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
     } as any);
     jest
@@ -107,12 +134,12 @@ describe('AuditService security summary', () => {
         metadata: { classification: 'CONFIDENTIAL', docId: 'doc-confidential' },
       },
     ]);
-    const riskFindLimit = jest.fn().mockReturnValue({ lean: riskFindLean });
-    const riskFindSort = jest.fn().mockReturnValue({ limit: riskFindLimit });
-    const find = jest.fn().mockReturnValue({ sort: riskFindSort });
+    const riskFind = makeFindChain(riskFindLean);
+    const find = jest.fn().mockReturnValue(riskFind);
     const service = new AuditService({
       countDocuments,
       find,
+      findOne: makeWorkflowFindOne(),
       aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
     } as any);
     jest
@@ -163,8 +190,8 @@ describe('AuditService security summary', () => {
         timestamp: 1,
       },
     );
-    expect(riskFindSort).toHaveBeenCalledWith({ timestamp: -1 });
-    expect(riskFindLimit).toHaveBeenCalledWith(500);
+    expect(riskFind.sort).toHaveBeenCalledWith({ timestamp: -1 });
+    expect(riskFind.limit).toHaveBeenCalledWith(500);
   });
 
   it('detects ransomware-like behavior signals from audit event bursts', async () => {
@@ -245,20 +272,18 @@ describe('AuditService security summary', () => {
         metadata: { docId: 'doc-secret-3' },
       },
     ]);
-    const makeFindChain = (lean: jest.Mock) => {
-      const limit = jest.fn().mockReturnValue({ lean });
-      const sort = jest.fn().mockReturnValue({ limit });
-      return { sort, limit };
-    };
     const riskFind = makeFindChain(riskFindLean);
     const behaviorFind = makeFindChain(behaviorFindLean);
+    const workflowFind = makeFindChain(jest.fn().mockResolvedValue([]));
     const find = jest
       .fn()
       .mockReturnValueOnce(riskFind)
-      .mockReturnValueOnce(behaviorFind);
+      .mockReturnValueOnce(behaviorFind)
+      .mockReturnValue(workflowFind);
     const service = new AuditService({
       countDocuments,
       find,
+      findOne: makeWorkflowFindOne(),
       aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
     } as any);
     jest
@@ -406,20 +431,18 @@ describe('AuditService security summary', () => {
         metadata: { docId: 'doc-secret-3' },
       },
     ]);
-    const makeFindChain = (lean: jest.Mock) => {
-      const limit = jest.fn().mockReturnValue({ lean });
-      const sort = jest.fn().mockReturnValue({ limit });
-      return { sort, limit };
-    };
     const riskFind = makeFindChain(riskFindLean);
     const behaviorFind = makeFindChain(behaviorFindLean);
+    const workflowFind = makeFindChain(jest.fn().mockResolvedValue([]));
     const find = jest
       .fn()
       .mockReturnValueOnce(riskFind)
-      .mockReturnValueOnce(behaviorFind);
+      .mockReturnValueOnce(behaviorFind)
+      .mockReturnValue(workflowFind);
     const service = new AuditService({
       countDocuments,
       find,
+      findOne: makeWorkflowFindOne(),
       aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
     } as any);
     jest.spyOn(service, 'verifyChain').mockResolvedValue({
@@ -444,6 +467,7 @@ describe('AuditService security summary', () => {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: {},
+        workflow: { status: 'OPEN' },
       },
       {
         id: 'document-access-review:doc-secret',
@@ -463,6 +487,7 @@ describe('AuditService security summary', () => {
         affectedDocumentIds: ['doc-secret'],
         affectedActorIds: [],
         auditFilters: { documentId: 'doc-secret' },
+        workflow: { status: 'OPEN' },
       },
       {
         id: 'actor-access-review:DENY_BURST:viewer-1',
@@ -477,6 +502,7 @@ describe('AuditService security summary', () => {
         affectedDocumentIds: [],
         affectedActorIds: ['viewer-1'],
         auditFilters: { actorId: 'viewer-1' },
+        workflow: { status: 'OPEN' },
       },
       {
         id: 'dlp-classification-review',
@@ -490,6 +516,7 @@ describe('AuditService security summary', () => {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+        workflow: { status: 'OPEN' },
       },
       {
         id: 'malware-upload-review',
@@ -503,8 +530,221 @@ describe('AuditService security summary', () => {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+        workflow: { status: 'OPEN' },
       },
     ]);
+  });
+
+  it('attaches the latest recommendation workflow status from audit events', async () => {
+    const countDocuments = jest.fn((filter: Record<string, unknown>) => {
+      if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(1);
+      return Promise.resolve(0);
+    });
+    const aggregateExec = jest.fn().mockResolvedValue([]);
+    const riskFindLean = jest.fn().mockResolvedValue([]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([]);
+    const workflowFindOneLean = jest.fn().mockResolvedValue({
+      actorId: 'co1',
+      resourceId: 'dlp-classification-review',
+      timestamp: new Date('2026-05-31T11:00:00.000Z'),
+      metadata: {
+        recommendationId: 'dlp-classification-review',
+        status: 'INVESTIGATING',
+        note: 'Checking false positive override evidence',
+      },
+    });
+    const workflowFindOneSort = jest
+      .fn()
+      .mockReturnValue({ lean: workflowFindOneLean });
+    const workflowFindOne = jest
+      .fn()
+      .mockReturnValue({ sort: workflowFindOneSort });
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(makeFindChain(riskFindLean))
+      .mockReturnValueOnce(makeFindChain(behaviorFindLean));
+    const service = new AuditService({
+      countDocuments,
+      find,
+      findOne: workflowFindOne,
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    jest
+      .spyOn(service, 'verifyChain')
+      .mockResolvedValue({ valid: true, checked: 42 });
+
+    const result = await service.securitySummary();
+
+    expect(result.recommendations[0]).toMatchObject({
+      id: 'dlp-classification-review',
+      workflow: {
+        status: 'INVESTIGATING',
+        note: 'Checking false positive override evidence',
+        updatedBy: 'co1',
+        updatedAt: '2026-05-31T11:00:00.000Z',
+      },
+    });
+    expect(workflowFindOne).toHaveBeenCalledWith(
+      {
+        action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+        resourceType: 'SECURITY_RECOMMENDATION',
+        resourceId: 'dlp-classification-review',
+      },
+      {
+        _id: 0,
+        actorId: 1,
+        metadata: 1,
+        resourceId: 1,
+        timestamp: 1,
+      },
+    );
+    expect(workflowFindOneSort).toHaveBeenCalledWith({
+      timestamp: -1,
+      _id: -1,
+    });
+  });
+
+  it('overlays workflow state per recommendation even when another recommendation has many newer updates', async () => {
+    const countDocuments = jest.fn((filter: Record<string, unknown>) => {
+      if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(1);
+      if (filter.action === 'MALWARE_UPLOAD_BLOCKED') return Promise.resolve(1);
+      return Promise.resolve(0);
+    });
+    const aggregateExec = jest.fn().mockResolvedValue([]);
+    const riskFindLean = jest.fn().mockResolvedValue([]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([]);
+    const starvedGlobalWorkflowFindLean = jest.fn().mockResolvedValue(
+      Array.from({ length: 10 }, (_item, index) => ({
+        actorId: `co-${index}`,
+        resourceId: 'dlp-classification-review',
+        timestamp: new Date(`2026-05-31T12:${String(index).padStart(2, '0')}:00.000Z`),
+        metadata: {
+          recommendationId: 'dlp-classification-review',
+          status: 'INVESTIGATING',
+        },
+      })),
+    );
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(makeFindChain(riskFindLean))
+      .mockReturnValueOnce(makeFindChain(behaviorFindLean))
+      .mockReturnValue(makeFindChain(starvedGlobalWorkflowFindLean));
+    const workflowFindOne = makeWorkflowFindOne({
+      'dlp-classification-review': {
+        actorId: 'co-dlp',
+        resourceId: 'dlp-classification-review',
+        timestamp: new Date('2026-05-31T12:09:00.000Z'),
+        metadata: {
+          recommendationId: 'dlp-classification-review',
+          status: 'INVESTIGATING',
+        },
+      },
+      'malware-upload-review': {
+        actorId: 'co-malware',
+        resourceId: 'malware-upload-review',
+        timestamp: new Date('2026-05-31T09:00:00.000Z'),
+        metadata: {
+          recommendationId: 'malware-upload-review',
+          status: 'RESOLVED',
+          note: 'Blocked upload reviewed',
+        },
+      },
+    });
+    const service = new AuditService({
+      countDocuments,
+      find,
+      findOne: workflowFindOne,
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    jest
+      .spyOn(service, 'verifyChain')
+      .mockResolvedValue({ valid: true, checked: 42 });
+
+    const result = await service.securitySummary();
+    const recommendations = new Map(
+      result.recommendations.map((recommendation) => [
+        recommendation.id,
+        recommendation,
+      ]),
+    );
+
+    expect(recommendations.get('dlp-classification-review')?.workflow).toEqual({
+      status: 'INVESTIGATING',
+      note: undefined,
+      updatedAt: '2026-05-31T12:09:00.000Z',
+      updatedBy: 'co-dlp',
+    });
+    expect(recommendations.get('malware-upload-review')?.workflow).toEqual({
+      status: 'RESOLVED',
+      note: 'Blocked upload reviewed',
+      updatedAt: '2026-05-31T09:00:00.000Z',
+      updatedBy: 'co-malware',
+    });
+    expect(workflowFindOne).toHaveBeenCalledTimes(2);
+  });
+
+  it('audits recommendation workflow updates without exposing file content or grant data', async () => {
+    const create = jest.fn().mockResolvedValue({
+      toObject: () => ({ eventId: 'event-recommendation-updated' }),
+    });
+    const service = new AuditService({
+      findOne: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          lean: jest.fn().mockResolvedValue({ hash: 'previous-hash' }),
+        }),
+      }),
+      create,
+    } as any);
+    const createEvent = jest.spyOn(service, 'create');
+
+    await service.updateSecurityRecommendationWorkflow(
+      'dlp-classification-review',
+      {
+        status: 'REVIEWED',
+        note: 'False positive reviewed with ticket SEC-12',
+      },
+      {
+        actorId: 'co1',
+        roles: ['compliance_officer'],
+        ip: '127.0.0.1',
+        traceId: 'trace-1',
+      },
+    );
+
+    expect(createEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'co1',
+        actorRoles: ['compliance_officer'],
+        action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+        resourceType: 'SECURITY_RECOMMENDATION',
+        resourceId: 'dlp-classification-review',
+        result: 'SUCCESS',
+        reason: 'False positive reviewed with ticket SEC-12',
+        timestamp: expect.any(String),
+        ip: '127.0.0.1',
+        traceId: 'trace-1',
+        metadata: {
+          recommendationId: 'dlp-classification-review',
+          status: 'REVIEWED',
+          note: 'False positive reviewed with ticket SEC-12',
+        },
+      }),
+    );
+    const metadata = create.mock.calls[0][0].metadata;
+    expect(JSON.stringify(metadata)).not.toContain('objectKey');
+    expect(JSON.stringify(metadata)).not.toContain('grantToken');
+    expect(JSON.stringify(metadata)).not.toContain('presigned');
+    expect(JSON.stringify(metadata)).not.toContain('content');
+  });
+
+  it('rejects invalid recommendation workflow status as a bad request', async () => {
+    const service = new AuditService({} as any);
+
+    await expect(
+      service.updateSecurityRecommendationWorkflow('dlp-classification-review', {
+        status: 'DONE' as any,
+      }),
+    ).rejects.toBeInstanceOf(BadRequestException);
   });
 
   it('audits recommendation views without exposing file content or grant data', async () => {
@@ -515,15 +755,11 @@ describe('AuditService security summary', () => {
     const aggregateExec = jest.fn().mockResolvedValue([]);
     const riskFindLean = jest.fn().mockResolvedValue([]);
     const behaviorFindLean = jest.fn().mockResolvedValue([]);
-    const makeFindChain = (lean: jest.Mock) => {
-      const limit = jest.fn().mockReturnValue({ lean });
-      const sort = jest.fn().mockReturnValue({ limit });
-      return { sort, limit };
-    };
     const find = jest
       .fn()
       .mockReturnValueOnce(makeFindChain(riskFindLean))
-      .mockReturnValueOnce(makeFindChain(behaviorFindLean));
+      .mockReturnValueOnce(makeFindChain(behaviorFindLean))
+      .mockReturnValue(makeFindChain(jest.fn().mockResolvedValue([])));
     const create = jest.fn().mockResolvedValue({
       toObject: () => ({ eventId: 'event-recommendations-viewed' }),
     });

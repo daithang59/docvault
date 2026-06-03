@@ -7,6 +7,7 @@ import type {
   AuditLogEntry,
   AuditQueryFilters,
   SecuritySummary,
+  UpdateSecurityRecommendationWorkflowRequest,
 } from './audit.types';
 
 const DEFAULT_AUDIT_WINDOW_PAGE_SIZE = 100;
@@ -112,4 +113,15 @@ export async function verifyAuditChain(): Promise<AuditChainStatus> {
 export async function getSecuritySummary(): Promise<SecuritySummary> {
   const res = await apiClient.get(apiEndpoints.audit.securitySummary);
   return unwrap(res) as SecuritySummary;
+}
+
+export async function updateSecurityRecommendationWorkflow(
+  id: string,
+  dto: UpdateSecurityRecommendationWorkflowRequest,
+): Promise<AuditLogEntry> {
+  const res = await apiClient.patch(
+    apiEndpoints.audit.securityRecommendationWorkflow(id),
+    dto,
+  );
+  return unwrap(res) as AuditLogEntry;
 }

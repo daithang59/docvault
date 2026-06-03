@@ -1,10 +1,15 @@
-import { Injectable } from '@nestjs/common';
+import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { createHash, randomUUID } from 'crypto';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
+import {
+  SECURITY_RECOMMENDATION_WORKFLOW_STATUSES,
+  SecurityRecommendationWorkflowDto,
+  SecurityRecommendationWorkflowStatus,
+} from './dto/security-recommendation-workflow.dto';
 
 const AUTHORIZED_CONTENT_ACTIONS = [
   'DOCUMENT_DOWNLOAD_AUTHORIZED',
@@ -61,6 +66,13 @@ export type SecurityRecommendationType =
 
 export type SecurityRecommendationSeverity = 'critical' | 'warning' | 'info';
 
+export interface SecurityRecommendationWorkflow {
+  status: SecurityRecommendationWorkflowStatus;
+  note?: string | null;
+  updatedAt?: string;
+  updatedBy?: string;
+}
+
 export interface SecurityRecommendationSummary {
   id: string;
   type: SecurityRecommendationType;
@@ -79,6 +91,7 @@ export interface SecurityRecommendationSummary {
     resourceId?: string;
     documentId?: string;
   };
+  workflow: SecurityRecommendationWorkflow;
 }
 
 export interface SecuritySummaryViewer {
@@ -251,6 +264,28 @@ export class AuditService {
       this.getBehaviorSignals(),
     ]);
 
+    const recommendations = this.buildSecurityRecommendations({
+      chain,
+      totals: {
+        deniedEvents,
+        malwareBlocked,
+        dlpDetections,
+        downloadDenied,
+      },
+      repeatedDenyActors,
+      riskyDocuments,
+      behaviorSignals,
+    });
+    const workflowStates = await this.getRecommendationWorkflowStates(
+      recommendations.map((recommendation) => recommendation.id),
+    );
+    const recommendationsWithWorkflow = recommendations.map(
+      (recommendation) => ({
+        ...recommendation,
+        workflow: workflowStates.get(recommendation.id) ?? { status: 'OPEN' },
+      }),
+    );
+
     const summary = {
       chain,
       totals: {
@@ -262,23 +297,39 @@ export class AuditService {
       repeatedDenyActors,
       riskyDocuments,
       behaviorSignals,
-      recommendations: this.buildSecurityRecommendations({
-        chain,
-        totals: {
-          deniedEvents,
-          malwareBlocked,
-          dlpDetections,
-          downloadDenied,
-        },
-        repeatedDenyActors,
-        riskyDocuments,
-        behaviorSignals,
-      }),
+      recommendations: recommendationsWithWorkflow,
     };
 
     await this.recordRecommendationView(viewer, summary.recommendations);
 
     return summary;
+  }
+
+  async updateSecurityRecommendationWorkflow(
+    recommendationId: string,
+    dto: SecurityRecommendationWorkflowDto,
+    viewer?: SecuritySummaryViewer,
+  ) {
+    const status = this.normalizeRecommendationWorkflowStatus(dto.status);
+    const note = this.normalizeRecommendationWorkflowNote(dto.note);
+
+    return this.create({
+      timestamp: new Date().toISOString(),
+      actorId: viewer?.actorId ?? 'unknown',
+      actorRoles: viewer?.roles ?? [],
+      action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+      resourceType: 'SECURITY_RECOMMENDATION',
+      resourceId: recommendationId,
+      result: 'SUCCESS',
+      reason: note ?? `Security recommendation marked ${status}`,
+      ip: viewer?.ip,
+      traceId: viewer?.traceId,
+      metadata: {
+        recommendationId,
+        status,
+        ...(note ? { note } : {}),
+      },
+    });
   }
 
   /**
@@ -655,6 +706,7 @@ export class AuditService {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: {},
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -678,6 +730,7 @@ export class AuditService {
         affectedDocumentIds: [document.documentId],
         affectedActorIds: [],
         auditFilters: { documentId: document.documentId },
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -703,6 +756,7 @@ export class AuditService {
         affectedDocumentIds: [],
         affectedActorIds: [signal.actorId],
         auditFilters: { actorId: signal.actorId },
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -723,6 +777,7 @@ export class AuditService {
         affectedDocumentIds: [],
         affectedActorIds: [actor.actorId],
         auditFilters: { actorId: actor.actorId },
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -741,6 +796,7 @@ export class AuditService {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -759,6 +815,7 @@ export class AuditService {
         affectedDocumentIds: [],
         affectedActorIds: [],
         auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+        workflow: { status: 'OPEN' },
       });
     }
 
@@ -806,6 +863,103 @@ export class AuditService {
         })),
       },
     });
+  }
+
+  private async getRecommendationWorkflowStates(
+    recommendationIds: string[],
+  ): Promise<Map<string, SecurityRecommendationWorkflow>> {
+    if (recommendationIds.length === 0) return new Map();
+
+    const events = await Promise.all(
+      recommendationIds.map((recommendationId) =>
+        this.auditEvent
+          .findOne(
+            {
+              action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+              resourceType: 'SECURITY_RECOMMENDATION',
+              resourceId: recommendationId,
+            },
+            {
+              _id: 0,
+              actorId: 1,
+              metadata: 1,
+              resourceId: 1,
+              timestamp: 1,
+            },
+          )
+          .sort({ timestamp: -1, _id: -1 })
+          .lean(),
+      ),
+    );
+
+    const workflows = new Map<string, SecurityRecommendationWorkflow>();
+
+    for (const event of events) {
+      if (!event) {
+        continue;
+      }
+
+      const recommendationId =
+        typeof event.resourceId === 'string'
+          ? event.resourceId
+          : typeof event.metadata?.recommendationId === 'string'
+            ? event.metadata.recommendationId
+            : undefined;
+      const status = this.tryRecommendationWorkflowStatus(
+        event.metadata?.status,
+      );
+
+      if (!recommendationId || !status || workflows.has(recommendationId)) {
+        continue;
+      }
+
+      workflows.set(recommendationId, {
+        status,
+        note:
+          typeof event.metadata?.note === 'string'
+            ? event.metadata.note
+            : undefined,
+        updatedAt:
+          event.timestamp instanceof Date
+            ? event.timestamp.toISOString()
+            : new Date(event.timestamp).toISOString(),
+        updatedBy: event.actorId,
+      });
+    }
+
+    return workflows;
+  }
+
+  private normalizeRecommendationWorkflowStatus(
+    status: unknown,
+  ): SecurityRecommendationWorkflowStatus {
+    const workflowStatus = this.tryRecommendationWorkflowStatus(status);
+    if (!workflowStatus) {
+      throw new BadRequestException(
+        `Invalid recommendation workflow status: ${String(status)}`,
+      );
+    }
+    return workflowStatus;
+  }
+
+  private tryRecommendationWorkflowStatus(
+    status: unknown,
+  ): SecurityRecommendationWorkflowStatus | null {
+    if (typeof status !== 'string') return null;
+    const normalized = status.trim().toUpperCase();
+    return SECURITY_RECOMMENDATION_WORKFLOW_STATUSES.includes(
+      normalized as SecurityRecommendationWorkflowStatus,
+    )
+      ? (normalized as SecurityRecommendationWorkflowStatus)
+      : null;
+  }
+
+  private normalizeRecommendationWorkflowNote(
+    note: string | undefined,
+  ): string | undefined {
+    const normalized = note?.trim();
+    if (!normalized) return undefined;
+    return normalized.length > 500 ? normalized.slice(0, 500) : normalized;
   }
 
   private getBehaviorRecommendationTitle(signal: BehaviorSignalSummary): string {

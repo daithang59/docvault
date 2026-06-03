@@ -1,4 +1,14 @@
-import { Body, Controller, Get, Post, Query, Req, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
@@ -7,6 +17,7 @@ import { ServiceTokenGuard } from '../auth/service-token.guard';
 import { AuditService } from './audit.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
+import { SecurityRecommendationWorkflowDto } from './dto/security-recommendation-workflow.dto';
 
 @ApiTags('audit')
 @ApiBearerAuth()
@@ -48,6 +59,23 @@ export class AuditController {
   @ApiOperation({ summary: 'Summarize security audit evidence' })
   securitySummary(@Req() req: any) {
     return this.auditService.securitySummary({
+      actorId: req.user?.username ?? req.user?.sub,
+      roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      ip: req.ip,
+      traceId: req.headers?.['x-trace-id'],
+    });
+  }
+
+  @Patch('security-recommendations/:id/workflow')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Update security recommendation workflow state' })
+  updateSecurityRecommendationWorkflow(
+    @Param('id') id: string,
+    @Body() body: SecurityRecommendationWorkflowDto,
+    @Req() req: any,
+  ) {
+    return this.auditService.updateSecurityRecommendationWorkflow(id, body, {
       actorId: req.user?.username ?? req.user?.sub,
       roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
       ip: req.ip,
