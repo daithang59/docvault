@@ -45,6 +45,8 @@ export const apiEndpoints = {
     securitySummary: '/audit/security-summary',
     securityRecommendationWorkflow: (id: string) =>
       `/audit/security-recommendations/${encodeURIComponent(id)}/workflow`,
+    securityRecommendationWorkflowHistory: (id: string) =>
+      `/audit/security-recommendations/${encodeURIComponent(id)}/workflow-history`,
   },
 } as const;
 

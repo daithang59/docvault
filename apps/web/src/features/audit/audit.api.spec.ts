@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { PaginatedResponse } from '@/types/pagination';
 import type { AuditLogEntry, AuditQueryFilters } from './audit.types';
 import {
+  getSecurityRecommendationWorkflowHistory,
   queryAuditLogWindow,
   updateSecurityRecommendationWorkflow,
 } from './audit.api';
@@ -119,5 +120,38 @@ describe('updateSecurityRecommendationWorkflow', () => {
       eventId: 'event-recommendation-updated',
       action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
     });
+  });
+});
+
+describe('getSecurityRecommendationWorkflowHistory', () => {
+  it('gets the encoded recommendation workflow history endpoint and unwraps entries', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: [
+        {
+          eventId: 'event-reviewed',
+          status: 'REVIEWED',
+          note: 'Reviewed with ticket SEC-12',
+          updatedAt: '2026-05-31T11:00:00.000Z',
+          updatedBy: 'co1',
+        },
+      ],
+    });
+
+    const result = await getSecurityRecommendationWorkflowHistory(
+      'actor-access-review:DENY_BURST:viewer-1',
+    );
+
+    expect(apiClientMock.get).toHaveBeenCalledWith(
+      '/audit/security-recommendations/actor-access-review%3ADENY_BURST%3Aviewer-1/workflow-history',
+    );
+    expect(result).toEqual([
+      {
+        eventId: 'event-reviewed',
+        status: 'REVIEWED',
+        note: 'Reviewed with ticket SEC-12',
+        updatedAt: '2026-05-31T11:00:00.000Z',
+        updatedBy: 'co1',
+      },
+    ]);
   });
 });

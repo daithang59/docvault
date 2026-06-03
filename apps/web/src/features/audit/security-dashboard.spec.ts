@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { AuditLogEntry, SecuritySummary } from './audit.types';
 import {
   buildAuditFilterQuery,
+  buildRecommendationEvidencePacket,
   buildSecurityDashboardModel,
 } from './security-dashboard';
 
@@ -338,5 +339,73 @@ describe('buildSecurityDashboardModel', () => {
     expect(buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })).toBe(
       'action=DLP_PATTERN_DETECTED',
     );
+  });
+
+  it('builds metadata-only evidence packets for recommendation export', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        chain: { valid: true, checked: 42 },
+        recommendations: [
+          {
+            id: 'dlp-classification-review',
+            type: 'DLP_CLASSIFICATION_REVIEW',
+            severity: 'warning',
+            title: 'Review DLP-driven classification controls',
+            reason: '1 DLP detection event was recorded in the audit summary.',
+            recommendedAction:
+              'Confirm classification escalation, verify override reasons, and block unsafe downgrade paths.',
+            evidence: ['1 DLP detection event'],
+            affectedDocumentIds: [],
+            affectedActorIds: [],
+            auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+            workflow: { status: 'REVIEWED' },
+          },
+        ],
+      }),
+    );
+
+    const packet = buildRecommendationEvidencePacket({
+      recommendation: model.recommendations.items[0],
+      auditChain: { valid: true, checked: 42 },
+      workflowHistory: [
+        {
+          eventId: 'event-reviewed',
+          status: 'REVIEWED',
+          note: 'Reviewed with ticket SEC-12',
+          updatedAt: '2026-05-31T11:00:00.000Z',
+          updatedBy: 'co1',
+        },
+      ],
+      generatedAt: '2026-06-01T00:00:00.000Z',
+    });
+
+    expect(packet).toEqual({
+      generatedAt: '2026-06-01T00:00:00.000Z',
+      metadataOnly: true,
+      excludedSensitiveFields: [
+        'fileContent',
+        'objectKey',
+        'presignedUrl',
+        'grantToken',
+      ],
+      auditChain: { valid: true, checked: 42 },
+      recommendation: expect.objectContaining({
+        id: 'dlp-classification-review',
+        workflow: { status: 'REVIEWED' },
+      }),
+      workflowHistory: [
+        {
+          eventId: 'event-reviewed',
+          status: 'REVIEWED',
+          note: 'Reviewed with ticket SEC-12',
+          updatedAt: '2026-05-31T11:00:00.000Z',
+          updatedBy: 'co1',
+        },
+      ],
+    });
+    expect(JSON.stringify(packet)).not.toContain('objectKeyValue');
+    expect(JSON.stringify(packet)).not.toContain('grant-token');
+    expect(JSON.stringify(packet)).not.toContain('presigned-url');
+    expect(JSON.stringify(packet)).not.toContain('file-content');
   });
 });

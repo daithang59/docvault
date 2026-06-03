@@ -372,6 +372,18 @@ pnpm test:e2e
 - Recommendation có workflow trạng thái qua `PATCH /audit/security-recommendations/:id/workflow`.
 - Enum workflow: `OPEN`, `INVESTIGATING`, `REVIEWED`, `RESOLVED`; security summary overlay `recommendation.workflow`, mặc định `OPEN` nếu chưa có event workflow.
 - Khi cập nhật workflow, audit event `SECURITY_RECOMMENDATION_STATUS_UPDATED` được ghi với `resourceType=SECURITY_RECOMMENDATION`, `resourceId` là recommendation id.
+- Recommendation card có History timeline để xem lịch sử workflow metadata-only.
+- History endpoint:
+  - `GET /audit/security-recommendations/:id/workflow-history`
+- Workflow history chỉ trả metadata entries:
+  - `eventId`
+  - `status`
+  - `note?`
+  - `updatedAt`
+  - `updatedBy`
+- Recommendation card có action download evidence packet JSON.
+- Recommendation evidence packet được tạo client-side từ recommendation, audit-chain status và workflow history.
+- Packet là metadata-only và có `excludedSensitiveFields` để ghi rõ các trường nhạy cảm bị loại trừ.
 
 **Ý nghĩa**
 
@@ -379,6 +391,8 @@ pnpm test:e2e
 - Recommendation deterministic giúp demo ổn định, không phụ thuộc LLM.
 - Không đưa file content/object key/presigned URL/grant token vào recommendation metadata.
 - Workflow recommendation giúp compliance/admin ghi nhận điều tra/review/resolve mà vẫn giữ audit trail metadata-safe.
+- History timeline giúp chứng minh tiến trình xử lý recommendation mà không mở rộng quyền xem nội dung file.
+- Evidence packet JSON giúp xuất bằng chứng kiểm toán riêng cho recommendation, vẫn loại trừ file content, object key, presigned URL và grant token.
 
 **Cách sử dụng**
 
@@ -409,6 +423,9 @@ http://localhost:3006/security
 7. Gọi lại `GET /audit/security-summary` và kiểm tra recommendation tương ứng có `workflow.status`.
 8. Mở Audit và lọc `action=SECURITY_RECOMMENDATION_STATUS_UPDATED`, `resourceType=SECURITY_RECOMMENDATION`, `resourceId=<recommendation-id>`.
 9. Kiểm tra metadata audit chỉ có dữ liệu như `recommendationId`, `status`, `note`; không có file content, object key, presigned URL hoặc grant token.
+10. Mở History trên recommendation card và kiểm tra timeline có entry metadata-only tương ứng với status vừa cập nhật.
+11. Download evidence packet JSON từ recommendation card.
+12. Kiểm tra packet có recommendation, audit-chain status, workflow history và `excludedSensitiveFields`; không có file content, object key, presigned URL hoặc grant token.
 
 **Cách test**
 
@@ -485,6 +502,7 @@ pnpm test:e2e
   - presigned URL
   - preview grant
   - download grant token
+- Security dashboard cũng có recommendation evidence packet JSON metadata-only, tạo client-side từ recommendation + audit-chain status + workflow history và ghi `excludedSensitiveFields`.
 - Viewer/editor/approver không có role compliance/admin sẽ bị deny.
 
 **Ý nghĩa**
@@ -716,6 +734,7 @@ Kết quả kỳ vọng:
 - DLP upload escalate classification.
 - DLP downgrade bị chặn nếu không có override hợp lệ.
 - Evidence packet có metadata/version/workflow/retention/audit evidence.
+- Recommendation evidence packet có recommendation metadata, audit-chain status, workflow history và `excludedSensitiveFields`.
 - Viewer bị deny evidence packet/audit ingest.
 - Retention auto-archive tạo workflow history và audit.
 
@@ -771,7 +790,7 @@ Sau đó mở `/audit` và verify chain.
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
 | Approvals | `http://localhost:3006/approvals` | approver/admin | Approve/reject Pending document |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
-| Security | `http://localhost:3006/security` | compliance/admin | Counters, alerts, risk scoring, anomalies, recommendations |
+| Security | `http://localhost:3006/security` | compliance/admin | Counters, alerts, risk scoring, anomalies, recommendations, recommendation history/evidence packet |
 | Retention | `http://localhost:3006/retention` | compliance/admin | Retention status và records evidence |
 
 ## 7. Demo flow để trình bày với giảng viên
@@ -792,9 +811,11 @@ Sau đó mở `/audit` và verify chain.
     - risky documents
     - behavior anomaly
     - security recommendations
-13. Vào document detail, export evidence packet và chỉ ra packet không có file content/token.
-14. Vào `/retention`, trình bày retention class/deadline/status.
-15. Vào edit document, đổi classification để xem access impact preview.
+13. Đổi workflow status của một recommendation, mở History timeline và download recommendation evidence packet JSON.
+14. Chỉ ra recommendation packet có `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
+15. Vào document detail, export evidence packet và chỉ ra packet không có file content/token.
+16. Vào `/retention`, trình bày retention class/deadline/status.
+17. Vào edit document, đổi classification để xem access impact preview.
 
 ## 8. Điểm cần nói rõ trong báo cáo
 
@@ -804,6 +825,7 @@ Sau đó mở `/audit` và verify chain.
 - MinIO SSE là encryption-at-rest MVP; hướng nâng cao là Vault/KMS/client-side encryption/E2EE.
 - Compliance Officer có thể xem audit/metadata/evidence theo policy, nhưng không được xem file content.
 - Security Recommendation Engine chỉ dùng audit metadata, không đưa nội dung file, object key, presigned URL hay grant token vào output/audit.
+- Recommendation history và recommendation evidence packet cũng metadata-only; packet ghi `excludedSensitiveFields` để chứng minh các trường nhạy cảm đã bị loại trừ.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -837,6 +859,6 @@ Ghi chú:
 
 1. Chụp ảnh UI các trang `/security`, `/audit`, `/retention`, document detail và access impact preview để đưa vào báo cáo.
 2. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
-3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED` và audit event tương ứng.
+3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED`, mở History timeline, tải recommendation evidence packet JSON và audit event tương ứng.
 4. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
 5. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

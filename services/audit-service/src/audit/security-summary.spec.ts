@@ -747,6 +747,68 @@ describe('AuditService security summary', () => {
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 
+  it('returns recommendation workflow history without exposing content-bearing metadata', async () => {
+    const workflowFindLean = jest.fn().mockResolvedValue([
+      {
+        eventId: 'event-reviewed',
+        actorId: 'co1',
+        timestamp: new Date('2026-05-31T11:00:00.000Z'),
+        metadata: {
+          recommendationId: 'dlp-classification-review',
+          status: 'REVIEWED',
+          note: 'Reviewed with ticket SEC-12',
+          objectKey: 'documents/private.pdf',
+          grantToken: 'grant-token',
+          presignedUrl: 'https://storage.example/private.pdf',
+          content: 'secret file text',
+        },
+      },
+      {
+        eventId: 'event-investigating',
+        actorId: 'co2',
+        timestamp: new Date('2026-05-31T10:00:00.000Z'),
+        metadata: {
+          recommendationId: 'dlp-classification-review',
+          status: 'INVESTIGATING',
+        },
+      },
+    ]);
+    const workflowFind = makeFindChain(workflowFindLean);
+    const service = new AuditService({
+      find: jest.fn().mockReturnValue(workflowFind),
+    } as any);
+
+    const result = await service.getSecurityRecommendationWorkflowHistory(
+      'dlp-classification-review',
+    );
+
+    expect(result).toEqual([
+      {
+        eventId: 'event-reviewed',
+        status: 'REVIEWED',
+        note: 'Reviewed with ticket SEC-12',
+        updatedAt: '2026-05-31T11:00:00.000Z',
+        updatedBy: 'co1',
+      },
+      {
+        eventId: 'event-investigating',
+        status: 'INVESTIGATING',
+        note: undefined,
+        updatedAt: '2026-05-31T10:00:00.000Z',
+        updatedBy: 'co2',
+      },
+    ]);
+    expect(workflowFind.sort).toHaveBeenCalledWith({
+      timestamp: -1,
+      _id: -1,
+    });
+    expect(workflowFind.limit).toHaveBeenCalledWith(50);
+    expect(JSON.stringify(result)).not.toContain('objectKey');
+    expect(JSON.stringify(result)).not.toContain('grantToken');
+    expect(JSON.stringify(result)).not.toContain('presigned');
+    expect(JSON.stringify(result)).not.toContain('content');
+  });
+
   it('audits recommendation views without exposing file content or grant data', async () => {
     const countDocuments = jest.fn((filter: Record<string, unknown>) => {
       if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(1);

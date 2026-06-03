@@ -154,4 +154,24 @@ export class AuditProxyController {
     });
     return response.data;
   }
+
+  /** Return append-only workflow history for one recommendation. */
+  @Get('security-recommendations/:id/workflow-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Get security recommendation workflow history',
+    description:
+      'Returns status/note timeline entries derived from audit events without file content, object keys, presigned URLs, or grant tokens.',
+  })
+  async getSecurityRecommendationWorkflowHistory(
+    @Req() req: any,
+    @Param('id') id: string,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.AUDIT_SERVICE_URL}/audit/security-recommendations/${encodeURIComponent(id)}/workflow-history`,
+    });
+    return response.data;
+  }
 }

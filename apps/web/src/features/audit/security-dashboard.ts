@@ -1,8 +1,10 @@
 import type {
+  AuditChainStatus,
   AuditLogEntry,
   AuditQueryFilters,
   BehaviorSignalSummary,
   RiskyDocumentSummary,
+  SecurityRecommendationWorkflowHistoryEntry,
   SecurityRecommendationWorkflow,
   SecurityRecommendationSummary,
   SecuritySummary,
@@ -79,6 +81,41 @@ export interface SecurityDashboardModel {
     description: string;
     filters: AuditQueryFilters;
   }>;
+}
+
+export interface SecurityRecommendationEvidencePacket {
+  generatedAt: string;
+  metadataOnly: true;
+  excludedSensitiveFields: string[];
+  auditChain: AuditChainStatus;
+  recommendation: SecurityRecommendationRow;
+  workflowHistory: SecurityRecommendationWorkflowHistoryEntry[];
+}
+
+export function buildRecommendationEvidencePacket({
+  recommendation,
+  auditChain,
+  workflowHistory,
+  generatedAt,
+}: {
+  recommendation: SecurityRecommendationRow;
+  auditChain: AuditChainStatus;
+  workflowHistory: SecurityRecommendationWorkflowHistoryEntry[];
+  generatedAt: string;
+}): SecurityRecommendationEvidencePacket {
+  return {
+    generatedAt,
+    metadataOnly: true,
+    excludedSensitiveFields: [
+      'fileContent',
+      'objectKey',
+      'presignedUrl',
+      'grantToken',
+    ],
+    auditChain,
+    recommendation,
+    workflowHistory,
+  };
 }
 
 export function buildSecurityDashboardModel(

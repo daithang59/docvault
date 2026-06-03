@@ -94,6 +94,14 @@ export interface SecurityRecommendationWorkflow {
 
 export type SecurityRecommendationWorkflowSummary = SecurityRecommendationWorkflow;
 
+export interface SecurityRecommendationWorkflowHistoryEntry {
+  eventId: string;
+  status: SecurityRecommendationWorkflowStatus;
+  note?: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export interface SecurityRecommendationWorkflowRequest {
   status: SecurityRecommendationWorkflowStatus;
   note?: string;

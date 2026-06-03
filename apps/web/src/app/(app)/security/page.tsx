@@ -5,6 +5,7 @@ import type { FormEvent } from 'react';
 import { useEffect, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
+  Clock,
   AlertTriangle,
   Bug,
   Download,
@@ -29,6 +30,7 @@ import { formatDateTime } from '@/lib/utils/date';
 import { truncateMiddle } from '@/lib/utils/format';
 import { auditKeys } from '@/features/audit/audit.keys';
 import {
+  getSecurityRecommendationWorkflowHistory,
   getSecuritySummary,
   queryAuditLog,
   queryAuditLogWindow,
@@ -36,13 +38,16 @@ import {
   verifyAuditChain,
 } from '@/features/audit/audit.api';
 import type {
+  AuditChainStatus,
   AuditLogEntry,
+  SecurityRecommendationWorkflowHistoryEntry,
   SecurityRecommendationWorkflowRequest,
   SecurityRecommendationWorkflowStatus,
 } from '@/features/audit/audit.types';
 import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
+  buildRecommendationEvidencePacket,
   type SecurityDashboardMetric,
 } from '@/features/audit/security-dashboard';
 
@@ -69,6 +74,12 @@ type RecommendationWorkflowMutation = {
   payload: SecurityRecommendationWorkflowRequest;
 };
 
+type RecommendationHistoryState = Record<
+  string,
+  SecurityRecommendationWorkflowHistoryEntry[]
+>;
+type RecommendationHistoryErrors = Record<string, string | undefined>;
+
 export default function SecurityPage() {
   const { session } = useAuth();
   const hasAccess = canViewAudit(session);
@@ -80,6 +91,11 @@ export default function SecurityPage() {
     id: string;
     message: string;
   } | null>(null);
+  const [expandedHistoryIds, setExpandedHistoryIds] = useState<string[]>([]);
+  const [workflowHistoryByRecommendationId, setWorkflowHistoryByRecommendationId] =
+    useState<RecommendationHistoryState>({});
+  const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
+  const [historyErrors, setHistoryErrors] = useState<RecommendationHistoryErrors>({});
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -195,6 +211,11 @@ export default function SecurityPage() {
 
     try {
       await workflowMutation.mutateAsync({ id, payload });
+      setWorkflowHistoryByRecommendationId((current) => {
+        const next = { ...current };
+        delete next[id];
+        return next;
+      });
     } catch {
       setWorkflowError({
         id,
@@ -203,6 +224,69 @@ export default function SecurityPage() {
     } finally {
       setPendingRecommendationId(null);
     }
+  }
+
+  async function loadRecommendationHistory(id: string) {
+    setHistoryLoadingId(id);
+    setHistoryErrors((current) => ({ ...current, [id]: undefined }));
+
+    try {
+      const history = await getSecurityRecommendationWorkflowHistory(id);
+      setWorkflowHistoryByRecommendationId((current) => ({
+        ...current,
+        [id]: history,
+      }));
+      return history;
+    } catch {
+      setHistoryErrors((current) => ({
+        ...current,
+        [id]: 'Failed to load workflow history.',
+      }));
+      return null;
+    } finally {
+      setHistoryLoadingId(null);
+    }
+  }
+
+  async function toggleRecommendationHistory(id: string) {
+    const isExpanded = expandedHistoryIds.includes(id);
+    setExpandedHistoryIds((current) =>
+      isExpanded ? current.filter((item) => item !== id) : [...current, id],
+    );
+
+    if (!isExpanded && !workflowHistoryByRecommendationId[id]) {
+      await loadRecommendationHistory(id);
+    }
+  }
+
+  async function downloadRecommendationEvidence(
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
+  ) {
+    const history =
+      workflowHistoryByRecommendationId[item.id] ??
+      (await loadRecommendationHistory(item.id));
+
+    if (!history || !summaryQuery.data?.chain) {
+      return;
+    }
+
+    const packet = buildRecommendationEvidencePacket({
+      recommendation: item,
+      auditChain: summaryQuery.data.chain,
+      workflowHistory: history,
+      generatedAt: new Date().toISOString(),
+    });
+    const blob = new Blob([JSON.stringify(packet, null, 2)], {
+      type: 'application/json',
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${item.id.replace(/[^a-z0-9-]+/gi, '-')}-evidence-packet.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
   }
 
   if (!hasAccess) {
@@ -227,6 +311,8 @@ export default function SecurityPage() {
       />
     );
   }
+
+  const auditChain = summaryQuery.data?.chain ?? { valid: false, checked: 0 };
 
   return (
     <div>
@@ -261,7 +347,7 @@ export default function SecurityPage() {
           level={model.posture.level}
           label={model.posture.label}
           description={model.posture.description}
-          checked={summaryQuery.data?.chain.checked ?? 0}
+          checked={auditChain.checked}
           onVerify={refreshAndVerifyChain}
           isVerifying={isVerifyingChain}
           verifyError={verifyChainError}
@@ -308,9 +394,16 @@ export default function SecurityPage() {
       <section className="mt-4">
         <RecommendationsPanel
           recommendations={model.recommendations}
+          auditChain={auditChain}
           pendingRecommendationId={pendingRecommendationId}
           workflowError={workflowError}
+          expandedHistoryIds={expandedHistoryIds}
+          workflowHistoryByRecommendationId={workflowHistoryByRecommendationId}
+          historyLoadingId={historyLoadingId}
+          historyErrors={historyErrors}
           onSaveWorkflow={saveRecommendationWorkflow}
+          onToggleHistory={toggleRecommendationHistory}
+          onDownloadEvidence={downloadRecommendationEvidence}
         />
       </section>
 
@@ -333,16 +426,32 @@ export default function SecurityPage() {
 
 function RecommendationsPanel({
   recommendations,
+  auditChain,
   pendingRecommendationId,
   workflowError,
+  expandedHistoryIds,
+  workflowHistoryByRecommendationId,
+  historyLoadingId,
+  historyErrors,
   onSaveWorkflow,
+  onToggleHistory,
+  onDownloadEvidence,
 }: {
   recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
+  auditChain: AuditChainStatus;
   pendingRecommendationId: string | null;
   workflowError: { id: string; message: string } | null;
+  expandedHistoryIds: string[];
+  workflowHistoryByRecommendationId: RecommendationHistoryState;
+  historyLoadingId: string | null;
+  historyErrors: RecommendationHistoryErrors;
   onSaveWorkflow: (
     id: string,
     payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+  onToggleHistory: (id: string) => Promise<void>;
+  onDownloadEvidence: (
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
   ) => Promise<void>;
 }) {
   const items = recommendations.items;
@@ -466,11 +575,124 @@ function RecommendationsPanel({
                   error={workflowError?.id === item.id ? workflowError.message : null}
                   onSave={onSaveWorkflow}
                 />
+
+                <RecommendationHistoryControls
+                  item={item}
+                  auditChain={auditChain}
+                  isExpanded={expandedHistoryIds.includes(item.id)}
+                  isLoading={historyLoadingId === item.id}
+                  error={historyErrors[item.id] ?? null}
+                  history={workflowHistoryByRecommendationId[item.id] ?? []}
+                  onToggleHistory={onToggleHistory}
+                  onDownloadEvidence={onDownloadEvidence}
+                />
               </div>
             );
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function RecommendationHistoryControls({
+  item,
+  auditChain,
+  isExpanded,
+  isLoading,
+  error,
+  history,
+  onToggleHistory,
+  onDownloadEvidence,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  auditChain: AuditChainStatus;
+  isExpanded: boolean;
+  isLoading: boolean;
+  error: string | null;
+  history: SecurityRecommendationWorkflowHistoryEntry[];
+  onToggleHistory: (id: string) => Promise<void>;
+  onDownloadEvidence: (
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
+  ) => Promise<void>;
+}) {
+  return (
+    <div className="mt-3 border-t border-[var(--border-soft)] pt-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Evidence packet
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Audit chain: {auditChain.checked} event{auditChain.checked === 1 ? '' : 's'} checked
+            {auditChain.valid ? '' : ' · invalid'}
+          </p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => onToggleHistory(item.id)}
+            disabled={isLoading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Clock className={`h-4 w-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isExpanded ? 'Hide history' : 'History'}
+          </button>
+          <button
+            type="button"
+            onClick={() => onDownloadEvidence(item)}
+            disabled={isLoading}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            Download packet
+          </button>
+        </div>
+      </div>
+
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-[var(--state-error-text)]">
+          {error}
+        </p>
+      ) : null}
+
+      {isExpanded ? (
+        <div className="mt-3 space-y-2">
+          {isLoading ? (
+            <p className="text-xs text-[var(--text-muted)]">Loading history...</p>
+          ) : null}
+          {!isLoading && history.length === 0 ? (
+            <p className="text-xs text-[var(--text-muted)]">
+              No workflow update has been recorded yet.
+            </p>
+          ) : null}
+          {!isLoading &&
+            history.map((entry) => (
+              <div
+                key={entry.eventId}
+                className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2"
+              >
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span className="text-xs font-semibold text-[var(--text-main)]">
+                    {getRecommendationWorkflowLabel(entry.status)}
+                  </span>
+                  <span className="text-[11px] text-[var(--text-faint)]">
+                    {formatDateTime(entry.updatedAt)}
+                  </span>
+                </div>
+                <p className="mt-1 text-[11px] text-[var(--text-faint)]">
+                  actor {truncateMiddle(entry.updatedBy, 18)} · event{' '}
+                  {truncateMiddle(entry.eventId, 18)}
+                </p>
+                {entry.note ? (
+                  <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                    {entry.note}
+                  </p>
+                ) : null}
+              </div>
+            ))}
+        </div>
+      ) : null}
     </div>
   );
 }

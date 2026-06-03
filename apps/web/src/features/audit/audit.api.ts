@@ -6,6 +6,7 @@ import type {
   AuditChainStatus,
   AuditLogEntry,
   AuditQueryFilters,
+  SecurityRecommendationWorkflowHistoryEntry,
   SecuritySummary,
   UpdateSecurityRecommendationWorkflowRequest,
 } from './audit.types';
@@ -124,4 +125,13 @@ export async function updateSecurityRecommendationWorkflow(
     dto,
   );
   return unwrap(res) as AuditLogEntry;
+}
+
+export async function getSecurityRecommendationWorkflowHistory(
+  id: string,
+): Promise<SecurityRecommendationWorkflowHistoryEntry[]> {
+  const res = await apiClient.get(
+    apiEndpoints.audit.securityRecommendationWorkflowHistory(id),
+  );
+  return unwrap(res) as SecurityRecommendationWorkflowHistoryEntry[];
 }

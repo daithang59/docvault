@@ -73,6 +73,14 @@ export interface SecurityRecommendationWorkflow {
   updatedBy?: string;
 }
 
+export interface SecurityRecommendationWorkflowHistoryEntry {
+  eventId: string;
+  status: SecurityRecommendationWorkflowStatus;
+  note?: string;
+  updatedAt: string;
+  updatedBy: string;
+}
+
 export interface SecurityRecommendationSummary {
   id: string;
   type: SecurityRecommendationType;
@@ -330,6 +338,54 @@ export class AuditService {
         ...(note ? { note } : {}),
       },
     });
+  }
+
+  async getSecurityRecommendationWorkflowHistory(
+    recommendationId: string,
+  ): Promise<SecurityRecommendationWorkflowHistoryEntry[]> {
+    const events = await this.auditEvent
+      .find(
+        {
+          action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+          resourceType: 'SECURITY_RECOMMENDATION',
+          resourceId: recommendationId,
+        },
+        {
+          _id: 0,
+          actorId: 1,
+          eventId: 1,
+          metadata: 1,
+          timestamp: 1,
+        },
+      )
+      .sort({ timestamp: -1, _id: -1 })
+      .limit(50)
+      .lean();
+
+    return (events as any[])
+      .map((event): SecurityRecommendationWorkflowHistoryEntry | null => {
+        const status = this.tryRecommendationWorkflowStatus(
+          event.metadata?.status,
+        );
+        if (!status) return null;
+
+        return {
+          eventId: event.eventId,
+          status,
+          note:
+            typeof event.metadata?.note === 'string'
+              ? event.metadata.note
+              : undefined,
+          updatedAt: this.toEventDate(event.timestamp).toISOString(),
+          updatedBy: event.actorId,
+        };
+      })
+      .filter(
+        (
+          event,
+        ): event is SecurityRecommendationWorkflowHistoryEntry =>
+          event !== null,
+      );
   }
 
   /**

@@ -82,4 +82,12 @@ export class AuditController {
       traceId: req.headers?.['x-trace-id'],
     });
   }
+
+  @Get('security-recommendations/:id/workflow-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Get security recommendation workflow history' })
+  getSecurityRecommendationWorkflowHistory(@Param('id') id: string) {
+    return this.auditService.getSecurityRecommendationWorkflowHistory(id);
+  }
 }

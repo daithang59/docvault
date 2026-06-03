@@ -495,6 +495,19 @@ components:
         updatedAt: { type: string, format: date-time, nullable: true }
         updatedBy: { type: string, nullable: true }
 
+    SecurityRecommendationWorkflowHistoryEntry:
+      type: object
+      description: Metadata-only workflow history entry for a security recommendation.
+      required: [eventId, status, updatedAt, updatedBy]
+      properties:
+        eventId: { type: string }
+        status: { $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus' }
+        note:
+          type: string
+          description: Optional investigation/review note with content-bearing fields excluded.
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+
     UpdateSecurityRecommendationWorkflow:
       type: object
       required: [status]
@@ -1774,6 +1787,39 @@ paths:
                 $ref: '#/components/schemas/AuditEvent'
         '400':
           description: Invalid workflow status or note
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-recommendations/{id}/workflow-history:
+    get:
+      summary: List security recommendation workflow history
+      operationId: getSecurityRecommendationWorkflowHistory
+      description: |
+        Returns the latest metadata-only workflow events for a deterministic
+        security recommendation. Entries expose eventId/status/note/updatedAt/
+        updatedBy only and exclude file content, object keys, presigned URLs,
+        and grant tokens.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Security recommendation ID
+      responses:
+        '200':
+          description: Latest workflow history entries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SecurityRecommendationWorkflowHistoryEntry'
         '401':
           description: Unauthorized
         '403':
