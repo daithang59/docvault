@@ -13,6 +13,7 @@ import { DocumentFilters } from '@/components/documents/document-filters';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
+  buildDocumentQuickViewOptions,
   countActiveDocumentFilters,
   describeActiveDocumentFilters,
   filterAndSortDocuments,
@@ -87,6 +88,10 @@ export default function MyDocumentsPage() {
   );
   const filterOptions = useMemo(
     () => buildDocumentFilterOptions(ownedDocuments),
+    [ownedDocuments],
+  );
+  const quickViews = useMemo(
+    () => buildDocumentQuickViewOptions(ownedDocuments),
     [ownedDocuments],
   );
   const filtered = useMemo(
@@ -216,6 +221,7 @@ export default function MyDocumentsPage() {
         <DocumentFilters
           filters={filters}
           options={filterOptions}
+          quickViews={quickViews}
           resultCount={filtered.length}
           totalCount={ownedDocuments.length}
           onChange={(nextFilters) => {

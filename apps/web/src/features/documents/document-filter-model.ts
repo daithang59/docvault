@@ -11,7 +11,16 @@ export type DocumentSortField =
 
 export type DocumentSortDirection = 'asc' | 'desc';
 
+export type DocumentQuickView =
+  | 'all'
+  | 'needs-action'
+  | 'drafts'
+  | 'pending-review'
+  | 'published'
+  | 'sensitive';
+
 export interface DocumentFiltersState {
+  view: DocumentQuickView;
   search: string;
   status: DocumentStatus | '';
   classification: ClassificationLevel | '';
@@ -31,7 +40,15 @@ export interface DocumentFilterChip {
   label: string;
 }
 
+export interface DocumentQuickViewOption {
+  value: DocumentQuickView;
+  label: string;
+  description: string;
+  count: number;
+}
+
 export const DEFAULT_DOCUMENT_FILTERS: DocumentFiltersState = {
+  view: 'all',
   search: '',
   status: '',
   classification: '',
@@ -65,6 +82,39 @@ const SORT_FIELDS: DocumentSortField[] = [
   'ownerId',
 ];
 
+const QUICK_VIEW_DEFINITIONS: Array<Omit<DocumentQuickViewOption, 'count'>> = [
+  {
+    value: 'all',
+    label: 'All',
+    description: 'All visible documents.',
+  },
+  {
+    value: 'needs-action',
+    label: 'Needs action',
+    description: 'Drafts and pending review items.',
+  },
+  {
+    value: 'drafts',
+    label: 'Drafts',
+    description: 'Documents still being prepared.',
+  },
+  {
+    value: 'pending-review',
+    label: 'Pending review',
+    description: 'Documents waiting for approval.',
+  },
+  {
+    value: 'published',
+    label: 'Published',
+    description: 'Approved documents available by policy.',
+  },
+  {
+    value: 'sensitive',
+    label: 'Sensitive',
+    description: 'Confidential, secret, or DLP-detected documents.',
+  },
+];
+
 export function filterAndSortDocuments(
   documents: DocumentListItem[],
   filters: DocumentFiltersState,
@@ -73,6 +123,7 @@ export function filterAndSortDocuments(
 
   return documents
     .filter((document) => {
+      if (!documentMatchesQuickView(document, filters.view)) return false;
       if (query && !documentMatchesQuery(document, query)) return false;
       if (filters.status && document.status !== filters.status) return false;
       if (
@@ -86,6 +137,17 @@ export function filterAndSortDocuments(
       return true;
     })
     .sort((left, right) => compareDocuments(left, right, filters));
+}
+
+export function buildDocumentQuickViewOptions(
+  documents: DocumentListItem[],
+): DocumentQuickViewOption[] {
+  return QUICK_VIEW_DEFINITIONS.map((view) => ({
+    ...view,
+    count: documents.filter((document) =>
+      documentMatchesQuickView(document, view.value),
+    ).length,
+  }));
 }
 
 export function buildDocumentFilterOptions(
@@ -129,6 +191,12 @@ export function getActiveDocumentFilterChips(
 ): DocumentFilterChip[] {
   const chips: DocumentFilterChip[] = [];
 
+  if (filters.view !== 'all') {
+    chips.push({
+      key: 'view',
+      label: `View: ${findQuickViewLabel(filters.view)}`,
+    });
+  }
   if (filters.search.trim()) {
     chips.push({ key: 'search', label: `Search: ${filters.search.trim()}` });
   }
@@ -185,8 +253,10 @@ export function parseDocumentFiltersFromSearchParams(
   const classification = params.get('classification');
   const sort = params.get('sort');
   const sortDir = params.get('dir');
+  const view = params.get('view');
 
   return {
+    view: isQuickView(view) ? view : DEFAULT_DOCUMENT_FILTERS.view,
     search: params.get('q') ?? '',
     status: isDocumentStatus(status) ? status : '',
     classification: isClassification(classification) ? classification : '',
@@ -204,6 +274,9 @@ export function serializeDocumentFiltersToSearchParams(
   const search = filters.search.trim();
 
   if (search) params.set('q', search);
+  if (filters.view !== DEFAULT_DOCUMENT_FILTERS.view) {
+    params.set('view', filters.view);
+  }
   if (filters.status) params.set('status', filters.status);
   if (filters.classification) {
     params.set('classification', filters.classification);
@@ -218,6 +291,27 @@ export function serializeDocumentFiltersToSearchParams(
   }
 
   return params;
+}
+
+function documentMatchesQuickView(
+  document: DocumentListItem,
+  view: DocumentQuickView,
+): boolean {
+  if (view === 'all') return true;
+  if (view === 'needs-action') {
+    return document.status === 'DRAFT' || document.status === 'PENDING';
+  }
+  if (view === 'drafts') return document.status === 'DRAFT';
+  if (view === 'pending-review') return document.status === 'PENDING';
+  if (view === 'published') return document.status === 'PUBLISHED';
+  if (view === 'sensitive') {
+    return (
+      document.classification === 'CONFIDENTIAL' ||
+      document.classification === 'SECRET' ||
+      document.dlpStatus === 'DETECTED'
+    );
+  }
+  return true;
 }
 
 function documentMatchesQuery(
@@ -278,6 +372,13 @@ function findOwnerLabel(
   return options.owners.find((owner) => owner.value === ownerId)?.label ?? ownerId;
 }
 
+function findQuickViewLabel(view: DocumentQuickView): string {
+  return (
+    QUICK_VIEW_DEFINITIONS.find((definition) => definition.value === view)
+      ?.label ?? formatEnum(view)
+  );
+}
+
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
 }
@@ -301,4 +402,8 @@ function isClassification(value: string | null): value is ClassificationLevel {
 
 function isSortField(value: string | null): value is DocumentSortField {
   return SORT_FIELDS.includes(value as DocumentSortField);
+}
+
+function isQuickView(value: string | null): value is DocumentQuickView {
+  return QUICK_VIEW_DEFINITIONS.some((view) => view.value === value);
 }

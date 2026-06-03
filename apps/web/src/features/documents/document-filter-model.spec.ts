@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
+  buildDocumentQuickViewOptions,
   countActiveDocumentFilters,
   describeActiveDocumentFilters,
   filterAndSortDocuments,
@@ -55,11 +56,27 @@ const documents: DocumentListItem[] = [
     createdAt: '2026-05-03T09:00:00.000Z',
     updatedAt: '2026-06-02T09:00:00.000Z',
   },
+  {
+    id: 'doc-4',
+    title: 'Incident Export',
+    description: 'Investigation export with detected sensitive fields',
+    status: 'PUBLISHED',
+    classification: 'INTERNAL',
+    dlpStatus: 'DETECTED',
+    ownerId: 'owner-3',
+    ownerDisplay: 'Tran Chi',
+    currentVersion: 1,
+    filename: 'incident-export.csv',
+    tags: ['security'],
+    createdAt: '2026-05-04T09:00:00.000Z',
+    updatedAt: '2026-06-03T09:00:00.000Z',
+  },
 ];
 
 describe('filterAndSortDocuments', () => {
   it('combines text, owner, tag, status, and classification filters', () => {
     const filters: DocumentFiltersState = {
+      view: 'all',
       search: 'finance',
       ownerId: 'owner-1',
       tag: 'board',
@@ -97,11 +114,11 @@ describe('filterAndSortDocuments', () => {
         sort: 'title',
         sortDir: 'asc',
       }).map((doc) => doc.title),
-    ).toEqual(['Board Report', 'Hiring Plan', 'Public Handbook']);
+    ).toEqual(['Board Report', 'Hiring Plan', 'Incident Export', 'Public Handbook']);
 
     expect(
       filterAndSortDocuments(documents, DEFAULT_DOCUMENT_FILTERS).map((doc) => doc.id),
-    ).toEqual(['doc-3', 'doc-1', 'doc-2']);
+    ).toEqual(['doc-4', 'doc-3', 'doc-1', 'doc-2']);
   });
 
   it('sorts owners by displayed owner label instead of raw owner id', () => {
@@ -128,6 +145,30 @@ describe('filterAndSortDocuments', () => {
       }).map((doc) => doc.id),
     ).toEqual(['doc-a', 'doc-z']);
   });
+
+  it('applies commercial quick views before regular filters and sorting', () => {
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        view: 'needs-action',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-3', 'doc-2']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        view: 'sensitive',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-4', 'doc-1']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        view: 'sensitive',
+        tag: 'finance',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-1']);
+  });
 });
 
 describe('document filter metadata', () => {
@@ -137,8 +178,9 @@ describe('document filter metadata', () => {
     expect(options.owners).toEqual([
       { value: 'owner-1', label: 'Nguyen An' },
       { value: 'owner-2', label: 'Le Binh' },
+      { value: 'owner-3', label: 'Tran Chi' },
     ]);
-    expect(options.tags).toEqual(['board', 'finance', 'hr', 'policy']);
+    expect(options.tags).toEqual(['board', 'finance', 'hr', 'policy', 'security']);
 
     const filters: DocumentFiltersState = {
       ...DEFAULT_DOCUMENT_FILTERS,
@@ -160,9 +202,33 @@ describe('document filter metadata', () => {
     );
   });
 
+  it('builds quick view counts and active view chips', () => {
+    expect(buildDocumentQuickViewOptions(documents)).toEqual([
+      expect.objectContaining({ value: 'all', count: 4 }),
+      expect.objectContaining({ value: 'needs-action', count: 2 }),
+      expect.objectContaining({ value: 'drafts', count: 1 }),
+      expect.objectContaining({ value: 'pending-review', count: 1 }),
+      expect.objectContaining({ value: 'published', count: 2 }),
+      expect.objectContaining({ value: 'sensitive', count: 2 }),
+    ]);
+
+    const filters: DocumentFiltersState = {
+      ...DEFAULT_DOCUMENT_FILTERS,
+      view: 'needs-action',
+      search: 'handbook',
+    };
+
+    expect(countActiveDocumentFilters(filters)).toBe(2);
+    expect(getActiveDocumentFilterChips(filters, buildDocumentFilterOptions(documents))).toEqual([
+      { key: 'view', label: 'View: Needs action' },
+      { key: 'search', label: 'Search: handbook' },
+    ]);
+  });
+
   it('round-trips supported filters through URL search params', () => {
     const filters: DocumentFiltersState = {
       search: 'finance',
+      view: 'sensitive',
       status: 'PUBLISHED',
       classification: 'CONFIDENTIAL',
       ownerId: 'owner-1',
@@ -174,7 +240,7 @@ describe('document filter metadata', () => {
     const params = serializeDocumentFiltersToSearchParams(filters);
 
     expect(params.toString()).toBe(
-      'q=finance&status=PUBLISHED&classification=CONFIDENTIAL&owner=owner-1&tag=board&sort=title&dir=asc',
+      'q=finance&view=sensitive&status=PUBLISHED&classification=CONFIDENTIAL&owner=owner-1&tag=board&sort=title&dir=asc',
     );
     expect(parseDocumentFiltersFromSearchParams(params)).toEqual(filters);
   });

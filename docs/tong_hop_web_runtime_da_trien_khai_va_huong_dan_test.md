@@ -25,7 +25,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Security dashboard tổng hợp deny, malware, DLP, audit-chain, risk scoring, behavior anomaly và recommendation.
 - Evidence Center gom audit-chain, recommendation packet, document packet và retention evidence thành workspace compliance riêng.
 - Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
-- Documents/My Documents có search/filter thương mại hơn: owner, tag, status, classification, sort, reset, active chips và URL query state.
+- Documents/My Documents có smart workbench views, search/filter thương mại hơn: quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
 - Document detail/preview có metadata summary, evidence links và trạng thái preview rõ ràng theo policy/format.
 - AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
 - Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
@@ -562,6 +562,13 @@ pnpm --filter web build
 **Đã triển khai**
 
 - Web pages: `/documents` và `/my-documents`.
+- Smart workbench quick views có count:
+  - All
+  - Needs action
+  - Drafts
+  - Pending review
+  - Published
+  - Sensitive
 - Search match trên title, description, filename, tags, owner id và owner display.
 - Filter theo:
   - Status
@@ -572,12 +579,12 @@ pnpm --filter web build
 - Active filter chips có thể xóa từng filter.
 - Reset toàn bộ filter/sort về mặc định.
 - Empty state giải thích filter nào đang làm danh sách rỗng.
-- `/documents` đồng bộ query string, ví dụ `?q=finance&status=PUBLISHED&tag=board&sort=title&dir=asc`.
+- `/documents` đồng bộ query string, ví dụ `?view=sensitive&q=finance&status=PUBLISHED&tag=board&sort=title&dir=asc`.
 - Filter model được tách thành helper testable để không nhồi logic vào page component.
 
 **Ý nghĩa**
 
-- Trải nghiệm Documents gần hơn với app quản lý tài liệu thương mại: người dùng có thể scan, combine filter, bỏ filter nhanh và gửi link trạng thái filter.
+- Trải nghiệm Documents gần hơn với app quản lý tài liệu thương mại: người dùng có thể chuyển nhanh giữa workbench views, scan count theo nhóm việc, combine filter, bỏ filter nhanh và gửi link trạng thái filter.
 - Không đổi backend contract trong giai đoạn này. Filter hiện vẫn chạy trên dữ liệu document list đã tải về từ frontend; backend search/filter sâu hơn có thể làm ở phase enterprise sau.
 
 **Cách sử dụng**
@@ -590,10 +597,11 @@ http://localhost:3006/documents
 ```
 
 3. Search theo title/tag/owner/filename.
-4. Chọn status, classification, owner hoặc tag.
-5. Đổi sort và kiểm tra thứ tự bảng.
-6. Xóa từng active chip hoặc bấm `Reset`.
-7. Copy URL có query string và reload để kiểm tra filter state được khôi phục.
+4. Chọn quick view `Needs action`, `Pending review`, `Published` hoặc `Sensitive`.
+5. Chọn status, classification, owner hoặc tag.
+6. Đổi sort và kiểm tra thứ tự bảng.
+7. Xóa từng active chip hoặc bấm `Reset`.
+8. Copy URL có query string và reload để kiểm tra filter state được khôi phục.
 
 **Cách test**
 
@@ -1003,7 +1011,7 @@ Sau đó mở `/audit` và verify chain.
 
 | Trang | URL local | Role nên dùng | Kiểm tra |
 |---|---|---|---|
-| Documents | `http://localhost:3006/documents` | viewer/editor/admin | List, commercial search/filter, active chips, URL query state, preview/download button policy |
+| Documents | `http://localhost:3006/documents` | viewer/editor/admin | Smart workbench quick views, commercial search/filter, active chips, URL query state, preview/download button policy |
 | New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
@@ -1018,7 +1026,7 @@ Sau đó mở `/audit` và verify chain.
 
 1. Đăng nhập `editor1`.
 2. Tạo document mới, upload file bình thường.
-3. Vào `/documents`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra active chips và URL query state.
+3. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
 4. Submit document.
 5. Đăng nhập `approver1`, approve document.
 6. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
@@ -1061,7 +1069,7 @@ Sau đó mở `/audit` và verify chain.
 - Recommendation Playbook là lớp điều phối deterministic trên metadata/workflow, không phải DevSecOps pipeline và không mở quyền xem file content.
 - Evidence Center là workspace runtime để gom/export evidence; Evidence Bundle manifest và Evidence Report HTML chỉ là metadata index/presentation có checklist/counts, document packet export được scrub các content-bearing fields trước khi tải xuống.
 - Notification Center là runtime work queue trong web app, không phải alerting/DevSecOps pipeline; nó gom workflow/retention/security/document events thành danh sách hành động có read state và target links.
-- Document search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
+- Document smart workbench/search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
 - Document detail/preview polish là UX/presentation layer: làm rõ metadata, policy denial và unsupported format; không claim là backend full-text preview engine.
 
 ## 9. Verification đã ghi nhận gần nhất
@@ -1101,7 +1109,7 @@ Ghi chú:
 5. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
 6. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
 7. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
-8. Chụp `/documents`: owner/tag/status/classification filters, active chips, reset action và URL query state.
+8. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
 9. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
 10. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
 11. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

@@ -35,7 +35,7 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Argo CD application `Synced/Healthy`.
 - Web app login page on EKS.
 - Successful Keycloak login.
-- Document search/filter workbench with active chips and URL query state.
+- Document smart workbench quick views with active chips, counts, and URL query state.
 - Document detail metadata summary, evidence links, and version preview posture.
 - Upload, preview and download success.
 - Compliance Officer preview/download denial reason on document detail.
@@ -70,8 +70,9 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 7. Open preview.
 8. Expected result: the uploaded file preview renders through the EKS gateway route, or the version row explains why the format is unsupported.
 9. Return to **Documents**.
-10. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
-11. Expected result: the result count, URL query state, active chips and table rows update together.
+10. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**.
+11. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
+12. Expected result: quick-view counts, result count, URL query state, active chips and table rows update together.
 
 ---
 
@@ -218,8 +219,9 @@ Navigate to: **http://localhost:3100**
 6. Check **Metadata summary** and **Version History** preview posture
 7. ✅ Summary should show owner/status/classification/retention/current version/checksum/content type without object keys
 8. Return to **Documents**
-9. Search `finance`, set status/classification/tag/owner filters, and change sort
-10. ✅ Active chips and URL query params should reflect the selected filters
+9. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**
+10. Search `finance`, set status/classification/tag/owner filters, and change sort
+11. ✅ Quick-view counts, active chips and URL query params should reflect the selected workbench state
 
 ---
 

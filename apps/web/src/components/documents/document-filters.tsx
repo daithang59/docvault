@@ -17,12 +17,14 @@ import {
   getActiveDocumentFilterChips,
   type DocumentFilterOptions,
   type DocumentFiltersState,
+  type DocumentQuickViewOption,
 } from '@/features/documents/document-filter-model';
 import { cn } from '@/lib/utils/cn';
 
 interface DocumentFiltersProps {
   filters: DocumentFiltersState;
   options: DocumentFilterOptions;
+  quickViews: DocumentQuickViewOption[];
   resultCount: number;
   totalCount: number;
   onChange: (filters: DocumentFiltersState) => void;
@@ -45,6 +47,7 @@ const SORT_OPTIONS = [
 export function DocumentFilters({
   filters,
   options,
+  quickViews,
   resultCount,
   totalCount,
   onChange,
@@ -82,6 +85,41 @@ export function DocumentFilters({
         <p className="text-xs text-[var(--text-muted)]">
           Showing {resultCount} of {totalCount} documents
         </p>
+      </div>
+
+      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Document quick views">
+        {quickViews.map((view) => {
+          const active = filters.view === view.value;
+
+          return (
+            <button
+              key={view.value}
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={view.description}
+              onClick={() => setField('view', view.value)}
+              className={cn(
+                'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition',
+                active
+                  ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
+                  : 'border-[var(--border-soft)] bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-main)]',
+              )}
+            >
+              <span>{view.label}</span>
+              <span
+                className={cn(
+                  'rounded-full px-1.5 py-0.5 text-[10px]',
+                  active
+                    ? 'bg-white/20 text-white'
+                    : 'bg-[var(--bg-card)] text-[var(--text-faint)]',
+                )}
+              >
+                {view.count}
+              </span>
+            </button>
+          );
+        })}
       </div>
 
       <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(150px,auto))_auto]">
