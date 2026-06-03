@@ -8,6 +8,8 @@ import {
   Clock,
   AlertTriangle,
   Bug,
+  CheckCircle2,
+  Circle,
   Download,
   Eye,
   ExternalLink,
@@ -49,6 +51,8 @@ import {
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
   type SecurityDashboardMetric,
+  type SecurityRecommendationPlaybook,
+  type SecurityRecommendationSlaState,
 } from '@/features/audit/security-dashboard';
 
 const metricIcons: Record<SecurityDashboardMetric['key'], typeof ShieldX> = {
@@ -576,6 +580,8 @@ function RecommendationsPanel({
                   onSave={onSaveWorkflow}
                 />
 
+                <RecommendationPlaybook playbook={item.playbook} />
+
                 <RecommendationHistoryControls
                   item={item}
                   auditChain={auditChain}
@@ -591,6 +597,75 @@ function RecommendationsPanel({
           })}
         </div>
       )}
+    </div>
+  );
+}
+
+function RecommendationPlaybook({
+  playbook,
+}: {
+  playbook: SecurityRecommendationPlaybook;
+}) {
+  const tone = getRecommendationSlaTone(playbook.slaState);
+
+  return (
+    <div className="mt-3 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-3">
+      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Playbook
+          </p>
+          <p className="mt-1 text-sm font-medium text-[var(--text-main)]">
+            {playbook.ownerLabel}
+          </p>
+        </div>
+        <span
+          className={`inline-flex w-fit items-center gap-2 rounded-full border px-2.5 py-1 text-xs font-semibold ${tone}`}
+        >
+          <Clock className="h-3.5 w-3.5" />
+          {getRecommendationSlaLabel(playbook.slaState)}
+        </span>
+      </div>
+
+      <div className="mt-3 grid gap-2 text-xs text-[var(--text-muted)] sm:grid-cols-2">
+        <p>
+          SLA target: <span className="font-medium">{playbook.slaHours}h</span>
+        </p>
+        <p>
+          Due:{' '}
+          <span className="font-medium">
+            {playbook.dueAt
+              ? formatDateTime(playbook.dueAt)
+              : 'starts after investigation'}
+          </span>
+        </p>
+      </div>
+
+      <div className="mt-3 space-y-2">
+        {playbook.steps.map((step) => {
+          const Icon = step.isComplete ? CheckCircle2 : Circle;
+
+          return (
+            <div key={step.id} className="flex gap-2">
+              <Icon
+                className={`mt-0.5 h-4 w-4 flex-none ${
+                  step.isComplete
+                    ? 'text-[var(--status-published-text)]'
+                    : 'text-[var(--text-faint)]'
+                }`}
+              />
+              <div>
+                <p className="text-xs font-medium text-[var(--text-main)]">
+                  {step.label}
+                </p>
+                <p className="mt-0.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                  {step.evidenceHint}
+                </p>
+              </div>
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1459,6 +1534,36 @@ function getRecommendationWorkflowLabel(
       return 'Reviewed';
     case 'RESOLVED':
       return 'Resolved';
+  }
+}
+
+function getRecommendationSlaLabel(state: SecurityRecommendationSlaState): string {
+  switch (state) {
+    case 'not-started':
+      return 'Not started';
+    case 'on-track':
+      return 'On track';
+    case 'due-soon':
+      return 'Due soon';
+    case 'overdue':
+      return 'Overdue';
+    case 'closed':
+      return 'Closed';
+  }
+}
+
+function getRecommendationSlaTone(state: SecurityRecommendationSlaState): string {
+  switch (state) {
+    case 'closed':
+      return 'border-[var(--status-published-border)] bg-[var(--status-published-bg)] text-[var(--status-published-text)]';
+    case 'overdue':
+      return 'border-[var(--state-error-border)] bg-[var(--state-error-bg)] text-[var(--state-error-text)]';
+    case 'due-soon':
+      return 'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]';
+    case 'on-track':
+      return 'border-[var(--state-info-border)] bg-[var(--state-info-bg)] text-[var(--state-info-text)]';
+    case 'not-started':
+      return 'border-[var(--border-soft)] bg-[var(--bg-subtle)] text-[var(--text-muted)]';
   }
 }
 

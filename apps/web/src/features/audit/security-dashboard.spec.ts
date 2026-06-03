@@ -297,6 +297,69 @@ describe('buildSecurityDashboardModel', () => {
     expect(model.recommendations.items[0].workflow).toEqual({ status: 'OPEN' });
   });
 
+  it('attaches a deterministic playbook with owner, SLA, and checklist progress', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          {
+            id: 'document-access-review:doc-secret',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'critical',
+            title: 'Tighten access for high-risk SECRET document',
+            reason:
+              'Document doc-secret reached risk score 95 from classification and access metadata.',
+            recommendedAction:
+              'Review ACLs, confirm business need for recent grants, and keep watermark-required delivery for sensitive content.',
+            evidence: ['SECRET classification'],
+            affectedDocumentIds: ['doc-secret'],
+            affectedActorIds: [],
+            auditFilters: { documentId: 'doc-secret' },
+            workflow: {
+              status: 'INVESTIGATING',
+              updatedAt: '2026-06-01T10:00:00.000Z',
+              updatedBy: 'co1',
+            },
+          },
+        ],
+      }),
+      undefined,
+      { now: '2026-06-02T08:30:00.000Z' },
+    );
+
+    expect(model.recommendations.items[0].playbook).toEqual({
+      ownerLabel: 'Document owner',
+      slaHours: 24,
+      dueAt: '2026-06-02T10:00:00.000Z',
+      slaState: 'due-soon',
+      steps: [
+        {
+          id: 'triage',
+          label: 'Acknowledge and scope recommendation',
+          evidenceHint: 'Capture the recommendation id, affected scope, and audit filters.',
+          isComplete: true,
+        },
+        {
+          id: 'investigate',
+          label: 'Review supporting audit metadata',
+          evidenceHint: 'Open the scoped audit deep link and verify metadata-only evidence.',
+          isComplete: true,
+        },
+        {
+          id: 'review',
+          label: 'Record review decision',
+          evidenceHint: 'Move workflow to REVIEWED with a short investigation note.',
+          isComplete: false,
+        },
+        {
+          id: 'resolve',
+          label: 'Close and export evidence packet',
+          evidenceHint: 'Move workflow to RESOLVED and download the recommendation packet.',
+          isComplete: false,
+        },
+      ],
+    });
+  });
+
   it('defines quick investigation filters for the required security event classes', () => {
     const model = buildSecurityDashboardModel(summary());
 
@@ -392,6 +455,10 @@ describe('buildSecurityDashboardModel', () => {
       recommendation: expect.objectContaining({
         id: 'dlp-classification-review',
         workflow: { status: 'REVIEWED' },
+      }),
+      playbook: expect.objectContaining({
+        ownerLabel: 'DLP reviewer',
+        slaHours: 72,
       }),
       workflowHistory: [
         {

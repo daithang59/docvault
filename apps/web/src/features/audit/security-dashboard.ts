@@ -44,9 +44,32 @@ export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
 export interface SecurityRecommendationRow
   extends Omit<SecurityRecommendationSummary, 'workflow'> {
   workflow: SecurityRecommendationWorkflow;
+  playbook: SecurityRecommendationPlaybook;
   severityLabel: string;
   typeLabel: string;
   auditFilters: AuditQueryFilters;
+}
+
+export type SecurityRecommendationSlaState =
+  | 'not-started'
+  | 'on-track'
+  | 'due-soon'
+  | 'overdue'
+  | 'closed';
+
+export interface SecurityRecommendationPlaybookStep {
+  id: 'triage' | 'investigate' | 'review' | 'resolve';
+  label: string;
+  evidenceHint: string;
+  isComplete: boolean;
+}
+
+export interface SecurityRecommendationPlaybook {
+  ownerLabel: string;
+  slaHours: number;
+  dueAt: string | null;
+  slaState: SecurityRecommendationSlaState;
+  steps: SecurityRecommendationPlaybookStep[];
 }
 
 export interface SecurityDashboardModel {
@@ -89,6 +112,7 @@ export interface SecurityRecommendationEvidencePacket {
   excludedSensitiveFields: string[];
   auditChain: AuditChainStatus;
   recommendation: SecurityRecommendationRow;
+  playbook: SecurityRecommendationPlaybook;
   workflowHistory: SecurityRecommendationWorkflowHistoryEntry[];
 }
 
@@ -114,8 +138,13 @@ export function buildRecommendationEvidencePacket({
     ],
     auditChain,
     recommendation,
+    playbook: recommendation.playbook,
     workflowHistory,
   };
+}
+
+export interface SecurityDashboardModelOptions {
+  now?: string | Date;
 }
 
 export function buildSecurityDashboardModel(
@@ -124,6 +153,7 @@ export function buildSecurityDashboardModel(
     downloadAuthorizedTotal?: number;
     sensitiveAccessEvents?: AuditLogEntry[];
   },
+  options: SecurityDashboardModelOptions = {},
 ): SecurityDashboardModel {
   const totals = summary?.totals ?? {
     deniedEvents: 0,
@@ -143,6 +173,7 @@ export function buildSecurityDashboardModel(
   );
   const recommendations = buildRecommendationRows(
     summary?.recommendations ?? [],
+    normalizeNow(options.now),
   );
 
   if (summary?.chain.valid === false) {
@@ -345,16 +376,133 @@ function buildBehaviorSignalRows(
 
 function buildRecommendationRows(
   recommendations: SecurityRecommendationSummary[],
+  now: Date,
 ): SecurityRecommendationRow[] {
   return [...recommendations]
     .sort((a, b) => getSeverityRank(b.severity) - getSeverityRank(a.severity))
-    .map((recommendation) => ({
-      ...recommendation,
-      severityLabel: getRecommendationSeverityLabel(recommendation.severity),
-      typeLabel: getRecommendationTypeLabel(recommendation.type),
-      auditFilters: recommendation.auditFilters ?? {},
-      workflow: recommendation.workflow ?? { status: 'OPEN' },
-    }));
+    .map((recommendation) => {
+      const workflow = recommendation.workflow ?? { status: 'OPEN' };
+
+      return {
+        ...recommendation,
+        severityLabel: getRecommendationSeverityLabel(recommendation.severity),
+        typeLabel: getRecommendationTypeLabel(recommendation.type),
+        auditFilters: recommendation.auditFilters ?? {},
+        workflow,
+        playbook: buildRecommendationPlaybook(recommendation, workflow, now),
+      };
+    });
+}
+
+function buildRecommendationPlaybook(
+  recommendation: SecurityRecommendationSummary,
+  workflow: SecurityRecommendationWorkflow,
+  now: Date,
+): SecurityRecommendationPlaybook {
+  const slaHours = getRecommendationSlaHours(recommendation.severity);
+  const dueAt = workflow.updatedAt
+    ? addHoursIso(workflow.updatedAt, slaHours)
+    : null;
+
+  return {
+    ownerLabel: getRecommendationOwnerLabel(recommendation.type),
+    slaHours,
+    dueAt,
+    slaState: getRecommendationSlaState(workflow.status, dueAt, now),
+    steps: buildRecommendationPlaybookSteps(workflow.status),
+  };
+}
+
+function buildRecommendationPlaybookSteps(
+  status: SecurityRecommendationWorkflow['status'],
+): SecurityRecommendationPlaybookStep[] {
+  const hasStarted = status !== 'OPEN';
+  const hasReviewed = status === 'REVIEWED' || status === 'RESOLVED';
+  const hasResolved = status === 'RESOLVED';
+
+  return [
+    {
+      id: 'triage',
+      label: 'Acknowledge and scope recommendation',
+      evidenceHint: 'Capture the recommendation id, affected scope, and audit filters.',
+      isComplete: hasStarted,
+    },
+    {
+      id: 'investigate',
+      label: 'Review supporting audit metadata',
+      evidenceHint: 'Open the scoped audit deep link and verify metadata-only evidence.',
+      isComplete: hasStarted,
+    },
+    {
+      id: 'review',
+      label: 'Record review decision',
+      evidenceHint: 'Move workflow to REVIEWED with a short investigation note.',
+      isComplete: hasReviewed,
+    },
+    {
+      id: 'resolve',
+      label: 'Close and export evidence packet',
+      evidenceHint: 'Move workflow to RESOLVED and download the recommendation packet.',
+      isComplete: hasResolved,
+    },
+  ];
+}
+
+function getRecommendationSlaHours(
+  severity: SecurityRecommendationSummary['severity'],
+): number {
+  if (severity === 'critical') return 24;
+  if (severity === 'warning') return 72;
+  return 168;
+}
+
+function getRecommendationOwnerLabel(
+  type: SecurityRecommendationSummary['type'],
+): string {
+  switch (type) {
+    case 'AUDIT_CHAIN_REVIEW':
+      return 'Compliance officer';
+    case 'DLP_CLASSIFICATION_REVIEW':
+      return 'DLP reviewer';
+    case 'MALWARE_UPLOAD_REVIEW':
+      return 'Security reviewer';
+    case 'DOCUMENT_ACCESS_REVIEW':
+      return 'Document owner';
+    case 'ACTOR_ACCESS_REVIEW':
+      return 'IAM reviewer';
+  }
+}
+
+function getRecommendationSlaState(
+  status: SecurityRecommendationWorkflow['status'],
+  dueAt: string | null,
+  now: Date,
+): SecurityRecommendationSlaState {
+  if (status === 'RESOLVED') return 'closed';
+  if (!dueAt) return 'not-started';
+
+  const dueDate = new Date(dueAt);
+  if (Number.isNaN(dueDate.getTime())) return 'not-started';
+  if (dueDate.getTime() <= now.getTime()) return 'overdue';
+
+  const dueSoonWindowMs = 24 * 60 * 60 * 1000;
+  if (dueDate.getTime() - now.getTime() <= dueSoonWindowMs) {
+    return 'due-soon';
+  }
+
+  return 'on-track';
+}
+
+function addHoursIso(timestamp: string, hours: number): string | null {
+  const date = new Date(timestamp);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Date(date.getTime() + hours * 60 * 60 * 1000).toISOString();
+}
+
+function normalizeNow(now?: string | Date): Date {
+  const date = now ? new Date(now) : new Date();
+  if (Number.isNaN(date.getTime())) return new Date();
+  return date;
 }
 
 function getSeverityRank(
