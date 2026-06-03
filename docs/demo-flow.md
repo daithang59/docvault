@@ -278,6 +278,20 @@ Navigate to: **http://localhost:3100**
 
 ---
 
+## Step 9 — Compliance Officer: Evidence Case Presentation
+
+1. Sign in as `co1` or stay in the compliance session
+2. Go to **Evidence Center** in sidebar
+3. ✅ Should see source cards for Audit Chain, Recommendation Packets, Retention Evidence, and Document Packets
+4. Select recommendation packets and document packets for the audit case
+5. Click **Bundle** to export the metadata-only bundle manifest
+6. Click **Report** to export the printable Evidence Report HTML
+7. Open **Presentation**
+8. ✅ Should see case readiness, audit-chain posture, retention posture, checklist, recommendation timeline, and document packet list
+9. Confirm the bundle/report show `metadataOnly` and `excludedSensitiveFields`
+
+---
+
 ## Security Evidence Probes
 
 Use the backend E2E command below to demonstrate the automated controls:

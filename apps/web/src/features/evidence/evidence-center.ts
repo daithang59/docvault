@@ -136,6 +136,46 @@ export interface EvidenceBundleManifest {
   missingSelectionIds: string[];
 }
 
+export type EvidenceCaseStatus = 'ready' | 'incomplete' | 'blocked';
+export type EvidenceCaseSectionState = 'verified' | 'ready' | 'attention' | 'blocked';
+
+export interface EvidenceCaseAuditChain {
+  state: 'verified' | 'blocked';
+  label: string;
+  checkedEvents: number;
+}
+
+export interface EvidenceCaseRetentionPosture {
+  state: 'ready' | 'attention' | 'blocked';
+  label: string;
+  tracked: number;
+  dueSoon: number;
+  overdue: number;
+  archived: number;
+}
+
+export interface EvidenceCaseTimelineItem
+  extends EvidenceBundleRecommendationReference {
+  eventLabel: string;
+  sequence: number;
+}
+
+export interface EvidenceCaseNarrative {
+  caseId: string;
+  generatedAt: string;
+  status: EvidenceCaseStatus;
+  headline: string;
+  metadataOnly: true;
+  excludedSensitiveFields: string[];
+  auditChain: EvidenceCaseAuditChain;
+  retentionPosture: EvidenceCaseRetentionPosture;
+  checklist: EvidenceBundleChecklistItem[];
+  timeline: EvidenceCaseTimelineItem[];
+  documents: EvidenceBundleDocumentReference[];
+  warnings: string[];
+  blockers: string[];
+}
+
 export interface EvidenceBundleSelection {
   selectedRecommendationIds: string[];
   selectedDocumentIds: string[];
@@ -336,6 +376,69 @@ export function buildEvidenceBundle(
   };
 }
 
+export function buildEvidenceCaseNarrative(
+  bundle: EvidenceBundleManifest,
+): EvidenceCaseNarrative {
+  const retentionPosture = buildRetentionPosture(bundle.retentionSummary);
+  const warnings = [
+    ...bundle.missingSelectionIds.map((id) => `Missing selected packet: ${id}`),
+  ];
+
+  if (bundle.summary.recommendationPackets === 0) {
+    warnings.push('No recommendation packet selected.');
+  }
+  if (bundle.summary.documentPackets === 0) {
+    warnings.push('No document packet selected.');
+  }
+
+  const blockers = [
+    ...(bundle.auditChain.valid
+      ? []
+      : [
+          'Audit chain is not verified. Resolve tamper evidence before presenting this case.',
+        ]),
+    ...(retentionPosture.state === 'blocked'
+      ? [
+          'Retention evidence has overdue records. Resolve or explain retention exceptions before presenting this case.',
+        ]
+      : []),
+  ];
+
+  return {
+    caseId: bundle.bundleId.toUpperCase(),
+    generatedAt: bundle.generatedAt,
+    status:
+      blockers.length > 0
+        ? 'blocked'
+        : warnings.length > 0
+          ? 'incomplete'
+          : 'ready',
+    headline: `Audit case with ${formatCount(
+      bundle.summary.recommendationPackets,
+      'recommendation packet',
+    )} and ${formatCount(bundle.summary.documentPackets, 'document packet')}.`,
+    metadataOnly: true,
+    excludedSensitiveFields: [...bundle.excludedSensitiveFields],
+    auditChain: {
+      state: bundle.auditChain.valid ? 'verified' : 'blocked',
+      label: bundle.auditChain.valid
+        ? 'Audit chain verified'
+        : 'Audit chain needs review',
+      checkedEvents: bundle.auditChain.checked,
+    },
+    retentionPosture,
+    checklist: bundle.checklist.map((item) => ({ ...item })),
+    timeline: bundle.packets.recommendations.map((item, index) => ({
+      ...item,
+      eventLabel: 'Recommendation packet selected',
+      sequence: index + 1,
+    })),
+    documents: bundle.packets.documents.map((item) => ({ ...item })),
+    warnings,
+    blockers,
+  };
+}
+
 export function buildEvidenceCenterDocumentPacket(
   packet: ComplianceEvidencePacket,
 ): EvidenceCenterDocumentPacket {
@@ -380,6 +483,48 @@ function buildDocumentPacketTarget(
     retentionStatus: record.retentionStatus,
     packetFilename: `docvault-evidence-${slugify(record.title) || record.docId}.json`,
   };
+}
+
+function buildRetentionPosture(
+  summary: RetentionEvidenceResult['summary'],
+): EvidenceCaseRetentionPosture {
+  if (summary.overdue > 0) {
+    return {
+      state: 'blocked',
+      label: `${formatCount(summary.overdue, 'retention record')} overdue`,
+      tracked: summary.tracked,
+      dueSoon: summary.dueSoon,
+      overdue: summary.overdue,
+      archived: summary.archived,
+    };
+  }
+
+  if (summary.dueSoon > 0) {
+    return {
+      state: 'attention',
+      label: `${formatCount(summary.dueSoon, 'retention record')} due soon`,
+      tracked: summary.tracked,
+      dueSoon: summary.dueSoon,
+      overdue: summary.overdue,
+      archived: summary.archived,
+    };
+  }
+
+  return {
+    state: summary.tracked > 0 ? 'ready' : 'attention',
+    label:
+      summary.tracked > 0
+        ? `${summary.tracked} retention record${summary.tracked === 1 ? '' : 's'} tracked`
+        : 'No retention evidence linked',
+    tracked: summary.tracked,
+    dueSoon: summary.dueSoon,
+    overdue: summary.overdue,
+    archived: summary.archived,
+  };
+}
+
+function formatCount(count: number, singular: string): string {
+  return `${count} ${singular}${count === 1 ? '' : 's'}`;
 }
 
 function slugify(value: string): string {

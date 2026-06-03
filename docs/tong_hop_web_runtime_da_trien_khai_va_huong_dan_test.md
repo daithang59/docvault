@@ -463,12 +463,15 @@ pnpm --filter web build
 - Manifest và document packet export là metadata-only và ghi `excludedSensitiveFields`.
 - Document packet export loại bỏ cả alias nhạy cảm như `storagePath` và `downloadToken`, ngoài `objectKey`, `presignedUrl`, `grantToken`, `fileContent`.
 - Evidence Bundle Builder cho phép chọn nhiều recommendation/document packet và export một case bundle manifest metadata-only.
+- Evidence Case Presentation hiển thị case id, readiness status, audit-chain posture, retention posture, checklist, recommendation timeline và document packet list từ bundle đang chọn.
+- Export Evidence Report HTML standalone, có thể mở/print trong browser và vẫn metadata-only.
 
 **Ý nghĩa**
 
 - Gom bằng chứng compliance vào một workspace riêng thay vì bắt người demo nhảy qua nhiều trang.
 - Tạo “demo bundle manifest” để trình bày báo cáo: audit-chain, recommendation ids, document packet ids, retention summary.
 - Tạo case bundle manifest có counts, checklist, audit-chain status, retention summary và danh sách packet đã chọn để trình bày một hồ sơ kiểm toán có cấu trúc.
+- Biến bundle JSON thành màn hình presentation/report dễ hiểu hơn, gần với sản phẩm compliance thương mại.
 - Không phải DevSecOps; đây là tính năng web/runtime compliance evidence.
 
 **Cách sử dụng**
@@ -488,12 +491,15 @@ http://localhost:3006/evidence
 8. Tick các packet cần gom vào bundle, hoặc dùng `Select recommendations` / `Select documents`.
 9. Nhấn `Export bundle`.
 10. Kiểm tra bundle manifest có `metadataOnly`, `excludedSensitiveFields`, counts, checklist, audit-chain status, retention summary và packet filenames.
-11. Dùng deep link sang Audit/Security/Retention/Document detail để chỉ ra evidence chain.
+11. Nhấn `Report` để tải Evidence Report HTML.
+12. Chuyển sang tab `Presentation`.
+13. Chỉ ra case readiness, audit-chain, retention posture, checklist, recommendation timeline và document packet list.
+14. Dùng deep link sang Audit/Security/Retention/Document detail để chỉ ra evidence chain.
 
 **Cách test**
 
 ```bash
-pnpm --filter web test -- evidence-center.spec.ts
+pnpm --filter web test -- evidence-center.spec.ts evidence-report.spec.ts
 pnpm --filter web exec tsc --noEmit
 ```
 
@@ -878,10 +884,12 @@ Sau đó mở `/audit` và verify chain.
 15. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
 16. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
 17. Tick nhiều packet, export Evidence Bundle manifest và chỉ ra checklist/counts/packet filenames.
-18. Chỉ ra manifest có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
-19. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
-20. Vào `/retention`, trình bày retention class/deadline/status.
-21. Vào edit document, đổi classification để xem access impact preview.
+18. Export Evidence Report HTML và mở report để chỉ ra đây là printable metadata-only report.
+19. Chuyển sang tab Presentation, chỉ ra case readiness, audit-chain status, retention posture, checklist, recommendation timeline và document packet list.
+20. Chỉ ra manifest/report có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
+21. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
+22. Vào `/retention`, trình bày retention class/deadline/status.
+23. Vào edit document, đổi classification để xem access impact preview.
 
 ## 8. Điểm cần nói rõ trong báo cáo
 
@@ -893,7 +901,7 @@ Sau đó mở `/audit` và verify chain.
 - Security Recommendation Engine chỉ dùng audit metadata, không đưa nội dung file, object key, presigned URL hay grant token vào output/audit.
 - Recommendation history và recommendation evidence packet cũng metadata-only; packet ghi `excludedSensitiveFields` để chứng minh các trường nhạy cảm đã bị loại trừ.
 - Recommendation Playbook là lớp điều phối deterministic trên metadata/workflow, không phải DevSecOps pipeline và không mở quyền xem file content.
-- Evidence Center là workspace runtime để gom/export evidence; Evidence Bundle manifest chỉ là metadata index có checklist/counts, document packet export được scrub các content-bearing fields trước khi tải xuống.
+- Evidence Center là workspace runtime để gom/export evidence; Evidence Bundle manifest và Evidence Report HTML chỉ là metadata index/presentation có checklist/counts, document packet export được scrub các content-bearing fields trước khi tải xuống.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -929,6 +937,7 @@ Ghi chú:
 2. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
 3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED`, chỉ ra Playbook owner/SLA/checklist, mở History timeline, tải recommendation evidence packet JSON và audit event tương ứng.
 4. Chụp `/evidence`: source cards, export manifest, export recommendation packet, export document packet.
-5. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest, chỉ ra checklist/counts.
-6. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-7. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+5. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
+6. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
+7. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+8. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

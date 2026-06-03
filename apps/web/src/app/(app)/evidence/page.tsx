@@ -5,9 +5,11 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Archive,
+  Clipboard,
   Download,
   ExternalLink,
   FileJson,
+  FileText,
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
@@ -25,15 +27,18 @@ import {
 import { getComplianceEvidencePacket } from '@/features/documents/documents.api';
 import {
   buildEvidenceBundle,
+  buildEvidenceCaseNarrative,
   buildEvidenceCenterManifest,
   buildEvidenceCenterModel,
   buildEvidenceCenterDocumentPacket,
   type EvidenceBundleManifest,
+  type EvidenceCaseNarrative,
   type EvidenceCenterModel,
   type EvidenceDocumentPacketTarget,
   type EvidenceRecommendationTarget,
   type EvidenceSourceState,
 } from '@/features/evidence/evidence-center';
+import { buildEvidenceReportHtml } from '@/features/evidence/evidence-report';
 import { getRetentionEvidence } from '@/features/retention/retention.api';
 import { retentionKeys } from '@/features/retention/retention.keys';
 import { useAuth } from '@/lib/auth/auth-context';
@@ -50,6 +55,8 @@ const sourceStateTone: Record<EvidenceSourceState, string> = {
     'border-[var(--border-soft)] bg-[var(--bg-subtle)] text-[var(--text-muted)]',
 };
 
+type EvidenceCenterView = 'builder' | 'presentation';
+
 export default function EvidenceCenterPage() {
   const { session } = useAuth();
   const hasAccess = canViewAudit(session);
@@ -59,6 +66,7 @@ export default function EvidenceCenterPage() {
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
+  const [activeView, setActiveView] = useState<EvidenceCenterView>('builder');
 
   const securityQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -109,6 +117,10 @@ export default function EvidenceCenterPage() {
         : null,
     [model, selectedDocumentIds, selectedRecommendationIds],
   );
+  const caseNarrative = useMemo(
+    () => (bundlePreview ? buildEvidenceCaseNarrative(bundlePreview) : null),
+    [bundlePreview],
+  );
 
   async function refreshEvidenceCenter() {
     setDownloadError(null);
@@ -130,6 +142,28 @@ export default function EvidenceCenterPage() {
       generatedAt: new Date().toISOString(),
     });
     downloadJson(bundle, bundle.bundleFilename);
+  }
+
+  function downloadReport(currentModel: EvidenceCenterModel) {
+    const bundle = buildEvidenceBundle(currentModel, {
+      selectedRecommendationIds,
+      selectedDocumentIds,
+      generatedAt: new Date().toISOString(),
+    });
+    const narrative = buildEvidenceCaseNarrative(bundle);
+    downloadHtml(
+      buildEvidenceReportHtml(bundle, narrative),
+      `${bundle.bundleId}-report.html`,
+    );
+  }
+
+  async function copyEvidenceText(value: string) {
+    setDownloadError(null);
+    try {
+      await navigator.clipboard.writeText(value);
+    } catch {
+      setDownloadError('Failed to copy evidence value.');
+    }
   }
 
   function toggleRecommendationSelection(id: string) {
@@ -299,33 +333,75 @@ export default function EvidenceCenterPage() {
         ))}
       </section>
 
-      <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
-        <RecommendationPacketQueue
-          items={model.recommendationTargets}
-          pendingId={pendingRecommendationId}
-          selectedIds={selectedRecommendationIdSet}
-          onToggleSelection={toggleRecommendationSelection}
-          onDownload={downloadRecommendationPacket}
-        />
-        <EvidenceBundlePanel
-          model={model}
-          bundle={bundlePreview}
-          onExport={() => downloadBundle(model)}
-          onSelectAllRecommendations={() => selectAllRecommendations(model)}
-          onSelectAllDocuments={() => selectAllDocuments(model)}
-          onClear={clearBundleSelection}
-        />
-      </section>
+      <div className="mt-4 inline-flex rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+        <button
+          type="button"
+          aria-pressed={activeView === 'builder'}
+          onClick={() => setActiveView('builder')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            activeView === 'builder'
+              ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          Builder
+        </button>
+        <button
+          type="button"
+          aria-pressed={activeView === 'presentation'}
+          onClick={() => setActiveView('presentation')}
+          className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+            activeView === 'presentation'
+              ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+              : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+          }`}
+        >
+          Presentation
+        </button>
+      </div>
 
-      <section className="mt-4">
-        <DocumentPacketTargets
-          items={model.documentPacketTargets}
-          pendingId={pendingDocumentId}
-          selectedIds={selectedDocumentIdSet}
-          onToggleSelection={toggleDocumentSelection}
-          onDownload={downloadDocumentPacket}
-        />
-      </section>
+      {activeView === 'builder' ? (
+        <>
+          <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+            <RecommendationPacketQueue
+              items={model.recommendationTargets}
+              pendingId={pendingRecommendationId}
+              selectedIds={selectedRecommendationIdSet}
+              onToggleSelection={toggleRecommendationSelection}
+              onDownload={downloadRecommendationPacket}
+            />
+            <EvidenceBundlePanel
+              model={model}
+              bundle={bundlePreview}
+              onExport={() => downloadBundle(model)}
+              onExportReport={() => downloadReport(model)}
+              onSelectAllRecommendations={() => selectAllRecommendations(model)}
+              onSelectAllDocuments={() => selectAllDocuments(model)}
+              onClear={clearBundleSelection}
+            />
+          </section>
+
+          <section className="mt-4">
+            <DocumentPacketTargets
+              items={model.documentPacketTargets}
+              pendingId={pendingDocumentId}
+              selectedIds={selectedDocumentIdSet}
+              onToggleSelection={toggleDocumentSelection}
+              onDownload={downloadDocumentPacket}
+            />
+          </section>
+        </>
+      ) : (
+        <section className="mt-4">
+          <EvidenceCasePresentation
+            bundle={bundlePreview}
+            narrative={caseNarrative}
+            onCopy={copyEvidenceText}
+            onExportBundle={() => downloadBundle(model)}
+            onExportReport={() => downloadReport(model)}
+          />
+        </section>
+      )}
     </div>
   );
 }
@@ -334,6 +410,7 @@ function EvidenceBundlePanel({
   model,
   bundle,
   onExport,
+  onExportReport,
   onSelectAllRecommendations,
   onSelectAllDocuments,
   onClear,
@@ -341,6 +418,7 @@ function EvidenceBundlePanel({
   model: EvidenceCenterModel;
   bundle: EvidenceBundleManifest | null;
   onExport: () => void;
+  onExportReport: () => void;
   onSelectAllRecommendations: () => void;
   onSelectAllDocuments: () => void;
   onClear: () => void;
@@ -386,15 +464,26 @@ function EvidenceBundlePanel({
               manifest for the demo bundle.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={onExport}
-            disabled={totalPackets === 0}
-            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--text-main)] px-3 text-sm font-medium text-[var(--bg-card)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-          >
-            <Download className="h-4 w-4" />
-            Export bundle
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={onExport}
+              disabled={totalPackets === 0}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--text-main)] px-3 text-sm font-medium text-[var(--bg-card)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              Bundle
+            </button>
+            <button
+              type="button"
+              onClick={onExportReport}
+              disabled={totalPackets === 0}
+              className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FileText className="h-4 w-4" />
+              Report
+            </button>
+          </div>
         </div>
 
         <div className="mt-3 grid gap-2 sm:grid-cols-3">
@@ -462,6 +551,262 @@ function EvidenceBundlePanel({
   );
 }
 
+function EvidenceCasePresentation({
+  bundle,
+  narrative,
+  onCopy,
+  onExportBundle,
+  onExportReport,
+}: {
+  bundle: EvidenceBundleManifest | null;
+  narrative: EvidenceCaseNarrative | null;
+  onCopy: (value: string) => void | Promise<void>;
+  onExportBundle: () => void;
+  onExportReport: () => void;
+}) {
+  if (!bundle || !narrative) {
+    return null;
+  }
+
+  const readinessNotes = [...narrative.blockers, ...narrative.warnings];
+  const hasPackets = bundle.summary.totalPackets > 0;
+
+  return (
+    <div
+      className="rounded-lg border"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
+    >
+      <div className="border-b px-4 py-4" style={{ borderColor: 'var(--border-soft)' }}>
+        <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+          <div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className={caseStatusClass(narrative.status)}>
+                {narrative.status}
+              </span>
+              <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+                Metadata-only
+              </span>
+            </div>
+            <h2 className="mt-2 text-lg font-semibold text-[var(--text-main)]">
+              {narrative.caseId}
+            </h2>
+            <p className="mt-1 text-sm text-[var(--text-muted)]">
+              {narrative.headline}
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => onCopy(narrative.caseId)}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-soft)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+            >
+              <Clipboard className="h-4 w-4" />
+              Case ID
+            </button>
+            <button
+              type="button"
+              onClick={() => onCopy(bundle.bundleFilename)}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-soft)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+            >
+              <Clipboard className="h-4 w-4" />
+              Filename
+            </button>
+            <button
+              type="button"
+              onClick={onExportBundle}
+              disabled={!hasPackets}
+              className="inline-flex h-9 items-center gap-2 rounded-lg bg-[var(--text-main)] px-3 text-sm font-medium text-[var(--bg-card)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <Download className="h-4 w-4" />
+              Bundle
+            </button>
+            <button
+              type="button"
+              onClick={onExportReport}
+              disabled={!hasPackets}
+              className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)] disabled:cursor-not-allowed disabled:opacity-60"
+            >
+              <FileText className="h-4 w-4" />
+              Report
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="grid gap-4 p-4 xl:grid-cols-[0.9fr_1.1fr]">
+        <div className="space-y-4">
+          <div className="grid gap-2 sm:grid-cols-2">
+            <BundleMetric
+              label="Recommendations"
+              value={bundle.summary.recommendationPackets}
+            />
+            <BundleMetric
+              label="Documents"
+              value={bundle.summary.documentPackets}
+            />
+            <BundleMetric
+              label="Audit events"
+              value={narrative.auditChain.checkedEvents}
+            />
+            <BundleMetric
+              label="Missing"
+              value={bundle.summary.missingSelections}
+            />
+          </div>
+
+          <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+            <div className="flex items-start gap-2">
+              {narrative.auditChain.state === 'verified' ? (
+                <ShieldCheck className="mt-0.5 h-4 w-4 text-[var(--status-published-text)]" />
+              ) : (
+                <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--state-error-text)]" />
+              )}
+              <div>
+                <p className="text-sm font-semibold text-[var(--text-main)]">
+                  {narrative.auditChain.label}
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {narrative.auditChain.checkedEvents} audit events checked.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+            <p className="text-sm font-semibold text-[var(--text-main)]">
+              Retention posture
+            </p>
+            <p className="mt-1 text-xs text-[var(--text-muted)]">
+              {narrative.retentionPosture.label}
+            </p>
+            <div className="mt-2 grid grid-cols-4 gap-2 text-center text-xs">
+              <MiniMetric label="Tracked" value={narrative.retentionPosture.tracked} />
+              <MiniMetric label="Due soon" value={narrative.retentionPosture.dueSoon} />
+              <MiniMetric label="Overdue" value={narrative.retentionPosture.overdue} />
+              <MiniMetric label="Archived" value={narrative.retentionPosture.archived} />
+            </div>
+          </div>
+
+          {readinessNotes.length > 0 ? (
+            <div className="rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] p-3">
+              <p className="text-sm font-semibold text-[var(--status-pending-text)]">
+                Readiness notes
+              </p>
+              <ul className="mt-2 space-y-1 text-xs text-[var(--status-pending-text)]">
+                {readinessNotes.map((item) => (
+                  <li key={item}>{item}</li>
+                ))}
+              </ul>
+            </div>
+          ) : null}
+        </div>
+
+        <div className="space-y-4">
+          <div className="rounded border border-[var(--border-soft)]">
+            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-soft)' }}>
+              <h3 className="text-sm font-semibold text-[var(--text-main)]">
+                Case checklist
+              </h3>
+            </div>
+            <div className="divide-y divide-[var(--border-soft)]">
+              {narrative.checklist.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex items-center justify-between gap-3 px-3 py-2 text-xs"
+                >
+                  <span className="font-medium text-[var(--text-main)]">
+                    {item.label}
+                  </span>
+                  <span
+                    className={
+                      item.complete
+                        ? 'text-[var(--status-published-text)]'
+                        : 'text-[var(--status-pending-text)]'
+                    }
+                  >
+                    {item.complete ? 'ready' : 'pending'} - {item.evidenceCount}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <div className="rounded border border-[var(--border-soft)]">
+            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-soft)' }}>
+              <h3 className="text-sm font-semibold text-[var(--text-main)]">
+                Recommendation timeline
+              </h3>
+            </div>
+            {narrative.timeline.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-[var(--text-muted)]">
+                No recommendation packet selected.
+              </p>
+            ) : (
+              <div className="divide-y divide-[var(--border-soft)]">
+                {narrative.timeline.map((item) => (
+                  <div key={item.id} className="px-3 py-3">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]">
+                        #{item.sequence}
+                      </span>
+                      <span className={badgeClass(item.severity)}>
+                        {item.severity}
+                      </span>
+                      <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+                        {item.workflowStatus}
+                      </span>
+                    </div>
+                    <p className="mt-2 text-sm font-semibold text-[var(--text-main)]">
+                      {item.title}
+                    </p>
+                    <p className="mt-1 font-mono text-xs text-[var(--text-faint)]">
+                      {item.packetFilename}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="rounded border border-[var(--border-soft)]">
+            <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-soft)' }}>
+              <h3 className="text-sm font-semibold text-[var(--text-main)]">
+                Document packets
+              </h3>
+            </div>
+            {narrative.documents.length === 0 ? (
+              <p className="px-3 py-3 text-sm text-[var(--text-muted)]">
+                No document packet selected.
+              </p>
+            ) : (
+              <div className="divide-y divide-[var(--border-soft)]">
+                {narrative.documents.map((item) => (
+                  <div key={item.id} className="px-3 py-3">
+                    <p className="text-sm font-semibold text-[var(--text-main)]">
+                      {item.title}
+                    </p>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+                        {item.classification}
+                      </span>
+                      <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs text-[var(--text-muted)]">
+                        {item.retentionStatus.replace('_', ' ')}
+                      </span>
+                    </div>
+                    <p className="mt-2 font-mono text-xs text-[var(--text-faint)]">
+                      {item.packetFilename}
+                    </p>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function BundleMetric({ label, value }: { label: string; value: number }) {
   return (
     <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
@@ -471,6 +816,15 @@ function BundleMetric({ label, value }: { label: string; value: number }) {
       <p className="mt-1 text-lg font-semibold text-[var(--text-main)]">
         {value}
       </p>
+    </div>
+  );
+}
+
+function MiniMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded bg-[var(--bg-card)] px-2 py-1">
+      <p className="font-semibold text-[var(--text-main)]">{value}</p>
+      <p className="mt-0.5 text-[10px] text-[var(--text-faint)]">{label}</p>
     </div>
   );
 }
@@ -674,6 +1028,16 @@ function EvidenceLink({ href, label }: { href: string; label: string }) {
   );
 }
 
+function caseStatusClass(status: EvidenceCaseNarrative['status']): string {
+  if (status === 'ready') {
+    return 'rounded border border-[var(--status-published-border)] bg-[var(--status-published-bg)] px-2 py-1 text-xs font-semibold uppercase text-[var(--status-published-text)]';
+  }
+  if (status === 'blocked') {
+    return 'rounded border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-2 py-1 text-xs font-semibold uppercase text-[var(--state-error-text)]';
+  }
+  return 'rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold uppercase text-[var(--status-pending-text)]';
+}
+
 function badgeClass(severity: EvidenceRecommendationTarget['severity']): string {
   if (severity === 'critical') {
     return 'rounded bg-[var(--state-error-bg)] px-2 py-1 text-xs font-semibold text-[var(--state-error-text)]';
@@ -687,6 +1051,20 @@ function badgeClass(severity: EvidenceRecommendationTarget['severity']): string 
 function downloadJson(value: unknown, filename: string) {
   const blob = new Blob([JSON.stringify(value, null, 2)], {
     type: 'application/json',
+  });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement('a');
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
+function downloadHtml(value: string, filename: string) {
+  const blob = new Blob([value], {
+    type: 'text/html',
   });
   const url = URL.createObjectURL(blob);
   const link = document.createElement('a');

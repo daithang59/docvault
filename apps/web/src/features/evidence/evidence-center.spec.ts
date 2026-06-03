@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildEvidenceBundle,
+  buildEvidenceCaseNarrative,
   buildEvidenceCenterDocumentPacket,
   EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS,
   buildEvidenceCenterModel,
@@ -292,6 +293,144 @@ describe('buildEvidenceBundle', () => {
       }),
       expect.objectContaining({ id: 'document-packets', complete: false }),
       expect.objectContaining({ id: 'retention-evidence', complete: true }),
+    ]);
+  });
+});
+
+describe('buildEvidenceCaseNarrative', () => {
+  it('builds a ready case narrative from a complete selected bundle', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['actor-access-review:DENY_BURST:viewer-1'],
+      selectedDocumentIds: ['doc-secret'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    const narrative = buildEvidenceCaseNarrative(bundle);
+
+    expect(narrative).toMatchObject({
+      caseId: 'DOCVAULT-EVIDENCE-BUNDLE-20260602093000',
+      status: 'ready',
+      headline:
+        'Audit case with 1 recommendation packet and 1 document packet.',
+      auditChain: {
+        state: 'verified',
+        label: 'Audit chain verified',
+        checkedEvents: 42,
+      },
+      retentionPosture: {
+        state: 'attention',
+        label: '1 retention record due soon',
+        tracked: 2,
+        dueSoon: 1,
+        overdue: 0,
+      },
+      warnings: [],
+      blockers: [],
+    });
+    expect(narrative.timeline).toEqual([
+      expect.objectContaining({
+        id: 'actor-access-review:DENY_BURST:viewer-1',
+        title: 'Investigate denied access burst for viewer-1',
+        eventLabel: 'Recommendation packet selected',
+        packetFilename:
+          'actor-access-review-deny-burst-viewer-1-recommendation-evidence.json',
+      }),
+    ]);
+    expect(narrative.documents).toEqual([
+      expect.objectContaining({
+        id: 'doc-secret',
+        title: 'Secret Plan',
+        packetFilename: 'docvault-evidence-secret-plan.json',
+      }),
+    ]);
+  });
+
+  it('marks missing selected packets as incomplete warnings', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['missing-recommendation'],
+      selectedDocumentIds: ['missing-document'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    const narrative = buildEvidenceCaseNarrative(bundle);
+
+    expect(narrative.status).toBe('incomplete');
+    expect(narrative.warnings).toEqual([
+      'Missing selected packet: missing-recommendation',
+      'Missing selected packet: missing-document',
+      'No recommendation packet selected.',
+      'No document packet selected.',
+    ]);
+    expect(narrative.blockers).toEqual([]);
+  });
+
+  it('blocks presentation readiness when the audit chain is invalid', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: {
+        ...securitySummary(),
+        chain: { valid: false, checked: 42 },
+      },
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['actor-access-review:DENY_BURST:viewer-1'],
+      selectedDocumentIds: ['doc-secret'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    const narrative = buildEvidenceCaseNarrative(bundle);
+
+    expect(narrative.status).toBe('blocked');
+    expect(narrative.auditChain).toMatchObject({
+      state: 'blocked',
+      label: 'Audit chain needs review',
+    });
+    expect(narrative.blockers).toEqual([
+      'Audit chain is not verified. Resolve tamper evidence before presenting this case.',
+    ]);
+  });
+
+  it('blocks presentation readiness when retention evidence has overdue records', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: {
+        ...retentionEvidence(),
+        summary: {
+          tracked: 2,
+          active: 0,
+          dueSoon: 0,
+          overdue: 1,
+          archived: 1,
+        },
+      },
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['actor-access-review:DENY_BURST:viewer-1'],
+      selectedDocumentIds: ['doc-secret'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    const narrative = buildEvidenceCaseNarrative(bundle);
+
+    expect(narrative.status).toBe('blocked');
+    expect(narrative.retentionPosture).toMatchObject({
+      state: 'blocked',
+      label: '1 retention record overdue',
+    });
+    expect(narrative.blockers).toEqual([
+      'Retention evidence has overdue records. Resolve or explain retention exceptions before presenting this case.',
     ]);
   });
 });
