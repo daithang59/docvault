@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
 import { deleteDocument } from '@/lib/api/workflow';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
@@ -9,7 +9,17 @@ import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
-import { DocumentFilters, DocumentFiltersState } from '@/components/documents/document-filters';
+import { DocumentFilters } from '@/components/documents/document-filters';
+import {
+  DEFAULT_DOCUMENT_FILTERS,
+  buildDocumentFilterOptions,
+  countActiveDocumentFilters,
+  describeActiveDocumentFilters,
+  filterAndSortDocuments,
+  parseDocumentFiltersFromSearchParams,
+  serializeDocumentFiltersToSearchParams,
+  type DocumentFiltersState,
+} from '@/features/documents/document-filter-model';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -26,19 +36,12 @@ import { ApiError } from '@/types/api';
 import { parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 
-const DEFAULT_FILTERS: DocumentFiltersState = {
-  search: '',
-  status: '',
-  classification: '',
-  sort: 'updatedAt',
-  sortDir: 'desc',
-};
-
 export default function DocumentsPage() {
   const qc = useQueryClient();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
-  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -54,27 +57,41 @@ export default function DocumentsPage() {
     onError: (msg) => toast.error(msg),
   });
 
-  const filtered = useMemo(() => {
-    if (!docs) return [];
-    let result = [...docs.data];
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(
-        (d) => d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q))
-      );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFilters(parseDocumentFiltersFromSearchParams(params));
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+
+    const params = serializeDocumentFiltersToSearchParams(filters);
+    const query = params.toString();
+    const nextUrl = query
+      ? `${window.location.pathname}?${query}`
+      : window.location.pathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+    if (currentUrl !== nextUrl) {
+      window.history.replaceState(null, '', nextUrl);
     }
-    if (filters.status) result = result.filter((d) => d.status === filters.status);
-    if (filters.classification) result = result.filter(
-      (d) => d.classification === filters.classification
-    );
-    result.sort((a, b) => {
-      const valA: string | number = a[filters.sort as keyof DocumentListItem] as string ?? '';
-      const valB: string | number = b[filters.sort as keyof DocumentListItem] as string ?? '';
-      const cmp = String(valA).localeCompare(String(valB));
-      return filters.sortDir === 'asc' ? cmp : -cmp;
-    });
-    return result;
-  }, [docs, filters]);
+  }, [filters, filtersHydrated]);
+
+  const documents = useMemo(() => docs?.data ?? [], [docs?.data]);
+  const filterOptions = useMemo(
+    () => buildDocumentFilterOptions(documents),
+    [documents],
+  );
+  const filtered = useMemo(
+    () => filterAndSortDocuments(documents, filters),
+    [documents, filters],
+  );
+  const activeFilterCount = countActiveDocumentFilters(filters);
+  const emptyDescription =
+    documents.length === 0 && activeFilterCount === 0
+      ? 'Create your first document to get started.'
+      : describeActiveDocumentFilters(filters, filterOptions);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
@@ -173,6 +190,13 @@ export default function DocumentsPage() {
         <PageHeader
           title="Documents"
           subtitle="Manage and review secure documents across their lifecycle."
+          badge={
+            activeFilterCount > 0 ? (
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold text-white bg-[var(--color-primary)]">
+                {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+              </span>
+            ) : null
+          }
           actions={
             <ProtectedAction roles={['editor', 'admin']}>
               <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
@@ -185,17 +209,23 @@ export default function DocumentsPage() {
       </div>
 
       <div className="animate-in delay-2">
-        <DocumentFilters filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
+        <DocumentFilters
+          filters={filters}
+          options={filterOptions}
+          resultCount={filtered.length}
+          totalCount={documents.length}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            setPage(1);
+          }}
+        />
       </div>
 
       {filtered.length === 0 ? (
         <div className="animate-in delay-3">
           <EmptyState
             title="No documents found"
-          description={filters.search || filters.status || filters.classification
-            ? 'Try adjusting your filters.'
-            : 'Create your first document to get started.'
-          }
+          description={emptyDescription}
           icon="document"
           action={
             <ProtectedAction roles={['editor', 'admin']}>

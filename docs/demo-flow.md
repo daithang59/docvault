@@ -35,6 +35,7 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Argo CD application `Synced/Healthy`.
 - Web app login page on EKS.
 - Successful Keycloak login.
+- Document search/filter workbench with active chips and URL query state.
 - Upload, preview and download success.
 - Notification Center showing approval/security/retention/document work queues.
 - ZAP report artifact: `zap_report.html` and `zap_report.json`.
@@ -65,6 +66,9 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 5. Expected result: document detail page opens with status **Draft**.
 6. Open preview.
 7. Expected result: the uploaded file preview renders through the EKS gateway route.
+8. Return to **Documents**.
+9. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
+10. Expected result: the result count, URL query state, active chips and table rows update together.
 
 ---
 
@@ -205,6 +209,9 @@ Navigate to: **http://localhost:3100**
 3. Drag & drop or click to attach a PDF file
 4. Click **Save Draft**
 5. ✅ Should redirect to document detail page, status = **Draft**
+6. Return to **Documents**
+7. Search `finance`, set status/classification/tag/owner filters, and change sort
+8. ✅ Active chips and URL query params should reflect the selected filters
 
 ---
 
