@@ -27,6 +27,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
 - Documents/My Documents có smart workbench views, search/filter thương mại hơn: quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
 - Document detail/preview có metadata summary, evidence links và trạng thái preview rõ ràng theo policy/format.
+- Approval UX có readiness checklist, attention reasons và reject reason presets cho approver.
 - AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
 - Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
 - One-click compliance evidence packet để xuất gói bằng chứng cho từng document.
@@ -51,6 +52,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.7 | Commercial document search/filter UX | Xong | `apps/web/src/features/documents/document-filter-model.ts`, `apps/web/src/components/documents/document-filters.tsx` |
 | W-P1.8 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
 | W-P1.9 | Document detail/preview UX polish | Xong | `apps/web/src/features/documents/document-detail-presentation.ts`, `apps/web/src/components/documents/document-versions-card.tsx` |
+| W-P1.10 | Approval readiness UX | Xong | `apps/web/src/features/documents/document-approval-readiness.ts`, `apps/web/src/components/documents/document-approval-readiness-card.tsx` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -663,7 +665,55 @@ pnpm --filter web lint
 pnpm --filter web build
 ```
 
-### 3.14. Retention và records management
+### 3.14. Approval readiness UX
+
+**Đã triển khai**
+
+- Document detail có `Approval readiness` card.
+- Approvals review drawer có checklist readiness ngay trong panel review.
+- Checklist kiểm tra:
+  - file/current version
+  - metadata title/description
+  - classification
+  - tags
+  - DLP status
+  - retention evidence
+  - workflow/submission state
+- Trạng thái tổng hợp:
+  - `Ready`
+  - `Needs attention`
+  - `Blocked`
+- Reject dialog có reason presets để approver chọn nhanh:
+  - missing metadata
+  - classification needs review
+  - DLP remediation
+  - retention evidence incomplete
+
+**Ý nghĩa**
+
+- Approval flow không còn chỉ là nút approve/reject; approver có checklist vận hành để xem tài liệu có đủ điều kiện review chưa.
+- Editor/compliance có thể giải thích rõ vì sao tài liệu cần bổ sung metadata/tag/retention/DLP trước khi approve.
+- Đây là lớp FE/runtime UX, không thay đổi backend workflow state machine và không claim approval lock production.
+
+**Cách sử dụng**
+
+1. Đăng nhập `editor1`, tạo/upload document và submit.
+2. Mở document detail để xem `Approval readiness`.
+3. Đăng nhập `approver1`.
+4. Mở `/approvals` và chọn một document pending.
+5. Kiểm tra drawer có readiness checklist.
+6. Bấm reject và chọn một preset reason nếu muốn trả document về draft.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- document-approval-readiness.spec.ts document-approval-readiness-card.spec.ts
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
+
+### 3.15. Retention và records management
 
 **Đã làm**
 
@@ -708,7 +758,7 @@ pnpm --filter metadata-service test
 pnpm test:e2e
 ```
 
-### 3.15. One-click compliance evidence packet
+### 3.16. One-click compliance evidence packet
 
 **Đã làm**
 
@@ -753,7 +803,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm test:e2e
 ```
 
-### 3.16. AI-ready guardrails
+### 3.17. AI-ready guardrails
 
 **Đã làm**
 
@@ -788,7 +838,7 @@ Kiểm tra thủ công:
 2. Xem AI guardrails card.
 3. Đăng nhập `co1` và xác nhận content summarization/Q&A bị deny.
 
-### 3.17. Access impact preview
+### 3.18. Access impact preview
 
 **Đã làm**
 
@@ -827,7 +877,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm --filter web test -- document-access-impact-card.spec.ts
 ```
 
-### 3.18. Shared auth/contracts và OpenAPI alignment
+### 3.19. Shared auth/contracts và OpenAPI alignment
 
 **Đã làm**
 
@@ -1013,9 +1063,9 @@ Sau đó mở `/audit` và verify chain.
 |---|---|---|---|
 | Documents | `http://localhost:3006/documents` | viewer/editor/admin | Smart workbench quick views, commercial search/filter, active chips, URL query state, preview/download button policy |
 | New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
-| Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
+| Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, approval readiness, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
-| Approvals | `http://localhost:3006/approvals` | approver/admin | Approve/reject Pending document |
+| Approvals | `http://localhost:3006/approvals` | approver/admin | Review readiness checklist, approve/reject Pending document, chọn reject reason presets |
 | Notifications | `http://localhost:3006/notifications` | mọi role đăng nhập | Work queue, group filters, read/unread, target links |
 | Evidence | `http://localhost:3006/evidence` | compliance/admin | Export evidence manifest, recommendation packets, document packets |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
@@ -1028,7 +1078,7 @@ Sau đó mở `/audit` và verify chain.
 2. Tạo document mới, upload file bình thường.
 3. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
 4. Submit document.
-5. Đăng nhập `approver1`, approve document.
+5. Đăng nhập `approver1`, mở `/approvals`, chỉ ra readiness checklist và reject reason presets, sau đó approve document.
 6. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
 7. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
 8. Trên document detail, chỉ ra metadata summary, Version History preview posture và evidence links nếu role có quyền.
@@ -1071,6 +1121,7 @@ Sau đó mở `/audit` và verify chain.
 - Notification Center là runtime work queue trong web app, không phải alerting/DevSecOps pipeline; nó gom workflow/retention/security/document events thành danh sách hành động có read state và target links.
 - Document smart workbench/search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
 - Document detail/preview polish là UX/presentation layer: làm rõ metadata, policy denial và unsupported format; không claim là backend full-text preview engine.
+- Approval readiness là FE/runtime review aid cho approver; chưa claim là backend workflow lock hoặc approval state machine production.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -1096,8 +1147,13 @@ pnpm test:e2e
 
 Ghi chú:
 
-- web lint pass với 0 error và còn 5 warning sẵn có.
-- git diff --check pass, Git chỉ cảnh báo line-ending conversion.
+- Đợt verify web bổ sung cho Approval readiness / smart workbench / detail polish / evidence / notification ngày 2026-06-03 đã chạy:
+  - `pnpm --filter web test -- document-approval-readiness.spec.ts document-approval-readiness-card.spec.ts document-filter-model.spec.ts document-detail-presentation.spec.ts document-detail-polish-cards.spec.ts notifications-center.spec.ts evidence-center.spec.ts evidence-report.spec.ts security-dashboard.spec.ts`
+  - `pnpm --filter web exec tsc --noEmit`
+  - `pnpm --filter web lint`
+  - `pnpm --filter web build`
+- web lint pass với 0 error và còn 4 warning sẵn có.
+- git diff --check / browser smoke cho diff mới nhất nên chạy lại khi sandbox hoặc local runtime cho phép.
 - pnpm test:e2e cần local stack đang chạy.
 
 ## 10. Việc còn nên làm nếu muốn polish thêm
@@ -1111,5 +1167,6 @@ Ghi chú:
 7. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
 8. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
 9. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
-10. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-11. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+10. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.
+11. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+12. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

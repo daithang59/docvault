@@ -37,6 +37,8 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Successful Keycloak login.
 - Document smart workbench quick views with active chips, counts, and URL query state.
 - Document detail metadata summary, evidence links, and version preview posture.
+- Approval readiness checklist in document detail and Approvals review drawer.
+- Reject dialog reason presets for approver review.
 - Upload, preview and download success.
 - Compliance Officer preview/download denial reason on document detail.
 - Notification Center showing approval/security/retention/document work queues.
@@ -90,10 +92,12 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 2. Login through Keycloak as the Approver test user.
 3. Open **Approvals**.
 4. Select the pending document.
-5. Click **Approve** and confirm.
-6. Expected result: document is approved/published and leaves the pending approval queue.
-7. Open the bell menu or **Notifications**.
-8. Expected result: approval notifications can be filtered by unread/read state and link back to the target workflow.
+5. Check the approval readiness checklist in the review drawer.
+6. Open **Reject** once to show the preset reason buttons, then cancel.
+7. Click **Approve** and confirm.
+8. Expected result: document is approved/published and leaves the pending approval queue.
+9. Open the bell menu or **Notifications**.
+10. Expected result: approval notifications can be filtered by unread/read state and link back to the target workflow.
 
 ---
 
@@ -241,20 +245,21 @@ Navigate to: **http://localhost:3100**
 2. Demo Login as `approver1`, role: **Approver**
 3. Click **Approvals** in sidebar
 4. ✅ Should see the submitted document in the pending list
+5. ✅ Opening the row should show the approval readiness checklist in the drawer
 
 ---
 
 ## Step 5 — Approver: Approve Document
 
 1. Click on the pending document row → Review drawer opens on right
-2. Review the document details and workflow history
+2. Review the document details, workflow history, and readiness checklist
 3. Click **Approve**
 4. Confirm in dialog
 5. ✅ Toast: "Document approved and published"
 6. ✅ Document disappears from approvals queue
 
 *Alternative — Reject:*
-- Click **Reject**, optionally enter reason, confirm
+- Click **Reject**, choose a preset reason or enter a custom reason, confirm
 - Document returns to Draft status
 
 ---

@@ -8,6 +8,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { DocumentHeader } from '@/components/documents/document-header';
 import { DocumentDlpFindingsCard } from '@/components/documents/document-dlp-findings-card';
 import { DocumentAiGuardrailsCard } from '@/components/documents/document-ai-guardrails-card';
+import { DocumentApprovalReadinessCard } from '@/components/documents/document-approval-readiness-card';
 import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
 import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
@@ -90,6 +91,12 @@ export default function DocumentDetailPage({ params }: Props) {
 
       <div className="animate-in delay-2 mb-5">
         <DocumentMetadataSummaryCard
+          document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+        />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentApprovalReadinessCard
           document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
         />
       </div>

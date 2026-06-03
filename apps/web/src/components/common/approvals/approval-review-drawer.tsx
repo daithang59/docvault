@@ -12,10 +12,18 @@ import { CheckCircle, XCircle, X, Eye, Clock, User, Tag, ArrowRight } from 'luci
 import { useApproveDocument, useRejectDocument } from '@/features/workflow/workflow.hooks';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { DocumentApprovalReadinessCard } from '@/components/documents/document-approval-readiness-card';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage } from '@/lib/api/errors';
 import { ROUTES } from '@/lib/constants/routes';
+
+const REJECT_REASON_PRESETS = [
+  'Missing required metadata.',
+  'Classification needs review.',
+  'DLP findings need remediation.',
+  'Retention evidence is incomplete.',
+];
 
 interface ApprovalReviewDrawerProps {
   doc: DocumentListItem | null;
@@ -182,7 +190,12 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
             </div>
           )}
 
-          {/* Section 4: Activity */}
+          {/* Section 4: Approval readiness */}
+          <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
+            <DocumentApprovalReadinessCard document={doc} compact />
+          </div>
+
+          {/* Section 5: Activity */}
           {history && history.length > 0 && (
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-center gap-1.5 mb-3">
@@ -297,6 +310,22 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
             color: 'var(--input-text)',
           }}
         />
+        <div className="mt-2 flex flex-wrap gap-1.5">
+          {REJECT_REASON_PRESETS.map((reason) => (
+            <button
+              key={reason}
+              type="button"
+              onClick={() => setRejectReason(reason)}
+              className="rounded-lg border px-2 py-1 text-xs font-medium transition hover:bg-[var(--bg-muted)]"
+              style={{
+                borderColor: 'var(--border-soft)',
+                color: 'var(--text-muted)',
+              }}
+            >
+              {reason}
+            </button>
+          ))}
+        </div>
       </ConfirmDialog>
     </>
   );
