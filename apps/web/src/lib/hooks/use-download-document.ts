@@ -13,11 +13,11 @@ interface UseDownloadDocumentOptions {
 export function useDownloadDocument(options?: UseDownloadDocumentOptions) {
   const [isDownloading, setIsDownloading] = useState(false);
 
-  async function download(docId: string) {
+  async function download(docId: string, version?: number) {
     setIsDownloading(true);
     try {
       // 1. Authorize — metadata-service checks ACL/classification/role
-      const authorization = await authorizeDownload(docId);
+      const authorization = await authorizeDownload(docId, version);
       const filename = authorization.filename || `document-${docId}`;
 
       // 2. Presign URL — pass grantToken so document-service skips re-authorization

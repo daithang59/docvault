@@ -4,13 +4,14 @@ import { DocumentVersion } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
 import { formatBytes } from '@/lib/utils/file';
 import { truncateMiddle } from '@/lib/utils/format';
-import { Download, Eye, FileText } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Download, Eye, FileText } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
+import { getVersionPreviewPosture } from '@/features/documents/document-detail-presentation';
 
 interface DocumentVersionsCardProps {
   docId: string;
   versions: DocumentVersion[];
-  onDownload?: () => void;
+  onDownload?: (docId: string, version: DocumentVersion) => void;
   onPreview?: (docId: string, version: DocumentVersion) => void;
   canDownload: boolean;
   canPreview: boolean;
@@ -54,75 +55,115 @@ export function DocumentVersionsCard({
         />
       ) : (
         <div className="divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {sorted.map((v) => (
-            <div key={v.id} className="flex items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-card-hover)]">
-              <div
-                className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
-                style={{ background: 'var(--stat-total-bg)' }}
-              >
-                <FileText className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 mb-0.5">
-                  <span
-                    className="text-xs font-medium text-white px-1.5 py-0.5 rounded"
-                    style={{ background: 'var(--color-primary)' }}
-                  >
-                    v{v.versionNumber ?? v.version ?? 1}
-                  </span>
-                  <span className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{v.filename}</span>
+          {sorted.map((v) => {
+            const previewPosture = getVersionPreviewPosture(v, {
+              allowed: canPreview,
+              reason: previewDeniedReason,
+            });
+            const previewSupported = previewPosture.state === 'supported';
+
+            return (
+              <div key={v.id} className="flex items-start gap-3 px-5 py-4 transition-colors hover:bg-[var(--bg-card-hover)]">
+                <div
+                  className="h-9 w-9 rounded-lg flex items-center justify-center shrink-0 mt-0.5"
+                  style={{ background: 'var(--stat-total-bg)' }}
+                >
+                  <FileText className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
                 </div>
-                <div className="flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-faint)' }}>
-                  {(v.fileSize ?? v.size) != null && (
-                    <span>{formatBytes((v.fileSize ?? v.size)!)}</span>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-0.5">
+                    <span
+                      className="text-xs font-medium text-white px-1.5 py-0.5 rounded"
+                      style={{ background: 'var(--color-primary)' }}
+                    >
+                      v{v.versionNumber ?? v.version ?? 1}
+                    </span>
+                    <span className="text-sm font-medium truncate" style={{ color: 'var(--text-main)' }}>{v.filename}</span>
+                  </div>
+                  <div className="flex flex-wrap gap-3 text-xs" style={{ color: 'var(--text-faint)' }}>
+                    {(v.fileSize ?? v.size) != null && (
+                      <span>{formatBytes((v.fileSize ?? v.size)!)}</span>
+                    )}
+                    {(v.mimeType ?? v.contentType) && (
+                      <span>{v.mimeType ?? v.contentType}</span>
+                    )}
+                    {v.checksum && (
+                      <span title={v.checksum}>SHA: {truncateMiddle(v.checksum, 12)}</span>
+                    )}
+                    {(v.createdBy ?? v.uploadedById) && (
+                      <span>By {v.createdBy ?? v.uploadedById}</span>
+                    )}
+                    <span>{formatDateTime(v.uploadedAt ?? v.createdAt ?? '')}</span>
+                  </div>
+                  <div
+                    className="mt-2 inline-flex max-w-full items-start gap-1.5 rounded-lg border px-2 py-1 text-xs"
+                    style={{
+                      borderColor:
+                        previewPosture.state === 'supported'
+                          ? 'var(--status-published-border)'
+                          : 'var(--status-pending-border)',
+                      background:
+                        previewPosture.state === 'supported'
+                          ? 'var(--status-published-bg)'
+                          : 'var(--status-pending-bg)',
+                      color:
+                        previewPosture.state === 'supported'
+                          ? 'var(--status-published-text)'
+                          : 'var(--status-pending-text)',
+                    }}
+                  >
+                    {previewPosture.state === 'supported' ? (
+                      <CheckCircle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    ) : (
+                      <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                    )}
+                    <span className="min-w-0">
+                      <span className="font-medium">{previewPosture.label}:</span>{' '}
+                      {previewPosture.reason}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1 shrink-0">
+                  {canPreview && onPreview && previewSupported && (
+                    <button
+                      onClick={() => onPreview(docId, v)}
+                      className="p-1.5 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-faint)' }}
+                      title="Preview this version"
+                      aria-label="Preview this version"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </button>
                   )}
-                  {(v.mimeType ?? v.contentType) && (
-                    <span>{v.mimeType ?? v.contentType}</span>
+                  {(!canPreview || !previewSupported) && (
+                    <DisabledIconButton
+                      icon={Eye}
+                      label="Preview"
+                      reason={previewPosture.reason}
+                    />
                   )}
-                  {v.checksum && (
-                    <span title={v.checksum}>SHA: {truncateMiddle(v.checksum, 12)}</span>
+                  {canDownload && onDownload && (
+                    <button
+                      onClick={() => onDownload(docId, v)}
+                      className="p-1.5 rounded-lg transition-colors"
+                      style={{ color: 'var(--text-faint)' }}
+                      title="Download this version"
+                      aria-label="Download this version"
+                    >
+                      <Download className="h-4 w-4" />
+                    </button>
                   )}
-                  <span>{formatDateTime(v.uploadedAt ?? v.createdAt ?? '')}</span>
+                  {!canDownload && downloadDeniedReason && (
+                    <DisabledIconButton
+                      icon={Download}
+                      label="Download"
+                      reason={downloadDeniedReason}
+                    />
+                  )}
                 </div>
               </div>
-              <div className="flex items-center gap-1 shrink-0">
-                {canPreview && onPreview && (
-                  <button
-                    onClick={() => onPreview(docId, v)}
-                    className="p-1.5 rounded-lg transition-colors"
-                    style={{ color: 'var(--text-faint)' }}
-                    title="Preview this version"
-                  >
-                    <Eye className="h-4 w-4" />
-                  </button>
-                )}
-                {!canPreview && previewDeniedReason && (
-                  <DisabledIconButton
-                    icon={Eye}
-                    label="Preview"
-                    reason={previewDeniedReason}
-                  />
-                )}
-                {canDownload && onDownload && (
-                  <button
-                    onClick={() => onDownload()}
-                    className="p-1.5 rounded-lg transition-colors"
-                    style={{ color: 'var(--text-faint)' }}
-                    title="Download this version"
-                  >
-                    <Download className="h-4 w-4" />
-                  </button>
-                )}
-                {!canDownload && downloadDeniedReason && (
-                  <DisabledIconButton
-                    icon={Download}
-                    label="Download"
-                    reason={downloadDeniedReason}
-                  />
-                )}
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>

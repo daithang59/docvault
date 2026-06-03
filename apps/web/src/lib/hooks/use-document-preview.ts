@@ -61,16 +61,6 @@ export function useDocumentPreview(options?: UseDocumentPreviewOptions) {
     try {
       const response = await apiClient.get(buildPreviewPath(docId, version), {
         responseType: 'arraybuffer',
-      }).catch((err: unknown) => {
-        let bodyStr = '';
-        const e = err as { details?: { data?: Uint8Array }; statusCode?: number; message?: string };
-        if (e.details?.data) {
-          try {
-            bodyStr = new TextDecoder().decode(e.details.data);
-          } catch { bodyStr = 'cannot decode'; }
-        }
-        console.error('[Preview] API error:', e.statusCode, e.message, 'BODY:', bodyStr);
-        throw err;
       });
 
       // Extract filename from Content-Disposition header if present

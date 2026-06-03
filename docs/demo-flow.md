@@ -36,7 +36,9 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Web app login page on EKS.
 - Successful Keycloak login.
 - Document search/filter workbench with active chips and URL query state.
+- Document detail metadata summary, evidence links, and version preview posture.
 - Upload, preview and download success.
+- Compliance Officer preview/download denial reason on document detail.
 - Notification Center showing approval/security/retention/document work queues.
 - ZAP report artifact: `zap_report.html` and `zap_report.json`.
 - Grafana dashboard showing pod/workload health and CPU/RAM.
@@ -64,11 +66,12 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 3. Attach a PDF or DOCX file.
 4. Click **Save Draft**.
 5. Expected result: document detail page opens with status **Draft**.
-6. Open preview.
-7. Expected result: the uploaded file preview renders through the EKS gateway route.
-8. Return to **Documents**.
-9. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
-10. Expected result: the result count, URL query state, active chips and table rows update together.
+6. Check the metadata summary and Version History preview posture.
+7. Open preview.
+8. Expected result: the uploaded file preview renders through the EKS gateway route, or the version row explains why the format is unsupported.
+9. Return to **Documents**.
+10. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
+11. Expected result: the result count, URL query state, active chips and table rows update together.
 
 ---
 
@@ -98,8 +101,9 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 1. Sign out.
 2. Login through Keycloak as the Viewer test user.
 3. Open **Documents** and select the published document.
-4. Click **Download**.
-5. Expected result: browser downloads the original file through the gateway.
+4. Check the metadata summary and preview posture in Version History.
+5. Click **Download**.
+6. Expected result: browser downloads the original file through the gateway.
 
 ---
 
@@ -110,7 +114,9 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 3. Open **Audit**.
 4. Expected result: audit table shows events from create, upload, submit, approve and download.
 5. Open the published document detail page.
-6. Expected result: the Compliance Officer cannot download the file; the UI hides or blocks the download action.
+6. Expected result: the Compliance Officer cannot preview/download file content; Version History shows the policy denial reason.
+7. Open evidence links from document detail to Audit, Evidence Center, Retention or Security when available.
+8. Expected result: links stay metadata-only and do not reveal file content.
 
 ---
 
@@ -209,9 +215,11 @@ Navigate to: **http://localhost:3100**
 3. Drag & drop or click to attach a PDF file
 4. Click **Save Draft**
 5. ✅ Should redirect to document detail page, status = **Draft**
-6. Return to **Documents**
-7. Search `finance`, set status/classification/tag/owner filters, and change sort
-8. ✅ Active chips and URL query params should reflect the selected filters
+6. Check **Metadata summary** and **Version History** preview posture
+7. ✅ Summary should show owner/status/classification/retention/current version/checksum/content type without object keys
+8. Return to **Documents**
+9. Search `finance`, set status/classification/tag/owner filters, and change sort
+10. ✅ Active chips and URL query params should reflect the selected filters
 
 ---
 
@@ -255,8 +263,9 @@ Navigate to: **http://localhost:3100**
 2. Go to **Documents** → Find the published document
 3. Click on it → Navigate to detail page
 4. Status should show **Published**
-5. Click **Download** in the action panel
-6. ✅ Browser should start downloading the file
+5. Check metadata summary and Version History preview posture
+6. Click **Download** in the action panel
+7. ✅ Browser should start downloading the file
 
 ---
 
@@ -269,7 +278,8 @@ Navigate to: **http://localhost:3100**
 5. ✅ Should see audit chain status and checked event count
 6. Try filtering by action type or date
 7. Navigate to a document detail page
-8. ✅ No **Preview** or **Download** button visible (compliance_officer can audit metadata/events, not file content)
+8. ✅ Version History shows preview/download blocked by policy (compliance_officer can audit metadata/events, not file content)
+9. ✅ Evidence links can open Audit/Evidence/Retention/Security workspaces without exposing file content
 
 ---
 

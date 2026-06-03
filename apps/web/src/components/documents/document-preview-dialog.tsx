@@ -116,7 +116,7 @@ export function DocumentPreviewDialog({
       if (downloadDeniedReason) toast.error(downloadDeniedReason);
       return;
     }
-    download.download(docId);
+    download.download(docId, version.versionNumber ?? version.version);
   }
 
   async function renderDocx(data: ArrayBuffer): Promise<string> {

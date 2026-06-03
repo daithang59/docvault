@@ -39,9 +39,15 @@ interface DocumentActionPanelProps {
   doc: DocumentDetail;
   onActionComplete?: () => void;
   onPreview?: () => void;
+  previewUnavailableReason?: string;
 }
 
-export function DocumentActionPanel({ doc, onActionComplete, onPreview }: DocumentActionPanelProps) {
+export function DocumentActionPanel({
+  doc,
+  onActionComplete,
+  onPreview,
+  previewUnavailableReason,
+}: DocumentActionPanelProps) {
   const { session } = useAuth();
 
   const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
@@ -61,6 +67,9 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   });
   const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
   const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
+  const previewBlockedReason = !previewDecision.allowed
+    ? previewDecision.reason
+    : previewUnavailableReason;
 
   async function handleSubmit() {
     try {
@@ -155,6 +164,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
     canRejectDocument(session, doc) ||
     canArchiveDocument(session, doc) ||
     Boolean(onPreview) ||
+    Boolean(previewBlockedReason) ||
     canViewComplianceEvidencePacket(session) ||
     canDeleteDocument(session, doc) ||
     Boolean(downloadDecision.reason);
@@ -257,7 +267,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </button>
         )}
 
-        {onPreview && previewDecision.allowed && (
+        {onPreview && previewDecision.allowed && !previewBlockedReason && (
           <button
             onClick={onPreview}
             className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
@@ -266,11 +276,11 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
             Preview
           </button>
         )}
-        {onPreview && !previewDecision.allowed && previewDecision.reason && (
+        {previewBlockedReason && (
           <DisabledActionButton
             icon={Eye}
             label="Preview"
-            reason={previewDecision.reason}
+            reason={previewBlockedReason}
           />
         )}
 
