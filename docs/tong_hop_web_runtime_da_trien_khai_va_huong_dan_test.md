@@ -23,6 +23,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Tài liệu nhạy cảm bị hạn chế presigned URL trực tiếp, ưu tiên stream qua service để watermark.
 - Retention/records management có trường dữ liệu, endpoint, audit và workflow history.
 - Security dashboard tổng hợp deny, malware, DLP, audit-chain, risk scoring, behavior anomaly và recommendation.
+- Evidence Center gom audit-chain, recommendation packet, document packet và retention evidence thành workspace compliance riêng.
 - AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
 - Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
 - One-click compliance evidence packet để xuất gói bằng chứng cho từng document.
@@ -42,7 +43,8 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.2 | DLP và classification policy | Gần xong | DLP state, downgrade guard, admin override audit |
 | W-P1.3 | Encryption at rest và presigned URL posture | Đủ cho MVP | MinIO SSE, sensitive stream-only download |
 | W-P1.4 | Security dashboard | Xong | `apps/web/src/app/(app)/security/page.tsx` |
-| W-P1.5 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
+| W-P1.5 | Evidence Center | Xong | `apps/web/src/app/(app)/evidence/page.tsx` |
+| W-P1.6 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -444,7 +446,53 @@ pnpm --filter web exec tsc --noEmit
 pnpm --filter web build
 ```
 
-### 3.10. Retention và records management
+### 3.10. Evidence Center
+
+**Đã triển khai**
+
+- Web page: `/evidence`.
+- Role: compliance/admin.
+- Source cards cho:
+  - Audit Chain
+  - Recommendation Packets
+  - Retention Evidence
+  - Document Packets
+- Export `docvault-evidence-center-manifest.json`.
+- Export từng recommendation evidence packet trực tiếp từ Evidence Center.
+- Export từng document evidence packet từ retention evidence records.
+- Manifest và document packet export là metadata-only và ghi `excludedSensitiveFields`.
+- Document packet export loại bỏ cả alias nhạy cảm như `storagePath` và `downloadToken`, ngoài `objectKey`, `presignedUrl`, `grantToken`, `fileContent`.
+
+**Ý nghĩa**
+
+- Gom bằng chứng compliance vào một workspace riêng thay vì bắt người demo nhảy qua nhiều trang.
+- Tạo “demo bundle manifest” để trình bày báo cáo: audit-chain, recommendation ids, document packet ids, retention summary.
+- Không phải DevSecOps; đây là tính năng web/runtime compliance evidence.
+
+**Cách sử dụng**
+
+1. Đăng nhập `co1` hoặc admin.
+2. Mở:
+
+```text
+http://localhost:3006/evidence
+```
+
+3. Kiểm tra 4 source cards.
+4. Nhấn `Export manifest`.
+5. Kiểm tra manifest có `metadataOnly`, `excludedSensitiveFields`, audit-chain status, recommendation packet ids và document packet ids.
+6. Export một recommendation packet.
+7. Export một document evidence packet.
+8. Dùng deep link sang Audit/Security/Retention/Document detail để chỉ ra evidence chain.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- evidence-center.spec.ts
+pnpm --filter web exec tsc --noEmit
+```
+
+### 3.11. Retention và records management
 
 **Đã làm**
 
@@ -489,7 +537,7 @@ pnpm --filter metadata-service test
 pnpm test:e2e
 ```
 
-### 3.11. One-click compliance evidence packet
+### 3.12. One-click compliance evidence packet
 
 **Đã làm**
 
@@ -506,9 +554,10 @@ pnpm test:e2e
 - Packet không gồm:
   - file content
   - object key
+  - storage path alias
   - presigned URL
   - preview grant
-  - download grant token
+  - download grant token / download token alias
 - Security dashboard cũng có recommendation evidence packet JSON metadata-only, tạo client-side từ recommendation + audit-chain status + playbook + workflow history và ghi `excludedSensitiveFields`.
 - Viewer/editor/approver không có role compliance/admin sẽ bị deny.
 
@@ -533,7 +582,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm test:e2e
 ```
 
-### 3.12. AI-ready guardrails
+### 3.13. AI-ready guardrails
 
 **Đã làm**
 
@@ -568,7 +617,7 @@ Kiểm tra thủ công:
 2. Xem AI guardrails card.
 3. Đăng nhập `co1` và xác nhận content summarization/Q&A bị deny.
 
-### 3.13. Access impact preview
+### 3.14. Access impact preview
 
 **Đã làm**
 
@@ -607,7 +656,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm --filter web test -- document-access-impact-card.spec.ts
 ```
 
-### 3.14. Shared auth/contracts và OpenAPI alignment
+### 3.15. Shared auth/contracts và OpenAPI alignment
 
 **Đã làm**
 
@@ -796,6 +845,7 @@ Sau đó mở `/audit` và verify chain.
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
 | Approvals | `http://localhost:3006/approvals` | approver/admin | Approve/reject Pending document |
+| Evidence | `http://localhost:3006/evidence` | compliance/admin | Export evidence manifest, recommendation packets, document packets |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
 | Security | `http://localhost:3006/security` | compliance/admin | Counters, alerts, risk scoring, anomalies, recommendations, playbook, recommendation history/evidence packet |
 | Retention | `http://localhost:3006/retention` | compliance/admin | Retention status và records evidence |
@@ -821,9 +871,11 @@ Sau đó mở `/audit` và verify chain.
 13. Đổi workflow status của một recommendation và chỉ ra Playbook cập nhật checklist/SLA.
 14. Mở History timeline và download recommendation evidence packet JSON.
 15. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
-16. Vào document detail, export evidence packet và chỉ ra packet không có file content/token.
-17. Vào `/retention`, trình bày retention class/deadline/status.
-18. Vào edit document, đổi classification để xem access impact preview.
+16. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
+17. Chỉ ra manifest có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
+18. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
+19. Vào `/retention`, trình bày retention class/deadline/status.
+20. Vào edit document, đổi classification để xem access impact preview.
 
 ## 8. Điểm cần nói rõ trong báo cáo
 
@@ -835,6 +887,7 @@ Sau đó mở `/audit` và verify chain.
 - Security Recommendation Engine chỉ dùng audit metadata, không đưa nội dung file, object key, presigned URL hay grant token vào output/audit.
 - Recommendation history và recommendation evidence packet cũng metadata-only; packet ghi `excludedSensitiveFields` để chứng minh các trường nhạy cảm đã bị loại trừ.
 - Recommendation Playbook là lớp điều phối deterministic trên metadata/workflow, không phải DevSecOps pipeline và không mở quyền xem file content.
+- Evidence Center là workspace runtime để gom/export evidence; manifest chỉ là metadata index, document packet export được scrub các content-bearing fields trước khi tải xuống.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -869,5 +922,6 @@ Ghi chú:
 1. Chụp ảnh UI các trang `/security`, `/audit`, `/retention`, document detail và access impact preview để đưa vào báo cáo.
 2. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
 3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED`, chỉ ra Playbook owner/SLA/checklist, mở History timeline, tải recommendation evidence packet JSON và audit event tương ứng.
-4. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-5. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+4. Chụp `/evidence`: source cards, export manifest, export recommendation packet, export document packet.
+5. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+6. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

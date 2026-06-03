@@ -239,8 +239,18 @@ export interface RetentionEvidenceRecord {
   daysRemaining?: number | null;
 }
 
+export type ComplianceEvidenceVersionDto = Omit<
+  DocumentVersionDto,
+  'objectKey' | 'storagePath'
+> & {
+  objectKey?: never;
+  storagePath?: never;
+};
+
 export interface ComplianceEvidencePacket {
   generatedAt: string;
+  metadataOnly?: true;
+  excludedSensitiveFields?: string[];
   generatedBy: {
     id: string | null;
     username: string | null;
@@ -252,7 +262,7 @@ export interface ComplianceEvidencePacket {
     asOf?: string | null;
   };
   document: Omit<DocumentDetailDto, 'versions' | 'aclEntries' | 'acl' | 'workflowHistory'>;
-  versions: DocumentVersionDto[];
+  versions: ComplianceEvidenceVersionDto[];
   aclEntries: DocumentAclEntryDto[];
   workflowHistory: WorkflowHistoryItemDto[];
   retention: {

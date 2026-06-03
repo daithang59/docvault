@@ -7,6 +7,7 @@ export const ROUTES = {
   DOCUMENT_EDIT: (id: string) => `/documents/${id}/edit`,
   APPROVALS: '/approvals',
   MY_DOCUMENTS: '/my-documents',
+  EVIDENCE: '/evidence',
   SECURITY: '/security',
   AUDIT: '/audit',
   RETENTION: '/retention',

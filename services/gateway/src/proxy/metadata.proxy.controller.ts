@@ -21,6 +21,15 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
 
+const EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS = [
+  'fileContent',
+  'objectKey',
+  'storagePath',
+  'presignedUrl',
+  'grantToken',
+  'downloadToken',
+] as const;
+
 @ApiTags('metadata-proxy')
 @ApiBearerAuth()
 @ApiSecurity('cookie')
@@ -160,8 +169,10 @@ export class MetadataProxyController {
       ? auditResponse.data.data
       : [];
 
-    return {
+    const packet = {
       generatedAt: new Date().toISOString(),
+      metadataOnly: true,
+      excludedSensitiveFields: [...EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS],
       generatedBy: {
         id: req.user?.sub ?? req.user?.username ?? null,
         username: req.user?.username ?? null,
@@ -198,6 +209,8 @@ export class MetadataProxyController {
         pageSize: auditResponse.data?.pageSize ?? auditEvents.length,
       },
     };
+
+    return sanitizeEvidencePacket(packet);
   }
 
   @Get('documents/:docId/ai-guardrails')
@@ -441,4 +454,31 @@ export class MetadataProxyController {
     });
     return response.data;
   }
+}
+
+function sanitizeEvidencePacket(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeEvidencePacket);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<
+    Record<string, unknown>
+  >((acc, [key, nestedValue]) => {
+    if (isExcludedEvidenceField(key)) {
+      return acc;
+    }
+
+    acc[key] = sanitizeEvidencePacket(nestedValue);
+    return acc;
+  }, {});
+}
+
+function isExcludedEvidenceField(key: string): boolean {
+  return (
+    EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS as readonly string[]
+  ).includes(key);
 }

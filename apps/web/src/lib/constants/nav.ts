@@ -3,6 +3,7 @@ import {
   FileText,
   FolderOpen,
   FilePlus,
+  FileJson,
   CheckSquare,
   ShieldAlert,
   Shield,
@@ -49,6 +50,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.APPROVALS,
     icon: CheckSquare,
     roles: ['approver', 'admin'],
+  },
+  {
+    label: 'Evidence',
+    href: ROUTES.EVIDENCE,
+    icon: FileJson,
+    roles: ['compliance_officer', 'admin'],
   },
   {
     label: 'Security',

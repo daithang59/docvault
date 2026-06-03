@@ -594,6 +594,11 @@ components:
       type: object
       properties:
         generatedAt: { type: string, format: date-time }
+        metadataOnly: { type: boolean, enum: [true] }
+        excludedSensitiveFields:
+          type: array
+          items: { type: string }
+          example: [fileContent, objectKey, storagePath, presignedUrl, grantToken, downloadToken]
         generatedBy:
           type: object
           properties:
@@ -611,7 +616,20 @@ components:
         versions:
           type: array
           items:
-            $ref: '#/components/schemas/DocumentVersion'
+            type: object
+            description: Version metadata with object storage keys removed.
+            properties:
+              id: { type: string }
+              docId: { type: string }
+              version: { type: integer }
+              checksum: { type: string }
+              size: { type: integer }
+              filename: { type: string }
+              contentType: { type: string, nullable: true }
+              dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+              dlpFindings: { type: array, nullable: true, items: { type: object } }
+              createdAt: { type: string, format: date-time }
+              createdBy: { type: string }
         aclEntries:
           type: array
           items:

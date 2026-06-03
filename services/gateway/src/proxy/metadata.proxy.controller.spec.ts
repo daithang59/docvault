@@ -33,6 +33,8 @@ describe('MetadataProxyController evidence packet', () => {
           version: 2,
           filename: 'board-v2.txt',
           checksum: 'sha256-v2',
+          objectKey: 'documents/doc-1/v2/board-v2.txt',
+          storagePath: 'documents/doc-1/v2/board-v2.txt',
         },
       ],
       aclEntries: [
@@ -65,6 +67,16 @@ describe('MetadataProxyController evidence packet', () => {
       resourceType: 'DOCUMENT',
       resourceId: 'doc-1',
       result: 'SUCCESS',
+      metadata: {
+        objectKey: 'documents/doc-1/v2/board-v2.txt',
+        grantToken: 'grant-token',
+        downloadToken: 'download-token',
+        nested: {
+          presignedUrl: 'https://storage.example/board-v2.txt',
+          fileContent: 'board bytes',
+          kept: 'metadata',
+        },
+      },
     };
 
     const proxyService = {
@@ -116,7 +128,14 @@ describe('MetadataProxyController evidence packet', () => {
         classification: 'CONFIDENTIAL',
         dlpStatus: 'DETECTED',
       },
-      versions: document.versions,
+      versions: [
+        {
+          id: 'version-2',
+          version: 2,
+          filename: 'board-v2.txt',
+          checksum: 'sha256-v2',
+        },
+      ],
       aclEntries: document.aclEntries,
       workflowHistory,
       retention: {
@@ -124,11 +143,42 @@ describe('MetadataProxyController evidence packet', () => {
       },
       audit: {
         chain,
-        events: [auditEvent],
+        events: [
+          {
+            ...auditEvent,
+            metadata: {
+              nested: {
+                kept: 'metadata',
+              },
+            },
+          },
+        ],
         total: 1,
       },
     });
-    expect(JSON.stringify(packet)).not.toContain('grantToken');
+    expect(packet.metadataOnly).toBe(true);
+    expect(packet.excludedSensitiveFields).toEqual([
+      'fileContent',
+      'objectKey',
+      'storagePath',
+      'presignedUrl',
+      'grantToken',
+      'downloadToken',
+    ]);
+    expect(packet.versions[0]).not.toHaveProperty('objectKey');
+    expect(packet.versions[0]).not.toHaveProperty('storagePath');
+    expect(packet.audit.events[0].metadata).not.toHaveProperty('objectKey');
+    expect(packet.audit.events[0].metadata).not.toHaveProperty('grantToken');
+    expect(packet.audit.events[0].metadata).not.toHaveProperty('downloadToken');
+    expect(JSON.stringify(packet)).not.toContain(
+      'documents/doc-1/v2/board-v2.txt',
+    );
+    expect(JSON.stringify(packet)).not.toContain('grant-token');
+    expect(JSON.stringify(packet)).not.toContain('download-token');
+    expect(JSON.stringify(packet)).not.toContain(
+      'https://storage.example/board-v2.txt',
+    );
+    expect(JSON.stringify(packet)).not.toContain('board bytes');
     expect(proxyService.forward).toHaveBeenCalledWith(expect.anything(), {
       method: 'GET',
       url: `${auditUrl}/audit/query`,
