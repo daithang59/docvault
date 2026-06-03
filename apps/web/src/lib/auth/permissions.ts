@@ -264,6 +264,10 @@ export function getExplainableDocumentAccessDecision(
   }
 
   return decision;
+// ownerId is stored as sub (Keycloak UUID).
+// Use sub for ownership checks.
+function isOwner(session: Session | null, ownerId: string | undefined): boolean {
+  return session?.user?.sub === ownerId;
 }
 
 // ── Document list / creation ──────────────────────────────────────────────────
