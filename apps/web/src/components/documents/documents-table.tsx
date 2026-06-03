@@ -28,7 +28,6 @@ import {
   canDeleteDocument,
   getExplainableDocumentAccessDecision,
 } from '@/lib/auth/permissions';
-import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
 

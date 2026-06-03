@@ -80,6 +80,68 @@ export interface EvidenceCenterManifest {
   documentPacketIds: string[];
 }
 
+export type EvidenceBundleChecklistId =
+  | 'manifest'
+  | 'audit-chain'
+  | 'recommendation-packets'
+  | 'document-packets'
+  | 'retention-evidence';
+
+export interface EvidenceBundleChecklistItem {
+  id: EvidenceBundleChecklistId;
+  label: string;
+  complete: boolean;
+  evidenceCount: number;
+}
+
+export interface EvidenceBundlePacketReference {
+  id: string;
+  title: string;
+  packetFilename: string;
+}
+
+export interface EvidenceBundleRecommendationReference
+  extends EvidenceBundlePacketReference {
+  severity: SecurityRecommendationRow['severity'];
+  workflowStatus: SecurityRecommendationRow['workflow']['status'];
+  ownerLabel: string;
+}
+
+export interface EvidenceBundleDocumentReference
+  extends EvidenceBundlePacketReference {
+  status: DocumentStatus;
+  classification: ClassificationLevel;
+  retentionStatus: RetentionStatus;
+}
+
+export interface EvidenceBundleManifest {
+  bundleId: string;
+  bundleFilename: string;
+  generatedAt: string;
+  metadataOnly: true;
+  excludedSensitiveFields: string[];
+  auditChain: AuditChainStatus;
+  summary: {
+    recommendationPackets: number;
+    documentPackets: number;
+    totalPackets: number;
+    missingSelections: number;
+  };
+  retentionSummary: RetentionEvidenceResult['summary'];
+  packets: {
+    recommendations: EvidenceBundleRecommendationReference[];
+    documents: EvidenceBundleDocumentReference[];
+  };
+  checklist: EvidenceBundleChecklistItem[];
+  missingSelectionIds: string[];
+}
+
+export interface EvidenceBundleSelection {
+  selectedRecommendationIds: string[];
+  selectedDocumentIds: string[];
+  generatedAt?: string;
+}
+
 export interface EvidenceCenterDocumentPacket
   extends Omit<ComplianceEvidencePacket, 'versions'> {
   metadataOnly: true;
@@ -175,6 +237,105 @@ export function buildEvidenceCenterManifest(
   };
 }
 
+export function buildEvidenceBundle(
+  model: EvidenceCenterModel,
+  selection: EvidenceBundleSelection,
+): EvidenceBundleManifest {
+  const generatedAt = selection.generatedAt ?? model.generatedAt;
+  const bundleId = `docvault-evidence-bundle-${timestampSlug(generatedAt)}`;
+  const selectedRecommendationIds = new Set(selection.selectedRecommendationIds);
+  const selectedDocumentIds = new Set(selection.selectedDocumentIds);
+
+  const recommendations = model.recommendationTargets
+    .filter((item) => selectedRecommendationIds.has(item.id))
+    .map<EvidenceBundleRecommendationReference>((item) => ({
+      id: item.id,
+      title: item.title,
+      severity: item.severity,
+      workflowStatus: item.workflowStatus,
+      ownerLabel: item.ownerLabel,
+      packetFilename: item.packetFilename,
+    }));
+  const documents = model.documentPacketTargets
+    .filter((item) => selectedDocumentIds.has(item.docId))
+    .map<EvidenceBundleDocumentReference>((item) => ({
+      id: item.docId,
+      title: item.title,
+      status: item.status,
+      classification: item.classification,
+      retentionStatus: item.retentionStatus,
+      packetFilename: item.packetFilename,
+    }));
+
+  const resolvedRecommendationIds = new Set(
+    recommendations.map((item) => item.id),
+  );
+  const resolvedDocumentIds = new Set(documents.map((item) => item.id));
+  const missingSelectionIds = [
+    ...selection.selectedRecommendationIds.filter(
+      (id) => !resolvedRecommendationIds.has(id),
+    ),
+    ...selection.selectedDocumentIds.filter((id) => !resolvedDocumentIds.has(id)),
+  ];
+
+  return {
+    bundleId,
+    bundleFilename: `${bundleId}.json`,
+    generatedAt,
+    metadataOnly: true,
+    excludedSensitiveFields: [...EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS],
+    auditChain: model.auditChain,
+    summary: {
+      recommendationPackets: recommendations.length,
+      documentPackets: documents.length,
+      totalPackets: recommendations.length + documents.length,
+      missingSelections: missingSelectionIds.length,
+    },
+    retentionSummary: model.retentionSummary,
+    packets: {
+      recommendations,
+      documents,
+    },
+    checklist: [
+      {
+        id: 'manifest',
+        label: 'Bundle manifest exported',
+        complete: true,
+        evidenceCount: recommendations.length + documents.length,
+      },
+      {
+        id: 'audit-chain',
+        label: 'Audit chain verified',
+        complete: model.auditChain.valid,
+        evidenceCount: model.auditChain.checked,
+      },
+      {
+        id: 'recommendation-packets',
+        label: 'Recommendation packets selected',
+        complete:
+          selection.selectedRecommendationIds.length > 0 &&
+          recommendations.length === selection.selectedRecommendationIds.length,
+        evidenceCount: recommendations.length,
+      },
+      {
+        id: 'document-packets',
+        label: 'Document packets selected',
+        complete:
+          selection.selectedDocumentIds.length > 0 &&
+          documents.length === selection.selectedDocumentIds.length,
+        evidenceCount: documents.length,
+      },
+      {
+        id: 'retention-evidence',
+        label: 'Retention evidence linked',
+        complete: model.retentionSummary.tracked > 0,
+        evidenceCount: model.retentionSummary.tracked,
+      },
+    ],
+    missingSelectionIds,
+  };
+}
+
 export function buildEvidenceCenterDocumentPacket(
   packet: ComplianceEvidencePacket,
 ): EvidenceCenterDocumentPacket {
@@ -227,6 +388,15 @@ function slugify(value: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/^-+|-+$/g, '')
     .slice(0, 80);
+}
+
+function timestampSlug(value: string): string {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return slugify(value) || 'manual';
+  }
+
+  return date.toISOString().replace(/\D/g, '').slice(0, 14);
 }
 
 function stripSensitiveEvidenceFields(value: unknown): unknown {

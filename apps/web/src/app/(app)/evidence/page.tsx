@@ -24,9 +24,11 @@ import {
 } from '@/features/audit/security-dashboard';
 import { getComplianceEvidencePacket } from '@/features/documents/documents.api';
 import {
+  buildEvidenceBundle,
   buildEvidenceCenterManifest,
   buildEvidenceCenterModel,
   buildEvidenceCenterDocumentPacket,
+  type EvidenceBundleManifest,
   type EvidenceCenterModel,
   type EvidenceDocumentPacketTarget,
   type EvidenceRecommendationTarget,
@@ -55,6 +57,8 @@ export default function EvidenceCenterPage() {
   const [pendingRecommendationId, setPendingRecommendationId] = useState<string | null>(null);
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
+  const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
+  const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
 
   const securityQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -87,6 +91,24 @@ export default function EvidenceCenterPage() {
         : null,
     [generatedAt, retentionQuery.data, securityQuery.data],
   );
+  const selectedRecommendationIdSet = useMemo(
+    () => new Set(selectedRecommendationIds),
+    [selectedRecommendationIds],
+  );
+  const selectedDocumentIdSet = useMemo(
+    () => new Set(selectedDocumentIds),
+    [selectedDocumentIds],
+  );
+  const bundlePreview = useMemo(
+    () =>
+      model
+        ? buildEvidenceBundle(model, {
+            selectedRecommendationIds,
+            selectedDocumentIds,
+          })
+        : null,
+    [model, selectedDocumentIds, selectedRecommendationIds],
+  );
 
   async function refreshEvidenceCenter() {
     setDownloadError(null);
@@ -99,6 +121,48 @@ export default function EvidenceCenterPage() {
       buildEvidenceCenterManifest(currentModel),
       'docvault-evidence-center-manifest.json',
     );
+  }
+
+  function downloadBundle(currentModel: EvidenceCenterModel) {
+    const bundle = buildEvidenceBundle(currentModel, {
+      selectedRecommendationIds,
+      selectedDocumentIds,
+      generatedAt: new Date().toISOString(),
+    });
+    downloadJson(bundle, bundle.bundleFilename);
+  }
+
+  function toggleRecommendationSelection(id: string) {
+    setSelectedRecommendationIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function toggleDocumentSelection(id: string) {
+    setSelectedDocumentIds((current) =>
+      current.includes(id)
+        ? current.filter((item) => item !== id)
+        : [...current, id],
+    );
+  }
+
+  function selectAllRecommendations(currentModel: EvidenceCenterModel) {
+    setSelectedRecommendationIds(
+      currentModel.recommendationTargets.map((item) => item.id),
+    );
+  }
+
+  function selectAllDocuments(currentModel: EvidenceCenterModel) {
+    setSelectedDocumentIds(
+      currentModel.documentPacketTargets.map((item) => item.docId),
+    );
+  }
+
+  function clearBundleSelection() {
+    setSelectedRecommendationIds([]);
+    setSelectedDocumentIds([]);
   }
 
   async function downloadRecommendationPacket(target: EvidenceRecommendationTarget) {
@@ -239,15 +303,26 @@ export default function EvidenceCenterPage() {
         <RecommendationPacketQueue
           items={model.recommendationTargets}
           pendingId={pendingRecommendationId}
+          selectedIds={selectedRecommendationIdSet}
+          onToggleSelection={toggleRecommendationSelection}
           onDownload={downloadRecommendationPacket}
         />
-        <EvidenceBundlePanel model={model} />
+        <EvidenceBundlePanel
+          model={model}
+          bundle={bundlePreview}
+          onExport={() => downloadBundle(model)}
+          onSelectAllRecommendations={() => selectAllRecommendations(model)}
+          onSelectAllDocuments={() => selectAllDocuments(model)}
+          onClear={clearBundleSelection}
+        />
       </section>
 
       <section className="mt-4">
         <DocumentPacketTargets
           items={model.documentPacketTargets}
           pendingId={pendingDocumentId}
+          selectedIds={selectedDocumentIdSet}
+          onToggleSelection={toggleDocumentSelection}
           onDownload={downloadDocumentPacket}
         />
       </section>
@@ -255,7 +330,23 @@ export default function EvidenceCenterPage() {
   );
 }
 
-function EvidenceBundlePanel({ model }: { model: EvidenceCenterModel }) {
+function EvidenceBundlePanel({
+  model,
+  bundle,
+  onExport,
+  onSelectAllRecommendations,
+  onSelectAllDocuments,
+  onClear,
+}: {
+  model: EvidenceCenterModel;
+  bundle: EvidenceBundleManifest | null;
+  onExport: () => void;
+  onSelectAllRecommendations: () => void;
+  onSelectAllDocuments: () => void;
+  onClear: () => void;
+}) {
+  const totalPackets = bundle?.summary.totalPackets ?? 0;
+
   return (
     <div
       className="rounded-lg border p-4"
@@ -284,6 +375,83 @@ function EvidenceBundlePanel({ model }: { model: EvidenceCenterModel }) {
         <EvidenceLink href={ROUTES.RETENTION} label="Retention evidence records" />
       </div>
 
+      <div className="mt-4 border-t border-[var(--border-soft)] pt-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+          <div>
+            <h3 className="text-sm font-semibold text-[var(--text-main)]">
+              Evidence bundle builder
+            </h3>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+              Select packets in the queues and export a metadata-only case
+              manifest for the demo bundle.
+            </p>
+          </div>
+          <button
+            type="button"
+            onClick={onExport}
+            disabled={totalPackets === 0}
+            className="inline-flex h-9 items-center justify-center gap-2 rounded-lg bg-[var(--text-main)] px-3 text-sm font-medium text-[var(--bg-card)] transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Download className="h-4 w-4" />
+            Export bundle
+          </button>
+        </div>
+
+        <div className="mt-3 grid gap-2 sm:grid-cols-3">
+          <BundleMetric label="Recommendations" value={bundle?.summary.recommendationPackets ?? 0} />
+          <BundleMetric label="Documents" value={bundle?.summary.documentPackets ?? 0} />
+          <BundleMetric label="Total packets" value={totalPackets} />
+        </div>
+
+        <div className="mt-3 flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={onSelectAllRecommendations}
+            className="rounded border border-[var(--border-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+          >
+            Select recommendations
+          </button>
+          <button
+            type="button"
+            onClick={onSelectAllDocuments}
+            className="rounded border border-[var(--border-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+          >
+            Select documents
+          </button>
+          <button
+            type="button"
+            onClick={onClear}
+            className="rounded border border-[var(--border-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-subtle)]"
+          >
+            Clear
+          </button>
+        </div>
+
+        {bundle ? (
+          <div className="mt-3 space-y-2">
+            {bundle.checklist.map((item) => (
+              <div
+                key={item.id}
+                className="flex items-center justify-between gap-3 rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2 text-xs"
+              >
+                <span className="font-medium text-[var(--text-main)]">
+                  {item.label}
+                </span>
+                <span
+                  className={
+                    item.complete
+                      ? 'text-[var(--status-published-text)]'
+                      : 'text-[var(--status-pending-text)]'
+                  }
+                >
+                  {item.complete ? 'ready' : 'pending'} · {item.evidenceCount}
+                </span>
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </div>
+
       <div className="mt-4 rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3 text-xs text-[var(--text-muted)]">
         <p>Generated {formatDateTime(model.generatedAt)}</p>
         <p className="mt-1">
@@ -294,13 +462,30 @@ function EvidenceBundlePanel({ model }: { model: EvidenceCenterModel }) {
   );
 }
 
+function BundleMetric({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+      <p className="text-[10px] font-semibold uppercase text-[var(--text-faint)]">
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-semibold text-[var(--text-main)]">
+        {value}
+      </p>
+    </div>
+  );
+}
+
 function RecommendationPacketQueue({
   items,
   pendingId,
+  selectedIds,
+  onToggleSelection,
   onDownload,
 }: {
   items: EvidenceRecommendationTarget[];
   pendingId: string | null;
+  selectedIds: Set<string>;
+  onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceRecommendationTarget) => Promise<void>;
 }) {
   return (
@@ -329,6 +514,15 @@ function RecommendationPacketQueue({
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
                   <div className="flex flex-wrap items-center gap-2">
+                    <label className="inline-flex items-center gap-1.5 rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-main)]">
+                      <input
+                        type="checkbox"
+                        checked={selectedIds.has(item.id)}
+                        onChange={() => onToggleSelection(item.id)}
+                        className="h-3.5 w-3.5 accent-[var(--color-primary)]"
+                      />
+                      Bundle
+                    </label>
                     <span className={badgeClass(item.severity)}>
                       {item.severity}
                     </span>
@@ -385,10 +579,14 @@ function RecommendationPacketQueue({
 function DocumentPacketTargets({
   items,
   pendingId,
+  selectedIds,
+  onToggleSelection,
   onDownload,
 }: {
   items: EvidenceDocumentPacketTarget[];
   pendingId: string | null;
+  selectedIds: Set<string>;
+  onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceDocumentPacketTarget) => Promise<void>;
 }) {
   return (
@@ -419,6 +617,15 @@ function DocumentPacketTargets({
               <div className="flex items-start gap-3">
                 <FileJson className="mt-0.5 h-5 w-5 text-[var(--text-muted)]" />
                 <div className="min-w-0 flex-1">
+                  <label className="mb-2 inline-flex items-center gap-1.5 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 text-xs font-medium text-[var(--text-main)]">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.has(item.docId)}
+                      onChange={() => onToggleSelection(item.docId)}
+                      className="h-3.5 w-3.5 accent-[var(--color-primary)]"
+                    />
+                    Bundle
+                  </label>
                   <Link
                     href={ROUTES.DOCUMENT_DETAIL(item.docId)}
                     className="block truncate text-sm font-semibold text-[var(--text-main)] hover:text-[var(--color-primary)]"

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { FormEvent } from 'react';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Clock,
@@ -573,6 +573,7 @@ function RecommendationsPanel({
                 ) : null}
 
                 <RecommendationWorkflowControls
+                  key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
                   item={item}
                   isPending={pendingRecommendationId === item.id}
                   isDisabled={pendingRecommendationId !== null}
@@ -792,11 +793,6 @@ function RecommendationWorkflowControls({
     item.workflow.status,
   );
   const [note, setNote] = useState(item.workflow.note ?? '');
-
-  useEffect(() => {
-    setStatus(item.workflow.status);
-    setNote(item.workflow.note ?? '');
-  }, [item.id, item.workflow.note, item.workflow.status]);
 
   const trimmedNote = note.trim();
   const savedNote = (item.workflow.note ?? '').trim();

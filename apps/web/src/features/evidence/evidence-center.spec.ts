@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildEvidenceBundle,
   buildEvidenceCenterDocumentPacket,
   EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS,
   buildEvidenceCenterModel,
@@ -188,6 +189,110 @@ describe('buildEvidenceCenterManifest', () => {
       ],
       documentPacketIds: ['doc-secret', 'doc-public'],
     });
+  });
+});
+
+describe('buildEvidenceBundle', () => {
+  it('builds a selected metadata-only evidence bundle manifest', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['actor-access-review:DENY_BURST:viewer-1'],
+      selectedDocumentIds: ['doc-secret'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    expect(bundle).toMatchObject({
+      bundleId: 'docvault-evidence-bundle-20260602093000',
+      bundleFilename: 'docvault-evidence-bundle-20260602093000.json',
+      generatedAt: '2026-06-02T09:30:00.000Z',
+      metadataOnly: true,
+      excludedSensitiveFields: [
+        ...EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS,
+      ],
+      summary: {
+        recommendationPackets: 1,
+        documentPackets: 1,
+        totalPackets: 2,
+        missingSelections: 0,
+      },
+      retentionSummary: {
+        tracked: 2,
+        active: 1,
+        dueSoon: 1,
+        overdue: 0,
+        archived: 0,
+      },
+    });
+    expect(bundle.packets.recommendations).toEqual([
+      expect.objectContaining({
+        id: 'actor-access-review:DENY_BURST:viewer-1',
+        title: 'Investigate denied access burst for viewer-1',
+        packetFilename:
+          'actor-access-review-deny-burst-viewer-1-recommendation-evidence.json',
+        workflowStatus: 'OPEN',
+      }),
+    ]);
+    expect(bundle.packets.documents).toEqual([
+      expect.objectContaining({
+        id: 'doc-secret',
+        title: 'Secret Plan',
+        packetFilename: 'docvault-evidence-secret-plan.json',
+        retentionStatus: 'DUE_SOON',
+      }),
+    ]);
+    expect(bundle.checklist).toEqual([
+      expect.objectContaining({ id: 'manifest', complete: true }),
+      expect.objectContaining({ id: 'audit-chain', complete: true }),
+      expect.objectContaining({ id: 'recommendation-packets', complete: true }),
+      expect.objectContaining({ id: 'document-packets', complete: true }),
+      expect.objectContaining({ id: 'retention-evidence', complete: true }),
+    ]);
+    const bundleJson = JSON.stringify(bundle);
+    expect(bundleJson).not.toContain('documents/doc-secret/v1/secret.pdf');
+    expect(bundleJson).not.toContain('grant-token');
+    expect(bundleJson).not.toContain('download-token');
+    expect(bundleJson).not.toContain('https://storage.example/secret.pdf');
+    expect(bundleJson).not.toContain('classified bytes');
+  });
+
+  it('tracks missing selected packet ids for checklist review', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['missing-recommendation'],
+      selectedDocumentIds: ['missing-document'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    expect(bundle.summary).toMatchObject({
+      recommendationPackets: 0,
+      documentPackets: 0,
+      totalPackets: 0,
+      missingSelections: 2,
+    });
+    expect(bundle.missingSelectionIds).toEqual([
+      'missing-recommendation',
+      'missing-document',
+    ]);
+    expect(bundle.checklist).toEqual([
+      expect.objectContaining({ id: 'manifest', complete: true }),
+      expect.objectContaining({ id: 'audit-chain', complete: true }),
+      expect.objectContaining({
+        id: 'recommendation-packets',
+        complete: false,
+      }),
+      expect.objectContaining({ id: 'document-packets', complete: false }),
+      expect.objectContaining({ id: 'retention-evidence', complete: true }),
+    ]);
   });
 });
 
