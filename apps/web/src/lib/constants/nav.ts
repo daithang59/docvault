@@ -5,6 +5,7 @@ import {
   FilePlus,
   FileJson,
   CheckSquare,
+  Bell,
   ShieldAlert,
   Shield,
   Archive,
@@ -50,6 +51,12 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.APPROVALS,
     icon: CheckSquare,
     roles: ['approver', 'admin'],
+  },
+  {
+    label: 'Notifications',
+    href: ROUTES.NOTIFICATIONS,
+    icon: Bell,
+    roles: ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'],
   },
   {
     label: 'Evidence',

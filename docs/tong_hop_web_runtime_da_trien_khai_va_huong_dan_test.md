@@ -24,11 +24,12 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Retention/records management có trường dữ liệu, endpoint, audit và workflow history.
 - Security dashboard tổng hợp deny, malware, DLP, audit-chain, risk scoring, behavior anomaly và recommendation.
 - Evidence Center gom audit-chain, recommendation packet, document packet và retention evidence thành workspace compliance riêng.
+- Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
 - AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
 - Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
 - One-click compliance evidence packet để xuất gói bằng chứng cho từng document.
 
-Ước lượng theo kế hoạch Web App: khoảng 90-93% hoàn thành. Các hạng mục bắt buộc cho demo bảo mật web app đã có code và test; phần còn lại chủ yếu là chụp evidence, polish báo cáo và các nâng cấp AI/enterprise thật sự.
+Ước lượng theo kế hoạch Web App: khoảng 92-95% hoàn thành. Các hạng mục bắt buộc cho demo bảo mật web app đã có code và test; phần còn lại chủ yếu là chụp evidence, polish UX tài liệu/search và các nâng cấp AI/enterprise thật sự.
 
 ## 2. Bảng đối chiếu hạng mục đã làm
 
@@ -44,7 +45,8 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.3 | Encryption at rest và presigned URL posture | Đủ cho MVP | MinIO SSE, sensitive stream-only download |
 | W-P1.4 | Security dashboard | Xong | `apps/web/src/app/(app)/security/page.tsx` |
 | W-P1.5 | Evidence Center | Xong | `apps/web/src/app/(app)/evidence/page.tsx` |
-| W-P1.6 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
+| W-P1.6 | Notification Center work queue | Xong | `apps/web/src/app/(app)/notifications/page.tsx`, `apps/web/src/features/notifications/notifications-center.ts` |
+| W-P1.7 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -503,7 +505,55 @@ pnpm --filter web test -- evidence-center.spec.ts evidence-report.spec.ts
 pnpm --filter web exec tsc --noEmit
 ```
 
-### 3.11. Retention và records management
+### 3.11. Notification Center work queue
+
+**Đã triển khai**
+
+- Web page: `/notifications`.
+- Sidebar có mục Notifications cho viewer/editor/approver/compliance/admin.
+- Bell topbar có link mở full Notification Center.
+- Notification model gom work queue theo:
+  - Approvals
+  - Retention
+  - Security
+  - Documents
+- Có summary cards cho tổng số và unread count từng nhóm.
+- Có filter `All / Unread / Read`.
+- Có action `Mark read` từng dòng và `Mark all read` toàn bộ queue.
+- Notification rows hiển thị type, severity, group, read state, timestamp, target link và reason/description.
+- Target links điều hướng về `/approvals`, `/retention`, `/security`, `/audit` hoặc document detail.
+- Mapping đã chuẩn bị cho event tương lai như `RETENTION_OVERDUE`, `DLP_DETECTED`, `MALWARE_BLOCKED`, `AUDIT_CHAIN_INVALID`.
+
+**Ý nghĩa**
+
+- Biến notification từ dropdown nhỏ thành work queue giống sản phẩm thương mại.
+- Approver có thể mở nhanh pending submissions; compliance/admin có thể nhìn retention/security/audit items theo mức độ nghiêm trọng.
+- Read/unread filter giúp trình bày trạng thái xử lý công việc mà không cần reload page.
+
+**Cách sử dụng**
+
+1. Đăng nhập bằng bất kỳ role hợp lệ.
+2. Mở bell topbar và chọn `Open notification center`, hoặc mở trực tiếp:
+
+```text
+http://localhost:3006/notifications
+```
+
+3. Chọn summary card `Approvals`, `Retention`, `Security` hoặc `Documents`.
+4. Chuyển filter `Unread` để chỉ xem việc chưa xử lý.
+5. Bấm `Mark read` trên một dòng hoặc `Mark all read`.
+6. Bấm target action để điều hướng tới trang xử lý tương ứng.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- notifications-center.spec.ts
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
+
+### 3.12. Retention và records management
 
 **Đã làm**
 
@@ -548,7 +598,7 @@ pnpm --filter metadata-service test
 pnpm test:e2e
 ```
 
-### 3.12. One-click compliance evidence packet
+### 3.13. One-click compliance evidence packet
 
 **Đã làm**
 
@@ -593,7 +643,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm test:e2e
 ```
 
-### 3.13. AI-ready guardrails
+### 3.14. AI-ready guardrails
 
 **Đã làm**
 
@@ -628,7 +678,7 @@ Kiểm tra thủ công:
 2. Xem AI guardrails card.
 3. Đăng nhập `co1` và xác nhận content summarization/Q&A bị deny.
 
-### 3.14. Access impact preview
+### 3.15. Access impact preview
 
 **Đã làm**
 
@@ -667,7 +717,7 @@ pnpm --filter gateway test -- metadata.proxy.controller.spec.ts
 pnpm --filter web test -- document-access-impact-card.spec.ts
 ```
 
-### 3.15. Shared auth/contracts và OpenAPI alignment
+### 3.16. Shared auth/contracts và OpenAPI alignment
 
 **Đã làm**
 
@@ -856,6 +906,7 @@ Sau đó mở `/audit` và verify chain.
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
 | Approvals | `http://localhost:3006/approvals` | approver/admin | Approve/reject Pending document |
+| Notifications | `http://localhost:3006/notifications` | mọi role đăng nhập | Work queue, group filters, read/unread, target links |
 | Evidence | `http://localhost:3006/evidence` | compliance/admin | Export evidence manifest, recommendation packets, document packets |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
 | Security | `http://localhost:3006/security` | compliance/admin | Counters, alerts, risk scoring, anomalies, recommendations, playbook, recommendation history/evidence packet |
@@ -867,29 +918,31 @@ Sau đó mở `/audit` và verify chain.
 2. Tạo document mới, upload file bình thường.
 3. Submit document.
 4. Đăng nhập `approver1`, approve document.
-5. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
-6. Tạo/upload tài liệu có nội dung nhạy cảm, ví dụ có email và keyword `confidential`.
-7. Chỉ ra DLP evidence và classification escalation.
-8. Tạo/upload EICAR test file để chứng minh malware bị chặn.
-9. Đăng nhập `co1`.
-10. Vào `/audit`, query event và verify hash-chain.
-11. Thử preview/download document bằng `co1` và chỉ ra bị deny.
-12. Vào `/security`, trình bày:
+5. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
+6. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
+7. Tạo/upload tài liệu có nội dung nhạy cảm, ví dụ có email và keyword `confidential`.
+8. Chỉ ra DLP evidence và classification escalation.
+9. Tạo/upload EICAR test file để chứng minh malware bị chặn.
+10. Đăng nhập `co1`.
+11. Vào `/notifications`, lọc `Security` hoặc `Retention` nếu có event tương ứng, chỉ ra severity/read state/target link.
+12. Vào `/audit`, query event và verify hash-chain.
+13. Thử preview/download document bằng `co1` và chỉ ra bị deny.
+14. Vào `/security`, trình bày:
     - deny/malware/DLP counters
     - risky documents
     - behavior anomaly
     - security recommendations
-13. Đổi workflow status của một recommendation và chỉ ra Playbook cập nhật checklist/SLA.
-14. Mở History timeline và download recommendation evidence packet JSON.
-15. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
-16. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
-17. Tick nhiều packet, export Evidence Bundle manifest và chỉ ra checklist/counts/packet filenames.
-18. Export Evidence Report HTML và mở report để chỉ ra đây là printable metadata-only report.
-19. Chuyển sang tab Presentation, chỉ ra case readiness, audit-chain status, retention posture, checklist, recommendation timeline và document packet list.
-20. Chỉ ra manifest/report có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
-21. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
-22. Vào `/retention`, trình bày retention class/deadline/status.
-23. Vào edit document, đổi classification để xem access impact preview.
+15. Đổi workflow status của một recommendation và chỉ ra Playbook cập nhật checklist/SLA.
+16. Mở History timeline và download recommendation evidence packet JSON.
+17. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
+18. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
+19. Tick nhiều packet, export Evidence Bundle manifest và chỉ ra checklist/counts/packet filenames.
+20. Export Evidence Report HTML và mở report để chỉ ra đây là printable metadata-only report.
+21. Chuyển sang tab Presentation, chỉ ra case readiness, audit-chain status, retention posture, checklist, recommendation timeline và document packet list.
+22. Chỉ ra manifest/report có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
+23. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
+24. Vào `/retention`, trình bày retention class/deadline/status.
+25. Vào edit document, đổi classification để xem access impact preview.
 
 ## 8. Điểm cần nói rõ trong báo cáo
 
@@ -902,6 +955,7 @@ Sau đó mở `/audit` và verify chain.
 - Recommendation history và recommendation evidence packet cũng metadata-only; packet ghi `excludedSensitiveFields` để chứng minh các trường nhạy cảm đã bị loại trừ.
 - Recommendation Playbook là lớp điều phối deterministic trên metadata/workflow, không phải DevSecOps pipeline và không mở quyền xem file content.
 - Evidence Center là workspace runtime để gom/export evidence; Evidence Bundle manifest và Evidence Report HTML chỉ là metadata index/presentation có checklist/counts, document packet export được scrub các content-bearing fields trước khi tải xuống.
+- Notification Center là runtime work queue trong web app, không phải alerting/DevSecOps pipeline; nó gom workflow/retention/security/document events thành danh sách hành động có read state và target links.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -939,5 +993,6 @@ Ghi chú:
 4. Chụp `/evidence`: source cards, export manifest, export recommendation packet, export document packet.
 5. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
 6. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
-7. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-8. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+7. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
+8. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+9. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

@@ -36,6 +36,7 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Web app login page on EKS.
 - Successful Keycloak login.
 - Upload, preview and download success.
+- Notification Center showing approval/security/retention/document work queues.
 - ZAP report artifact: `zap_report.html` and `zap_report.json`.
 - Grafana dashboard showing pod/workload health and CPU/RAM.
 - Dependency Check report plus SCA triage record.
@@ -83,6 +84,8 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 4. Select the pending document.
 5. Click **Approve** and confirm.
 6. Expected result: document is approved/published and leaves the pending approval queue.
+7. Open the bell menu or **Notifications**.
+8. Expected result: approval notifications can be filtered by unread/read state and link back to the target workflow.
 
 ---
 
@@ -278,7 +281,20 @@ Navigate to: **http://localhost:3100**
 
 ---
 
-## Step 9 — Compliance Officer: Evidence Case Presentation
+## Step 9 — Notification Center Work Queue
+
+1. Sign in as `approver1`, `co1`, or `admin1`
+2. Open the bell menu and click **Open notification center**
+3. Filter by **Approvals**, **Retention**, **Security**, or **Documents**
+4. Switch between **All**, **Unread**, and **Read**
+5. Click **Mark read** on one item, then click **Mark all read**
+6. ✅ Should update the queue without a full page reload
+7. Click a target action
+8. ✅ Should navigate to the matching page: Approvals, Retention, Security, Audit, or Document detail
+
+---
+
+## Step 10 — Compliance Officer: Evidence Case Presentation
 
 1. Sign in as `co1` or stay in the compliance session
 2. Go to **Evidence Center** in sidebar
