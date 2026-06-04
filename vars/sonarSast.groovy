@@ -21,7 +21,9 @@ def call(Map cfg = [:]) {
         sh """
             set -eu
 
-            mkdir -p .sonar-cache
+            rm -rf .scannerwork
+            mkdir -p .sonar-cache .scannerwork
+            chmod 777 .sonar-cache .scannerwork
 
             CONFIGURED_SONAR_HOST="${hostOverride}"
             SONAR_HOST=""
@@ -75,8 +77,12 @@ def call(Map cfg = [:]) {
                 -Dsonar.sources="${sources}" \\
                 -Dsonar.exclusions="${exclusions}" \\
                 -Dsonar.host.url="\${SONAR_HOST}" \\
+                -Dsonar.scanner.metadataFilePath="/usr/src/.scannerwork/report-task.txt" \\
                 -Dsonar.scanner.skipJreProvisioning=true \\
                 ${extraArgs}
+
+            echo ">>> Sonar scanner metadata files:"
+            find . -path '*/report-task.txt' -print || true
         """
         if (enforceQG) {
             pollQualityGateFromReport(qgTimeoutMinutes)
@@ -87,11 +93,14 @@ def call(Map cfg = [:]) {
 def pollQualityGateFromReport(int qgTimeoutMinutes) {
     echo '>>> Waiting for SonarQube Quality Gate...'
 
-    if (!fileExists('.scannerwork/report-task.txt')) {
+    def reportTaskPath = findReportTaskPath()
+    if (!reportTaskPath) {
+        sh "find . -maxdepth 4 -type f | sort | sed -n '1,200p'"
         error('SonarQube report-task.txt was not found. The scanner did not publish task metadata for quality gate polling.')
     }
 
-    def taskProps = readSonarReportTask('.scannerwork/report-task.txt')
+    echo ">>> SonarQube report task metadata: ${reportTaskPath}"
+    def taskProps = readSonarReportTask(reportTaskPath)
     def ceTaskId = taskProps.ceTaskId
     def serverUrl = taskProps.serverUrl?.replaceAll('/+$', '')
 
@@ -132,6 +141,15 @@ def pollQualityGateFromReport(int qgTimeoutMinutes) {
             return true
         }
     }
+}
+
+String findReportTaskPath() {
+    def reportTaskPath = sh(
+        script: "find . -path '*/report-task.txt' -print -quit",
+        returnStdout: true
+    ).trim()
+
+    return reportTaskPath
 }
 
 Map readSonarReportTask(String reportPath) {

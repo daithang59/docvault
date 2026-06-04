@@ -9,18 +9,17 @@ def call() {
 
             echo ">>> Creating exclusion file for TruffleHog..."
             cat > .trufflehog-exclude <<EOF
-.pnpm-store
-node_modules
-.turbo
-.next
-**/.terraform
-**/*.tfstate
-**/*.tfstate.*
-**/*.tfvars
-**/tfplan
-**/*.tfplan
-**/*-secret.json
-**/*.kubeconfig
+(^|/)\\.pnpm-store(/|$)
+(^|/)node_modules(/|$)
+(^|/)\\.turbo(/|$)
+(^|/)\\.next(/|$)
+(^|/)\\.terraform(/|$)
+\\.tfstate(\\..*)?$
+\\.tfvars$
+(^|/)tfplan$
+\\.tfplan$
+-secret\\.json$
+\\.kubeconfig$
 EOF
 
             echo ">>> Scanning repository for leaked secrets..."
