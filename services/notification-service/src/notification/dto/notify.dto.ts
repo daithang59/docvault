@@ -2,10 +2,10 @@ import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
 
 export enum NotifyType {
   SUBMITTED = 'SUBMITTED',
-  APPROVED  = 'APPROVED',
-  REJECTED  = 'REJECTED',
-  ARCHIVED  = 'ARCHIVED',
-  DELETED   = 'DELETED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  ARCHIVED = 'ARCHIVED',
+  DELETED = 'DELETED',
 }
 
 export class NotifyDto {

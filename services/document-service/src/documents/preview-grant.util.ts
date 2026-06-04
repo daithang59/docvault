@@ -63,9 +63,7 @@ export function verifyPreviewGrantToken(
     Buffer.from(encodedPayload, 'base64url').toString('utf8'),
   ) as PreviewGrantPayload;
 
-  const secret = payload.kid
-    ? getSecretForKid(payload.kid)
-    : getLegacySecret();
+  const secret = payload.kid ? getSecretForKid(payload.kid) : getLegacySecret();
 
   const expectedSignature = createHmac('sha256', secret)
     .update(encodedPayload)

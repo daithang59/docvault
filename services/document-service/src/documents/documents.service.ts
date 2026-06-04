@@ -176,7 +176,10 @@ export class DocumentsService {
           { version: dto.version },
           context,
         );
-        grantPayload = verifyGrantToken(authorization.grantToken, context.actorId);
+        grantPayload = verifyGrantToken(
+          authorization.grantToken,
+          context.actorId,
+        );
         expiresInSeconds = authorization.expiresInSeconds;
       }
 
@@ -187,7 +190,9 @@ export class DocumentsService {
           docId,
           version: grantPayload.version,
           filename: grantPayload.filename,
-          expiresAt: new Date(Date.now() + expiresInSeconds * 1000).toISOString(),
+          expiresAt: new Date(
+            Date.now() + expiresInSeconds * 1000,
+          ).toISOString(),
           expiresInSeconds,
           url: null,
           watermarkRequired: true,

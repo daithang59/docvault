@@ -32,7 +32,8 @@ function makeDocument(overrides: Record<string, unknown> = {}) {
     archivedAt: null,
     retentionClass: 'SECRET_30D',
     retentionUntil: new Date('2026-05-01T00:00:00.000Z'),
-    retentionReason: 'SECRET records are retained for 30 days after publication',
+    retentionReason:
+      'SECRET records are retained for 30 days after publication',
     ...overrides,
   };
 }

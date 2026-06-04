@@ -40,9 +40,12 @@ export class MetadataClient {
     try {
       return await this.request(() =>
         firstValueFrom(
-          this.http.get(`${this.baseUrl}/documents/00000000-0000-0000-0000-000000000000/approvers`, {
-            headers: this.buildHeaders(context),
-          }),
+          this.http.get(
+            `${this.baseUrl}/documents/00000000-0000-0000-0000-000000000000/approvers`,
+            {
+              headers: this.buildHeaders(context),
+            },
+          ),
         ),
       );
     } catch {

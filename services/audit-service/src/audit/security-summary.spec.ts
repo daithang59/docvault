@@ -33,12 +33,13 @@ describe('AuditService security summary', () => {
       if (filter.result === 'DENY') return Promise.resolve(7);
       if (filter.action === 'MALWARE_UPLOAD_BLOCKED') return Promise.resolve(2);
       if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(3);
-      if (filter.action === 'DOCUMENT_DOWNLOAD_DENIED') return Promise.resolve(4);
+      if (filter.action === 'DOCUMENT_DOWNLOAD_DENIED')
+        return Promise.resolve(4);
       return Promise.resolve(0);
     });
-    const aggregateExec = jest.fn().mockResolvedValue([
-      { actorId: 'viewer-1', denyCount: 5 },
-    ]);
+    const aggregateExec = jest
+      .fn()
+      .mockResolvedValue([{ actorId: 'viewer-1', denyCount: 5 }]);
     const riskFindLean = jest.fn().mockResolvedValue([]);
     const riskFind = makeFindChain(riskFindLean);
     const find = jest.fn().mockReturnValue(riskFind);
@@ -66,7 +67,9 @@ describe('AuditService security summary', () => {
       riskyDocuments: [],
       behaviorSignals: [],
     });
-    expect(result.recommendations.map((recommendation) => recommendation.id)).toEqual([
+    expect(
+      result.recommendations.map((recommendation) => recommendation.id),
+    ).toEqual([
       'actor-access-review:repeated-deny:viewer-1',
       'dlp-classification-review',
       'malware-upload-review',
@@ -224,7 +227,10 @@ describe('AuditService security summary', () => {
         resourceId: 'doc-confidential-1',
         result: 'SUCCESS',
         timestamp: new Date('2026-05-30T10:04:00.000Z'),
-        metadata: { classification: 'CONFIDENTIAL', docId: 'doc-confidential-1' },
+        metadata: {
+          classification: 'CONFIDENTIAL',
+          docId: 'doc-confidential-1',
+        },
       },
       {
         action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
@@ -358,12 +364,13 @@ describe('AuditService security summary', () => {
       if (filter.result === 'DENY') return Promise.resolve(4);
       if (filter.action === 'MALWARE_UPLOAD_BLOCKED') return Promise.resolve(1);
       if (filter.action === 'DLP_PATTERN_DETECTED') return Promise.resolve(2);
-      if (filter.action === 'DOCUMENT_DOWNLOAD_DENIED') return Promise.resolve(3);
+      if (filter.action === 'DOCUMENT_DOWNLOAD_DENIED')
+        return Promise.resolve(3);
       return Promise.resolve(0);
     });
-    const aggregateExec = jest.fn().mockResolvedValue([
-      { actorId: 'viewer-1', denyCount: 4 },
-    ]);
+    const aggregateExec = jest
+      .fn()
+      .mockResolvedValue([{ actorId: 'viewer-1', denyCount: 4 }]);
     const riskFindLean = jest.fn().mockResolvedValue([
       {
         action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
@@ -617,7 +624,9 @@ describe('AuditService security summary', () => {
       Array.from({ length: 10 }, (_item, index) => ({
         actorId: `co-${index}`,
         resourceId: 'dlp-classification-review',
-        timestamp: new Date(`2026-05-31T12:${String(index).padStart(2, '0')}:00.000Z`),
+        timestamp: new Date(
+          `2026-05-31T12:${String(index).padStart(2, '0')}:00.000Z`,
+        ),
         metadata: {
           recommendationId: 'dlp-classification-review',
           status: 'INVESTIGATING',
@@ -741,9 +750,12 @@ describe('AuditService security summary', () => {
     const service = new AuditService({} as any);
 
     await expect(
-      service.updateSecurityRecommendationWorkflow('dlp-classification-review', {
-        status: 'DONE' as any,
-      }),
+      service.updateSecurityRecommendationWorkflow(
+        'dlp-classification-review',
+        {
+          status: 'DONE' as any,
+        },
+      ),
     ).rejects.toBeInstanceOf(BadRequestException);
   });
 

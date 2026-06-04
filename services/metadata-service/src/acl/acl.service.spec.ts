@@ -72,28 +72,26 @@ describe('AclService', () => {
     );
   });
 
-  it.each([
-    AclSubjectType.USER,
-    AclSubjectType.ROLE,
-    AclSubjectType.GROUP,
-  ])('rejects empty %s subject ids before storing ACL rules', async (subjectType) => {
-    const subjectId =
-      subjectType === AclSubjectType.GROUP ? ' / ' : '   ';
+  it.each([AclSubjectType.USER, AclSubjectType.ROLE, AclSubjectType.GROUP])(
+    'rejects empty %s subject ids before storing ACL rules',
+    async (subjectType) => {
+      const subjectId = subjectType === AclSubjectType.GROUP ? ' / ' : '   ';
 
-    await expect(
-      service.upsert(
-        'doc-1',
-        {
-          subjectType,
-          subjectId,
-          permission: DocumentPermission.READ,
-          effect: AclEffect.DENY,
-        },
-        { sub: 'admin-1', roles: ['admin'] },
-        context,
-      ),
-    ).rejects.toThrow(BadRequestException);
+      await expect(
+        service.upsert(
+          'doc-1',
+          {
+            subjectType,
+            subjectId,
+            permission: DocumentPermission.READ,
+            effect: AclEffect.DENY,
+          },
+          { sub: 'admin-1', roles: ['admin'] },
+          context,
+        ),
+      ).rejects.toThrow(BadRequestException);
 
-    expect(mockAclCreate).not.toHaveBeenCalled();
-  });
+      expect(mockAclCreate).not.toHaveBeenCalled();
+    },
+  );
 });

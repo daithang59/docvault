@@ -19,7 +19,10 @@ describe('DocumentsController comment mutation policy', () => {
   beforeEach(() => {
     jest.clearAllMocks();
     mockAssertCanReadMetadata.mockResolvedValue({ id: 'doc-1' });
-    mockUpdateComment.mockResolvedValue({ id: 'comment-1', content: 'Updated' });
+    mockUpdateComment.mockResolvedValue({
+      id: 'comment-1',
+      content: 'Updated',
+    });
     mockDeleteComment.mockResolvedValue(undefined);
 
     controller = new DocumentsController(

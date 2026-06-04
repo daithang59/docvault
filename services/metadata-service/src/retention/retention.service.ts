@@ -11,7 +11,12 @@ import {
 const DAY_MS = 24 * 60 * 60 * 1000;
 const DUE_SOON_DAYS = 14;
 
-export type RetentionStatus = 'ACTIVE' | 'DUE_SOON' | 'OVERDUE' | 'ARCHIVED' | 'UNSET';
+export type RetentionStatus =
+  | 'ACTIVE'
+  | 'DUE_SOON'
+  | 'OVERDUE'
+  | 'ARCHIVED'
+  | 'UNSET';
 
 export interface RetentionEvidenceRecord {
   docId: string;
@@ -65,7 +70,9 @@ export class RetentionService {
     return this.runRetention();
   }
 
-  async runRetention(options: RetentionRunOptions = {}): Promise<RetentionRunResult> {
+  async runRetention(
+    options: RetentionRunOptions = {},
+  ): Promise<RetentionRunResult> {
     const now = options.now ?? new Date();
     const requestedBy = options.requestedBy ?? 'system:cron';
     this.logger.log('Starting retention auto-archive job...');
@@ -162,8 +169,9 @@ export class RetentionService {
         .length,
       overdue: records.filter((record) => record.retentionStatus === 'OVERDUE')
         .length,
-      archived: records.filter((record) => record.retentionStatus === 'ARCHIVED')
-        .length,
+      archived: records.filter(
+        (record) => record.retentionStatus === 'ARCHIVED',
+      ).length,
     };
 
     return {
@@ -194,7 +202,8 @@ export class RetentionService {
     const policy = RETENTION_POLICY_BY_CLASSIFICATION[doc.classification];
     const retentionClass =
       doc.retentionClass ?? fallback?.retentionClass ?? policy.retentionClass;
-    const retentionUntil = doc.retentionUntil ?? fallback?.retentionUntil ?? null;
+    const retentionUntil =
+      doc.retentionUntil ?? fallback?.retentionUntil ?? null;
     const retentionReason =
       doc.retentionReason ?? fallback?.retentionReason ?? policy.reason;
     const daysRemaining =

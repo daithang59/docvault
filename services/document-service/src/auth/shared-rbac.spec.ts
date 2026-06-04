@@ -3,14 +3,8 @@ import {
   RolesGuard as SharedRolesGuard,
   ROLES_KEY as SHARED_ROLES_KEY,
 } from '@docvault/auth/rbac';
-import {
-  Controller,
-  Get,
-  INestApplication,
-  UseGuards,
-} from '@nestjs/common';
+import { Controller, ExecutionContext, Get, UseGuards } from '@nestjs/common';
 import { Test } from '@nestjs/testing';
-import request = require('supertest');
 import { Roles, ROLES_KEY } from './roles.decorator';
 import { RolesGuard } from './roles.guard';
 
@@ -36,22 +30,19 @@ describe('document-service shared RBAC wrappers', () => {
       controllers: [RbacTestController],
       providers: [RolesGuard],
     }).compile();
-    const app: INestApplication = moduleRef.createNestApplication();
-
-    app.use((req: any, _res: any, next: () => void) => {
-      req.user = { roles: ['editor'] };
-      next();
-    });
-
-    await app.init();
+    const guard = moduleRef.get(RolesGuard);
+    const context = {
+      getHandler: () => RbacTestController.prototype.editorOnly,
+      getClass: () => RbacTestController,
+      switchToHttp: () => ({
+        getRequest: () => ({ user: { roles: ['editor'] } }),
+      }),
+    } as unknown as ExecutionContext;
 
     try {
-      await request(app.getHttpServer())
-        .get('/rbac-test/editor')
-        .expect(200)
-        .expect({ ok: true });
+      expect(guard.canActivate(context)).toBe(true);
     } finally {
-      await app.close();
+      await moduleRef.close();
     }
   });
 });

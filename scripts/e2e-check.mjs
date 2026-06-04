@@ -23,6 +23,10 @@ function assert(condition, message) {
   }
 }
 
+function sleep(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
 async function getToken(username) {
   const response = await fetch(
     `${KEYCLOAK_BASE_URL}/realms/${KEYCLOAK_REALM}/protocol/openid-connect/token`,
@@ -65,6 +69,38 @@ async function expectStatus(label, path, expectedStatus, options = {}) {
   );
   log(`PASS ${label}: ${expectedStatus}`);
   return body;
+}
+
+async function expectAuditQueryContains(
+  label,
+  path,
+  token,
+  predicate,
+  message,
+) {
+  let lastStatus = 0;
+  let lastBody = null;
+
+  for (let attempt = 1; attempt <= 6; attempt++) {
+    const { response, body } = await call(path, {
+      headers: authHeaders(token),
+    });
+    lastStatus = response.status;
+    lastBody = body;
+
+    if (response.status === 200 && body?.data?.some(predicate)) {
+      log(`PASS ${label}: 200`);
+      return body;
+    }
+
+    if (attempt < 6) {
+      await sleep(500);
+    }
+  }
+
+  throw new Error(
+    `${message}; last status=${lastStatus}; last body=${JSON.stringify(lastBody)}`,
+  );
 }
 
 function authHeaders(token, extra = {}) {
@@ -801,20 +837,12 @@ async function main() {
     headers: authHeaders(complianceToken),
   });
 
-  const retentionAudit = await expectStatus(
+  await expectAuditQueryContains(
     'compliance officer retention audit query',
     `/api/audit/query?action=DOCUMENT_AUTO_ARCHIVED&resourceId=${docId}`,
-    200,
-    {
-      headers: authHeaders(complianceToken),
-    },
-  );
-  assert(
-    retentionAudit.data?.some(
-      (event) =>
-        event.action === 'DOCUMENT_AUTO_ARCHIVED' &&
-        event.resourceId === docId,
-    ),
+    complianceToken,
+    (event) =>
+      event.action === 'DOCUMENT_AUTO_ARCHIVED' && event.resourceId === docId,
     'audit query should include DOCUMENT_AUTO_ARCHIVED for retained document',
   );
   log('PASS retention audit event DOCUMENT_AUTO_ARCHIVED');

@@ -80,31 +80,35 @@ describe('MetadataProxyController evidence packet', () => {
     };
 
     const proxyService = {
-      forward: jest.fn((req: unknown, config: { url: string; params?: any }) => {
-        if (config.url === `${metadataUrl}/documents/doc-1`) {
-          return Promise.resolve({ data: document });
-        }
-        if (config.url === `${metadataUrl}/documents/doc-1/workflow-history`) {
-          return Promise.resolve({ data: workflowHistory });
-        }
-        if (config.url === `${metadataUrl}/retention/documents`) {
-          return Promise.resolve({ data: { records: [retentionRecord] } });
-        }
-        if (config.url === `${auditUrl}/audit/verify-chain`) {
-          return Promise.resolve({ data: chain });
-        }
-        if (config.url === `${auditUrl}/audit/query`) {
-          return Promise.resolve({
-            data: {
-              data: [auditEvent],
-              total: 1,
-              page: 1,
-              pageSize: 200,
-            },
-          });
-        }
-        throw new Error(`Unexpected proxy call: ${config.url}`);
-      }),
+      forward: jest.fn(
+        (req: unknown, config: { url: string; params?: any }) => {
+          if (config.url === `${metadataUrl}/documents/doc-1`) {
+            return Promise.resolve({ data: document });
+          }
+          if (
+            config.url === `${metadataUrl}/documents/doc-1/workflow-history`
+          ) {
+            return Promise.resolve({ data: workflowHistory });
+          }
+          if (config.url === `${metadataUrl}/retention/documents`) {
+            return Promise.resolve({ data: { records: [retentionRecord] } });
+          }
+          if (config.url === `${auditUrl}/audit/verify-chain`) {
+            return Promise.resolve({ data: chain });
+          }
+          if (config.url === `${auditUrl}/audit/query`) {
+            return Promise.resolve({
+              data: {
+                data: [auditEvent],
+                total: 1,
+                page: 1,
+                pageSize: 200,
+              },
+            });
+          }
+          throw new Error(`Unexpected proxy call: ${config.url}`);
+        },
+      ),
     } as unknown as ProxyService;
     const controller = new MetadataProxyController(proxyService);
 
@@ -202,7 +206,8 @@ describe('MetadataProxyController AI guardrails', () => {
       deniedOperations: [
         {
           operation: 'CONTENT_SUMMARIZATION',
-          reason: 'Compliance officers cannot use file content for AI operations',
+          reason:
+            'Compliance officers cannot use file content for AI operations',
         },
       ],
     };

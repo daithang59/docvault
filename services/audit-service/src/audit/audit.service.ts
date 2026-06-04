@@ -145,7 +145,7 @@ export class AuditService {
     // 1. Get hash of the most recent event for chain linking
     const lastEvent = await this.auditEvent
       .findOne({}, { hash: 1 })
-      .sort({ timestamp: -1 })
+      .sort({ timestamp: -1, _id: -1 })
       .lean();
 
     const prevHash = lastEvent?.hash ?? null;
@@ -381,9 +381,7 @@ export class AuditService {
         };
       })
       .filter(
-        (
-          event,
-        ): event is SecurityRecommendationWorkflowHistoryEntry =>
+        (event): event is SecurityRecommendationWorkflowHistoryEntry =>
           event !== null,
       );
   }
@@ -570,7 +568,9 @@ export class AuditService {
         bucket.windowEndedAt = timestamp;
       }
 
-      if ((AUTHORIZED_CONTENT_ACTIONS as readonly string[]).includes(event.action)) {
+      if (
+        (AUTHORIZED_CONTENT_ACTIONS as readonly string[]).includes(event.action)
+      ) {
         bucket.contentAccessCount += 1;
         if (documentId) bucket.contentDocuments.add(documentId);
         if (event.action === 'DOCUMENT_DOWNLOAD_AUTHORIZED') {
@@ -607,7 +607,9 @@ export class AuditService {
       .slice(0, 5);
   }
 
-  private buildBehaviorSignals(bucket: BehaviorBucket): BehaviorSignalSummary[] {
+  private buildBehaviorSignals(
+    bucket: BehaviorBucket,
+  ): BehaviorSignalSummary[] {
     const signals: BehaviorSignalSummary[] = [];
 
     if (
@@ -628,7 +630,9 @@ export class AuditService {
       ];
 
       if (bucket.sensitiveAccessCount > 0) {
-        reasons.push(`${bucket.sensitiveAccessCount} sensitive document grants`);
+        reasons.push(
+          `${bucket.sensitiveAccessCount} sensitive document grants`,
+        );
       }
       if (bucket.downloadCount > 0) {
         reasons.push(
@@ -677,7 +681,9 @@ export class AuditService {
     if (bucket.destructiveCount >= 2) {
       const riskScore = Math.min(
         100,
-        45 + bucket.destructiveCount * 15 + bucket.destructiveDocuments.size * 5,
+        45 +
+          bucket.destructiveCount * 15 +
+          bucket.destructiveDocuments.size * 5,
       );
       const reasons = [
         `${bucket.destructiveCount} destructive document events`,
@@ -909,9 +915,7 @@ export class AuditService {
         criticalCount,
         warningCount,
         recommendationTypes: Array.from(
-          new Set(
-            recommendations.map((recommendation) => recommendation.type),
-          ),
+          new Set(recommendations.map((recommendation) => recommendation.type)),
         ),
         auditFilters: recommendations.map((recommendation) => ({
           id: recommendation.id,
@@ -1018,7 +1022,9 @@ export class AuditService {
     return normalized.length > 500 ? normalized.slice(0, 500) : normalized;
   }
 
-  private getBehaviorRecommendationTitle(signal: BehaviorSignalSummary): string {
+  private getBehaviorRecommendationTitle(
+    signal: BehaviorSignalSummary,
+  ): string {
     switch (signal.type) {
       case 'MASS_CONTENT_ACCESS':
         return `Review mass content access by ${signal.actorId}`;
@@ -1029,9 +1035,7 @@ export class AuditService {
     }
   }
 
-  private getBehaviorRecommendationAction(
-    type: BehaviorSignalType,
-  ): string {
+  private getBehaviorRecommendationAction(type: BehaviorSignalType): string {
     switch (type) {
       case 'MASS_CONTENT_ACCESS':
         return 'Confirm business need, inspect document spread, and tighten ACLs for sensitive documents.';
@@ -1069,9 +1073,7 @@ export class AuditService {
     );
   }
 
-  private buildRiskyDocumentSummary(
-    bucket: RiskBucket,
-  ): RiskyDocumentSummary {
+  private buildRiskyDocumentSummary(bucket: RiskBucket): RiskyDocumentSummary {
     const actorCount = bucket.actors.size;
     const riskScore = Math.min(
       100,
@@ -1086,9 +1088,7 @@ export class AuditService {
       reasons.push(`${bucket.classification} classification`);
     }
     if (bucket.accessCount >= 2) {
-      reasons.push(
-        `${bucket.accessCount} successful preview/download grants`,
-      );
+      reasons.push(`${bucket.accessCount} successful preview/download grants`);
     }
     if (actorCount >= 2) {
       reasons.push(`${actorCount} distinct actors`);
@@ -1168,10 +1168,15 @@ export class AuditService {
    * Verify the integrity of the hash chain from the first event up to `limit` events.
    * Returns { valid: true } if every hash links correctly; otherwise throws with details.
    */
-  async verifyChain(limit = 1000): Promise<{ valid: boolean; checked: number; firstBrokenIndex?: number; message?: string }> {
+  async verifyChain(limit = 1000): Promise<{
+    valid: boolean;
+    checked: number;
+    firstBrokenIndex?: number;
+    message?: string;
+  }> {
     const events = await this.auditEvent
       .find({}, { _id: 0 })
-      .sort({ timestamp: 1 })
+      .sort({ timestamp: 1, _id: 1 })
       .limit(limit)
       .lean();
 
@@ -1193,9 +1198,10 @@ export class AuditService {
         reason: event.reason,
         ip: event.ip,
         traceId: event.traceId,
-        metadata: (event as any).metadata !== undefined
-          ? JSON.stringify((event as any).metadata)
-          : undefined,
+        metadata:
+          (event as any).metadata !== undefined
+            ? JSON.stringify((event as any).metadata)
+            : undefined,
       });
       const expectedHash = this.computeHash(
         i === 0 ? null : (events[i - 1] as any).hash,

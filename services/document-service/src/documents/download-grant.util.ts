@@ -64,9 +64,7 @@ export function verifyGrantToken(
     Buffer.from(encodedPayload, 'base64url').toString('utf8'),
   ) as GrantPayload;
 
-  const secret = payload.kid
-    ? getSecretForKid(payload.kid)
-    : getLegacySecret();
+  const secret = payload.kid ? getSecretForKid(payload.kid) : getLegacySecret();
 
   const expectedSignature = createHmac('sha256', secret)
     .update(encodedPayload)

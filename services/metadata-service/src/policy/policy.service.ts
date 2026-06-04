@@ -116,7 +116,15 @@ export class PolicyService {
       throw new ForbiddenException(deniedReason);
     }
 
-    if (this.matchesAcl(document.aclEntries, actorId, roles, groups, AclEffect.DENY)) {
+    if (
+      this.matchesAcl(
+        document.aclEntries,
+        actorId,
+        roles,
+        groups,
+        AclEffect.DENY,
+      )
+    ) {
       throw new ForbiddenException('Download denied by ACL');
     }
 
@@ -239,7 +247,7 @@ export class PolicyService {
       throw new NotFoundException('Document version not found');
     }
 
-    const statusDeniedReason = this.getPreviewDeniedReason(document.status);
+    const statusDeniedReason = this.getPreviewDeniedReason();
     if (statusDeniedReason) {
       throw new ForbiddenException(statusDeniedReason);
     }
@@ -391,14 +399,18 @@ export class PolicyService {
       if (['PUBLISHED', 'ARCHIVED'].includes(document.status)) {
         return document;
       }
-      return deny('Compliance officers can only read published or archived metadata');
+      return deny(
+        'Compliance officers can only read published or archived metadata',
+      );
     }
 
     if (roles.includes('approver')) {
       if (['PENDING', 'PUBLISHED', 'ARCHIVED'].includes(document.status)) {
         return document;
       }
-      return deny('Approvers can only read pending, published, or archived metadata');
+      return deny(
+        'Approvers can only read pending, published, or archived metadata',
+      );
     }
 
     if (document.status !== 'PUBLISHED') {
@@ -532,7 +544,8 @@ export class PolicyService {
       );
     }
 
-    const currentClassification = document.classification as ClassificationLevel;
+    const currentClassification =
+      document.classification as ClassificationLevel;
     const proposedClassification = dto.classification as ClassificationLevel;
     const current = this.buildAccessImpactState(
       document.status,
@@ -633,7 +646,7 @@ export class PolicyService {
     return null;
   }
 
-  private getPreviewDeniedReason(_status: string): string | null {
+  private getPreviewDeniedReason(): string | null {
     // Preview is allowed across workflow states as long as ACL/classification checks pass.
     return null;
   }
@@ -660,8 +673,16 @@ export class PolicyService {
     proposedClassification: ClassificationLevel,
   ) {
     const metadata = {
-      current: this.canBaselineReadMetadata(status, currentClassification, role),
-      proposed: this.canBaselineReadMetadata(status, proposedClassification, role),
+      current: this.canBaselineReadMetadata(
+        status,
+        currentClassification,
+        role,
+      ),
+      proposed: this.canBaselineReadMetadata(
+        status,
+        proposedClassification,
+        role,
+      ),
     };
     const download = {
       current: this.canBaselineDownload(status, currentClassification, role),
@@ -786,7 +807,9 @@ export class PolicyService {
     classification: string;
   }) {
     const signing = getSigningSecret('PREVIEW_GRANT_SECRET');
-    const tokenPayload = signing.kid ? { ...payload, kid: signing.kid } : payload;
+    const tokenPayload = signing.kid
+      ? { ...payload, kid: signing.kid }
+      : payload;
     const encoded = Buffer.from(JSON.stringify(tokenPayload)).toString(
       'base64url',
     );
@@ -985,7 +1008,9 @@ export class PolicyService {
     watermarkRequired: boolean;
   }) {
     const signing = getSigningSecret('DOWNLOAD_GRANT_SECRET');
-    const tokenPayload = signing.kid ? { ...payload, kid: signing.kid } : payload;
+    const tokenPayload = signing.kid
+      ? { ...payload, kid: signing.kid }
+      : payload;
     const encoded = Buffer.from(JSON.stringify(tokenPayload)).toString(
       'base64url',
     );

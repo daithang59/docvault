@@ -77,7 +77,9 @@ export class CommentsService {
           actualAuthor: comment.authorId,
         },
       });
-      throw new ForbiddenException('Only the author can edit their own comment');
+      throw new ForbiddenException(
+        'Only the author can edit their own comment',
+      );
     }
 
     const updated = await this.prisma.documentComment.update({

@@ -31,33 +31,6 @@ function getKeycloakJwksUri(baseUrl: string, realm: string): string {
   return `${jwksBaseUrl}/realms/${realm}/protocol/openid-connect/certs`;
 }
 
-function normalizeUrl(value: string): string {
-  return value.replace(/\/$/, '');
-}
-
-function getKeycloakIssuers(baseUrl: string, realm: string): string[] {
-  const configuredIssuers = (process.env.KEYCLOAK_ISSUER ?? '')
-    .split(',')
-    .map((value) => value.trim())
-    .filter(Boolean)
-    .map(normalizeUrl);
-  const internalIssuer = `${normalizeUrl(baseUrl)}/realms/${realm}`;
-
-  return Array.from(new Set([...configuredIssuers, internalIssuer]));
-}
-
-function getKeycloakJwksUri(baseUrl: string, realm: string): string {
-  const explicitJwksUri = process.env.KEYCLOAK_JWKS_URI?.trim();
-  if (explicitJwksUri) {
-    return explicitJwksUri;
-  }
-
-  const jwksBaseUrl = normalizeUrl(
-    process.env.KEYCLOAK_JWKS_BASE_URL ?? baseUrl,
-  );
-  return `${jwksBaseUrl}/realms/${realm}/protocol/openid-connect/certs`;
-}
-
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
   private readonly audience?: string;

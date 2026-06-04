@@ -1,4 +1,10 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { NextConfig } from "next";
+
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(dirname, '../..');
+const webNodeModules = path.join(dirname, 'node_modules');
 
 const securityHeaders = [
   {
@@ -60,6 +66,17 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   output: 'standalone',
   poweredByHeader: false,
+  turbopack: {
+    root: repoRoot,
+    resolveAlias: {
+      '@tailwindcss/postcss': path.join(
+        webNodeModules,
+        '@tailwindcss/postcss',
+      ),
+      next: path.join(webNodeModules, 'next'),
+      tailwindcss: path.join(webNodeModules, 'tailwindcss'),
+    },
+  },
   async headers() {
     return [
       {

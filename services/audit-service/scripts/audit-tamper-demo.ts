@@ -280,7 +280,7 @@ async function loadAuditEvents(
 ): Promise<AuditEventRecord[]> {
   return collection
     .find({})
-    .sort({ timestamp: 1 })
+    .sort({ timestamp: 1, _id: 1 })
     .limit(limit)
     .toArray();
 }

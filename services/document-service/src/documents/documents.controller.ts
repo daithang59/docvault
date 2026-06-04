@@ -85,7 +85,8 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
-    summary: 'Stream a document version by grant token (already authorized, no metadata call)',
+    summary:
+      'Stream a document version by grant token (already authorized, no metadata call)',
   })
   async streamVersion(
     @Param('docId') docId: string,
@@ -120,7 +121,11 @@ export class DocumentsController {
 
       return response.stream;
     } catch (err) {
-      console.error('[StreamVersion] Error streaming document:', (err as Error).message, (err as Error).stack);
+      console.error(
+        '[StreamVersion] Error streaming document:',
+        (err as Error).message,
+        (err as Error).stack,
+      );
       throw err;
     }
   }
@@ -187,7 +192,9 @@ export class DocumentsController {
 
     bodyStream.on('error', (err: Error) => {
       if (!res.headersSent) {
-        res.status(500).json({ message: ['Preview stream failed'], detail: err.message });
+        res
+          .status(500)
+          .json({ message: ['Preview stream failed'], detail: err.message });
       } else {
         res.destroy(err);
       }

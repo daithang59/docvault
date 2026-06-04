@@ -173,7 +173,12 @@ export class DocumentsController {
     @Param('aclId') aclId: string,
     @Req() req: any,
   ) {
-    return this.aclService.delete(docId, aclId, req.user, buildRequestContext(req));
+    return this.aclService.delete(
+      docId,
+      aclId,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/versions')
@@ -185,11 +190,7 @@ export class DocumentsController {
     @Body() body: CreateVersionDto,
     @Req() req: any,
   ) {
-    return this.versionsService.create(
-      docId,
-      body,
-      req.user,
-    );
+    return this.versionsService.create(docId, body, req.user);
   }
 
   @Post(':docId/status')
@@ -233,7 +234,7 @@ export class DocumentsController {
       'Used internally by the workflow service to route SUBMITTED notifications. ' +
       'No auth required — returns only user IDs, no sensitive data.',
   })
-  getApprovers(@Param('docId') _docId: string) {
+  getApprovers() {
     // docId is required by REST convention; the result is global role membership.
     return this.documentsService.getApprovers();
   }

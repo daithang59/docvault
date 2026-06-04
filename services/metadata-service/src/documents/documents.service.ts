@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { ClassificationLevel, Document } from '../../generated/prisma';
+import { Document } from '../../generated/prisma';
 import { AuditClient } from '../audit/audit.client';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -37,7 +37,6 @@ export class DocumentsService {
     let actorId: string;
     let roles: string[];
     let groups: string[];
-    let isAdmin: boolean;
 
     if (!userOrContext) {
       return [];
@@ -55,14 +54,19 @@ export class DocumentsService {
       groups = normalizeGroups(userOrContext.groups);
     }
 
-    isAdmin = roles.includes('admin');
+    const isAdmin = roles.includes('admin');
 
     // Build optional text search filter
     const searchFilter = searchQuery
       ? {
           OR: [
             { title: { contains: searchQuery, mode: 'insensitive' as const } },
-            { description: { contains: searchQuery, mode: 'insensitive' as const } },
+            {
+              description: {
+                contains: searchQuery,
+                mode: 'insensitive' as const,
+              },
+            },
             { tags: { has: searchQuery } },
           ],
         }
@@ -132,75 +136,83 @@ export class DocumentsService {
           // Visibility filter (role + classification based)
           {
             OR: [
-          // Documents the user owns (always visible regardless of classification)
-          { ownerId: actorId },
-          // Documents where user/role/group/all has explicit READ allow.
-          {
-            aclEntries: {
-              some: {
-                ...matchingReadAcl,
-                effect: 'ALLOW' as const,
+              // Documents the user owns (always visible regardless of classification)
+              { ownerId: actorId },
+              // Documents where user/role/group/all has explicit READ allow.
+              {
+                aclEntries: {
+                  some: {
+                    ...matchingReadAcl,
+                    effect: 'ALLOW' as const,
+                  },
+                },
               },
-            },
-          },
-          // compliance_officer sees ALL published + archived documents (any classification) for audit
-          ...(roles.includes('compliance_officer')
-            ? [
-                {
-                  status: { in: ['PUBLISHED' as const, 'ARCHIVED' as const] },
-                },
-              ]
-            : []),
-          // PENDING: approver sees all pending documents to review
-          ...(['approver', 'admin'].some((r) => roles.includes(r))
-            ? [
-                {
-                  status: 'PENDING' as const,
-                },
-              ]
-            : []),
-          // DRAFT: viewer sees their own drafts to preview/download
-          { ownerId: actorId, status: 'DRAFT' as const },
-          // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
-          ...(roles.some((r) =>
-            ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'].includes(r),
-          )
-            ? [
-                {
-                  status: 'PUBLISHED' as const,
-                  classification: 'PUBLIC' as const,
-                },
-              ]
-            : []),
-          // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
-          ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
-            roles.includes(r),
-          )
-            ? [
-                {
-                  status: 'PUBLISHED' as const,
-                  classification: 'INTERNAL' as const,
-                },
-              ]
-            : []),
-          // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
-          ...(['approver', 'admin'].some((r) => roles.includes(r))
-            ? [
-                {
-                  status: 'PUBLISHED' as const,
-                  classification: 'CONFIDENTIAL' as const,
-                },
-              ]
-            : []),
-          // SECRET: approver+ sees PUBLISHED + SECRET
-          ...(['approver', 'admin'].some((r) => roles.includes(r))
-            ? [
-                {
-                  status: 'PUBLISHED' as const,
-                  classification: 'SECRET' as const,
-                },
-              ]
-            : []),
+              // compliance_officer sees ALL published + archived documents (any classification) for audit
+              ...(roles.includes('compliance_officer')
+                ? [
+                    {
+                      status: {
+                        in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                      },
+                    },
+                  ]
+                : []),
+              // PENDING: approver sees all pending documents to review
+              ...(['approver', 'admin'].some((r) => roles.includes(r))
+                ? [
+                    {
+                      status: 'PENDING' as const,
+                    },
+                  ]
+                : []),
+              // DRAFT: viewer sees their own drafts to preview/download
+              { ownerId: actorId, status: 'DRAFT' as const },
+              // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
+              ...(roles.some((r) =>
+                [
+                  'viewer',
+                  'editor',
+                  'approver',
+                  'compliance_officer',
+                  'admin',
+                ].includes(r),
+              )
+                ? [
+                    {
+                      status: 'PUBLISHED' as const,
+                      classification: 'PUBLIC' as const,
+                    },
+                  ]
+                : []),
+              // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
+              ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
+                roles.includes(r),
+              )
+                ? [
+                    {
+                      status: 'PUBLISHED' as const,
+                      classification: 'INTERNAL' as const,
+                    },
+                  ]
+                : []),
+              // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
+              ...(['approver', 'admin'].some((r) => roles.includes(r))
+                ? [
+                    {
+                      status: 'PUBLISHED' as const,
+                      classification: 'CONFIDENTIAL' as const,
+                    },
+                  ]
+                : []),
+              // SECRET: approver+ sees PUBLISHED + SECRET
+              ...(['approver', 'admin'].some((r) => roles.includes(r))
+                ? [
+                    {
+                      status: 'PUBLISHED' as const,
+                      classification: 'SECRET' as const,
+                    },
+                  ]
+                : []),
             ],
           },
         ],
@@ -349,7 +361,10 @@ export class DocumentsService {
           },
         });
       }
-      changes.classification = { old: document.classification, new: dto.classification };
+      changes.classification = {
+        old: document.classification,
+        new: dto.classification,
+      };
       data.classification = dto.classification;
     }
     if (dto.tags !== undefined) {
@@ -434,14 +449,17 @@ export class DocumentsService {
       return { userIds: this.approverCache.ids };
     }
 
-    const baseUrl    = process.env.KEYCLOAK_BASE_URL;
-    const realm      = process.env.KEYCLOAK_REALM;
-    const adminUser  = process.env.KEYCLOAK_ADMIN;
-    const adminPass  = process.env.KEYCLOAK_ADMIN_PASSWORD;
+    const baseUrl = process.env.KEYCLOAK_BASE_URL;
+    const realm = process.env.KEYCLOAK_REALM;
+    const adminUser = process.env.KEYCLOAK_ADMIN;
+    const adminPass = process.env.KEYCLOAK_ADMIN_PASSWORD;
 
     if (!baseUrl || !realm || !adminUser || !adminPass) {
       // Credentials not configured — silent no-op, don't block workflow
-      this.approverCache = { ids: [], expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
+      this.approverCache = {
+        ids: [],
+        expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS,
+      };
       return { userIds: [] };
     }
 
@@ -454,21 +472,27 @@ export class DocumentsService {
           headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
           body: new URLSearchParams({
             grant_type: 'password',
-            client_id:  'admin-cli',
-            username:   adminUser,
-            password:   adminPass,
+            client_id: 'admin-cli',
+            username: adminUser,
+            password: adminPass,
           }),
         },
       );
 
-      if (!tokenRes.ok) throw new Error(`Token fetch failed: ${tokenRes.status}`);
-      const { access_token } = await tokenRes.json() as { access_token: string };
+      if (!tokenRes.ok)
+        throw new Error(`Token fetch failed: ${tokenRes.status}`);
+      const { access_token } = (await tokenRes.json()) as {
+        access_token: string;
+      };
 
       // 2. Fetch users by role in the docvault realm — parallel requests
       const [approverRes, adminRes] = await Promise.all([
-        fetch(`${baseUrl}/admin/realms/${realm}/roles/approver/users?max=1000`, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        }),
+        fetch(
+          `${baseUrl}/admin/realms/${realm}/roles/approver/users?max=1000`,
+          {
+            headers: { Authorization: `Bearer ${access_token}` },
+          },
+        ),
         fetch(`${baseUrl}/admin/realms/${realm}/roles/admin/users?max=1000`, {
           headers: { Authorization: `Bearer ${access_token}` },
         }),
@@ -476,8 +500,10 @@ export class DocumentsService {
 
       if (!approverRes.ok || !adminRes.ok) throw new Error(`Role query failed`);
 
-      const approverUsers: Array<{ id: string; username: string }> = await approverRes.json();
-      const adminUsers:    Array<{ id: string; username: string }> = await adminRes.json();
+      const approverUsers: Array<{ id: string; username: string }> =
+        await approverRes.json();
+      const adminUsers: Array<{ id: string; username: string }> =
+        await adminRes.json();
 
       // Use sub (id/UUID) — NOT username.
       // Notifications are stored and retrieved by sub (UUID) to match req.user.sub in GET /notify.
@@ -488,7 +514,10 @@ export class DocumentsService {
         ]),
       ];
 
-      this.approverCache = { ids, expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS };
+      this.approverCache = {
+        ids,
+        expiresAt: now + DocumentsService.APPROVER_CACHE_TTL_MS,
+      };
       return { userIds: ids };
     } catch (err) {
       // Don't cache on failure — next submit() will retry automatically.

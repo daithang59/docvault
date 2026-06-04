@@ -6,22 +6,13 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateVersionDto } from './dto/create-version.dto';
-import {
-  ServiceUser,
-  buildActorId,
-} from '../common/request-context';
+import { ServiceUser, buildActorId } from '../common/request-context';
 
 @Injectable()
 export class VersionsService {
-  constructor(
-    private readonly prisma: PrismaService,
-  ) {}
+  constructor(private readonly prisma: PrismaService) {}
 
-  async create(
-    docId: string,
-    dto: CreateVersionDto,
-    user: ServiceUser,
-  ) {
+  async create(docId: string, dto: CreateVersionDto, user: ServiceUser) {
     const document = await this.prisma.document.findUnique({
       where: { id: docId },
     });

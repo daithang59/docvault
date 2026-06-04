@@ -12,17 +12,28 @@ describe('AuditService — Hash Chain', () => {
   // Plain mock model — no NestJS/Mongoose dependency
   let mockLean: jest.Mock;
   let mockCreate: jest.Mock;
+  let mockFindOneSort: jest.Mock;
+  let mockFindSort: jest.Mock;
   let service: AuditService;
 
   beforeEach(() => {
     mockLean = jest.fn();
     mockCreate = jest.fn();
+    mockFindOneSort = jest.fn().mockReturnValue({ lean: mockLean });
+    mockFindSort = jest.fn().mockReturnValue({
+      limit: jest.fn().mockReturnValue({
+        lean: jest.fn().mockResolvedValue([]),
+      }),
+    });
 
     const mockModel = {
       create: mockCreate,
-      // MongoDB: findOne({}).sort({ timestamp: -1 }).lean()
+      // MongoDB: findOne({}).sort(...).lean()
       findOne: jest.fn().mockReturnValue({
-        sort: jest.fn().mockReturnValue({ lean: mockLean }),
+        sort: mockFindOneSort,
+      }),
+      find: jest.fn().mockReturnValue({
+        sort: mockFindSort,
       }),
     };
 
@@ -109,5 +120,23 @@ describe('AuditService — Hash Chain', () => {
     // Verify hash is a valid SHA-256 hex string
     expect(result.hash).toMatch(/^[a-f0-9]{64}$/);
     expect(result.prevHash).toBeNull();
+  });
+
+  it('selects the previous chain head with deterministic timestamp and _id ordering', async () => {
+    await service.create(baseDto);
+
+    expect(mockFindOneSort).toHaveBeenCalledWith({
+      timestamp: -1,
+      _id: -1,
+    });
+  });
+
+  it('verifies the chain with deterministic timestamp and _id ordering', async () => {
+    await service.verifyChain();
+
+    expect(mockFindSort).toHaveBeenCalledWith({
+      timestamp: 1,
+      _id: 1,
+    });
   });
 });

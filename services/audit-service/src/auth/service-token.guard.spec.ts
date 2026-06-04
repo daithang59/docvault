@@ -91,10 +91,7 @@ describe('ServiceTokenGuard', () => {
       Reflect.getMetadata(ROLES_KEY, AuditController.prototype.verifyChain),
     ).toEqual(['compliance_officer', 'admin']);
     expect(
-      Reflect.getMetadata(
-        ROLES_KEY,
-        AuditController.prototype.securitySummary,
-      ),
+      Reflect.getMetadata(ROLES_KEY, AuditController.prototype.securitySummary),
     ).toEqual(['compliance_officer', 'admin']);
   });
 });

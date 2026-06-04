@@ -73,7 +73,7 @@ export class MetadataProxyController {
     description:
       'Returns records-management evidence for published and archived documents, including retention class, retention deadline, and computed status.',
   })
-  async listRetention(@Req() req: any, @Query('asOf') _asOf?: string) {
+  async listRetention(@Req() req: any) {
     const queryString = req.url.includes('?')
       ? req.url.substring(req.url.indexOf('?'))
       : '';
@@ -93,7 +93,7 @@ export class MetadataProxyController {
     description:
       'Admin-only demo endpoint that runs the retention job. Optional `asOf` query parameter can be used as a deterministic demo clock.',
   })
-  async runRetention(@Req() req: any, @Query('asOf') _asOf?: string) {
+  async runRetention(@Req() req: any) {
     const queryString = req.url.includes('?')
       ? req.url.substring(req.url.indexOf('?'))
       : '';
@@ -162,13 +162,12 @@ export class MetadataProxyController {
         }),
       ]);
 
-    const {
-      versions = [],
-      aclEntries,
-      acl,
-      workflowHistory: _embeddedWorkflowHistory,
-      ...documentMetadata
-    } = document;
+    const { versions = [], aclEntries, acl } = document;
+    const documentMetadata = { ...document };
+    delete documentMetadata.versions;
+    delete documentMetadata.aclEntries;
+    delete documentMetadata.acl;
+    delete documentMetadata.workflowHistory;
     const retentionRecords = Array.isArray(retentionResponse.data?.records)
       ? retentionResponse.data.records
       : [];
@@ -485,7 +484,7 @@ function sanitizeEvidencePacket(value: unknown): unknown {
 }
 
 function isExcludedEvidenceField(key: string): boolean {
-  return (
-    EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES as readonly string[]
-  ).includes(key);
+  return (EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES as readonly string[]).includes(
+    key,
+  );
 }

@@ -34,8 +34,7 @@ export const RETENTION_POLICY_BY_CLASSIFICATION: Record<
   CONFIDENTIAL: {
     days: CLASSIFICATION_RETENTION_DAYS.CONFIDENTIAL,
     retentionClass: 'CONFIDENTIAL_180D',
-    reason:
-      'CONFIDENTIAL records are retained for 180 days after publication',
+    reason: 'CONFIDENTIAL records are retained for 180 days after publication',
   },
   SECRET: {
     days: CLASSIFICATION_RETENTION_DAYS.SECRET,

@@ -1,5 +1,12 @@
 import {
-  Controller, Get, Post, Body, Param, Query, Req, UseGuards,
+  Controller,
+  Get,
+  Post,
+  Body,
+  Param,
+  Query,
+  Req,
+  UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
@@ -25,17 +32,19 @@ export class NotificationController {
   /** Frontend — paginated list for the authenticated user. */
   @Get('notify')
   @UseGuards(AuthGuard('jwt'))
-  @ApiOperation({ summary: 'List paginated notifications for the current user' })
+  @ApiOperation({
+    summary: 'List paginated notifications for the current user',
+  })
   list(
     @Req() req: any,
-    @Query('page')  page?: string,
+    @Query('page') page?: string,
     @Query('limit') limit?: string,
   ) {
     // Use sub (UUID) to match buildActorId() — sub ?? username ?? 'unknown'.
     const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
     return this.ns.getForUser(
       userId,
-      page  ? parseInt(page,  10) : 1,
+      page ? parseInt(page, 10) : 1,
       limit ? parseInt(limit, 10) : 20,
     );
   }

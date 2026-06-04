@@ -53,7 +53,8 @@ describe('DocumentsService DLP downgrade guard', () => {
       expect.objectContaining({
         action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
         result: 'DENY',
-        reason: 'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
+        reason:
+          'DLP-detected documents cannot be downgraded below CONFIDENTIAL',
       }),
     );
   });
@@ -74,7 +75,8 @@ describe('DocumentsService DLP downgrade guard', () => {
       expect.objectContaining({
         action: 'DLP_CLASSIFICATION_DOWNGRADE_DENIED',
         result: 'DENY',
-        reason: 'Admin override reason is required for DLP classification downgrade',
+        reason:
+          'Admin override reason is required for DLP classification downgrade',
       }),
     );
   });
@@ -101,7 +103,9 @@ describe('DocumentsService DLP downgrade guard', () => {
       { ...context, actorId: 'admin-1', roles: ['admin'] } as any,
     );
 
-    expect(result).toEqual(expect.objectContaining({ classification: 'PUBLIC' }));
+    expect(result).toEqual(
+      expect.objectContaining({ classification: 'PUBLIC' }),
+    );
     expect(mockDocumentUpdate).toHaveBeenCalledWith({
       where: { id: 'doc-1' },
       data: { classification: 'PUBLIC' },
@@ -142,14 +146,12 @@ describe('DocumentsService access-controlled list visibility', () => {
   });
 
   it('includes GROUP READ ALLOW subjects in list visibility and does not grant visibility from deny-only ACL', async () => {
-    await service.findAll(
-      {
-        traceId: 'trace-1',
-        actorId: 'viewer-1',
-        roles: ['viewer'],
-        groups: ['finance-team'],
-      } as any,
-    );
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'viewer-1',
+      roles: ['viewer'],
+      groups: ['finance-team'],
+    } as any);
 
     const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
 
@@ -163,14 +165,12 @@ describe('DocumentsService access-controlled list visibility', () => {
   });
 
   it('applies READ DENY filtering to admin list visibility', async () => {
-    await service.findAll(
-      {
-        traceId: 'trace-1',
-        actorId: 'admin-1',
-        roles: ['admin'],
-        groups: ['blocked-team'],
-      } as any,
-    );
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'admin-1',
+      roles: ['admin'],
+      groups: ['blocked-team'],
+    } as any);
 
     const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
 

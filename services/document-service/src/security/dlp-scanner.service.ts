@@ -67,7 +67,11 @@ const RULES: Rule[] = [
 @Injectable()
 export class DlpScannerService {
   scan(buffer: Buffer): DlpScanResult {
-    const content = buffer.toString('utf8', 0, Math.min(buffer.length, 1_000_000));
+    const content = buffer.toString(
+      'utf8',
+      0,
+      Math.min(buffer.length, 1_000_000),
+    );
     const findings = RULES.flatMap((rule) => {
       const matches = content.match(rule.regex);
       if (!matches?.length) {

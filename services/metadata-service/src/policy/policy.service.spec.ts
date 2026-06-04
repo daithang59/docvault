@@ -366,11 +366,13 @@ describe('PolicyService', () => {
       expect.arrayContaining([
         expect.objectContaining({
           operation: 'CONTENT_SUMMARIZATION',
-          reason: 'Compliance officers cannot use file content for AI operations',
+          reason:
+            'Compliance officers cannot use file content for AI operations',
         }),
         expect.objectContaining({
           operation: 'CONTENT_QA',
-          reason: 'Compliance officers cannot use file content for AI operations',
+          reason:
+            'Compliance officers cannot use file content for AI operations',
         }),
       ]),
     );

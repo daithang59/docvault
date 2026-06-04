@@ -58,13 +58,7 @@ describe('CommentsService document comment pairing', () => {
     });
 
     await expect(
-      (service as any).update(
-        'doc-1',
-        'comment-1',
-        'Updated',
-        author,
-        context,
-      ),
+      (service as any).update('doc-1', 'comment-1', 'Updated', author, context),
     ).rejects.toThrow(NotFoundException);
 
     expect(mockCommentUpdate).not.toHaveBeenCalled();
