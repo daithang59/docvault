@@ -141,6 +141,7 @@ export class AuditService {
 
   async create(dto: CreateAuditEventDto) {
     const eventId = dto.eventId ?? randomUUID();
+    const eventTimestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
 
     // 1. Get hash of the most recent event for chain linking
     const lastEvent = await this.auditEvent
@@ -153,7 +154,7 @@ export class AuditService {
     // 2. Build canonical payload for deterministic hashing
     const canonicalFields: Record<string, any> = {
       eventId,
-      timestamp: dto.timestamp,
+      timestamp: eventTimestamp.toISOString(),
       actorId: dto.actorId,
       actorRoles: dto.actorRoles,
       action: dto.action,
@@ -175,7 +176,7 @@ export class AuditService {
     // 3. Insert the event
     const saved = await this.auditEvent.create({
       eventId,
-      timestamp: dto.timestamp ? new Date(dto.timestamp) : new Date(),
+      timestamp: eventTimestamp,
       actorId: dto.actorId,
       actorRoles: dto.actorRoles,
       action: dto.action,
@@ -409,10 +410,37 @@ export class AuditService {
   private canonicalMetadata(
     metadata: Record<string, unknown> | undefined,
   ): string | undefined {
-    if (metadata === undefined || Object.keys(metadata).length === 0) {
+    if (
+      metadata === undefined ||
+      metadata === null ||
+      Object.keys(metadata).length === 0
+    ) {
       return undefined;
     }
-    return JSON.stringify(metadata);
+    return JSON.stringify(this.sortMetadataValue(metadata));
+  }
+
+  private sortMetadataValue(value: unknown): unknown {
+    if (Array.isArray(value)) {
+      return value.map((item) => this.sortMetadataValue(item));
+    }
+
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      !(value instanceof Date)
+    ) {
+      return Object.keys(value as Record<string, unknown>)
+        .sort()
+        .reduce<Record<string, unknown>>((sorted, key) => {
+          sorted[key] = this.sortMetadataValue(
+            (value as Record<string, unknown>)[key],
+          );
+          return sorted;
+        }, {});
+    }
+
+    return value;
   }
 
   /**
@@ -1186,7 +1214,7 @@ export class AuditService {
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i] as any;
-      const canonicalPayload = this.buildCanonicalPayload({
+      const canonicalFields: Record<string, any> = {
         eventId: event.eventId,
         timestamp: event.timestamp?.toISOString?.() ?? event.timestamp,
         actorId: event.actorId,
@@ -1198,11 +1226,12 @@ export class AuditService {
         reason: event.reason,
         ip: event.ip,
         traceId: event.traceId,
-        metadata:
-          (event as any).metadata !== undefined
-            ? JSON.stringify((event as any).metadata)
-            : undefined,
-      });
+      };
+      const metadataStr = this.canonicalMetadata((event as any).metadata);
+      if (metadataStr !== undefined) {
+        canonicalFields.metadata = metadataStr;
+      }
+      const canonicalPayload = this.buildCanonicalPayload(canonicalFields);
       const expectedHash = this.computeHash(
         i === 0 ? null : (events[i - 1] as any).hash,
         canonicalPayload,

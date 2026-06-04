@@ -1,7 +1,7 @@
 'use client';
 
 import type { ReactNode } from 'react';
-import { useForm, Controller } from 'react-hook-form';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
@@ -47,7 +47,7 @@ export function DocumentForm({
   classificationSlot,
   children,
 }: DocumentFormProps) {
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DocumentFormValues>({
+  const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<DocumentFormValues>({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
       title: '',
@@ -59,8 +59,9 @@ export function DocumentForm({
     },
   });
 
-  const tags = watch('tags');
-  const classification = watch('classification');
+  const tags = useWatch({ control, name: 'tags' }) ?? [];
+  const classification =
+    useWatch({ control, name: 'classification' }) ?? 'INTERNAL';
   const showClassificationOverrideReason =
     isAdmin && dlpStatus === 'DETECTED' && (classification === 'PUBLIC' || classification === 'INTERNAL');
 

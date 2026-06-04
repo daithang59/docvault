@@ -3,7 +3,6 @@ import { documentsKeys } from '@/features/documents/documents.keys';
 import { getDocuments, createDocument, updateDocument } from '@/lib/api/metadata';
 import { uploadDocumentFile } from '@/features/documents/documents.api';
 import { submitDocument, approveDocument, rejectDocument, archiveDocument } from '@/lib/api/workflow';
-import { useDeleteDocument } from '@/features/workflow/workflow.hooks';
 import { CreateDocumentDto, UpdateDocumentDto } from '@/types/document';
 
 export function useDocuments() {
