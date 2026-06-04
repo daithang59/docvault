@@ -1,6 +1,7 @@
 export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
+  DEMO_KIT: '/demo-kit',
   DOCUMENTS: '/documents',
   DOCUMENTS_NEW: '/documents/new',
   DOCUMENT_DETAIL: (id: string) => `/documents/${id}`,

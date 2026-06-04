@@ -24,6 +24,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Retention/records management có trường dữ liệu, endpoint, audit và workflow history.
 - Security dashboard tổng hợp deny, malware, DLP, audit-chain, risk scoring, behavior anomaly và recommendation.
 - Evidence Center gom audit-chain, recommendation packet, document packet và retention evidence thành workspace compliance riêng.
+- Demo Kit gom screenshot targets, presenter flow, scope note và markdown export để trình bày bằng chứng Web runtime.
 - Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
 - Documents/My Documents có smart workbench views, search/filter thương mại hơn: quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
 - Document detail/preview có metadata summary, evidence links và trạng thái preview rõ ràng theo policy/format.
@@ -53,6 +54,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.8 | Retention / records management | Gần xong | `/metadata/retention/documents`, `/metadata/retention/run` |
 | W-P1.9 | Document detail/preview UX polish | Xong | `apps/web/src/features/documents/document-detail-presentation.ts`, `apps/web/src/components/documents/document-versions-card.tsx` |
 | W-P1.10 | Approval readiness UX | Xong | `apps/web/src/features/documents/document-approval-readiness.ts`, `apps/web/src/components/documents/document-approval-readiness-card.tsx` |
+| W-P1.11 | Web Runtime Evidence Demo Kit | Xong | `apps/web/src/features/demo/demo-evidence-kit.ts`, `apps/web/src/app/(app)/demo-kit/page.tsx` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -908,6 +910,46 @@ pnpm --filter gateway test
 node -e "const fs=require('fs'); const yaml=require('js-yaml'); yaml.load(fs.readFileSync('libs/contracts
 ```
 
+### 3.20. Web Runtime Evidence Demo Kit
+
+**Đã triển khai**
+
+- Web page: `/demo-kit`.
+- Sidebar có mục `Demo Kit` cho `compliance_officer` và `admin`.
+- Demo Kit hiển thị:
+  - Web/runtime evidence scope.
+  - Screenshot targets cho Documents, Document Detail, Approvals, Notifications, Security, Evidence và Retention.
+  - Presenter flow từng bước.
+  - Out-of-scope notes để tránh claim nhầm DevSecOps pipeline, approval lock production hoặc LLM thật.
+  - Copy checklist và Download markdown cho báo cáo.
+
+**Ý nghĩa**
+
+- Người trình bày có một checklist tập trung thay vì phải nhớ từng màn hình cần chụp.
+- Dễ chứng minh với giảng viên rằng các cải tiến Web runtime đã có bằng chứng UI cụ thể.
+- Đây là presentation/evidence utility, không thay thế Evidence Center và không mở rộng quyền xem dữ liệu nhạy cảm.
+
+**Cách sử dụng**
+
+1. Đăng nhập `co1` hoặc `admin1`.
+2. Mở:
+
+```text
+http://localhost:3006/demo-kit
+```
+
+3. Dùng các route card để mở từng màn cần chụp.
+4. Bấm `Copy checklist` hoặc `Download markdown` để lấy checklist đưa vào báo cáo.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- demo-evidence-kit.spec.ts demo-evidence-kit-panel.spec.ts
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
+
 ## 4. Hướng dẫn chạy local để demo các tính năng
 
 ### 4.1. Chuẩn bị
@@ -1061,6 +1103,7 @@ Sau đó mở `/audit` và verify chain.
 
 | Trang | URL local | Role nên dùng | Kiểm tra |
 |---|---|---|---|
+| Demo Kit | `http://localhost:3006/demo-kit` | compliance/admin | Web runtime scope, screenshot targets, presenter flow, copy/download markdown |
 | Documents | `http://localhost:3006/documents` | viewer/editor/admin | Smart workbench quick views, commercial search/filter, active chips, URL query state, preview/download button policy |
 | New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, approval readiness, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
@@ -1074,38 +1117,39 @@ Sau đó mở `/audit` và verify chain.
 
 ## 7. Demo flow để trình bày với giảng viên
 
-1. Đăng nhập `editor1`.
-2. Tạo document mới, upload file bình thường.
-3. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
-4. Submit document.
-5. Đăng nhập `approver1`, mở `/approvals`, chỉ ra readiness checklist và reject reason presets, sau đó approve document.
-6. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
-7. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
-8. Trên document detail, chỉ ra metadata summary, Version History preview posture và evidence links nếu role có quyền.
-9. Tạo/upload tài liệu có nội dung nhạy cảm, ví dụ có email và keyword `confidential`.
-10. Chỉ ra DLP evidence và classification escalation.
-11. Tạo/upload EICAR test file để chứng minh malware bị chặn.
-12. Đăng nhập `co1`.
-13. Vào `/notifications`, lọc `Security` hoặc `Retention` nếu có event tương ứng, chỉ ra severity/read state/target link.
-14. Vào `/audit`, query event và verify hash-chain.
-15. Thử preview/download document bằng `co1` và chỉ ra reason bị deny ngay trong Version History.
-16. Bấm evidence links từ document detail sang Audit/Evidence/Retention/Security để chứng minh luồng metadata-only.
-17. Vào `/security`, trình bày:
+1. Đăng nhập `co1` hoặc `admin1`, mở `/demo-kit`, chỉ ra Web runtime scope, screenshot targets, presenter flow và markdown export.
+2. Đăng nhập `editor1`.
+3. Tạo document mới, upload file bình thường.
+4. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
+5. Submit document.
+6. Đăng nhập `approver1`, mở `/approvals`, chỉ ra readiness checklist và reject reason presets, sau đó approve document.
+7. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
+8. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
+9. Trên document detail, chỉ ra metadata summary, Version History preview posture và evidence links nếu role có quyền.
+10. Tạo/upload tài liệu có nội dung nhạy cảm, ví dụ có email và keyword `confidential`.
+11. Chỉ ra DLP evidence và classification escalation.
+12. Tạo/upload EICAR test file để chứng minh malware bị chặn.
+13. Đăng nhập `co1`.
+14. Vào `/notifications`, lọc `Security` hoặc `Retention` nếu có event tương ứng, chỉ ra severity/read state/target link.
+15. Vào `/audit`, query event và verify hash-chain.
+16. Thử preview/download document bằng `co1` và chỉ ra reason bị deny ngay trong Version History.
+17. Bấm evidence links từ document detail sang Audit/Evidence/Retention/Security để chứng minh luồng metadata-only.
+18. Vào `/security`, trình bày:
     - deny/malware/DLP counters
     - risky documents
     - behavior anomaly
     - security recommendations
-18. Đổi workflow status của một recommendation và chỉ ra Playbook cập nhật checklist/SLA.
-19. Mở History timeline và download recommendation evidence packet JSON.
-20. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
-21. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
-22. Tick nhiều packet, export Evidence Bundle manifest và chỉ ra checklist/counts/packet filenames.
-23. Export Evidence Report HTML và mở report để chỉ ra đây là printable metadata-only report.
-24. Chuyển sang tab Presentation, chỉ ra case readiness, audit-chain status, retention posture, checklist, recommendation timeline và document packet list.
-25. Chỉ ra manifest/report có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
-26. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
-27. Vào `/retention`, trình bày retention class/deadline/status.
-28. Vào edit document, đổi classification để xem access impact preview.
+19. Đổi workflow status của một recommendation và chỉ ra Playbook cập nhật checklist/SLA.
+20. Mở History timeline và download recommendation evidence packet JSON.
+21. Chỉ ra recommendation packet có playbook, `excludedSensitiveFields` và không có file content/object key/presigned URL/grant token.
+22. Vào `/evidence`, export manifest, recommendation packet và document evidence packet.
+23. Tick nhiều packet, export Evidence Bundle manifest và chỉ ra checklist/counts/packet filenames.
+24. Export Evidence Report HTML và mở report để chỉ ra đây là printable metadata-only report.
+25. Chuyển sang tab Presentation, chỉ ra case readiness, audit-chain status, retention posture, checklist, recommendation timeline và document packet list.
+26. Chỉ ra manifest/report có `metadataOnly`, audit-chain status, recommendation ids, document packet ids và `excludedSensitiveFields`.
+27. Vào document detail, export evidence packet và chỉ ra packet không có file content/object key/storage path/token.
+28. Vào `/retention`, trình bày retention class/deadline/status.
+29. Vào edit document, đổi classification để xem access impact preview.
 
 ## 8. Điểm cần nói rõ trong báo cáo
 
@@ -1118,6 +1162,7 @@ Sau đó mở `/audit` và verify chain.
 - Recommendation history và recommendation evidence packet cũng metadata-only; packet ghi `excludedSensitiveFields` để chứng minh các trường nhạy cảm đã bị loại trừ.
 - Recommendation Playbook là lớp điều phối deterministic trên metadata/workflow, không phải DevSecOps pipeline và không mở quyền xem file content.
 - Evidence Center là workspace runtime để gom/export evidence; Evidence Bundle manifest và Evidence Report HTML chỉ là metadata index/presentation có checklist/counts, document packet export được scrub các content-bearing fields trước khi tải xuống.
+- Demo Kit là presentation/checklist utility cho Web runtime evidence; nó không thay thế Evidence Center và không claim DevSecOps pipeline evidence.
 - Notification Center là runtime work queue trong web app, không phải alerting/DevSecOps pipeline; nó gom workflow/retention/security/document events thành danh sách hành động có read state và target links.
 - Document smart workbench/search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
 - Document detail/preview polish là UX/presentation layer: làm rõ metadata, policy denial và unsupported format; không claim là backend full-text preview engine.
@@ -1152,21 +1197,28 @@ Ghi chú:
   - `pnpm --filter web exec tsc --noEmit`
   - `pnpm --filter web lint`
   - `pnpm --filter web build`
+- Đợt verify web bổ sung cho Demo Kit ngày 2026-06-04 đã chạy:
+  - `pnpm --filter web test -- demo-evidence-kit.spec.ts demo-evidence-kit-panel.spec.ts document-approval-readiness.spec.ts document-approval-readiness-card.spec.ts document-filter-model.spec.ts evidence-center.spec.ts evidence-report.spec.ts notifications-center.spec.ts security-dashboard.spec.ts`
+  - `pnpm --filter web exec tsc --noEmit`
+  - `pnpm --filter web lint`
+  - `pnpm --filter web build`
+  - `Invoke-WebRequest http://localhost:3006/demo-kit` trả `STATUS=200`.
 - web lint pass với 0 error và còn 4 warning sẵn có.
 - git diff --check / browser smoke cho diff mới nhất nên chạy lại khi sandbox hoặc local runtime cho phép.
 - pnpm test:e2e cần local stack đang chạy.
 
 ## 10. Việc còn nên làm nếu muốn polish thêm
 
-1. Chụp ảnh UI các trang `/security`, `/audit`, `/retention`, document detail metadata summary/version preview posture/evidence links và access impact preview để đưa vào báo cáo.
-2. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
-3. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED`, chỉ ra Playbook owner/SLA/checklist, mở History timeline, tải recommendation evidence packet JSON và audit event tương ứng.
-4. Chụp `/evidence`: source cards, export manifest, export recommendation packet, export document packet.
-5. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
-6. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
-7. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
-8. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
-9. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
-10. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.
-11. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-12. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+1. Chụp `/demo-kit`: Web runtime scope, screenshot targets, presenter flow và markdown export actions.
+2. Chụp ảnh UI các trang `/security`, `/audit`, `/retention`, document detail metadata summary/version preview posture/evidence links và access impact preview để đưa vào báo cáo.
+3. Tạo bảng completion matrix ngắn trong slide: W-P item, status, file evidence, command test.
+4. Chụp evidence workflow security recommendation: chuyển `OPEN -> INVESTIGATING -> REVIEWED/RESOLVED`, chỉ ra Playbook owner/SLA/checklist, mở History timeline, tải recommendation evidence packet JSON và audit event tương ứng.
+5. Chụp `/evidence`: source cards, export manifest, export recommendation packet, export document packet.
+6. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
+7. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
+8. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
+9. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
+10. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
+11. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.
+12. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+13. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.

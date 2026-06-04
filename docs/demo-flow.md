@@ -35,6 +35,7 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Argo CD application `Synced/Healthy`.
 - Web app login page on EKS.
 - Successful Keycloak login.
+- Demo Kit page showing web runtime scope, screenshot targets, presenter flow, and markdown export.
 - Document smart workbench quick views with active chips, counts, and URL query state.
 - Document detail metadata summary, evidence links, and version preview posture.
 - Approval readiness checklist in document detail and Approvals review drawer.
@@ -45,6 +46,15 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - ZAP report artifact: `zap_report.html` and `zap_report.json`.
 - Grafana dashboard showing pod/workload health and CPU/RAM.
 - Dependency Check report plus SCA triage record.
+
+---
+
+## Step 0 - Presenter Opens Demo Kit
+
+1. Login through Keycloak as a Compliance Officer or Admin test user.
+2. Open **Demo Kit**.
+3. Expected result: the page shows Web/runtime scope, screenshot targets, presenter flow, out-of-scope notes, and copy/download markdown actions.
+4. Use this page as the checklist while capturing the rest of the demo evidence.
 
 ---
 
@@ -197,6 +207,15 @@ pnpm --filter web dev -- --port 3100
 ```
 
 Navigate to: **http://localhost:3100**
+
+---
+
+## Step 0 — Presenter: Demo Kit
+
+1. Demo Login as `co1` or `admin1`
+2. Open **Demo Kit** in sidebar
+3. ✅ Should see Web runtime evidence scope, screenshot targets, presenter flow, and markdown export actions
+4. ✅ Out-of-scope notes should make clear this page does not claim DevSecOps pipeline evidence
 
 ---
 
