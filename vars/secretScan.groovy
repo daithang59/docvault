@@ -1,16 +1,9 @@
 def call() {
     echo '>>> Running Secret Scan (TruffleHog)...'
 
-    def status = sh(
-        script: """
-            set -eu
-            mkdir -p secret-scan-report
-            report="secret-scan-report/trufflehog-report.txt"
-            : > "\$report"
-
-            echo ">>> Creating exclusion file for TruffleHog..."
-            cat > .trufflehog-exclude <<EOF
-(^|/)\\.pnpm-store(/|$)
+    writeFile(
+        file: '.trufflehog-exclude',
+        text: '''(^|/)\\.pnpm-store(/|$)
 (^|/)node_modules(/|$)
 (^|/)\\.turbo(/|$)
 (^|/)\\.next(/|$)
@@ -21,7 +14,15 @@ def call() {
 \\.tfplan$
 -secret\\.json$
 \\.kubeconfig$
-EOF
+'''
+    )
+
+    def status = sh(
+        script: """
+            set -eu
+            mkdir -p secret-scan-report
+            report="secret-scan-report/trufflehog-report.txt"
+            : > "\$report"
 
             echo ">>> Scanning repository for leaked secrets..."
 

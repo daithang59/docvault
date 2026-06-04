@@ -220,7 +220,9 @@ pipeline {
         stage('Secret Scan') {
             steps {
                 script {
+                    echo '>>> Entering Secret Scan stage...'
                     secretScan()
+                    echo '>>> Secret Scan stage completed.'
                 }
             }
         }
