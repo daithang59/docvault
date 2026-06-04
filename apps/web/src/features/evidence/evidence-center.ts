@@ -138,11 +138,18 @@ export interface EvidenceBundleManifest {
 
 export type EvidenceCaseStatus = 'ready' | 'incomplete' | 'blocked';
 export type EvidenceCaseSectionState = 'verified' | 'ready' | 'attention' | 'blocked';
+export type EvidenceCaseSectionId = 'metadata' | 'workflow' | 'retention' | 'audit';
 
 export interface EvidenceCaseAuditChain {
   state: 'verified' | 'blocked';
   label: string;
   checkedEvents: number;
+}
+
+export interface EvidenceCaseIntegrityBadge {
+  state: EvidenceCaseAuditChain['state'];
+  label: string;
+  detail: string;
 }
 
 export interface EvidenceCaseRetentionPosture {
@@ -160,6 +167,29 @@ export interface EvidenceCaseTimelineItem
   sequence: number;
 }
 
+export interface EvidenceCaseSectionItem {
+  label: string;
+  value: string;
+}
+
+export interface EvidenceCaseSection {
+  id: EvidenceCaseSectionId;
+  label: string;
+  state: EvidenceCaseSectionState;
+  summary: string;
+  evidenceCount: number;
+  items: EvidenceCaseSectionItem[];
+}
+
+export interface EvidenceCaseVisualTimelineItem {
+  sequence: number;
+  sectionId: EvidenceCaseSectionId;
+  label: string;
+  description: string;
+  state: EvidenceCaseSectionState;
+  evidenceCount: number;
+}
+
 export interface EvidenceCaseNarrative {
   caseId: string;
   generatedAt: string;
@@ -168,7 +198,10 @@ export interface EvidenceCaseNarrative {
   metadataOnly: true;
   excludedSensitiveFields: string[];
   auditChain: EvidenceCaseAuditChain;
+  integrityBadge: EvidenceCaseIntegrityBadge;
   retentionPosture: EvidenceCaseRetentionPosture;
+  sections: EvidenceCaseSection[];
+  visualTimeline: EvidenceCaseVisualTimelineItem[];
   checklist: EvidenceBundleChecklistItem[];
   timeline: EvidenceCaseTimelineItem[];
   documents: EvidenceBundleDocumentReference[];
@@ -380,6 +413,13 @@ export function buildEvidenceCaseNarrative(
   bundle: EvidenceBundleManifest,
 ): EvidenceCaseNarrative {
   const retentionPosture = buildRetentionPosture(bundle.retentionSummary);
+  const integrityBadge = buildIntegrityBadge(bundle.auditChain);
+  const sections = buildEvidenceCaseSections(
+    bundle,
+    retentionPosture,
+    integrityBadge,
+  );
+  const visualTimeline = buildEvidenceVisualTimeline(sections);
   const warnings = [
     ...bundle.missingSelectionIds.map((id) => `Missing selected packet: ${id}`),
   ];
@@ -426,7 +466,10 @@ export function buildEvidenceCaseNarrative(
         : 'Audit chain needs review',
       checkedEvents: bundle.auditChain.checked,
     },
+    integrityBadge,
     retentionPosture,
+    sections,
+    visualTimeline,
     checklist: bundle.checklist.map((item) => ({ ...item })),
     timeline: bundle.packets.recommendations.map((item, index) => ({
       ...item,
@@ -437,6 +480,139 @@ export function buildEvidenceCaseNarrative(
     warnings,
     blockers,
   };
+}
+
+function buildIntegrityBadge(
+  auditChain: AuditChainStatus,
+): EvidenceCaseIntegrityBadge {
+  return {
+    state: auditChain.valid ? 'verified' : 'blocked',
+    label: auditChain.valid ? 'Audit chain valid' : 'Audit chain invalid',
+    detail: `${formatCount(auditChain.checked, 'audit event')} checked`,
+  };
+}
+
+function buildEvidenceCaseSections(
+  bundle: EvidenceBundleManifest,
+  retentionPosture: EvidenceCaseRetentionPosture,
+  integrityBadge: EvidenceCaseIntegrityBadge,
+): EvidenceCaseSection[] {
+  return [
+    {
+      id: 'metadata',
+      label: 'Metadata',
+      state:
+        bundle.summary.totalPackets > 0 && bundle.summary.missingSelections === 0
+          ? 'verified'
+          : 'attention',
+      summary: `${formatCount(
+        bundle.summary.totalPackets,
+        'metadata-only packet',
+      )} selected with ${formatCount(
+        bundle.summary.missingSelections,
+        'missing selection',
+      )}.`,
+      evidenceCount: bundle.summary.totalPackets,
+      items: [
+        { label: 'Bundle filename', value: bundle.bundleFilename },
+        { label: 'Generated at', value: bundle.generatedAt },
+        {
+          label: 'Sensitive fields excluded',
+          value: String(bundle.excludedSensitiveFields.length),
+        },
+      ],
+    },
+    {
+      id: 'workflow',
+      label: 'Workflow',
+      state: bundle.summary.recommendationPackets > 0 ? 'verified' : 'attention',
+      summary: `${formatCount(
+        bundle.summary.recommendationPackets,
+        'recommendation packet',
+      )} linked with workflow status and owner context.`,
+      evidenceCount: bundle.summary.recommendationPackets,
+      items: [
+        {
+          label: 'Recommendation packets',
+          value: String(bundle.summary.recommendationPackets),
+        },
+        {
+          label: 'Document packets',
+          value: String(bundle.summary.documentPackets),
+        },
+        {
+          label: 'Workflow statuses',
+          value: formatWorkflowStatuses(bundle.packets.recommendations),
+        },
+      ],
+    },
+    {
+      id: 'retention',
+      label: 'Retention',
+      state:
+        retentionPosture.state === 'ready'
+          ? 'verified'
+          : retentionPosture.state,
+      summary: retentionPosture.label,
+      evidenceCount: retentionPosture.tracked,
+      items: [
+        { label: 'Tracked', value: String(retentionPosture.tracked) },
+        { label: 'Due soon', value: String(retentionPosture.dueSoon) },
+        { label: 'Overdue', value: String(retentionPosture.overdue) },
+        { label: 'Archived', value: String(retentionPosture.archived) },
+      ],
+    },
+    {
+      id: 'audit',
+      label: 'Audit',
+      state: integrityBadge.state,
+      summary: integrityBadge.label,
+      evidenceCount: bundle.auditChain.checked,
+      items: [
+        { label: 'Integrity', value: integrityBadge.label },
+        { label: 'Checked events', value: String(bundle.auditChain.checked) },
+        {
+          label: 'Hash chain',
+          value: bundle.auditChain.valid ? 'Valid' : 'Invalid',
+        },
+      ],
+    },
+  ];
+}
+
+function buildEvidenceVisualTimeline(
+  sections: EvidenceCaseSection[],
+): EvidenceCaseVisualTimelineItem[] {
+  const timelineLabels: Record<EvidenceCaseSectionId, string> = {
+    metadata: 'Metadata packet selected',
+    workflow: 'Workflow evidence linked',
+    retention: 'Retention posture checked',
+    audit: 'Audit chain valid',
+  };
+
+  return sections.map((section, index) => ({
+    sequence: index + 1,
+    sectionId: section.id,
+    label:
+      section.id === 'audit' && section.state === 'blocked'
+        ? 'Audit chain invalid'
+        : timelineLabels[section.id],
+    description: section.summary,
+    state: section.state,
+    evidenceCount: section.evidenceCount,
+  }));
+}
+
+function formatWorkflowStatuses(
+  recommendations: EvidenceBundleRecommendationReference[],
+): string {
+  if (recommendations.length === 0) {
+    return 'None';
+  }
+
+  return [
+    ...new Set(recommendations.map((item) => item.workflowStatus)),
+  ].join(', ');
 }
 
 export function buildEvidenceCenterDocumentPacket(

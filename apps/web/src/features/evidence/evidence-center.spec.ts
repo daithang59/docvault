@@ -350,6 +350,87 @@ describe('buildEvidenceCaseNarrative', () => {
     ]);
   });
 
+  it('builds a visual timeline, integrity badge, and grouped packet sections', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummary(),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-02T09:00:00.000Z',
+    });
+    const bundle = buildEvidenceBundle(model, {
+      selectedRecommendationIds: ['actor-access-review:DENY_BURST:viewer-1'],
+      selectedDocumentIds: ['doc-secret'],
+      generatedAt: '2026-06-02T09:30:00.000Z',
+    });
+
+    const narrative = buildEvidenceCaseNarrative(bundle);
+
+    expect(narrative.integrityBadge).toEqual({
+      state: 'verified',
+      label: 'Audit chain valid',
+      detail: '42 audit events checked',
+    });
+    expect(narrative.sections.map((section) => section.id)).toEqual([
+      'metadata',
+      'workflow',
+      'retention',
+      'audit',
+    ]);
+    expect(narrative.sections).toEqual([
+      expect.objectContaining({
+        id: 'metadata',
+        label: 'Metadata',
+        state: 'verified',
+        evidenceCount: 2,
+      }),
+      expect.objectContaining({
+        id: 'workflow',
+        label: 'Workflow',
+        state: 'verified',
+        evidenceCount: 1,
+      }),
+      expect.objectContaining({
+        id: 'retention',
+        label: 'Retention',
+        state: 'attention',
+        evidenceCount: 2,
+      }),
+      expect.objectContaining({
+        id: 'audit',
+        label: 'Audit',
+        state: 'verified',
+        evidenceCount: 42,
+      }),
+    ]);
+    expect(narrative.visualTimeline.map((item) => item.label)).toEqual([
+      'Metadata packet selected',
+      'Workflow evidence linked',
+      'Retention posture checked',
+      'Audit chain valid',
+    ]);
+    expect(narrative.visualTimeline).toEqual([
+      expect.objectContaining({
+        sequence: 1,
+        sectionId: 'metadata',
+        state: 'verified',
+      }),
+      expect.objectContaining({
+        sequence: 2,
+        sectionId: 'workflow',
+        state: 'verified',
+      }),
+      expect.objectContaining({
+        sequence: 3,
+        sectionId: 'retention',
+        state: 'attention',
+      }),
+      expect.objectContaining({
+        sequence: 4,
+        sectionId: 'audit',
+        state: 'verified',
+      }),
+    ]);
+  });
+
   it('marks missing selected packets as incomplete warnings', () => {
     const model = buildEvidenceCenterModel({
       securitySummary: securitySummary(),

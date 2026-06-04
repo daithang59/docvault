@@ -7,6 +7,41 @@ export function buildEvidenceReportHtml(
   bundle: EvidenceBundleManifest,
   narrative: EvidenceCaseNarrative,
 ): string {
+  const sectionCards = narrative.sections
+    .map(
+      (section) => `
+        <article class="section-card">
+          <div>
+            <span class="state">${escapeHtml(section.state)}</span>
+            <h3>${escapeHtml(section.label)}</h3>
+          </div>
+          <p>${escapeHtml(section.summary)}</p>
+          <dl>
+            ${section.items
+              .map(
+                (item) => `
+                  <div>
+                    <dt>${escapeHtml(item.label)}</dt>
+                    <dd>${escapeHtml(item.value)}</dd>
+                  </div>`,
+              )
+              .join('')}
+          </dl>
+        </article>`,
+    )
+    .join('');
+  const timelineItems = narrative.visualTimeline
+    .map(
+      (item) => `
+        <li>
+          <span class="step">${item.sequence}</span>
+          <div>
+            <strong>${escapeHtml(item.label)}</strong>
+            <p>${escapeHtml(item.description)}</p>
+          </div>
+        </li>`,
+    )
+    .join('');
   const checklistRows = narrative.checklist
     .map(
       (item) => `
@@ -99,10 +134,58 @@ export function buildEvidenceReportHtml(
         grid-template-columns: repeat(4, minmax(0, 1fr));
         gap: 12px;
       }
+      .section-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 12px;
+      }
       .metric {
         border: 1px solid #d8dee9;
         border-radius: 8px;
         padding: 12px;
+      }
+      .section-card {
+        border: 1px solid #d8dee9;
+        border-radius: 8px;
+        padding: 14px;
+        break-inside: avoid;
+      }
+      .section-card h3 {
+        margin: 6px 0 0;
+        font-size: 15px;
+      }
+      .section-card p {
+        margin: 8px 0 0;
+        color: #526070;
+        font-size: 13px;
+      }
+      .section-card dl {
+        margin: 12px 0 0;
+      }
+      .section-card dl div {
+        display: flex;
+        justify-content: space-between;
+        gap: 12px;
+        border-top: 1px solid #e5e9f0;
+        padding: 8px 0;
+      }
+      .section-card dt {
+        color: #526070;
+        font-size: 12px;
+      }
+      .section-card dd {
+        margin: 0;
+        font-size: 12px;
+        font-weight: 700;
+        text-align: right;
+        word-break: break-word;
+      }
+      .state {
+        color: #526070;
+        font-size: 11px;
+        font-weight: 700;
+        text-transform: uppercase;
       }
       .metric span {
         display: block;
@@ -135,6 +218,51 @@ export function buildEvidenceReportHtml(
         margin: 10px 0 0;
         padding-left: 22px;
       }
+      .timeline {
+        margin: 12px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+      .timeline li {
+        display: grid;
+        grid-template-columns: 28px 1fr;
+        gap: 10px;
+        padding: 0 0 14px;
+      }
+      .timeline li + li {
+        border-top: 1px solid #e5e9f0;
+        padding-top: 14px;
+      }
+      .timeline .step {
+        display: inline-flex;
+        width: 28px;
+        height: 28px;
+        align-items: center;
+        justify-content: center;
+        border-radius: 999px;
+        background: #172033;
+        color: #ffffff;
+        font-size: 12px;
+        font-weight: 700;
+      }
+      .timeline strong {
+        display: block;
+        font-size: 13px;
+      }
+      .timeline p {
+        margin: 4px 0 0;
+        color: #526070;
+        font-size: 13px;
+      }
+      @media (max-width: 720px) {
+        body {
+          padding: 16px;
+        }
+        .grid,
+        .section-grid {
+          grid-template-columns: 1fr;
+        }
+      }
       @media print {
         body {
           background: #ffffff;
@@ -155,6 +283,9 @@ export function buildEvidenceReportHtml(
         narrative.generatedAt,
       )}</p>
       <p>${escapeHtml(narrative.headline)}</p>
+      <p><strong>${escapeHtml(narrative.integrityBadge.label)}</strong> - ${escapeHtml(
+        narrative.integrityBadge.detail,
+      )}</p>
 
       <section class="grid">
         <div class="metric"><span>Total packets</span><strong>${bundle.summary.totalPackets}</strong></div>
@@ -163,8 +294,14 @@ export function buildEvidenceReportHtml(
         <div class="metric"><span>Audit events</span><strong>${narrative.auditChain.checkedEvents}</strong></div>
       </section>
 
+      <h2>Evidence Packet Sections</h2>
+      <section class="section-grid">${sectionCards}</section>
+
+      <h2>Visual Timeline</h2>
+      <ol class="timeline">${timelineItems}</ol>
+
       <h2>Evidence Controls</h2>
-      <p>${escapeHtml(narrative.auditChain.label)}. ${escapeHtml(
+      <p>${escapeHtml(narrative.integrityBadge.label)}. ${escapeHtml(
         narrative.retentionPosture.label,
       )}.</p>
       <p class="meta">Excluded sensitive fields: ${bundle.excludedSensitiveFields

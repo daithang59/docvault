@@ -586,6 +586,9 @@ function EvidenceCasePresentation({
               <span className="rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
                 Metadata-only
               </span>
+              <span className={integrityBadgeClass(narrative.integrityBadge.state)}>
+                {narrative.integrityBadge.label}
+              </span>
             </div>
             <h2 className="mt-2 text-lg font-semibold text-[var(--text-main)]">
               {narrative.caseId}
@@ -654,23 +657,29 @@ function EvidenceCasePresentation({
             />
           </div>
 
-          <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+          <div
+            className={`rounded border p-3 ${integrityPanelClass(
+              narrative.integrityBadge.state,
+            )}`}
+          >
             <div className="flex items-start gap-2">
-              {narrative.auditChain.state === 'verified' ? (
+              {narrative.integrityBadge.state === 'verified' ? (
                 <ShieldCheck className="mt-0.5 h-4 w-4 text-[var(--status-published-text)]" />
               ) : (
                 <ShieldAlert className="mt-0.5 h-4 w-4 text-[var(--state-error-text)]" />
               )}
               <div>
                 <p className="text-sm font-semibold text-[var(--text-main)]">
-                  {narrative.auditChain.label}
+                  {narrative.integrityBadge.label}
                 </p>
                 <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {narrative.auditChain.checkedEvents} audit events checked.
+                  {narrative.integrityBadge.detail}.
                 </p>
               </div>
             </div>
           </div>
+
+          <EvidenceSectionSummary sections={narrative.sections} />
 
           <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
             <p className="text-sm font-semibold text-[var(--text-main)]">
@@ -702,6 +711,8 @@ function EvidenceCasePresentation({
         </div>
 
         <div className="space-y-4">
+          <EvidenceVisualTimeline items={narrative.visualTimeline} />
+
           <div className="rounded border border-[var(--border-soft)]">
             <div className="border-b px-3 py-2" style={{ borderColor: 'var(--border-soft)' }}>
               <h3 className="text-sm font-semibold text-[var(--text-main)]">
@@ -802,6 +813,99 @@ function EvidenceCasePresentation({
             )}
           </div>
         </div>
+      </div>
+    </div>
+  );
+}
+
+function EvidenceSectionSummary({
+  sections,
+}: {
+  sections: EvidenceCaseNarrative['sections'];
+}) {
+  return (
+    <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm font-semibold text-[var(--text-main)]">
+          Evidence packet sections
+        </p>
+        <span className="text-xs font-medium text-[var(--text-muted)]">
+          {sections.length} groups
+        </span>
+      </div>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {sections.map((section) => (
+          <div
+            key={section.id}
+            className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] p-3"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <h3 className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                {section.label}
+              </h3>
+              <span className={sectionStateClass(section.state)}>
+                {section.state}
+              </span>
+            </div>
+            <p className="mt-2 text-xs leading-relaxed text-[var(--text-muted)]">
+              {section.summary}
+            </p>
+            <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
+              {section.evidenceCount} evidence items
+            </p>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function EvidenceVisualTimeline({
+  items,
+}: {
+  items: EvidenceCaseNarrative['visualTimeline'];
+}) {
+  return (
+    <div className="rounded border border-[var(--border-soft)]">
+      <div
+        className="border-b px-3 py-2"
+        style={{ borderColor: 'var(--border-soft)' }}
+      >
+        <h3 className="text-sm font-semibold text-[var(--text-main)]">
+          Visual timeline
+        </h3>
+      </div>
+      <div className="px-3 py-3">
+        <ol className="space-y-0">
+          {items.map((item, index) => (
+            <li
+              key={item.sectionId}
+              className="grid grid-cols-[32px_1fr] gap-3"
+            >
+              <div className="flex flex-col items-center">
+                <span className={timelineDotClass(item.state)}>
+                  {item.sequence}
+                </span>
+                {index < items.length - 1 ? (
+                  <span className="h-full min-h-8 w-px bg-[var(--border-soft)]" />
+                ) : null}
+              </div>
+              <div className="pb-4">
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-[var(--text-main)]">
+                    {item.label}
+                  </p>
+                  <span className={sectionStateClass(item.state)}>
+                    {item.state}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                  {item.description}
+                </p>
+              </div>
+            </li>
+          ))}
+        </ol>
       </div>
     </div>
   );
@@ -1036,6 +1140,50 @@ function caseStatusClass(status: EvidenceCaseNarrative['status']): string {
     return 'rounded border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-2 py-1 text-xs font-semibold uppercase text-[var(--state-error-text)]';
   }
   return 'rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold uppercase text-[var(--status-pending-text)]';
+}
+
+function integrityBadgeClass(
+  state: EvidenceCaseNarrative['integrityBadge']['state'],
+): string {
+  if (state === 'verified') {
+    return 'rounded border border-[var(--status-published-border)] bg-[var(--status-published-bg)] px-2 py-1 text-xs font-semibold text-[var(--status-published-text)]';
+  }
+
+  return 'rounded border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-2 py-1 text-xs font-semibold text-[var(--state-error-text)]';
+}
+
+function integrityPanelClass(
+  state: EvidenceCaseNarrative['integrityBadge']['state'],
+): string {
+  if (state === 'verified') {
+    return 'border-[var(--status-published-border)] bg-[var(--status-published-bg)]';
+  }
+
+  return 'border-[var(--state-error-border)] bg-[var(--state-error-bg)]';
+}
+
+function sectionStateClass(
+  state: EvidenceCaseNarrative['sections'][number]['state'],
+): string {
+  if (state === 'verified' || state === 'ready') {
+    return 'rounded bg-[var(--status-published-bg)] px-2 py-1 text-[10px] font-semibold uppercase text-[var(--status-published-text)]';
+  }
+  if (state === 'blocked') {
+    return 'rounded bg-[var(--state-error-bg)] px-2 py-1 text-[10px] font-semibold uppercase text-[var(--state-error-text)]';
+  }
+  return 'rounded bg-[var(--status-pending-bg)] px-2 py-1 text-[10px] font-semibold uppercase text-[var(--status-pending-text)]';
+}
+
+function timelineDotClass(
+  state: EvidenceCaseNarrative['visualTimeline'][number]['state'],
+): string {
+  if (state === 'verified' || state === 'ready') {
+    return 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--status-published-text)] text-xs font-semibold text-[var(--bg-card)]';
+  }
+  if (state === 'blocked') {
+    return 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--state-error-text)] text-xs font-semibold text-[var(--bg-card)]';
+  }
+  return 'inline-flex h-7 w-7 items-center justify-center rounded-full bg-[var(--status-pending-text)] text-xs font-semibold text-[var(--bg-card)]';
 }
 
 function badgeClass(severity: EvidenceRecommendationTarget['severity']): string {

@@ -85,7 +85,13 @@ describe('buildEvidenceReportHtml', () => {
     expect(html).toContain('<!doctype html>');
     expect(html).toContain('DOCVAULT-EVIDENCE-BUNDLE-20260602093000');
     expect(html).toContain('Metadata-only report');
-    expect(html).toContain('Audit chain verified');
+    expect(html).toContain('Audit chain valid');
+    expect(html).toContain('Evidence Packet Sections');
+    expect(html).toContain('Visual Timeline');
+    expect(html).toContain('<h3>Metadata</h3>');
+    expect(html).toContain('<h3>Workflow</h3>');
+    expect(html).toContain('<h3>Retention</h3>');
+    expect(html).toContain('<h3>Audit</h3>');
     expect(html).toContain('docvault-evidence-secret-b-plan-b.json');
     expect(html).toContain('Review &lt;script&gt;alert(&quot;x&quot;)&lt;/script&gt; document');
     expect(html).toContain('Secret &lt;b&gt;Plan&lt;/b&gt;');
