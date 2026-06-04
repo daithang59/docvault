@@ -8,7 +8,7 @@ import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
-import { CheckCircle, XCircle, X, Eye, Clock, User, Tag, ArrowRight } from 'lucide-react';
+import { CheckCircle, XCircle, X, Eye, Clock, User, Tag, ArrowRight, ShieldCheck } from 'lucide-react';
 import { useApproveDocument, useRejectDocument } from '@/features/workflow/workflow.hooks';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
@@ -17,6 +17,7 @@ import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage } from '@/lib/api/errors';
 import { ROUTES } from '@/lib/constants/routes';
+import { buildApprovalSla, type ApprovalSla } from '@/features/approvals/approval-sla';
 
 const REJECT_REASON_PRESETS = [
   'Missing required metadata.',
@@ -38,6 +39,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
   const ownerDisplay = doc
     ? (displayNames?.[doc.ownerId]?.displayName ?? doc.ownerDisplay ?? doc.ownerId ?? 'Unknown')
     : '';
+  const sla = doc ? buildApprovalSla(doc) : null;
 
   const approve = useApproveDocument(doc?.id ?? '');
   const reject = useRejectDocument(doc?.id ?? '');
@@ -164,7 +166,38 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
             </div>
           </div>
 
-          {/* Section 3: Tags */}
+          {/* Section 3: Assignment and SLA */}
+          {sla && (
+            <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
+              <div className="mb-3 flex items-center gap-1.5">
+                <ShieldCheck className="h-3.5 w-3.5" style={{ color: 'var(--text-faint)' }} />
+                <span className="text-[11px] font-medium uppercase tracking-wide" style={{ color: 'var(--text-faint)' }}>
+                  Assignment
+                </span>
+              </div>
+              <div className="rounded-xl border p-3" style={{ borderColor: 'var(--border-soft)', background: 'var(--bg-subtle)' }}>
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>
+                      {sla.assignment.label}
+                    </p>
+                    <p className="mt-1 text-xs leading-5" style={{ color: 'var(--text-muted)' }}>
+                      {sla.assignment.reason}
+                    </p>
+                  </div>
+                  <span className={`shrink-0 rounded-full px-2 py-1 text-xs font-semibold ${slaBadgeClass(sla.tone)}`}>
+                    {sla.stateLabel}
+                  </span>
+                </div>
+                <div className="mt-3 grid gap-2 text-xs sm:grid-cols-2">
+                  <ApprovalSlaMeta label="Queued" value={`${sla.queuedHours}h`} />
+                  <ApprovalSlaMeta label="Due" value={formatDateTime(sla.dueAt)} />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Section 4: Tags */}
           {doc.tags.length > 0 && (
             <div className="px-5 pt-4 pb-3 border-b" style={{ borderColor: 'var(--border-soft)' }}>
               <div className="flex items-center gap-1.5 mb-2.5">
@@ -190,12 +223,12 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
             </div>
           )}
 
-          {/* Section 4: Approval readiness */}
+          {/* Section 5: Approval readiness */}
           <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
             <DocumentApprovalReadinessCard document={doc} compact />
           </div>
 
-          {/* Section 5: Activity */}
+          {/* Section 6: Activity */}
           {history && history.length > 0 && (
             <div className="px-5 pt-4 pb-3">
               <div className="flex items-center gap-1.5 mb-3">
@@ -329,4 +362,29 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
       </ConfirmDialog>
     </>
   );
+}
+
+function ApprovalSlaMeta({ label, value }: { label: string; value: string }) {
+  return (
+    <div>
+      <p className="font-medium uppercase tracking-wide" style={{ color: 'var(--text-faint)' }}>
+        {label}
+      </p>
+      <p className="mt-0.5" style={{ color: 'var(--text-main)' }}>
+        {value}
+      </p>
+    </div>
+  );
+}
+
+function slaBadgeClass(tone: ApprovalSla['tone']): string {
+  if (tone === 'danger') {
+    return 'bg-red-50 text-red-700 ring-1 ring-red-200';
+  }
+
+  if (tone === 'warning') {
+    return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+  }
+
+  return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
 }

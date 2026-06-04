@@ -93,15 +93,17 @@ export function buildDemoEvidenceKit({
       role: 'approver/admin',
       state: 'ready',
       purpose:
-        'Show that approval is supported by readiness criteria, not only approve/reject buttons.',
+        'Show that approval is supported by assignment, SLA status, and readiness criteria, not only approve/reject buttons.',
       evidence: [
+        'Assignment lane and SLA status',
+        'Overdue/due-soon/on-time summary',
         'Readiness checklist in review drawer',
         'Attention reasons for missing metadata/DLP/retention',
         'Reject reason presets',
         'Workflow history context',
       ],
       reportCallout:
-        'Approvers get a runtime review aid before approving, while backend approval locking remains future work.',
+        'Approvers get runtime SLA triage and readiness aid before approving, while backend assignment locking remains future work.',
     },
     {
       key: 'notification-work-queue',
@@ -198,7 +200,7 @@ export function buildDemoEvidenceKit({
       route: '/approvals',
       role: 'approver/admin',
       outcome:
-        'Approver checks readiness, attention reasons, workflow history, and reject reason presets.',
+        'Approver checks assignment lane, SLA state, readiness, workflow history, and reject reason presets.',
       captureKeys: ['approval-readiness'],
     },
     {

@@ -28,6 +28,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
 - Documents/My Documents có smart workbench views, search/filter thương mại hơn: quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
 - Document detail/preview có metadata summary, evidence links và trạng thái preview rõ ràng theo policy/format.
+- Approvals có SLA summary, assignment lane, due status, filter/sort và drawer hiển thị SLA context.
 - Approval UX có readiness checklist, attention reasons và reject reason presets cho approver.
 - AI-ready guardrails xác định rõ metadata-safe và content-denied operations trước khi tích hợp LLM thật.
 - Access impact preview giúp thay đổi classification có cảnh báo trước khi submit.
@@ -55,6 +56,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.9 | Document detail/preview UX polish | Xong | `apps/web/src/features/documents/document-detail-presentation.ts`, `apps/web/src/components/documents/document-versions-card.tsx` |
 | W-P1.10 | Approval readiness UX | Xong | `apps/web/src/features/documents/document-approval-readiness.ts`, `apps/web/src/components/documents/document-approval-readiness-card.tsx` |
 | W-P1.11 | Web Runtime Evidence Demo Kit | Xong | `apps/web/src/features/demo/demo-evidence-kit.ts`, `apps/web/src/app/(app)/demo-kit/page.tsx` |
+| W-P1.12 | Approval SLA + Assignment runtime triage | Xong | `apps/web/src/features/approvals/approval-sla.ts`, `apps/web/src/components/common/approvals/approvals-table.tsx` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -950,6 +952,66 @@ pnpm --filter web lint
 pnpm --filter web build
 ```
 
+### 3.21. Approval SLA + Assignment runtime triage
+
+**Đã triển khai**
+
+- Approvals page có SLA summary:
+  - overdue
+  - due soon
+  - on time
+  - compliance review
+- Bảng approvals hiển thị:
+  - assignment lane
+  - assignment reason
+  - SLA state
+  - due time
+- Có filter theo SLA view:
+  - all
+  - overdue
+  - due soon
+  - on time
+- Có sort theo:
+  - priority
+  - due date
+  - queued time
+- Review drawer hiển thị assignment/SLA ngay trước readiness checklist.
+- SLA runtime deterministic:
+  - `SECRET`: 8h
+  - DLP detected: tối đa 12h
+  - `CONFIDENTIAL`: 24h
+  - `INTERNAL`: 48h
+  - `PUBLIC`: 72h
+
+**Ý nghĩa**
+
+- Approvals không còn là danh sách pending phẳng; approver có work queue để xử lý document theo mức khẩn cấp.
+- Assignment lane giúp giải thích vì sao tài liệu đi vào document approver, security approver, compliance review hoặc records reviewer.
+- Đây là runtime triage trên frontend từ dữ liệu queue hiện có, chưa claim backend assignment lock hoặc SLA enforcement production.
+
+**Cách sử dụng**
+
+1. Đăng nhập `approver1` hoặc `admin1`.
+2. Mở:
+
+```text
+http://localhost:3006/approvals
+```
+
+3. Xem SLA summary cards.
+4. Lọc `Overdue` / `Due soon` / `On time`.
+5. Sort theo priority, due date hoặc queued time.
+6. Mở một document để xem assignment/SLA trong drawer cùng readiness checklist.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- approval-sla.spec.ts
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
+
 ## 4. Hướng dẫn chạy local để demo các tính năng
 
 ### 4.1. Chuẩn bị
@@ -1108,7 +1170,7 @@ Sau đó mở `/audit` và verify chain.
 | New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, approval readiness, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
-| Approvals | `http://localhost:3006/approvals` | approver/admin | Review readiness checklist, approve/reject Pending document, chọn reject reason presets |
+| Approvals | `http://localhost:3006/approvals` | approver/admin | SLA summary/filter/sort, assignment lane, readiness checklist, approve/reject Pending document, chọn reject reason presets |
 | Notifications | `http://localhost:3006/notifications` | mọi role đăng nhập | Work queue, group filters, read/unread, target links |
 | Evidence | `http://localhost:3006/evidence` | compliance/admin | Export evidence manifest, recommendation packets, document packets |
 | Audit | `http://localhost:3006/audit` | compliance/admin | Query audit, quick filters, verify chain |
@@ -1122,7 +1184,7 @@ Sau đó mở `/audit` và verify chain.
 3. Tạo document mới, upload file bình thường.
 4. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
 5. Submit document.
-6. Đăng nhập `approver1`, mở `/approvals`, chỉ ra readiness checklist và reject reason presets, sau đó approve document.
+6. Đăng nhập `approver1`, mở `/approvals`, chỉ ra SLA summary/filter/sort, assignment lane, readiness checklist và reject reason presets, sau đó approve document.
 7. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
 8. Đăng nhập `viewer1`, mở document và download nếu policy cho phép.
 9. Trên document detail, chỉ ra metadata summary, Version History preview posture và evidence links nếu role có quyền.
@@ -1167,6 +1229,7 @@ Sau đó mở `/audit` và verify chain.
 - Document smart workbench/search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
 - Document detail/preview polish là UX/presentation layer: làm rõ metadata, policy denial và unsupported format; không claim là backend full-text preview engine.
 - Approval readiness là FE/runtime review aid cho approver; chưa claim là backend workflow lock hoặc approval state machine production.
+- Approval SLA + Assignment là runtime triage trên dữ liệu queue hiện có; chưa claim backend assignment lock, escalation engine hoặc SLA enforcement production.
 
 ## 9. Verification đã ghi nhận gần nhất
 
@@ -1203,6 +1266,12 @@ Ghi chú:
   - `pnpm --filter web lint`
   - `pnpm --filter web build`
   - `Invoke-WebRequest http://localhost:3006/demo-kit` trả `STATUS=200`.
+- Đợt verify web bổ sung cho Approval SLA + Assignment ngày 2026-06-04 đã chạy:
+  - `pnpm --filter web test -- approval-sla.spec.ts demo-evidence-kit.spec.ts demo-evidence-kit-panel.spec.ts document-approval-readiness.spec.ts document-approval-readiness-card.spec.ts document-filter-model.spec.ts evidence-center.spec.ts evidence-report.spec.ts notifications-center.spec.ts security-dashboard.spec.ts`
+  - `pnpm --filter web exec tsc --noEmit`
+  - `pnpm --filter web lint`
+  - `pnpm --filter web build`
+  - `Invoke-WebRequest http://localhost:3006/approvals` trả `STATUS=200`.
 - web lint pass với 0 error và còn 4 warning sẵn có.
 - git diff --check / browser smoke cho diff mới nhất nên chạy lại khi sandbox hoặc local runtime cho phép.
 - pnpm test:e2e cần local stack đang chạy.
@@ -1219,6 +1288,7 @@ Ghi chú:
 8. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
 9. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
 10. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
-11. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.
-12. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
-13. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
+11. Chụp Approval SLA trên `/approvals`: summary cards, filter/sort, assignment lane, due status và drawer SLA context.
+12. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.
+13. Nếu muốn claim AI thật, cần bổ sung LLM summarization/QA có enforcement policy; hiện tại nên claim là AI-ready.
+14. Nếu muốn production-like encryption, bổ sung Vault/KMS hoặc client-side encryption trong future work.
