@@ -49,6 +49,20 @@ export interface DocumentQuickViewOption {
   count: number;
 }
 
+export type DocumentSearchSuggestionKind =
+  | 'status'
+  | 'classification'
+  | 'tag'
+  | 'file'
+  | 'owner';
+
+export interface DocumentSearchSuggestion {
+  token: string;
+  label: string;
+  description: string;
+  kind: DocumentSearchSuggestionKind;
+}
+
 export const DEFAULT_DOCUMENT_FILTERS: DocumentFiltersState = {
   view: 'all',
   search: '',
@@ -191,6 +205,66 @@ export function buildDocumentFilterOptions(
         left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }),
       ),
   };
+}
+
+export function buildDocumentSearchSuggestions(
+  documents: DocumentListItem[],
+): DocumentSearchSuggestion[] {
+  const suggestions: DocumentSearchSuggestion[] = [];
+
+  if (documents.some((document) => document.status === 'PENDING')) {
+    suggestions.push({
+      token: 'status:pending',
+      label: 'status:pending',
+      description: 'Pending review queue',
+      kind: 'status',
+    });
+  }
+
+  if (documents.some((document) => document.classification === 'CONFIDENTIAL')) {
+    suggestions.push({
+      token: 'class:confidential',
+      label: 'class:confidential',
+      description: 'Confidential library',
+      kind: 'classification',
+    });
+  }
+
+  const preferredTag =
+    findFirstTag(documents, 'security') ?? findFirstTag(documents);
+  if (preferredTag) {
+    suggestions.push({
+      token: `tag:${quoteQueryTokenValue(preferredTag)}`,
+      label: `tag:${quoteQueryTokenValue(preferredTag)}`,
+      description: `${formatEnum(preferredTag)} folder`,
+      kind: 'tag',
+    });
+  }
+
+  const fileDocument = documents.find((document) => document.filename);
+  if (fileDocument?.filename) {
+    suggestions.push({
+      token: `file:${quoteQueryTokenValue(fileDocument.filename)}`,
+      label: `file:${quoteQueryTokenValue(fileDocument.filename)}`,
+      description: 'Latest file lookup',
+      kind: 'file',
+    });
+  }
+
+  const ownerDocument = documents.find(
+    (document) => document.ownerDisplay || document.ownerId,
+  );
+  const ownerLabel = ownerDocument?.ownerDisplay ?? ownerDocument?.ownerId;
+  if (ownerLabel) {
+    suggestions.push({
+      token: `owner:${quoteQueryTokenValue(ownerLabel)}`,
+      label: `owner:${quoteQueryTokenValue(ownerLabel)}`,
+      description: 'Owner handoff',
+      kind: 'owner',
+    });
+  }
+
+  return uniqueSearchSuggestions(suggestions).slice(0, 5);
 }
 
 export function countActiveDocumentFilters(
@@ -520,6 +594,39 @@ function formatEnum(value: string): string {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function findFirstTag(
+  documents: DocumentListItem[],
+  preferred?: string,
+): string | null {
+  for (const document of documents) {
+    for (const tag of document.tags) {
+      const normalizedTag = tag.trim();
+      if (!normalizedTag) continue;
+      if (!preferred || normalizedTag.toLowerCase() === preferred) {
+        return normalizedTag;
+      }
+    }
+  }
+
+  return null;
+}
+
+function quoteQueryTokenValue(value: string): string {
+  return /\s/.test(value) ? `"${value.replace(/"/g, '\\"')}"` : value;
+}
+
+function uniqueSearchSuggestions(
+  suggestions: DocumentSearchSuggestion[],
+): DocumentSearchSuggestion[] {
+  const seen = new Set<string>();
+  return suggestions.filter((suggestion) => {
+    const key = suggestion.token.toLowerCase();
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
 }
 
 function isDocumentStatus(value: string | null): value is DocumentStatus {

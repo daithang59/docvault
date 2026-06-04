@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
@@ -34,6 +34,10 @@ interface ApprovalReviewDrawerProps {
 export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps) {
   const [confirmType, setConfirmType] = useState<'approve' | 'reject' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
+  const panelRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const titleId = useId();
+  const descriptionId = useId();
 
   const { data: displayNames } = useOwnerDisplayNames(doc ? [doc.ownerId] : []);
   const ownerDisplay = doc
@@ -44,6 +48,34 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
   const approve = useApproveDocument(doc?.id ?? '');
   const reject = useRejectDocument(doc?.id ?? '');
   const { data: history } = useWorkflowHistory(doc?.id ?? '');
+  const documentId = doc?.id;
+
+  useEffect(() => {
+    if (!documentId) return;
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+    panelRef.current?.focus();
+
+    return () => {
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
+  }, [documentId]);
+
+  useEffect(() => {
+    if (!doc || confirmType) return;
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      onClose();
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [confirmType, doc, onClose]);
 
   async function handleApprove() {
     if (!doc) return;
@@ -74,6 +106,7 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
     <>
       {/* Backdrop */}
       <div
+        aria-hidden="true"
         className="fixed inset-0 z-40 cursor-default backdrop-blur-sm"
         onClick={onClose}
         style={{ background: 'rgba(0,0,0,0.3)' }}
@@ -81,6 +114,12 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
 
       {/* Panel */}
       <div
+        ref={panelRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={descriptionId}
+        tabIndex={-1}
         className="fixed right-0 top-0 z-50 flex h-full w-full max-w-md flex-col"
         style={{
           background: 'var(--bg-card)',
@@ -92,10 +131,15 @@ export function ApprovalReviewDrawer({ doc, onClose }: ApprovalReviewDrawerProps
           className="flex items-center justify-between px-5 py-4 border-b shrink-0"
           style={{ borderColor: 'var(--border-soft)' }}
         >
-          <h2 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>
+          <h2 id={titleId} className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>
             Review Document
           </h2>
+          <p id={descriptionId} className="sr-only">
+            Review {doc.title} approval context and workflow actions.
+          </p>
           <button
+            type="button"
+            aria-label="Close review drawer"
             onClick={onClose}
             className="flex h-7 w-7 items-center justify-center rounded-lg transition-colors"
             style={{ color: 'var(--text-muted)' }}

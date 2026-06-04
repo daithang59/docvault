@@ -608,6 +608,47 @@ test('approver approves a pending document and removes it from the approval queu
   await expect(page.getByText('Published').first()).toBeVisible();
 });
 
+test('approver rejects a pending document and removes it from the approval queue', async ({ page }) => {
+  await mockDocumentFlowApi(page, sessionFor('approver'));
+
+  await page.goto('/approvals');
+  await expect(page.getByRole('heading', { name: 'Approvals' })).toBeVisible();
+  await expect(page.getByText('Pending Review Packet')).toBeVisible();
+
+  await page.getByRole('button', { name: /Review/ }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Review Document' })).toBeVisible();
+  await page.getByRole('button', { name: 'Reject' }).last().click();
+  await expect(page.getByRole('heading', { name: 'Reject Document' })).toBeVisible();
+  await page
+    .getByPlaceholder('Rejection reason (optional)...')
+    .fill('Missing required metadata.');
+  await page.getByRole('button', { name: 'Reject' }).last().click();
+
+  await expect(page.getByText('No pending approvals')).toBeVisible();
+  await expect(page.getByText('Pending Review Packet')).toHaveCount(0);
+});
+
+test('admin can bulk-apply eligible document actions from the document table', async ({ page }) => {
+  await mockDocumentFlowApi(page, sessionFor('admin'));
+
+  await page.goto('/documents');
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+  await page.getByRole('checkbox', { name: 'Select all' }).check();
+
+  await expect(page.getByText('3 selected', { exact: true })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Approve (1)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Archive (1)' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Delete (1)' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Approve (1)' }).click();
+  await expect(page.getByText('3 selected', { exact: true })).toHaveCount(0);
+  await expect(
+    page
+      .locator('tr', { hasText: 'Pending Review Packet' })
+      .locator('[aria-label="Document status: Published"]'),
+  ).toBeVisible();
+});
+
 test('viewer only sees readable published documents and cannot open restricted files', async ({ page }) => {
   await mockDocumentFlowApi(page, sessionFor('viewer'));
 

@@ -56,11 +56,24 @@ describe('buildDocumentSavedViewOptions', () => {
 
     expect(options.map((option) => option.id)).toEqual([
       'saved-pending-review',
+      'saved-action-queue',
+      'saved-security-triage',
       'saved-sensitive-attention',
       'saved-draft-handoff',
       'saved-recently-published',
       'saved-confidential-library',
     ]);
+    expect(options.find((option) => option.id === 'saved-action-queue')).toMatchObject({
+      count: 2,
+      filters: expect.objectContaining({ view: 'needs-action' }),
+    });
+    expect(options.find((option) => option.id === 'saved-security-triage')).toMatchObject({
+      count: 1,
+      filters: expect.objectContaining({
+        view: 'pending-review',
+        search: 'tag:security',
+      }),
+    });
     expect(options.find((option) => option.id === 'saved-sensitive-attention')).toMatchObject({
       count: 2,
       filters: expect.objectContaining({ view: 'sensitive' }),

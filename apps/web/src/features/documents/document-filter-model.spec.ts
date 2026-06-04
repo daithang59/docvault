@@ -3,6 +3,7 @@ import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
+  buildDocumentSearchSuggestions,
   countActiveDocumentFilters,
   describeActiveDocumentFilters,
   filterAndSortDocuments,
@@ -196,6 +197,41 @@ describe('filterAndSortDocuments', () => {
 });
 
 describe('document filter metadata', () => {
+  it('builds query token suggestions from the current document set', () => {
+    expect(buildDocumentSearchSuggestions(documents)).toEqual([
+      {
+        token: 'status:pending',
+        label: 'status:pending',
+        description: 'Pending review queue',
+        kind: 'status',
+      },
+      {
+        token: 'class:confidential',
+        label: 'class:confidential',
+        description: 'Confidential library',
+        kind: 'classification',
+      },
+      {
+        token: 'tag:security',
+        label: 'tag:security',
+        description: 'Security folder',
+        kind: 'tag',
+      },
+      {
+        token: 'file:board-report.pdf',
+        label: 'file:board-report.pdf',
+        description: 'Latest file lookup',
+        kind: 'file',
+      },
+      {
+        token: 'owner:"Nguyen An"',
+        label: 'owner:"Nguyen An"',
+        description: 'Owner handoff',
+        kind: 'owner',
+      },
+    ]);
+  });
+
   it('builds unique owner/tag options and active chips', () => {
     const options = buildDocumentFilterOptions(documents);
 

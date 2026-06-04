@@ -4,10 +4,13 @@ import type { ComponentType } from 'react';
 import {
   Bookmark,
   ChevronDown,
+  Clock,
+  FileText,
   FolderOpen,
   RotateCcw,
   Save,
   Search,
+  Shield,
   SlidersHorizontal,
   Tag,
   Trash2,
@@ -22,6 +25,8 @@ import {
   type DocumentFilterOptions,
   type DocumentFiltersState,
   type DocumentQuickViewOption,
+  type DocumentSearchSuggestion,
+  type DocumentSearchSuggestionKind,
 } from '@/features/documents/document-filter-model';
 import type { DocumentSavedViewOption } from '@/features/documents/document-saved-views';
 import { cn } from '@/lib/utils/cn';
@@ -31,6 +36,7 @@ interface DocumentFiltersProps {
   filters: DocumentFiltersState;
   options: DocumentFilterOptions;
   quickViews: DocumentQuickViewOption[];
+  searchSuggestions?: DocumentSearchSuggestion[];
   savedViews?: DocumentSavedViewOption[];
   activeSavedViewId?: string | null;
   resultCount: number;
@@ -59,6 +65,7 @@ export function DocumentFilters({
   filters,
   options,
   quickViews,
+  searchSuggestions = [],
   savedViews = [],
   activeSavedViewId = null,
   resultCount,
@@ -80,6 +87,19 @@ export function DocumentFilters({
 
   function resetFilters() {
     onChange(DEFAULT_DOCUMENT_FILTERS);
+  }
+
+  function appendSearchToken(token: string) {
+    const currentSearch = filters.search.trim();
+    const nextSearch = currentSearch
+      ? `${currentSearch} ${token}`
+      : token;
+
+    if (currentSearch.toLowerCase().includes(token.toLowerCase())) {
+      return;
+    }
+
+    setField('search', nextSearch);
   }
 
   const activeChips = getActiveDocumentFilterChips(filters, options);
@@ -311,6 +331,35 @@ export function DocumentFilters({
         </button>
       </div>
 
+      {searchSuggestions.length > 0 ? (
+        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+          <div className="flex shrink-0 items-center gap-2">
+            <Search className="h-3.5 w-3.5 text-[var(--text-faint)]" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Query chips
+            </p>
+          </div>
+          <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:pb-0">
+            {searchSuggestions.map((suggestion) => {
+              const Icon = suggestionIcon(suggestion.kind);
+
+              return (
+                <button
+                  key={suggestion.token}
+                  type="button"
+                  title={suggestion.description}
+                  onClick={() => appendSearchToken(suggestion.token)}
+                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-muted)] px-2.5 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-main)]"
+                >
+                  <Icon className="h-3.5 w-3.5" />
+                  <span>{suggestion.label}</span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
+
       {hasFolders ? (
         <div className="mt-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
           <div className="mb-2 flex items-center gap-2">
@@ -424,4 +473,14 @@ function formatEnum(value: string): string {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function suggestionIcon(
+  kind: DocumentSearchSuggestionKind,
+): ComponentType<{ className?: string }> {
+  if (kind === 'status') return Clock;
+  if (kind === 'classification') return Shield;
+  if (kind === 'file') return FileText;
+  if (kind === 'owner') return User;
+  return Tag;
 }

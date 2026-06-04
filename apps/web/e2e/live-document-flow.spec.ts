@@ -129,6 +129,83 @@ test('live backend document upload, approval, and viewer access flow', async ({
   await expect(page.getByText('Failed to load document.')).toBeVisible();
 });
 
+test('live backend rejection returns a submitted document to draft for the owner', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+
+  const runId = Date.now();
+  const title = `Live Playwright Rejection ${runId}`;
+  const filename = `live-reject-${runId}.txt`;
+
+  const editorSession = await buildSession('editor1');
+  const approverSession = await buildSession('approver1');
+
+  await installSession(page, editorSession);
+  await page.goto('/documents/new');
+
+  await page.getByPlaceholder('Enter document title').fill(title);
+  await page
+    .getByPlaceholder('Brief description of this document...')
+    .fill('Live Playwright proof for rejection back to draft.');
+  await page.getByRole('button', { name: 'Internal' }).click();
+  await page
+    .getByPlaceholder('Type and press Enter to add tags...')
+    .fill('live-e2e-reject');
+  await page.keyboard.press('Enter');
+  await page.locator('input[type="file"]').setInputFiles({
+    name: filename,
+    mimeType: 'text/plain',
+    buffer: Buffer.from(`DocVault live rejection E2E ${runId}`),
+  });
+
+  const createResponsePromise = waitForApiResponse(
+    page,
+    /^\/api\/metadata\/documents$/,
+    'POST',
+  );
+  const uploadResponsePromise = waitForApiResponse(
+    page,
+    /^\/api\/documents\/[^/]+\/upload$/,
+    'POST',
+  );
+  await page.getByRole('button', { name: 'Save Draft' }).click();
+  const createResponse = await createResponsePromise;
+  if (!createResponse.ok()) {
+    uploadResponsePromise.catch(() => undefined);
+  }
+  await expectOkApiResponse(createResponse, 'create rejection document');
+  const createdDocument = (await createResponse.json()) as { id?: string };
+  const docId = createdDocument.id;
+  if (!docId) throw new Error('Create document response did not include an id.');
+
+  await expectOkApiResponse(await uploadResponsePromise, 'upload rejection file');
+  await expect(page).toHaveURL(new RegExp(`/documents/${escapeRegExp(docId)}$`));
+  await page.getByRole('button', { name: 'Submit for Approval' }).click();
+  await page.getByRole('button', { name: /^Submit$/ }).click();
+  await expectDocumentStatus(page, 'Pending');
+
+  await installSession(page, approverSession);
+  await page.goto(`/documents/${docId}`);
+  await page.getByRole('button', { name: 'Reject Document' }).click();
+  await page
+    .getByPlaceholder('Reason for rejection (optional)...')
+    .fill('Live rejection coverage.');
+  const rejectResponsePromise = waitForApiResponse(
+    page,
+    new RegExp(`^/api/workflow/${escapeRegExp(docId)}/reject$`),
+    'POST',
+  );
+  await page.getByRole('button', { name: /^Reject$/ }).click();
+  await expectOkApiResponse(await rejectResponsePromise, 'reject document');
+
+  await installSession(page, editorSession);
+  await page.goto(`/documents/${docId}`);
+  await expect(page.getByText(title)).toBeVisible();
+  await expectDocumentStatus(page, 'Draft');
+  await expect(page.getByRole('button', { name: 'Submit for Approval' })).toBeVisible();
+});
+
 async function buildSession(username: LiveUser) {
   const accessToken = await getAccessToken(username);
   const payload = parseJwt(accessToken);
@@ -207,7 +284,10 @@ async function installSession(
   }, session);
 }
 
-async function expectDocumentStatus(page: Page, label: 'Pending' | 'Published') {
+async function expectDocumentStatus(
+  page: Page,
+  label: 'Draft' | 'Pending' | 'Published',
+) {
   await expect(
     page.locator(`[aria-label="Document status: ${label}"]`),
   ).toBeVisible();

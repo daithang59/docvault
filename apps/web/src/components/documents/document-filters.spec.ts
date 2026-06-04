@@ -5,6 +5,7 @@ import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
+  buildDocumentSearchSuggestions,
 } from '@/features/documents/document-filter-model';
 import { buildDocumentSavedViewOptions } from '@/features/documents/document-saved-views';
 import type { DocumentListItem } from '@/features/documents/documents.types';
@@ -19,6 +20,7 @@ const documents: DocumentListItem[] = [
     ownerId: 'owner-1',
     currentVersion: 1,
     tags: ['finance'],
+    filename: 'board-report.pdf',
     createdAt: '2026-06-01T09:00:00.000Z',
     updatedAt: '2026-06-03T09:00:00.000Z',
   },
@@ -31,6 +33,7 @@ describe('DocumentFilters', () => {
         filters: DEFAULT_DOCUMENT_FILTERS,
         options: buildDocumentFilterOptions(documents),
         quickViews: buildDocumentQuickViewOptions(documents),
+        searchSuggestions: buildDocumentSearchSuggestions(documents),
         savedViews: buildDocumentSavedViewOptions(documents),
         activeSavedViewId: null,
         resultCount: documents.length,
@@ -48,7 +51,10 @@ describe('DocumentFilters', () => {
     expect(html).toContain('Name current view');
     expect(html).toContain('Document quick views');
     expect(html).toContain('Smart folders');
-    expect(html).toContain('Search syntax');
+    expect(html).toContain('Query chips');
+    expect(html).toContain('status:pending');
+    expect(html).toContain('class:confidential');
+    expect(html).toContain('file:board-report.pdf');
     expect(html).toContain('Folder: finance');
   });
 });

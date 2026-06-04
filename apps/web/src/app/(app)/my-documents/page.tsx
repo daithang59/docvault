@@ -14,6 +14,7 @@ import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
+  buildDocumentSearchSuggestions,
   countActiveDocumentFilters,
   describeActiveDocumentFilters,
   filterAndSortDocuments,
@@ -104,6 +105,10 @@ export default function MyDocumentsPage() {
   );
   const quickViews = useMemo(
     () => buildDocumentQuickViewOptions(ownedDocuments),
+    [ownedDocuments],
+  );
+  const searchSuggestions = useMemo(
+    () => buildDocumentSearchSuggestions(ownedDocuments),
     [ownedDocuments],
   );
   const savedViews = useMemo(
@@ -263,6 +268,7 @@ export default function MyDocumentsPage() {
           filters={filters}
           options={filterOptions}
           quickViews={quickViews}
+          searchSuggestions={searchSuggestions}
           savedViews={savedViews}
           activeSavedViewId={activeSavedViewId}
           resultCount={filtered.length}

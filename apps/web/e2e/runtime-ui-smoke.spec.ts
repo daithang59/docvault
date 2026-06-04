@@ -228,6 +228,22 @@ async function screenshot(page: Page, testFile: string, filename: string) {
     'screenshots',
   );
   mkdirSync(outputDir, { recursive: true });
+  await page.addStyleTag({
+    content: `
+      *, *::before, *::after {
+        animation-delay: 0s !important;
+        animation-duration: 0s !important;
+        transition-delay: 0s !important;
+        transition-duration: 0s !important;
+        scroll-behavior: auto !important;
+      }
+    `,
+  });
+  await page.evaluate(async () => {
+    await Promise.allSettled(
+      document.getAnimations().map((animation) => animation.finished),
+    );
+  });
   await page.screenshot({
     path: path.join(outputDir, filename),
     fullPage: true,
@@ -256,10 +272,17 @@ test('documents page supports built-in and custom saved views', async ({ page },
 
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
   await expect(page.getByText('Saved views')).toBeVisible();
+  await expect(page.getByText('Query chips')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'tag:security' })).toBeVisible();
   await expect(page.getByText('Smart folders')).toBeVisible();
   await expect(page.getByRole('button', { name: /Folder: security/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Sensitive attention/ })).toBeVisible();
   await expect(page.getByText('Incident Export')).toBeVisible();
+
+  await page.getByRole('button', { name: 'tag:security' }).click();
+  await expect(page).toHaveURL(/q=tag%3Asecurity/);
+  await expect(page.getByText('Incident Export')).toBeVisible();
+  await expect(page.getByText('Board Report')).not.toBeVisible();
 
   await page.getByLabel('Search documents').fill('status:pending tag:security incident');
   await expect(page).toHaveURL(/q=status%3Apending\+tag%3Asecurity\+incident/);
@@ -351,14 +374,30 @@ test('approvals page renders SLA queue and review drawer context', async ({ page
 
   await page.getByRole('button', { name: /Review/ }).first().click();
 
+  const drawer = page.getByRole('dialog', { name: 'Review Document' });
+  await expect(drawer).toBeVisible();
+  await expect(drawer).toHaveAttribute('aria-modal', 'true');
+  await expect(page.getByRole('button', { name: 'Close review drawer' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Review Document' })).toBeVisible();
   await expect(page.getByText('Approval readiness')).toBeVisible();
   await expect(page.getByText('DLP findings need review before approval.').last()).toBeVisible();
 
+  await page.keyboard.press('Escape');
+  await expect(drawer).toBeHidden();
+
+  await page.getByRole('button', { name: /Review/ }).first().click();
+  await expect(page.getByRole('dialog', { name: 'Review Document' })).toBeVisible();
   await page.getByRole('button', { name: 'Reject' }).click();
-  await expect(page.getByRole('heading', { name: 'Reject Document' })).toBeVisible();
+  const rejectDialog = page.getByRole('dialog', { name: 'Reject Document' });
+  await expect(rejectDialog).toBeVisible();
+  await expect(rejectDialog).toHaveAttribute('aria-modal', 'true');
+  await expect(page.getByPlaceholder('Rejection reason (optional)...')).toBeFocused();
   await expect(page.getByRole('button', { name: 'Classification needs review.' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Retention evidence is incomplete.' })).toBeVisible();
+
+  await page.keyboard.press('Escape');
+  await expect(rejectDialog).toBeHidden();
+  await expect(page.getByRole('dialog', { name: 'Review Document' })).toBeVisible();
 
   await screenshot(page, testInfo.file, 'approvals-sla-readiness-playwright.png');
 });

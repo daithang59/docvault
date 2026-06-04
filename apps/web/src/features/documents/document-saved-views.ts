@@ -36,6 +36,27 @@ export const BUILT_IN_DOCUMENT_SAVED_VIEWS: DocumentSavedView[] = [
     },
   },
   {
+    id: 'saved-action-queue',
+    label: 'Action queue',
+    description: 'Drafts and pending items that need the next lifecycle action.',
+    source: 'built-in',
+    filters: {
+      ...DEFAULT_DOCUMENT_FILTERS,
+      view: 'needs-action',
+    },
+  },
+  {
+    id: 'saved-security-triage',
+    label: 'Security triage',
+    description: 'Pending security-tagged documents needing focused review.',
+    source: 'built-in',
+    filters: {
+      ...DEFAULT_DOCUMENT_FILTERS,
+      view: 'pending-review',
+      search: 'tag:security',
+    },
+  },
+  {
     id: 'saved-sensitive-attention',
     label: 'Sensitive attention',
     description: 'Confidential, secret, or DLP-detected documents.',
