@@ -1,3 +1,5 @@
+import groovy.json.JsonSlurperClassic
+
 def call(Map cfg = [:]) {
     echo '>>> Running SAST Scan (SonarQube)...'
 
@@ -76,14 +78,86 @@ def call(Map cfg = [:]) {
                 -Dsonar.scanner.skipJreProvisioning=true \\
                 ${extraArgs}
         """
-    }
-
-    if (enforceQG) {
-        echo '>>> Waiting for SonarQube Quality Gate...'
-        timeout(time: qgTimeoutMinutes, unit: 'MINUTES') {
-            waitForQualityGate abortPipeline: true
+        if (enforceQG) {
+            pollQualityGateFromReport(qgTimeoutMinutes)
         }
     }
+}
+
+def pollQualityGateFromReport(int qgTimeoutMinutes) {
+    echo '>>> Waiting for SonarQube Quality Gate...'
+
+    if (!fileExists('.scannerwork/report-task.txt')) {
+        error('SonarQube report-task.txt was not found. The scanner did not publish task metadata for quality gate polling.')
+    }
+
+    def taskProps = readSonarReportTask('.scannerwork/report-task.txt')
+    def ceTaskId = taskProps.ceTaskId
+    def serverUrl = taskProps.serverUrl?.replaceAll('/+$', '')
+
+    if (!ceTaskId || !serverUrl) {
+        error('SonarQube report-task.txt is missing ceTaskId or serverUrl.')
+    }
+
+    timeout(time: qgTimeoutMinutes, unit: 'MINUTES') {
+        waitUntil {
+            def taskJson = sonarApiGet("${serverUrl}/api/ce/task?id=${ceTaskId}")
+            def task = new JsonSlurperClassic().parseText(taskJson).task
+            def status = task.status
+
+            if (status in ['PENDING', 'IN_PROGRESS']) {
+                echo ">>> SonarQube analysis task status: ${status}"
+                sleep time: 10, unit: 'SECONDS'
+                return false
+            }
+
+            if (status != 'SUCCESS') {
+                error("SonarQube analysis task ended with status ${status}.")
+            }
+
+            def analysisId = task.analysisId
+            if (!analysisId) {
+                error('SonarQube analysis task succeeded but did not return analysisId.')
+            }
+
+            def qualityGateJson = sonarApiGet("${serverUrl}/api/qualitygates/project_status?analysisId=${analysisId}")
+            def qualityGate = new JsonSlurperClassic().parseText(qualityGateJson).projectStatus
+            def qualityGateStatus = qualityGate.status
+
+            echo ">>> SonarQube Quality Gate status: ${qualityGateStatus}"
+            if (qualityGateStatus != 'OK') {
+                error("SonarQube Quality Gate failed with status ${qualityGateStatus}.")
+            }
+
+            return true
+        }
+    }
+}
+
+Map readSonarReportTask(String reportPath) {
+    def props = [:]
+
+    readFile(reportPath).split('\n').each { line ->
+        def trimmed = line.trim()
+        if (!trimmed || trimmed.startsWith('#') || !trimmed.contains('=')) {
+            return
+        }
+
+        def index = trimmed.indexOf('=')
+        props[trimmed.substring(0, index)] = trimmed.substring(index + 1)
+    }
+
+    return props
+}
+
+String sonarApiGet(String url) {
+    return sh(
+        script: """
+            set +x
+            curl -fsS -u "\${SONAR_AUTH_TOKEN}:" '${url}'
+        """,
+        returnStdout: true
+    ).trim()
 }
 
 List sonarHostCandidates(Map cfg, String hostOverride) {

@@ -13,6 +13,14 @@ def call() {
 node_modules
 .turbo
 .next
+**/.terraform
+**/*.tfstate
+**/*.tfstate.*
+**/*.tfvars
+**/tfplan
+**/*.tfplan
+**/*-secret.json
+**/*.kubeconfig
 EOF
 
             echo ">>> Scanning repository for leaked secrets..."
