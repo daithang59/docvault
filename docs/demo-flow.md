@@ -36,7 +36,7 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 - Web app login page on EKS.
 - Successful Keycloak login.
 - Demo Kit page showing web runtime scope, screenshot targets, presenter flow, and markdown export.
-- Document smart workbench quick views with active chips, counts, and URL query state.
+- Document smart workbench saved views, quick views, active chips, counts, and URL query state.
 - Document detail metadata summary, evidence links, and version preview posture.
 - Approval SLA summary, assignment lane, due status, and sort/filter controls.
 - Approval readiness checklist in document detail and Approvals review drawer.
@@ -83,9 +83,10 @@ For the official demo, use Keycloak login rather than local demo-login mode.
 7. Open preview.
 8. Expected result: the uploaded file preview renders through the EKS gateway route, or the version row explains why the format is unsupported.
 9. Return to **Documents**.
-10. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**.
-11. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
-12. Expected result: quick-view counts, result count, URL query state, active chips and table rows update together.
+10. Apply saved views such as **Pending review**, **Sensitive attention**, or save the current filter as a custom view.
+11. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**.
+12. Search for `finance`, filter by classification/status/tag/owner, then clear active chips.
+13. Expected result: saved-view counts, quick-view counts, result count, URL query state, active chips and table rows update together.
 
 ---
 
@@ -244,9 +245,10 @@ Navigate to: **http://localhost:3100**
 6. Check **Metadata summary** and **Version History** preview posture
 7. ✅ Summary should show owner/status/classification/retention/current version/checksum/content type without object keys
 8. Return to **Documents**
-9. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**
-10. Search `finance`, set status/classification/tag/owner filters, and change sort
-11. ✅ Quick-view counts, active chips and URL query params should reflect the selected workbench state
+9. Apply saved views such as **Pending review**, **Sensitive attention**, or save the current filter as a custom view
+10. Switch quick views such as **Needs action**, **Pending review**, **Published**, or **Sensitive**
+11. Search `finance`, set status/classification/tag/owner filters, and change sort
+12. ✅ Saved-view counts, quick-view counts, active chips and URL query params should reflect the selected workbench state
 
 ---
 

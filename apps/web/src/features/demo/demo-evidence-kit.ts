@@ -59,15 +59,16 @@ export function buildDemoEvidenceKit({
       role: 'editor/admin',
       state: 'ready',
       purpose:
-        'Show commercial document discovery with quick views, active chips, filters, and URL state.',
+        'Show commercial document discovery with saved views, quick views, active chips, filters, and URL state.',
       evidence: [
+        'Built-in and custom saved views',
         'Quick views with counts',
         'Owner/tag/status/classification filters',
         'Active chips and reset action',
         'Stable URL query state',
       ],
       reportCallout:
-        'DocVault is no longer a basic upload list; it has an operational workbench for repeated document review.',
+        'DocVault is no longer a basic upload list; it has reusable workbench views for repeated document review.',
     },
     {
       key: 'document-detail',

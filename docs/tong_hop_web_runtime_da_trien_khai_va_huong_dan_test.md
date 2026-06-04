@@ -26,7 +26,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 - Evidence Center gom audit-chain, recommendation packet, document packet và retention evidence thành workspace compliance riêng.
 - Demo Kit gom screenshot targets, presenter flow, scope note và markdown export để trình bày bằng chứng Web runtime.
 - Notification Center có work queue đầy đủ cho approvals, retention, security và document events, kèm read/unread filter và target links.
-- Documents/My Documents có smart workbench views, search/filter thương mại hơn: quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
+- Documents/My Documents có smart workbench views, search/filter thương mại hơn: saved views, quick views, owner, tag, status, classification, sort, reset, active chips và URL query state.
 - Document detail/preview có metadata summary, evidence links và trạng thái preview rõ ràng theo policy/format.
 - Approvals có SLA summary, assignment lane, due status, filter/sort và drawer hiển thị SLA context.
 - Approval UX có readiness checklist, attention reasons và reject reason presets cho approver.
@@ -57,6 +57,7 @@ DocVault đã được nâng cấp từ một web app quản lý tài liệu có
 | W-P1.10 | Approval readiness UX | Xong | `apps/web/src/features/documents/document-approval-readiness.ts`, `apps/web/src/components/documents/document-approval-readiness-card.tsx` |
 | W-P1.11 | Web Runtime Evidence Demo Kit | Xong | `apps/web/src/features/demo/demo-evidence-kit.ts`, `apps/web/src/app/(app)/demo-kit/page.tsx` |
 | W-P1.12 | Approval SLA + Assignment runtime triage | Xong | `apps/web/src/features/approvals/approval-sla.ts`, `apps/web/src/components/common/approvals/approvals-table.tsx` |
+| W-P1.13 | Document Saved Views workbench | Xong | `apps/web/src/features/documents/document-saved-views.ts`, `apps/web/src/components/documents/document-filters.tsx` |
 | W-P2.1 | Shared auth/contracts | Một phần lớn | `@docvault/auth/rbac`, OpenAPI gateway contract |
 | W-P3 | AI-ready / future security intelligence | AI-ready đã mạnh, chưa có LLM thật | AI guardrails, access impact, risk scoring, anomaly, recommendation |
 
@@ -1012,6 +1013,58 @@ pnpm --filter web lint
 pnpm --filter web build
 ```
 
+### 3.22. Document Saved Views workbench
+
+**Đã triển khai**
+
+- Documents và My Documents có vùng `Saved views`.
+- Built-in saved views:
+  - Pending review
+  - Sensitive attention
+  - Draft handoff
+  - Recently published
+  - Confidential library
+- Người dùng có thể đặt tên và lưu filter hiện tại thành custom saved view.
+- Custom saved views được lưu localStorage bằng key `docvault.documents.savedViews`.
+- Saved views tái sử dụng filter model hiện có, gồm:
+  - quick view
+  - search
+  - status
+  - classification
+  - owner
+  - tag
+  - sort
+- Custom saved views không lưu document content, object key, token hoặc dữ liệu file.
+
+**Ý nghĩa**
+
+- Documents không chỉ có filter một lần; người dùng có thể quay lại các work queue quen thuộc như `Sensitive attention` hoặc `Pending review`.
+- Đây là nâng cấp UX giống các document/work management tools thương mại: saved work queues, repeatable review views và nhanh hơn khi demo.
+- Hiện tại là FE/runtime saved view bằng localStorage; chưa claim backend user preferences hoặc shared team views production.
+
+**Cách sử dụng**
+
+1. Mở:
+
+```text
+http://localhost:3006/documents
+```
+
+2. Chọn một saved view built-in.
+3. Tạo filter riêng, ví dụ search/tag/classification/sort.
+4. Nhập tên tại `Name current view...` rồi bấm `Save`.
+5. Chọn saved view vừa lưu để áp lại filter.
+6. Bấm biểu tượng xóa trên custom saved view nếu muốn xóa.
+
+**Cách test**
+
+```bash
+pnpm --filter web test -- document-saved-views.spec.ts document-filters.spec.ts document-filter-model.spec.ts
+pnpm --filter web exec tsc --noEmit
+pnpm --filter web lint
+pnpm --filter web build
+```
+
 ## 4. Hướng dẫn chạy local để demo các tính năng
 
 ### 4.1. Chuẩn bị
@@ -1166,7 +1219,7 @@ Sau đó mở `/audit` và verify chain.
 | Trang | URL local | Role nên dùng | Kiểm tra |
 |---|---|---|---|
 | Demo Kit | `http://localhost:3006/demo-kit` | compliance/admin | Web runtime scope, screenshot targets, presenter flow, copy/download markdown |
-| Documents | `http://localhost:3006/documents` | viewer/editor/admin | Smart workbench quick views, commercial search/filter, active chips, URL query state, preview/download button policy |
+| Documents | `http://localhost:3006/documents` | viewer/editor/admin | Smart workbench saved views, quick views, commercial search/filter, active chips, URL query state, preview/download button policy |
 | New Document | `http://localhost:3006/documents/new` | editor/admin | Tạo document và upload file |
 | Document Detail | `http://localhost:3006/documents/:id` | editor/approver/co/admin | Metadata summary, approval readiness, version preview posture, policy denial reason, evidence links, DLP evidence, AI guardrails, evidence packet |
 | Document Edit | `http://localhost:3006/documents/:id/edit` | owner editor/admin | Access impact preview khi đổi classification |
@@ -1182,7 +1235,7 @@ Sau đó mở `/audit` và verify chain.
 1. Đăng nhập `co1` hoặc `admin1`, mở `/demo-kit`, chỉ ra Web runtime scope, screenshot targets, presenter flow và markdown export.
 2. Đăng nhập `editor1`.
 3. Tạo document mới, upload file bình thường.
-4. Vào `/documents`, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
+4. Vào `/documents`, chọn saved views `Pending review` / `Sensitive attention`, lưu một custom saved view, chuyển quick views `Needs action` / `Pending review` / `Sensitive`, search theo `finance`, lọc status/classification/tag/owner, chỉ ra count, active chips và URL query state.
 5. Submit document.
 6. Đăng nhập `approver1`, mở `/approvals`, chỉ ra SLA summary/filter/sort, assignment lane, readiness checklist và reject reason presets, sau đó approve document.
 7. Mở bell topbar hoặc `/notifications`, lọc `Approvals` / `Unread`, bấm target link và `Mark read`.
@@ -1227,6 +1280,7 @@ Sau đó mở `/audit` và verify chain.
 - Demo Kit là presentation/checklist utility cho Web runtime evidence; nó không thay thế Evidence Center và không claim DevSecOps pipeline evidence.
 - Notification Center là runtime work queue trong web app, không phải alerting/DevSecOps pipeline; nó gom workflow/retention/security/document events thành danh sách hành động có read state và target links.
 - Document smart workbench/search/filter hiện là frontend workbench trên document list đã tải; chưa claim là enterprise search engine hay full-text indexing backend.
+- Document Saved Views hiện là FE/runtime user preference bằng localStorage; chưa claim backend shared views hoặc team-level saved search production.
 - Document detail/preview polish là UX/presentation layer: làm rõ metadata, policy denial và unsupported format; không claim là backend full-text preview engine.
 - Approval readiness là FE/runtime review aid cho approver; chưa claim là backend workflow lock hoặc approval state machine production.
 - Approval SLA + Assignment là runtime triage trên dữ liệu queue hiện có; chưa claim backend assignment lock, escalation engine hoặc SLA enforcement production.
@@ -1272,6 +1326,12 @@ Ghi chú:
   - `pnpm --filter web lint`
   - `pnpm --filter web build`
   - `Invoke-WebRequest http://localhost:3006/approvals` trả `STATUS=200`.
+- Đợt verify web bổ sung cho Document Saved Views ngày 2026-06-04 đã chạy:
+  - `pnpm --filter web test -- document-saved-views.spec.ts document-filters.spec.ts document-filter-model.spec.ts demo-evidence-kit.spec.ts demo-evidence-kit-panel.spec.ts approval-sla.spec.ts document-approval-readiness.spec.ts document-approval-readiness-card.spec.ts evidence-center.spec.ts evidence-report.spec.ts notifications-center.spec.ts security-dashboard.spec.ts`
+  - `pnpm --filter web exec tsc --noEmit`
+  - `pnpm --filter web lint`
+  - `pnpm --filter web build`
+  - `Invoke-WebRequest http://localhost:3006/documents` trả `STATUS=200`.
 - web lint pass với 0 error và còn 4 warning sẵn có.
 - git diff --check / browser smoke cho diff mới nhất nên chạy lại khi sandbox hoặc local runtime cho phép.
 - pnpm test:e2e cần local stack đang chạy.
@@ -1286,7 +1346,7 @@ Ghi chú:
 6. Chụp Evidence Bundle Builder: chọn nhiều packet, export bundle manifest và Evidence Report HTML, chỉ ra checklist/counts.
 7. Chụp Evidence Case Presentation tab: readiness status, audit-chain posture, retention posture, recommendation timeline và document packet list.
 8. Chụp `/notifications`: summary cards, group filter, unread filter, mark-read action và target link sang Approvals/Security/Retention/Audit/Document.
-9. Chụp `/documents`: quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
+9. Chụp `/documents`: saved views built-in/custom, quick views có count, owner/tag/status/classification filters, active chips, reset action và URL query state.
 10. Chụp document detail với tài khoản `co1`: reason preview/download bị chặn và evidence links sang các workspace compliance.
 11. Chụp Approval SLA trên `/approvals`: summary cards, filter/sort, assignment lane, due status và drawer SLA context.
 12. Chụp Approval readiness trên document detail và `/approvals`: checklist trong drawer, attention reasons và reject reason presets.

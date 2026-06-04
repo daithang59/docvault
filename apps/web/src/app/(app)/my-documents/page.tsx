@@ -21,6 +21,15 @@ import {
   serializeDocumentFiltersToSearchParams,
   type DocumentFiltersState,
 } from '@/features/documents/document-filter-model';
+import {
+  DOCUMENT_SAVED_VIEWS_STORAGE_KEY,
+  buildDocumentSavedViewOptions,
+  createCustomDocumentSavedView,
+  findMatchingDocumentSavedViewId,
+  parseCustomDocumentSavedViews,
+  serializeCustomDocumentSavedViews,
+  type DocumentSavedView,
+} from '@/features/documents/document-saved-views';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -42,6 +51,9 @@ export default function MyDocumentsPage() {
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
+  const [customSavedViews, setCustomSavedViews] = useState<DocumentSavedView[]>(
+    () => loadCustomDocumentSavedViews(),
+  );
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
@@ -93,6 +105,14 @@ export default function MyDocumentsPage() {
   const quickViews = useMemo(
     () => buildDocumentQuickViewOptions(ownedDocuments),
     [ownedDocuments],
+  );
+  const savedViews = useMemo(
+    () => buildDocumentSavedViewOptions(ownedDocuments, customSavedViews),
+    [ownedDocuments, customSavedViews],
+  );
+  const activeSavedViewId = useMemo(
+    () => findMatchingDocumentSavedViewId(savedViews, filters),
+    [savedViews, filters],
   );
   const filtered = useMemo(
     () => filterAndSortDocuments(ownedDocuments, filters),
@@ -195,6 +215,27 @@ export default function MyDocumentsPage() {
     setPage(1);
   }
 
+  function persistCustomSavedViews(nextViews: DocumentSavedView[]) {
+    setCustomSavedViews(nextViews);
+    window.localStorage.setItem(
+      DOCUMENT_SAVED_VIEWS_STORAGE_KEY,
+      serializeCustomDocumentSavedViews(nextViews),
+    );
+  }
+
+  function handleSaveCurrentView(label: string) {
+    const nextView = createCustomDocumentSavedView(label, filters);
+    const nextViews = [...customSavedViews, nextView].slice(-8);
+    persistCustomSavedViews(nextViews);
+    toast.success(`Saved view "${nextView.label}".`);
+  }
+
+  function handleDeleteSavedView(id: string) {
+    const nextViews = customSavedViews.filter((view) => view.id !== id);
+    persistCustomSavedViews(nextViews);
+    toast.success('Saved view removed.');
+  }
+
   return (
     <div>
       <div className="animate-in delay-1">
@@ -222,8 +263,16 @@ export default function MyDocumentsPage() {
           filters={filters}
           options={filterOptions}
           quickViews={quickViews}
+          savedViews={savedViews}
+          activeSavedViewId={activeSavedViewId}
           resultCount={filtered.length}
           totalCount={ownedDocuments.length}
+          onApplySavedView={(view) => {
+            setFilters(view.filters);
+            setPage(1);
+          }}
+          onSaveCurrentView={handleSaveCurrentView}
+          onDeleteSavedView={handleDeleteSavedView}
           onChange={(nextFilters) => {
             setFilters(nextFilters);
             setPage(1);
@@ -325,5 +374,12 @@ export default function MyDocumentsPage() {
         onConfirm={() => handleAction('delete')}
       />
     </div>
+  );
+}
+
+function loadCustomDocumentSavedViews(): DocumentSavedView[] {
+  if (typeof window === 'undefined') return [];
+  return parseCustomDocumentSavedViews(
+    window.localStorage.getItem(DOCUMENT_SAVED_VIEWS_STORAGE_KEY),
   );
 }

@@ -2,11 +2,14 @@
 
 import type { ComponentType } from 'react';
 import {
+  Bookmark,
   ChevronDown,
   RotateCcw,
+  Save,
   Search,
   SlidersHorizontal,
   Tag,
+  Trash2,
   User,
   X,
 } from 'lucide-react';
@@ -19,15 +22,22 @@ import {
   type DocumentFiltersState,
   type DocumentQuickViewOption,
 } from '@/features/documents/document-filter-model';
+import type { DocumentSavedViewOption } from '@/features/documents/document-saved-views';
 import { cn } from '@/lib/utils/cn';
+import { useState } from 'react';
 
 interface DocumentFiltersProps {
   filters: DocumentFiltersState;
   options: DocumentFilterOptions;
   quickViews: DocumentQuickViewOption[];
+  savedViews?: DocumentSavedViewOption[];
+  activeSavedViewId?: string | null;
   resultCount: number;
   totalCount: number;
   onChange: (filters: DocumentFiltersState) => void;
+  onApplySavedView?: (view: DocumentSavedViewOption) => void;
+  onSaveCurrentView?: (label: string) => void;
+  onDeleteSavedView?: (id: string) => void;
 }
 
 const STATUSES: DocumentStatus[] = ['DRAFT', 'PENDING', 'PUBLISHED', 'ARCHIVED', 'DELETED'];
@@ -48,10 +58,17 @@ export function DocumentFilters({
   filters,
   options,
   quickViews,
+  savedViews = [],
+  activeSavedViewId = null,
   resultCount,
   totalCount,
   onChange,
+  onApplySavedView,
+  onSaveCurrentView,
+  onDeleteSavedView,
 }: DocumentFiltersProps) {
+  const [savedViewName, setSavedViewName] = useState('');
+
   function setField<K extends keyof DocumentFiltersState>(key: K, value: DocumentFiltersState[K]) {
     onChange({ ...filters, [key]: value });
   }
@@ -66,6 +83,7 @@ export function DocumentFilters({
 
   const activeChips = getActiveDocumentFilterChips(filters, options);
   const hasActiveFilters = activeChips.length > 0;
+  const canSaveView = Boolean(savedViewName.trim() && onSaveCurrentView);
 
   return (
     <div
@@ -86,6 +104,96 @@ export function DocumentFilters({
           Showing {resultCount} of {totalCount} documents
         </p>
       </div>
+
+      {savedViews.length > 0 || onSaveCurrentView ? (
+        <div className="mb-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+          <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex items-center gap-2">
+              <Bookmark className="h-4 w-4 text-[var(--text-faint)]" />
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Saved views
+              </p>
+            </div>
+            {onSaveCurrentView ? (
+              <div className="flex w-full gap-2 lg:w-auto">
+                <input
+                  value={savedViewName}
+                  onChange={(event) => setSavedViewName(event.target.value)}
+                  placeholder="Name current view..."
+                  aria-label="Saved view name"
+                  className="h-9 min-w-0 flex-1 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)] lg:w-52"
+                />
+                <button
+                  type="button"
+                  disabled={!canSaveView}
+                  onClick={() => {
+                    const label = savedViewName.trim();
+                    if (!label) return;
+                    onSaveCurrentView?.(label);
+                    setSavedViewName('');
+                  }}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  <Save className="h-3.5 w-3.5" />
+                  Save
+                </button>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {savedViews.map((view) => {
+              const active = activeSavedViewId === view.id;
+
+              return (
+                <div
+                  key={view.id}
+                  className={cn(
+                    'inline-flex h-10 shrink-0 items-center overflow-hidden rounded-xl border transition',
+                    active
+                      ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
+                      : 'border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-muted)]',
+                  )}
+                >
+                  <button
+                    type="button"
+                    title={view.description}
+                    onClick={() => onApplySavedView?.(view)}
+                    className="inline-flex h-full items-center gap-2 px-3 text-xs font-semibold"
+                  >
+                    <span>{view.label}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-1.5 py-0.5 text-[10px]',
+                        active
+                          ? 'bg-white/20 text-white'
+                          : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
+                      )}
+                    >
+                      {view.count}
+                    </span>
+                  </button>
+                  {view.source === 'custom' && onDeleteSavedView ? (
+                    <button
+                      type="button"
+                      aria-label={`Delete saved view ${view.label}`}
+                      onClick={() => onDeleteSavedView(view.id)}
+                      className={cn(
+                        'flex h-full w-8 items-center justify-center border-l transition',
+                        active
+                          ? 'border-white/20 text-white hover:bg-white/10'
+                          : 'border-[var(--border-soft)] text-[var(--text-faint)] hover:bg-[var(--bg-muted)] hover:text-[var(--state-error-text)]',
+                      )}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  ) : null}
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Document quick views">
         {quickViews.map((view) => {
