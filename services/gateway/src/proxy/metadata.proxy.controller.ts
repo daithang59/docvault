@@ -21,13 +21,20 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
 
-const EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS = [
+const EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES = [
   'fileContent',
   'objectKey',
   'storagePath',
   'presignedUrl',
   'grantToken',
   'downloadToken',
+] as const;
+
+const EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS = [
+  'file-payload',
+  'storage-reference',
+  'direct-download-link',
+  'temporary-access-grant',
 ] as const;
 
 @ApiTags('metadata-proxy')
@@ -479,6 +486,6 @@ function sanitizeEvidencePacket(value: unknown): unknown {
 
 function isExcludedEvidenceField(key: string): boolean {
   return (
-    EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS as readonly string[]
+    EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES as readonly string[]
   ).includes(key);
 }

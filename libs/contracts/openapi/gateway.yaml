@@ -598,7 +598,7 @@ components:
         excludedSensitiveFields:
           type: array
           items: { type: string }
-          example: [fileContent, objectKey, storagePath, presignedUrl, grantToken, downloadToken]
+          example: [file-payload, storage-reference, direct-download-link, temporary-access-grant]
         generatedBy:
           type: object
           properties:

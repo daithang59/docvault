@@ -230,7 +230,7 @@ export function DocumentFilters({
         })}
       </div>
 
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-[minmax(220px,1fr)_repeat(5,minmax(150px,auto))_auto]">
+      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(240px,1fr)_repeat(5,minmax(140px,auto))_auto]">
         <div className="relative min-w-0">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
           <input

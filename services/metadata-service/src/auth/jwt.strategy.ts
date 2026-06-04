@@ -25,6 +25,8 @@ function normalizeGroups(groups?: string[]): string[] {
         .map((group) => group.replace(/^\/+/, '')),
     ),
   );
+}
+
 function normalizeUrl(value: string): string {
   return value.replace(/\/$/, '');
 }

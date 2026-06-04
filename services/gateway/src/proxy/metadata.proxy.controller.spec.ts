@@ -158,12 +158,10 @@ describe('MetadataProxyController evidence packet', () => {
     });
     expect(packet.metadataOnly).toBe(true);
     expect(packet.excludedSensitiveFields).toEqual([
-      'fileContent',
-      'objectKey',
-      'storagePath',
-      'presignedUrl',
-      'grantToken',
-      'downloadToken',
+      'file-payload',
+      'storage-reference',
+      'direct-download-link',
+      'temporary-access-grant',
     ]);
     expect(packet.versions[0]).not.toHaveProperty('objectKey');
     expect(packet.versions[0]).not.toHaveProperty('storagePath');
