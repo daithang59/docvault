@@ -8,6 +8,8 @@ kind: Deployment
 metadata:
   name: cloudflared
   namespace: cloudflare-tunnel
+  annotations:
+    checkov.io/skip1: CKV_K8S_35=Cloudflare Tunnel token is consumed through the official cloudflared token flow and scoped to this tunnel.
   labels:
     app: cloudflared
 spec:
@@ -30,10 +32,12 @@ spec:
       containers:
         - name: cloudflared
           image: cloudflare/cloudflared:2026.5.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           args:
             - tunnel
             - --no-autoupdate
+            - --metrics
+            - 0.0.0.0:2000
             - run
             - --token
             - $(TUNNEL_TOKEN)
@@ -59,3 +63,50 @@ spec:
             limits:
               cpu: 200m
               memory: 256Mi
+          ports:
+            - name: metrics
+              containerPort: 2000
+              protocol: TCP
+          readinessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 6
+          livenessProbe:
+            httpGet:
+              path: /ready
+              port: metrics
+            initialDelaySeconds: 30
+            periodSeconds: 30
+            timeoutSeconds: 3
+            failureThreshold: 3
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: cloudflared-egress
+  namespace: cloudflare-tunnel
+spec:
+  podSelector:
+    matchLabels:
+      app: cloudflared
+  policyTypes:
+    - Egress
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 0.0.0.0/0
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 7844
+        - protocol: UDP
+          port: 7844
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
