@@ -76,6 +76,7 @@ describe('buildDocumentSavedViewOptions', () => {
       ...DEFAULT_DOCUMENT_FILTERS,
       search: 'finance',
       classification: 'CONFIDENTIAL',
+      folder: 'finance',
       sort: 'title',
       sortDir: 'asc',
     };
@@ -92,6 +93,7 @@ describe('buildDocumentSavedViewOptions', () => {
     expect(options.at(-1)).toMatchObject({
       id: custom.id,
       count: 1,
+      filters: expect.objectContaining({ folder: 'finance' }),
     });
     expect(findMatchingDocumentSavedViewId(options, filters)).toBe(custom.id);
   });
@@ -104,6 +106,7 @@ describe('custom document saved view storage', () => {
       {
         ...DEFAULT_DOCUMENT_FILTERS,
         view: 'sensitive',
+        folder: 'security',
       },
       { generatedAt: '2026-06-04T04:00:00.000Z' },
     );

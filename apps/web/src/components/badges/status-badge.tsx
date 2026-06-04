@@ -18,8 +18,10 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, className }: StatusBadgeProps) {
   const key = status.toLowerCase(); // draft | pending | published | archived
+  const label = statusLabels[status];
   return (
     <span
+      aria-label={`Document status: ${label}`}
       className={cn(
         'inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold border transition-all',
         className
@@ -39,7 +41,7 @@ export function StatusBadge({ status, className }: StatusBadgeProps) {
           boxShadow: `0 0 6px var(--status-${key}-text)`,
         }}
       />
-      {statusLabels[status]}
+      {label}
     </span>
   );
 }

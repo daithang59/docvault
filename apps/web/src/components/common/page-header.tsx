@@ -13,7 +13,7 @@ interface PageHeaderProps {
 
 export function PageHeader({ title, subtitle, actions, badge, className }: PageHeaderProps) {
   return (
-    <div className={cn('mb-6 flex items-start justify-between gap-4', className)}>
+    <div className={cn('mb-6 flex flex-col items-stretch gap-4 sm:flex-row sm:items-start sm:justify-between', className)}>
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-3">
           <h1 className="truncate text-xl font-bold tracking-tight text-[var(--text-strong)]">{title}</h1>
@@ -24,7 +24,7 @@ export function PageHeader({ title, subtitle, actions, badge, className }: PageH
         )}
       </div>
       {actions && (
-        <div className="flex items-center gap-2 shrink-0">{actions}</div>
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto sm:shrink-0 sm:justify-end">{actions}</div>
       )}
     </div>
   );

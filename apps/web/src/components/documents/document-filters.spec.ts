@@ -47,5 +47,8 @@ describe('DocumentFilters', () => {
     expect(html).toContain('Sensitive attention');
     expect(html).toContain('Name current view');
     expect(html).toContain('Document quick views');
+    expect(html).toContain('Smart folders');
+    expect(html).toContain('Search syntax');
+    expect(html).toContain('Folder: finance');
   });
 });

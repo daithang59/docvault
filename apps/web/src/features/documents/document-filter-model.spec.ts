@@ -169,6 +169,29 @@ describe('filterAndSortDocuments', () => {
       }).map((doc) => doc.id),
     ).toEqual(['doc-1']);
   });
+
+  it('supports advanced field search tokens and smart folder filtering', () => {
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'status:published class:confidential tag:finance board',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-1']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'owner:"nguyen an" file:handbook.pdf',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-3']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        folder: 'security',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-4']);
+  });
 });
 
 describe('document filter metadata', () => {
@@ -181,24 +204,33 @@ describe('document filter metadata', () => {
       { value: 'owner-3', label: 'Tran Chi' },
     ]);
     expect(options.tags).toEqual(['board', 'finance', 'hr', 'policy', 'security']);
+    expect(options.folders).toEqual([
+      { value: 'board', label: 'Board', count: 1 },
+      { value: 'finance', label: 'Finance', count: 1 },
+      { value: 'hr', label: 'Hr', count: 2 },
+      { value: 'policy', label: 'Policy', count: 1 },
+      { value: 'security', label: 'Security', count: 1 },
+    ]);
 
     const filters: DocumentFiltersState = {
       ...DEFAULT_DOCUMENT_FILTERS,
       search: 'finance',
+      folder: 'finance',
       ownerId: 'owner-1',
       tag: 'board',
       status: 'PUBLISHED',
     };
 
-    expect(countActiveDocumentFilters(filters)).toBe(4);
+    expect(countActiveDocumentFilters(filters)).toBe(5);
     expect(getActiveDocumentFilterChips(filters, options)).toEqual([
       { key: 'search', label: 'Search: finance' },
       { key: 'status', label: 'Status: Published' },
+      { key: 'folder', label: 'Folder: Finance' },
       { key: 'ownerId', label: 'Owner: Nguyen An' },
       { key: 'tag', label: 'Tag: board' },
     ]);
     expect(describeActiveDocumentFilters(filters, options)).toBe(
-      'No documents match Search: finance, Status: Published, Owner: Nguyen An, Tag: board.',
+      'No documents match Search: finance, Status: Published, Folder: Finance, Owner: Nguyen An, Tag: board.',
     );
   });
 
@@ -231,6 +263,7 @@ describe('document filter metadata', () => {
       view: 'sensitive',
       status: 'PUBLISHED',
       classification: 'CONFIDENTIAL',
+      folder: 'finance',
       ownerId: 'owner-1',
       tag: 'board',
       sort: 'title',
@@ -240,7 +273,7 @@ describe('document filter metadata', () => {
     const params = serializeDocumentFiltersToSearchParams(filters);
 
     expect(params.toString()).toBe(
-      'q=finance&view=sensitive&status=PUBLISHED&classification=CONFIDENTIAL&owner=owner-1&tag=board&sort=title&dir=asc',
+      'q=finance&view=sensitive&status=PUBLISHED&classification=CONFIDENTIAL&folder=finance&owner=owner-1&tag=board&sort=title&dir=asc',
     );
     expect(parseDocumentFiltersFromSearchParams(params)).toEqual(filters);
   });

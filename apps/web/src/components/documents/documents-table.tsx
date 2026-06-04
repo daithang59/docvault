@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo, type ComponentType } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, type ComponentType } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -65,7 +66,11 @@ export function DocumentsTable({
   const { data: displayNames } = useOwnerDisplayNames(ownerIds);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -77,12 +82,32 @@ export function DocumentsTable({
     setHoveredRow(null);
   }, []);
 
+  const documentsById = useMemo(
+    () => new Map(data.map((document) => [document.id, document])),
+    [data],
+  );
+
+  useEffect(() => {
+    setRowSelection((currentSelection) => {
+      const retainedSelection = Object.fromEntries(
+        Object.entries(currentSelection).filter(
+          ([documentId, selected]) => selected && documentsById.has(documentId),
+        ),
+      );
+
+      return Object.keys(retainedSelection).length ===
+        Object.keys(currentSelection).length
+        ? currentSelection
+        : retainedSelection;
+    });
+  }, [documentsById]);
+
   const selectedDocs = useMemo(() => {
     return Object.keys(rowSelection)
       .filter((key) => rowSelection[key])
-      .map((key) => data[parseInt(key)])
-      .filter(Boolean);
-  }, [rowSelection, data]);
+      .map((key) => documentsById.get(key))
+      .filter((document): document is DocumentListItem => Boolean(document));
+  }, [rowSelection, documentsById]);
 
   const bulkSubmittable = useMemo(
     () => selectedDocs.filter((d) => canSubmitDocument(session, d)),
@@ -218,24 +243,39 @@ export function DocumentsTable({
       header: '',
       cell: ({ row }) => {
         const doc = row.original;
-        const isMenuOpen = activeMenu === doc.id;
+        const isMenuOpen = activeMenu?.id === doc.id;
         const downloadDecision = getExplainableDocumentAccessDecision(session, doc, 'download');
 
         return (
           <div className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setActiveMenu(isMenuOpen ? null : doc.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isMenuOpen) {
+                  setActiveMenu(null);
+                  return;
+                }
+
+                const rect = e.currentTarget.getBoundingClientRect();
+                setActiveMenu({
+                  id: doc.id,
+                  top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 280)),
+                  left: Math.max(8, Math.min(rect.right - 192, window.innerWidth - 200)),
+                });
+              }}
               className="rounded-xl p-1.5 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)] active:scale-95"
               aria-label="Actions"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
-            {isMenuOpen && (
+            {isMenuOpen && activeMenu && createPortal(
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
                 <div
-                  className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-2xl border"
+                  className="fixed z-20 max-h-[min(22rem,calc(100vh-1rem))] w-48 overflow-y-auto rounded-2xl border"
                   style={{
+                    top: activeMenu.top,
+                    left: activeMenu.left,
                     background: 'var(--surface-overlay-strong)',
                     borderColor: 'var(--surface-border)',
                     backdropFilter: 'blur(16px)',
@@ -273,7 +313,8 @@ export function DocumentsTable({
                     <ActionMenuItem icon={Trash2} label="Delete" onClick={() => { setActiveMenu(null); onDelete(doc); }} />
                   )}
                 </div>
-              </>
+              </>,
+              document.body,
             )}
           </div>
         );
@@ -289,6 +330,7 @@ export function DocumentsTable({
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     enableRowSelection: enableSelection,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -296,7 +338,7 @@ export function DocumentsTable({
 
   return (
     <div
-      className="overflow-hidden rounded-2xl border"
+      className="rounded-2xl border"
       style={{
         background: 'var(--table-surface-bg)',
         borderColor: 'var(--border-soft)',
@@ -307,13 +349,13 @@ export function DocumentsTable({
       {/* Bulk action bar */}
       {enableSelection && selectedDocs.length > 0 && (
         <div
-          className="flex items-center gap-3 border-b px-4 py-2.5 animate-fade"
+          className="flex flex-col gap-3 border-b px-4 py-3 animate-fade sm:flex-row sm:items-center sm:gap-3"
           style={{ background: 'var(--color-primary-bg)', borderColor: 'var(--border-soft)' }}
         >
           <span className="text-sm font-medium text-[var(--color-primary)]">
             {selectedDocs.length} selected
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {bulkSubmittable.length > 0 && onBulkSubmit && (
               <button
                 onClick={() => { onBulkSubmit(bulkSubmittable); setRowSelection({}); }}
@@ -353,7 +395,7 @@ export function DocumentsTable({
           </div>
           <button
             onClick={() => setRowSelection({})}
-            className="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+            className="text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)] sm:ml-auto sm:text-right"
           >
             Clear
           </button>

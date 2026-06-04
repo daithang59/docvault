@@ -4,6 +4,7 @@ import type { ComponentType } from 'react';
 import {
   Bookmark,
   ChevronDown,
+  FolderOpen,
   RotateCcw,
   Save,
   Search,
@@ -84,6 +85,7 @@ export function DocumentFilters({
   const activeChips = getActiveDocumentFilterChips(filters, options);
   const hasActiveFilters = activeChips.length > 0;
   const canSaveView = Boolean(savedViewName.trim() && onSaveCurrentView);
+  const hasFolders = options.folders.length > 0;
 
   return (
     <div
@@ -236,10 +238,12 @@ export function DocumentFilters({
           <input
             value={filters.search}
             onChange={(event) => setField('search', event.target.value)}
-            placeholder="Search title, tag, owner, filename..."
+            placeholder="Search documents..."
             aria-label="Search documents"
+            title="Search syntax: status:pending, class:confidential, tag:finance, owner:editor, file:report.pdf"
             className="h-10 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)]"
           />
+          <span className="sr-only">Search syntax</span>
         </div>
 
         <SelectFilter
@@ -306,6 +310,50 @@ export function DocumentFilters({
           Reset
         </button>
       </div>
+
+      {hasFolders ? (
+        <div className="mt-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <FolderOpen className="h-4 w-4 text-[var(--text-faint)]" />
+            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+              Smart folders
+            </p>
+          </div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {options.folders.map((folder) => {
+              const active = filters.folder === folder.value;
+
+              return (
+                <button
+                  key={folder.value}
+                  type="button"
+                  onClick={() =>
+                    setField('folder', active ? '' : folder.value)
+                  }
+                  className={cn(
+                    'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition',
+                    active
+                      ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
+                      : 'border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)]',
+                  )}
+                >
+                  <span>Folder: {folder.value}</span>
+                  <span
+                    className={cn(
+                      'rounded-full px-1.5 py-0.5 text-[10px]',
+                      active
+                        ? 'bg-white/20 text-white'
+                        : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
+                    )}
+                  >
+                    {folder.count}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : null}
 
       {activeChips.length > 0 ? (
         <div className="mt-3 flex flex-wrap gap-2">

@@ -194,6 +194,7 @@ function parseFilters(value: unknown): DocumentFiltersState | null {
     search: candidate.search ?? '',
     status: candidate.status ?? '',
     classification: candidate.classification ?? '',
+    folder: candidate.folder ?? '',
     ownerId: candidate.ownerId ?? '',
     tag: candidate.tag ?? '',
     sort: candidate.sort ?? DEFAULT_DOCUMENT_FILTERS.sort,

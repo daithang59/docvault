@@ -24,6 +24,7 @@ export interface DocumentFiltersState {
   search: string;
   status: DocumentStatus | '';
   classification: ClassificationLevel | '';
+  folder: string;
   ownerId: string;
   tag: string;
   sort: DocumentSortField;
@@ -33,6 +34,7 @@ export interface DocumentFiltersState {
 export interface DocumentFilterOptions {
   owners: Array<{ value: string; label: string }>;
   tags: string[];
+  folders: Array<{ value: string; label: string; count: number }>;
 }
 
 export interface DocumentFilterChip {
@@ -52,6 +54,7 @@ export const DEFAULT_DOCUMENT_FILTERS: DocumentFiltersState = {
   search: '',
   status: '',
   classification: '',
+  folder: '',
   ownerId: '',
   tag: '',
   sort: 'updatedAt',
@@ -119,12 +122,12 @@ export function filterAndSortDocuments(
   documents: DocumentListItem[],
   filters: DocumentFiltersState,
 ): DocumentListItem[] {
-  const query = normalizeText(filters.search);
+  const query = parseAdvancedDocumentQuery(filters.search);
 
   return documents
     .filter((document) => {
       if (!documentMatchesQuickView(document, filters.view)) return false;
-      if (query && !documentMatchesQuery(document, query)) return false;
+      if (!documentMatchesAdvancedQuery(document, query)) return false;
       if (filters.status && document.status !== filters.status) return false;
       if (
         filters.classification &&
@@ -132,6 +135,7 @@ export function filterAndSortDocuments(
       ) {
         return false;
       }
+      if (filters.folder && !document.tags.includes(filters.folder)) return false;
       if (filters.ownerId && document.ownerId !== filters.ownerId) return false;
       if (filters.tag && !document.tags.includes(filters.tag)) return false;
       return true;
@@ -155,13 +159,17 @@ export function buildDocumentFilterOptions(
 ): DocumentFilterOptions {
   const ownersById = new Map<string, string>();
   const tags = new Set<string>();
+  const folderCounts = new Map<string, number>();
 
   for (const document of documents) {
     if (document.ownerId && !ownersById.has(document.ownerId)) {
       ownersById.set(document.ownerId, document.ownerDisplay ?? document.ownerId);
     }
     for (const tag of document.tags) {
-      if (tag.trim()) tags.add(tag);
+      const normalizedTag = tag.trim();
+      if (!normalizedTag) continue;
+      tags.add(normalizedTag);
+      folderCounts.set(normalizedTag, (folderCounts.get(normalizedTag) ?? 0) + 1);
     }
   }
 
@@ -173,6 +181,15 @@ export function buildDocumentFilterOptions(
     tags: Array.from(tags).sort((left, right) =>
       left.localeCompare(right, undefined, { sensitivity: 'base' }),
     ),
+    folders: Array.from(folderCounts.entries())
+      .map(([value, count]) => ({
+        value,
+        label: formatEnum(value),
+        count,
+      }))
+      .sort((left, right) =>
+        left.label.localeCompare(right.label, undefined, { sensitivity: 'base' }),
+      ),
   };
 }
 
@@ -182,6 +199,7 @@ export function countActiveDocumentFilters(
   return getActiveDocumentFilterChips(filters, {
     owners: [],
     tags: [],
+    folders: [],
   }).length;
 }
 
@@ -207,6 +225,12 @@ export function getActiveDocumentFilterChips(
     chips.push({
       key: 'classification',
       label: `Classification: ${formatEnum(filters.classification)}`,
+    });
+  }
+  if (filters.folder) {
+    chips.push({
+      key: 'folder',
+      label: `Folder: ${findFolderLabel(filters.folder, options)}`,
     });
   }
   if (filters.ownerId) {
@@ -260,6 +284,7 @@ export function parseDocumentFiltersFromSearchParams(
     search: params.get('q') ?? '',
     status: isDocumentStatus(status) ? status : '',
     classification: isClassification(classification) ? classification : '',
+    folder: params.get('folder') ?? '',
     ownerId: params.get('owner') ?? '',
     tag: params.get('tag') ?? '',
     sort: isSortField(sort) ? sort : DEFAULT_DOCUMENT_FILTERS.sort,
@@ -281,6 +306,7 @@ export function serializeDocumentFiltersToSearchParams(
   if (filters.classification) {
     params.set('classification', filters.classification);
   }
+  if (filters.folder) params.set('folder', filters.folder);
   if (filters.ownerId) params.set('owner', filters.ownerId);
   if (filters.tag) params.set('tag', filters.tag);
   if (filters.sort !== DEFAULT_DOCUMENT_FILTERS.sort) {
@@ -314,7 +340,95 @@ function documentMatchesQuickView(
   return true;
 }
 
-function documentMatchesQuery(
+interface AdvancedDocumentQuery {
+  freeText: string[];
+  status: string[];
+  classification: string[];
+  owner: string[];
+  tag: string[];
+  folder: string[];
+  file: string[];
+}
+
+function parseAdvancedDocumentQuery(search: string): AdvancedDocumentQuery {
+  const query: AdvancedDocumentQuery = {
+    freeText: [],
+    status: [],
+    classification: [],
+    owner: [],
+    tag: [],
+    folder: [],
+    file: [],
+  };
+  const tokenPattern = /(\w+):"([^"]+)"|(\w+):(\S+)|"([^"]+)"|(\S+)/g;
+  const matches = search.matchAll(tokenPattern);
+
+  for (const match of matches) {
+    const rawKey = match[1] ?? match[3];
+    const rawValue = match[2] ?? match[4] ?? match[5] ?? match[6] ?? '';
+    const value = normalizeText(rawValue);
+    if (!value) continue;
+
+    const key = normalizeText(rawKey);
+    if (key === 'status') {
+      query.status.push(value);
+    } else if (key === 'class' || key === 'classification') {
+      query.classification.push(value);
+    } else if (key === 'owner') {
+      query.owner.push(value);
+    } else if (key === 'tag') {
+      query.tag.push(value);
+    } else if (key === 'folder') {
+      query.folder.push(value);
+    } else if (key === 'file' || key === 'filename') {
+      query.file.push(value);
+    } else {
+      query.freeText.push(value);
+    }
+  }
+
+  return query;
+}
+
+function documentMatchesAdvancedQuery(
+  document: DocumentListItem,
+  query: AdvancedDocumentQuery,
+): boolean {
+  return (
+    allQueryTermsMatch(query.freeText, (term) =>
+      documentMatchesFreeText(document, term),
+    ) &&
+    allQueryTermsMatch(query.status, (term) =>
+      normalizeEnumText(document.status).includes(normalizeEnumText(term)),
+    ) &&
+    allQueryTermsMatch(query.classification, (term) =>
+      normalizeEnumText(document.classification).includes(normalizeEnumText(term)),
+    ) &&
+    allQueryTermsMatch(query.owner, (term) =>
+      [document.ownerId, document.ownerDisplay].some((value) =>
+        normalizeText(value).includes(term),
+      ),
+    ) &&
+    allQueryTermsMatch(query.tag, (term) =>
+      document.tags.some((tag) => normalizeText(tag).includes(term)),
+    ) &&
+    allQueryTermsMatch(query.folder, (term) =>
+      document.tags.some((tag) => normalizeText(tag).includes(term)),
+    ) &&
+    allQueryTermsMatch(query.file, (term) =>
+      normalizeText(document.filename).includes(term),
+    )
+  );
+}
+
+function allQueryTermsMatch(
+  terms: string[],
+  predicate: (term: string) => boolean,
+): boolean {
+  return terms.every(predicate);
+}
+
+function documentMatchesFreeText(
   document: DocumentListItem,
   query: string,
 ): boolean {
@@ -324,6 +438,8 @@ function documentMatchesQuery(
     document.filename,
     document.ownerId,
     document.ownerDisplay,
+    document.status,
+    document.classification,
     ...document.tags,
   ].some((value) => normalizeText(value).includes(query));
 }
@@ -372,6 +488,16 @@ function findOwnerLabel(
   return options.owners.find((owner) => owner.value === ownerId)?.label ?? ownerId;
 }
 
+function findFolderLabel(
+  folder: string,
+  options: DocumentFilterOptions,
+): string {
+  return (
+    options.folders.find((option) => option.value === folder)?.label ??
+    formatEnum(folder)
+  );
+}
+
 function findQuickViewLabel(view: DocumentQuickView): string {
   return (
     QUICK_VIEW_DEFINITIONS.find((definition) => definition.value === view)
@@ -381,6 +507,10 @@ function findQuickViewLabel(view: DocumentQuickView): string {
 
 function normalizeText(value: string | null | undefined): string {
   return (value ?? '').trim().toLowerCase();
+}
+
+function normalizeEnumText(value: string | null | undefined): string {
+  return normalizeText(value).replace(/[_\s-]+/g, '');
 }
 
 function formatEnum(value: string): string {

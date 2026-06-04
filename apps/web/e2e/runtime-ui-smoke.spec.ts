@@ -256,9 +256,23 @@ test('documents page supports built-in and custom saved views', async ({ page },
 
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
   await expect(page.getByText('Saved views')).toBeVisible();
+  await expect(page.getByText('Smart folders')).toBeVisible();
+  await expect(page.getByRole('button', { name: /Folder: security/ })).toBeVisible();
   await expect(page.getByRole('button', { name: /Sensitive attention/ })).toBeVisible();
   await expect(page.getByText('Incident Export')).toBeVisible();
 
+  await page.getByLabel('Search documents').fill('status:pending tag:security incident');
+  await expect(page).toHaveURL(/q=status%3Apending\+tag%3Asecurity\+incident/);
+  await expect(page.getByText('Incident Export')).toBeVisible();
+  await expect(page.getByText('Board Report')).not.toBeVisible();
+
+  await page.getByLabel('Search documents').fill('');
+  await page.getByRole('button', { name: /Folder: security/ }).click();
+  await expect(page).toHaveURL(/folder=security/);
+  await expect(page.getByText('Incident Export')).toBeVisible();
+  await expect(page.getByText('Board Report')).not.toBeVisible();
+
+  await page.getByRole('button', { name: /Folder: security/ }).click();
   await page.getByRole('button', { name: /Sensitive attention/ }).click();
   await expect(page).toHaveURL(/view=sensitive/);
   await expect(page.getByText('View: Sensitive')).toBeVisible();
