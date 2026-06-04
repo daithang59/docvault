@@ -68,6 +68,16 @@ export class DocumentsService {
               },
             },
             { tags: { has: searchQuery } },
+            {
+              versions: {
+                some: {
+                  filename: {
+                    contains: searchQuery,
+                    mode: 'insensitive' as const,
+                  },
+                },
+              },
+            },
           ],
         }
       : undefined;
@@ -121,7 +131,8 @@ export class DocumentsService {
           ],
         },
         orderBy: { createdAt: 'desc' },
-      });
+        include: this.latestVersionInclude(),
+      }).then((documents) => documents.map((document) => this.toListSummary(document)));
     }
 
     return this.prisma.document.findMany({
@@ -218,7 +229,8 @@ export class DocumentsService {
         ],
       },
       orderBy: { createdAt: 'desc' },
-    });
+      include: this.latestVersionInclude(),
+    }).then((documents) => documents.map((document) => this.toListSummary(document)));
   }
 
   async findOneOrThrow(id: string) {
@@ -397,6 +409,38 @@ export class DocumentsService {
   private sanitizeTags(tags?: string[]): string[] {
     if (!tags) return [];
     return [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
+  }
+
+  private latestVersionInclude() {
+    return {
+      versions: {
+        orderBy: { version: 'desc' as const },
+        take: 1,
+      },
+    };
+  }
+
+  private toListSummary(
+    document: Document & {
+      versions?: Array<{
+        filename: string;
+        contentType?: string | null;
+        size: number;
+      }>;
+    },
+  ) {
+    const { versions, ...summary } = document;
+    const latestVersion = versions?.[0];
+
+    if (!latestVersion) return summary;
+
+    return {
+      ...summary,
+      filename: latestVersion.filename,
+      contentType: latestVersion.contentType,
+      mimeType: latestVersion.contentType ?? undefined,
+      fileSize: latestVersion.size,
+    };
   }
 
   private assertCanManage(ownerId: string, actorId: string, roles: string[]) {

@@ -1,4 +1,4 @@
-import { expect, test, type Page } from '@playwright/test';
+import { expect, test, type Page, type Response } from '@playwright/test';
 
 type LiveUser = 'editor1' | 'approver1' | 'viewer1';
 
@@ -63,10 +63,32 @@ test('live backend document upload, approval, and viewer access flow', async ({
     buffer: Buffer.from(`DocVault live E2E ${runId}`),
   });
 
+  const createResponsePromise = waitForApiResponse(
+    page,
+    /^\/api\/metadata\/documents$/,
+    'POST',
+  );
+  const uploadResponsePromise = waitForApiResponse(
+    page,
+    /^\/api\/documents\/[^/]+\/upload$/,
+    'POST',
+  );
   await page.getByRole('button', { name: 'Save Draft' }).click();
-  await expectCreatedDocumentDetailUrl(page);
-  const docId = getCurrentDocumentId(page);
-  if (!docId) throw new Error('Created document id was not present in URL.');
+  const createResponse = await createResponsePromise;
+  if (!createResponse.ok()) {
+    uploadResponsePromise.catch(() => undefined);
+  }
+  await expectOkApiResponse(createResponse, 'create document');
+  const createdDocument = (await createResponse.json()) as { id?: string };
+  const docId = createdDocument.id;
+  if (!docId) throw new Error('Create document response did not include an id.');
+
+  const uploadResponse = await uploadResponsePromise;
+  expect(new URL(uploadResponse.url()).pathname).toBe(
+    `/api/documents/${docId}/upload`,
+  );
+  await expectOkApiResponse(uploadResponse, 'upload initial file');
+  await expect(page).toHaveURL(new RegExp(`/documents/${escapeRegExp(docId)}$`));
 
   await expect(page.getByText(title)).toBeVisible();
   await expect(page.getByText(filename)).toBeVisible();
@@ -185,24 +207,44 @@ async function installSession(
   }, session);
 }
 
-async function expectCreatedDocumentDetailUrl(page: Page) {
-  await expect
-    .poll(() => new URL(page.url()).pathname, {
-      message: 'created document detail URL',
-    })
-    .toMatch(/^\/documents\/(?!new$)[^/]+$/);
-}
-
-function getCurrentDocumentId(page: Page) {
-  const pathname = new URL(page.url()).pathname;
-  const docId = pathname.split('/').at(-1);
-  return docId === 'new' ? undefined : docId;
-}
-
 async function expectDocumentStatus(page: Page, label: 'Pending' | 'Published') {
   await expect(
     page.locator(`[aria-label="Document status: ${label}"]`),
   ).toBeVisible();
+}
+
+async function waitForApiResponse(
+  page: Page,
+  pathnamePattern: RegExp,
+  method: string,
+) {
+  return page.waitForResponse((response) => {
+    const request = response.request();
+    return (
+      request.method() === method &&
+      pathnamePattern.test(new URL(response.url()).pathname)
+    );
+  });
+}
+
+async function expectOkApiResponse(response: Response, label: string) {
+  if (response.ok()) return;
+
+  throw new Error(
+    `${label} failed: HTTP ${response.status()} ${await safeResponseText(response)}`,
+  );
+}
+
+async function safeResponseText(response: Response) {
+  try {
+    return await response.text();
+  } catch {
+    return '<body unavailable>';
+  }
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
 function parseJwt(token: string): JwtPayload | null {

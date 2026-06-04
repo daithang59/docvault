@@ -82,6 +82,7 @@ describe('filterAndSortDocuments', () => {
       tag: 'board',
       status: 'PUBLISHED',
       classification: 'CONFIDENTIAL',
+      folder: '',
       sort: 'updatedAt',
       sortDir: 'desc',
     };

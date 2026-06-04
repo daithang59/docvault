@@ -180,4 +180,56 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('"NOT"');
     expect(queryText).toContain('"effect":"DENY"');
   });
+
+  it('returns latest version file metadata in document list summaries', async () => {
+    mockDocumentFindMany.mockResolvedValue([
+      {
+        id: 'doc-1',
+        title: 'Published contract',
+        versions: [
+          {
+            filename: 'contract-v2.pdf',
+            contentType: 'application/pdf',
+            size: 2048,
+          },
+        ],
+      },
+    ]);
+
+    const result = await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'viewer-1',
+      roles: ['viewer'],
+      groups: [],
+    } as any);
+
+    expect(result).toEqual([
+      expect.objectContaining({
+        id: 'doc-1',
+        filename: 'contract-v2.pdf',
+        contentType: 'application/pdf',
+        mimeType: 'application/pdf',
+        fileSize: 2048,
+      }),
+    ]);
+    expect(result[0]).not.toHaveProperty('versions');
+  });
+
+  it('searches document list by latest version filename', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'viewer-1',
+        roles: ['viewer'],
+        groups: [],
+      } as any,
+      'contract-v2.pdf',
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"versions"');
+    expect(queryText).toContain('"filename"');
+    expect(queryText).toContain('"contract-v2.pdf"');
+  });
 });
