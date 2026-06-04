@@ -217,6 +217,14 @@ pipeline {
             }
         }
 
+        stage('Secret Scan') {
+            steps {
+                script {
+                    secretScan()
+                }
+            }
+        }
+
         stage('Pre-build Security') {
             parallel {
                 stage('SCA - Dependency Check') {
@@ -247,14 +255,6 @@ pipeline {
                     steps {
                         script {
                             sonarSast(cfg + [enforceQualityGate: params.ENFORCE_SONAR_QG])
-                        }
-                    }
-                }
-
-                stage('Secret Scan') {
-                    steps {
-                        script {
-                            secretScan()
                         }
                     }
                 }
