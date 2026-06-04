@@ -3,13 +3,19 @@ def call() {
     def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'http://sonarqube:9000'
     def deployTargetUrl = env.DEPLOY_TARGET_URL?.trim() ? env.DEPLOY_TARGET_URL.trim() : ''
     def zapTarget = env.ZAP_TARGET?.trim() ? env.ZAP_TARGET.trim() : ''
-    def registryHost = env.REGISTRY_HOST?.trim() ? env.REGISTRY_HOST.trim() : ''
+    def registryHost = env.REGISTRY_HOST?.trim() ? env.REGISTRY_HOST.trim() : 'harbor.docvault.id.vn'
     def registryNamespace = env.REGISTRY_NAMESPACE?.trim()
         ? env.REGISTRY_NAMESPACE.trim()
-        : (registryHost ? 'docvault-dev' : 'daithang59')
+        : 'docvault-dev'
     def registryCredentialId = env.REGISTRY_CREDENTIAL_ID?.trim()
         ? env.REGISTRY_CREDENTIAL_ID.trim()
-        : 'dockerhub-credentials'
+        : 'harbor-docvault-dev-robot-token'
+    def registryCredentialType = env.REGISTRY_CREDENTIAL_TYPE?.trim()
+        ? env.REGISTRY_CREDENTIAL_TYPE.trim()
+        : 'secretText'
+    def registryUsername = env.REGISTRY_USERNAME?.trim()
+        ? env.REGISTRY_USERNAME.trim()
+        : 'robot$docvault-dev+jenkins-push'
     def pushLatest = env.PUSH_LATEST?.trim()
         ? env.PUSH_LATEST.equalsIgnoreCase('true')
         : false
@@ -19,6 +25,8 @@ def call() {
         registryHost: registryHost,
         registryNamespace: registryNamespace,
         registryCredentialId: registryCredentialId,
+        registryCredentialType: registryCredentialType,
+        registryUsername: registryUsername,
         pushLatest: pushLatest,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',

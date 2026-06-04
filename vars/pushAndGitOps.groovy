@@ -38,21 +38,29 @@ def pushImages(cfg, builtList, tag) {
     def imageDigests = [:]
     def registryArg = cfg.registryHost?.trim() ? shellQuote(cfg.registryHost.trim()) : ''
     def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialType = cfg.registryCredentialType ?: 'usernamePassword'
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
-            withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                sh "echo \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
-
-                runPushesInBatches(cfg, builtList, tag)
-
-                builtList.each { service ->
-                    def imageName = imageNameForService(cfg, service)
-                    def repository = resolveRepository(cfg, imageName)
-                    imageDigests[service] = resolveImageDigest(repository, tag)
+            if (credentialType == 'secretText') {
+                def registryUsername = cfg.registryUsername?.trim()
+                if (!registryUsername) {
+                    error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
                 }
 
-                sh "docker logout ${registryArg} || true"
+                withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
+                    pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
+                    sh "docker logout ${registryArg} || true"
+                }
+            } else if (credentialType == 'usernamePassword') {
+                withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
+                    pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
+                    sh "docker logout ${registryArg} || true"
+                }
+            } else {
+                error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
             }
         }
     } finally {
@@ -60,6 +68,16 @@ def pushImages(cfg, builtList, tag) {
     }
 
     return imageDigests
+}
+
+def pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests) {
+    runPushesInBatches(cfg, builtList, tag)
+
+    builtList.each { service ->
+        def imageName = imageNameForService(cfg, service)
+        def repository = resolveRepository(cfg, imageName)
+        imageDigests[service] = resolveImageDigest(repository, tag)
+    }
 }
 
 def runPushesInBatches(cfg, builtList, tag) {

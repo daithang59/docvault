@@ -18,18 +18,28 @@ pipeline {
         )
         string(
             name: 'REGISTRY_HOST',
-            defaultValue: '',
-            description: 'Container registry host without protocol. Leave empty for Docker Hub; use Harbor host such as harbor.example.com.'
+            defaultValue: 'harbor.docvault.id.vn',
+            description: 'Container registry host without protocol. Use harbor.docvault.id.vn for the DocVault Harbor registry.'
         )
         string(
             name: 'REGISTRY_NAMESPACE',
-            defaultValue: '',
+            defaultValue: 'docvault-dev',
             description: 'Registry namespace/project. For Harbor dev pushes use docvault-dev; for Docker Hub use the Docker Hub username/org.'
         )
         string(
             name: 'REGISTRY_CREDENTIAL_ID',
-            defaultValue: 'dockerhub-credentials',
-            description: 'Jenkins username/password credential for docker login. For Harbor use the project robot account credential.'
+            defaultValue: 'harbor-docvault-dev-robot-token',
+            description: 'Jenkins credential ID for docker login. Harbor AWS Secrets Manager credential uses Secret Text.'
+        )
+        choice(
+            name: 'REGISTRY_CREDENTIAL_TYPE',
+            choices: ['secretText', 'usernamePassword'],
+            description: 'Credential binding type. Use secretText for Harbor robot token from AWS Secrets Manager; usernamePassword for Docker Hub.'
+        )
+        string(
+            name: 'REGISTRY_USERNAME',
+            defaultValue: 'robot$docvault-dev+jenkins-push',
+            description: 'Registry username used when REGISTRY_CREDENTIAL_TYPE=secretText. For Harbor robot accounts this includes robot$.'
         )
         booleanParam(
             name: 'PUSH_LATEST',
@@ -129,6 +139,14 @@ pipeline {
                         ? params.REGISTRY_CREDENTIAL_ID.trim()
                         : cfg.registryCredentialId
 
+                    cfg.registryCredentialType = params.REGISTRY_CREDENTIAL_TYPE?.trim()
+                        ? params.REGISTRY_CREDENTIAL_TYPE.trim()
+                        : cfg.registryCredentialType
+
+                    cfg.registryUsername = params.REGISTRY_USERNAME?.trim()
+                        ? params.REGISTRY_USERNAME.trim()
+                        : cfg.registryUsername
+
                     cfg.pushLatest = params.PUSH_LATEST
 
                     cfg.deployTargetUrl = params.DEPLOY_TARGET_URL?.trim()
@@ -159,6 +177,8 @@ pipeline {
                     echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
                     echo ">>> Registry namespace/project: ${cfg.registryNamespace}"
                     echo ">>> Registry credential ID: ${cfg.registryCredentialId}"
+                    echo ">>> Registry credential type: ${cfg.registryCredentialType}"
+                    echo ">>> Registry username: ${cfg.registryUsername ?: '(credential-provided)'}"
                     echo ">>> PUSH_LATEST=${params.PUSH_LATEST}"
                     echo ">>> FORCE_BUILD_ALL=${params.FORCE_BUILD_ALL}"
                     echo ">>> DEPLOY_TARGET_URL=${cfg.deployTargetUrl ?: '(not set)'}"
