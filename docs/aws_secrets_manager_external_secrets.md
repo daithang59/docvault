@@ -85,10 +85,12 @@ Create JSON secrets with these exact names.
 
 ### `/docvault/testing/app`
 
+Use real connection strings when creating the AWS secret. The placeholders below intentionally avoid example passwords so repository secret scans do not treat the documentation as leaked credentials.
+
 ```json
 {
-  "DATABASE_URL": "postgresql://docvault:replace-me@db:5432/docvault_metadata?schema=public",
-  "MONGODB_URI": "mongodb://root:replace-me@mongo:27017/docvault_audit?authSource=admin",
+  "DATABASE_URL": "<postgres-connection-url>",
+  "MONGODB_URI": "<mongodb-connection-url>",
   "S3_ACCESS_KEY": "minioadmin",
   "S3_SECRET_KEY": "replace-me",
   "KEYCLOAK_ADMIN": "admin",
