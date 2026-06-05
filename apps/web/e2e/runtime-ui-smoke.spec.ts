@@ -361,6 +361,20 @@ test('documents filters stay usable on a mobile viewport', async ({ page }, test
   await screenshot(page, testInfo.file, 'documents-mobile-filters-playwright.png');
 });
 
+test('settings page summarizes product readiness and role capabilities', async ({ page }) => {
+  await page.goto('/settings');
+
+  await expect(page.getByRole('heading', { name: 'System Information' })).toBeVisible();
+  await expect(page.getByText('Product Readiness')).toBeVisible();
+  await expect(page.getByText('Commercial demo readiness')).toBeVisible();
+  await expect(page.getByText('100%')).toBeVisible();
+  await expect(page.getByText('Evidence export', { exact: true })).toBeVisible();
+  await expect(page.getByText('Available', { exact: true })).toBeVisible();
+  await expect(page.getByText('Enabled capabilities')).toBeVisible();
+  await expect(page.getByText('4 active')).toBeVisible();
+  await expect(page.getByText('Manage ACLs and application readiness')).toBeVisible();
+});
+
 test('approvals page renders SLA queue and review drawer context', async ({ page }, testInfo) => {
   await page.goto('/approvals');
 

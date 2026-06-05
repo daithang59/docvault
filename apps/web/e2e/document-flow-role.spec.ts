@@ -1,7 +1,7 @@
 import { expect, test, type Page, type Route } from '@playwright/test';
 
 type Role = 'admin' | 'editor' | 'approver' | 'viewer' | 'compliance_officer';
-type DocumentStatus = 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED';
+type DocumentStatus = 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED' | 'DELETED';
 type Classification = 'PUBLIC' | 'INTERNAL' | 'CONFIDENTIAL' | 'SECRET';
 
 interface FlowDocument {
@@ -187,6 +187,39 @@ function baseDocuments(): FlowDocument[] {
       aclEntries: [],
     },
   ];
+}
+
+function deletedDocument(): FlowDocument {
+  return {
+    id: 'doc-deleted-packet',
+    title: 'Deleted Draft Packet',
+    description: 'Deleted draft retained as lifecycle evidence.',
+    status: 'DELETED',
+    classification: 'INTERNAL',
+    ownerId: 'editor1',
+    ownerDisplay: 'Editor One',
+    currentVersion: 1,
+    filename: 'deleted-draft.pdf',
+    mimeType: 'application/pdf',
+    fileSize: 32_000,
+    tags: ['deleted'],
+    dlpStatus: 'CLEAR',
+    createdAt: hoursAgo(100),
+    updatedAt: hoursAgo(5),
+    versions: [
+      {
+        id: 'version-deleted-1',
+        docId: 'doc-deleted-packet',
+        version: 1,
+        filename: 'deleted-draft.pdf',
+        contentType: 'application/pdf',
+        size: 32_000,
+        createdAt: hoursAgo(90),
+        createdBy: 'editor1',
+      },
+    ],
+    aclEntries: [],
+  };
 }
 
 async function mockDocumentFlowApi(
@@ -436,6 +469,22 @@ function workflowHistoryFor(document: FlowDocument) {
     return [];
   }
 
+  if (document.status === 'DELETED') {
+    return [
+      {
+        id: `history-${document.id}`,
+        docId: document.id,
+        action: 'DELETE',
+        actorId: 'admin1',
+        actorDisplay: 'Admin One',
+        fromStatus: 'DRAFT',
+        toStatus: 'DELETED',
+        reason: 'Deleted by administrator.',
+        createdAt: document.updatedAt,
+      },
+    ];
+  }
+
   return [
     {
       id: `history-${document.id}`,
@@ -666,6 +715,41 @@ test('viewer only sees readable published documents and cannot open restricted f
   await expect(
     page.getByRole('button', { name: 'Download', exact: true }),
   ).toBeVisible();
+});
+
+test('viewer sees lifecycle guidance without restricted next-action links', async ({
+  page,
+}) => {
+  await mockDocumentFlowApi(page, sessionFor('viewer'));
+
+  await page.goto('/documents/doc-published-viewable');
+  await expect(page.getByRole('heading', { name: 'Workflow Timeline' })).toBeVisible();
+  await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Monitor retention')).toBeVisible();
+  await expect(page.getByText('Role gated')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Monitor retention/ })).toHaveCount(0);
+});
+
+test('approver sees actionable lifecycle link for pending review', async ({ page }) => {
+  await mockDocumentFlowApi(page, sessionFor('approver'));
+
+  await page.goto('/documents/doc-pending-review');
+  await expect(page.getByText('In review')).toBeVisible();
+  await expect(page.getByRole('link', { name: /Approve or reject/ })).toBeVisible();
+  await expect(page.getByText('Role gated')).toHaveCount(0);
+});
+
+test('deleted workflow history is labeled as deleted in the timeline', async ({ page }) => {
+  await mockDocumentFlowApi(page, sessionFor('admin'), [
+    ...baseDocuments(),
+    deletedDocument(),
+  ]);
+
+  await page.goto('/documents/doc-deleted-packet');
+  await expect(page.getByText('Deleted Draft Packet')).toBeVisible();
+  await expect(page.getByLabel('Document status: Deleted')).toBeVisible();
+  await expect(page.getByText('DRAFT → DELETED')).toBeVisible();
+  await expect(page.getByText('Submitted')).toHaveCount(0);
 });
 
 test('evidence packet presentation shows integrity badge, sections, and visual timeline', async ({
