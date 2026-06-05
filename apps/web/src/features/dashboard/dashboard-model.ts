@@ -1,5 +1,6 @@
 import { ROUTES } from '@/lib/constants/routes';
 import type { DocumentListItem } from '@/features/documents/documents.types';
+import type { UserRole } from '@/types/enums';
 
 export type DashboardWidgetTone = 'info' | 'success' | 'warning' | 'critical';
 
@@ -28,6 +29,8 @@ export interface DashboardWorkQueueItem {
   documentId: string;
   title: string;
   reason: string;
+  actionLabel: string;
+  roleScope: 'general' | 'owner' | 'approver' | 'compliance' | 'admin';
   updatedAt: string;
   href: string;
   tone: DashboardWidgetTone;
@@ -43,6 +46,10 @@ export interface DashboardModel {
 interface DashboardModelOptions {
   unreadNotifications?: number;
   now?: Date;
+  actor?: {
+    id: string;
+    roles: UserRole[];
+  };
 }
 
 export function buildDashboardModel(
@@ -92,7 +99,7 @@ export function buildDashboardModel(
         tone: (options.unreadNotifications ?? 0) > 0 ? 'info' : 'success',
       },
     ],
-    workQueue: buildWorkQueue(documents, now),
+    workQueue: buildWorkQueue(documents, now, options.actor),
     recentDocuments: sortByUpdatedDesc(documents).slice(0, 5),
   };
 }
@@ -114,10 +121,11 @@ function buildStats(documents: DocumentListItem[]): DashboardStats {
 function buildWorkQueue(
   documents: DocumentListItem[],
   now: Date,
+  actor?: DashboardModelOptions['actor'],
 ): DashboardWorkQueueItem[] {
   return sortByUpdatedDesc(documents)
     .flatMap((document) => {
-      const queueItem = buildWorkQueueItem(document, now);
+      const queueItem = buildWorkQueueItem(document, now, actor);
       return queueItem ? [queueItem] : [];
     })
     .slice(0, 6);
@@ -126,24 +134,103 @@ function buildWorkQueue(
 function buildWorkQueueItem(
   document: DocumentListItem,
   now: Date,
+  actor?: DashboardModelOptions['actor'],
 ): DashboardWorkQueueItem | null {
   const hasDlp = document.dlpStatus === 'DETECTED';
   const dueSoon = isRetentionDueSoon(document, now);
 
+  if (actor) {
+    const roles = new Set(actor.roles);
+    const isAdmin = roles.has('admin');
+    const isOwner = document.ownerId === actor.id;
+
+    if ((roles.has('compliance_officer') || isAdmin) && hasDlp) {
+      return toQueueItem(
+        document,
+        'Security triage',
+        'critical',
+        'Inspect evidence',
+        isAdmin ? 'admin' : 'compliance',
+      );
+    }
+
+    if ((roles.has('compliance_officer') || isAdmin) && dueSoon) {
+      return toQueueItem(
+        document,
+        'Retention review',
+        'warning',
+        'Review retention',
+        isAdmin ? 'admin' : 'compliance',
+      );
+    }
+
+    if ((roles.has('approver') || isAdmin) && document.status === 'PENDING') {
+      return toQueueItem(
+        document,
+        hasDlp ? 'Approval and security review' : 'Pending approval',
+        hasDlp ? 'critical' : 'warning',
+        'Review decision',
+        isAdmin ? 'admin' : 'approver',
+      );
+    }
+
+    if ((roles.has('editor') || isAdmin) && isOwner && document.status === 'DRAFT') {
+      return toQueueItem(
+        document,
+        'Draft handoff',
+        'info',
+        'Prepare submission',
+        isAdmin ? 'admin' : 'owner',
+      );
+    }
+
+    return null;
+  }
+
   if (document.status === 'PENDING' && hasDlp) {
-    return toQueueItem(document, 'Approval and security review', 'critical');
+    return toQueueItem(
+      document,
+      'Approval and security review',
+      'critical',
+      'Review decision',
+      'general',
+    );
   }
   if (document.status === 'PENDING') {
-    return toQueueItem(document, 'Pending approval', 'warning');
+    return toQueueItem(
+      document,
+      'Pending approval',
+      'warning',
+      'Review decision',
+      'general',
+    );
   }
   if (document.status === 'DRAFT') {
-    return toQueueItem(document, 'Draft handoff', 'info');
+    return toQueueItem(
+      document,
+      'Draft handoff',
+      'info',
+      'Prepare submission',
+      'general',
+    );
   }
   if (hasDlp) {
-    return toQueueItem(document, 'Security triage', 'critical');
+    return toQueueItem(
+      document,
+      'Security triage',
+      'critical',
+      'Inspect evidence',
+      'general',
+    );
   }
   if (dueSoon) {
-    return toQueueItem(document, 'Retention review', 'warning');
+    return toQueueItem(
+      document,
+      'Retention review',
+      'warning',
+      'Review retention',
+      'general',
+    );
   }
 
   return null;
@@ -153,11 +240,15 @@ function toQueueItem(
   document: DocumentListItem,
   reason: string,
   tone: DashboardWidgetTone,
+  actionLabel: string,
+  roleScope: DashboardWorkQueueItem['roleScope'],
 ): DashboardWorkQueueItem {
   return {
     documentId: document.id,
     title: document.title,
     reason,
+    actionLabel,
+    roleScope,
     updatedAt: document.updatedAt,
     href: ROUTES.DOCUMENT_DETAIL(document.id),
     tone,

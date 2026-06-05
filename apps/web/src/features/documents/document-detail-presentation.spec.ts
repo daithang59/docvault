@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDocumentLifecycleTimeline,
   buildDocumentEvidenceLinks,
   buildDocumentMetadataSummary,
   getLatestDocumentVersion,
@@ -123,5 +124,90 @@ describe('getLatestDocumentVersion', () => {
         { ...version, id: 'version-2', version: 2, versionNumber: 2 },
       ])?.id,
     ).toBe('version-3');
+  });
+});
+
+describe('buildDocumentLifecycleTimeline', () => {
+  it('builds stage posture, evidence timestamps, and the next best action', () => {
+    const timeline = buildDocumentLifecycleTimeline(
+      {
+        ...document,
+        status: 'PENDING',
+        publishedAt: null,
+        archivedAt: null,
+      },
+      [
+        {
+          id: 'history-submit',
+          docId: 'doc-1',
+          action: 'SUBMIT',
+          actorId: 'editor-1',
+          actorDisplay: 'Editor One',
+          fromStatus: 'DRAFT',
+          toStatus: 'PENDING',
+          createdAt: '2026-06-01T09:30:00.000Z',
+        },
+      ],
+    );
+
+    expect(timeline.nextAction).toEqual({
+      label: 'Approve or reject',
+      description: 'Approver action is the next lifecycle decision.',
+      href: '/approvals',
+      tone: 'warning',
+    });
+    expect(timeline.stages).toEqual([
+      expect.objectContaining({
+        id: 'DRAFT',
+        label: 'Draft',
+        state: 'complete',
+      }),
+      expect.objectContaining({
+        id: 'PENDING',
+        label: 'In review',
+        state: 'current',
+        timestamp: '2026-06-01T09:30:00.000Z',
+        actorLabel: 'Editor One',
+      }),
+      expect.objectContaining({
+        id: 'PUBLISHED',
+        label: 'Published',
+        state: 'upcoming',
+      }),
+      expect.objectContaining({
+        id: 'ARCHIVED',
+        label: 'Archived',
+        state: 'upcoming',
+      }),
+    ]);
+  });
+
+  it('uses delete workflow evidence for archived lifecycle posture', () => {
+    const timeline = buildDocumentLifecycleTimeline(
+      {
+        ...document,
+        status: 'DELETED',
+        archivedAt: null,
+      },
+      [
+        {
+          id: 'history-delete',
+          docId: 'doc-1',
+          action: 'DELETE',
+          actorId: 'admin-1',
+          actorDisplay: 'Admin One',
+          fromStatus: 'DRAFT',
+          toStatus: 'DELETED',
+          createdAt: '2026-06-03T08:00:00.000Z',
+        },
+      ],
+    );
+
+    expect(timeline.currentStage).toBe('ARCHIVED');
+    expect(timeline.stages.find((stage) => stage.id === 'ARCHIVED')).toMatchObject({
+      state: 'current',
+      timestamp: '2026-06-03T08:00:00.000Z',
+      actorLabel: 'Admin One',
+    });
   });
 });

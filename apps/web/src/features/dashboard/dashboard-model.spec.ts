@@ -125,4 +125,48 @@ describe('buildDashboardModel', () => {
       'doc-archived',
     ]);
   });
+
+  it('prioritizes role-specific work queues with clear next actions', () => {
+    const approverModel = buildDashboardModel(documents, {
+      now,
+      actor: { id: 'approver-1', roles: ['approver'] },
+    });
+
+    expect(approverModel.workQueue).toEqual([
+      expect.objectContaining({
+        documentId: 'doc-pending-dlp',
+        reason: 'Approval and security review',
+        actionLabel: 'Review decision',
+        roleScope: 'approver',
+      }),
+    ]);
+
+    const editorModel = buildDashboardModel(documents, {
+      now,
+      actor: { id: 'editor-2', roles: ['editor'] },
+    });
+
+    expect(editorModel.workQueue).toEqual([
+      expect.objectContaining({
+        documentId: 'doc-draft',
+        reason: 'Draft handoff',
+        actionLabel: 'Prepare submission',
+        roleScope: 'owner',
+      }),
+    ]);
+
+    const complianceModel = buildDashboardModel(documents, {
+      now,
+      actor: { id: 'co-1', roles: ['compliance_officer'] },
+    });
+
+    expect(complianceModel.workQueue).toEqual([
+      expect.objectContaining({
+        documentId: 'doc-pending-dlp',
+        reason: 'Security triage',
+        actionLabel: 'Inspect evidence',
+        roleScope: 'compliance',
+      }),
+    ]);
+  });
 });

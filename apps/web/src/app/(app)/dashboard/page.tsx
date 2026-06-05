@@ -3,6 +3,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDocuments } from '@/lib/hooks/use-documents';
+import { useAuth } from '@/lib/auth/auth-context';
 import { PageHeader } from '@/components/common/page-header';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { LoadingState } from '@/components/common/loading-state';
@@ -33,20 +34,28 @@ import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 
 export default function DashboardPage() {
+  const { session } = useAuth();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
+  const documents = docs?.data;
+  const userId = session?.user.sub;
+  const userRoles = session?.user.roles;
   const unreadQuery = useQuery({
     queryKey: ['notifications', 'unread-count', 'dashboard'],
     queryFn: fetchUnreadCount,
     enabled: !isLoading,
     retry: false,
   });
+  const unreadCount = unreadQuery.data?.count ?? 0;
 
   const dashboard = useMemo(
     () =>
-      buildDashboardModel(docs?.data ?? [], {
-        unreadNotifications: unreadQuery.data?.count ?? 0,
+      buildDashboardModel(documents ?? [], {
+        unreadNotifications: unreadCount,
+        actor: userId && userRoles
+          ? { id: userId, roles: userRoles }
+          : undefined,
       }),
-    [docs?.data, unreadQuery.data?.count],
+    [documents, unreadCount, userId, userRoles],
   );
 
   if (isLoading) return <LoadingState label="Loading dashboard..." />;
@@ -146,6 +155,9 @@ export default function DashboardPage() {
                       </p>
                       <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
                         {item.reason}
+                      </p>
+                      <p className="mt-1 text-[11px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
+                        {item.actionLabel}
                       </p>
                     </div>
                     <span

@@ -131,7 +131,10 @@ export default function DocumentDetailPage({ params }: Props) {
             />
           </div>
           <div className="animate-in delay-3">
-            <DocumentWorkflowTimeline history={history} />
+            <DocumentWorkflowTimeline
+              history={history}
+              document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+            />
           </div>
         </div>
 

@@ -3,7 +3,12 @@ import { formatDateTime } from '@/lib/utils/date';
 import { formatBytes } from '@/lib/utils/file';
 import { truncateMiddle } from '@/lib/utils/format';
 import type { DocumentAccessDecision } from '@/lib/auth/permissions';
-import type { DocumentDetail, DocumentVersion } from './documents.types';
+import type {
+  DocumentDetail,
+  DocumentVersion,
+  WorkflowHistoryEntry,
+} from './documents.types';
+import type { DocumentStatus } from '@/types/enums';
 
 export type DocumentMetadataKind =
   | 'identity'
@@ -26,6 +31,31 @@ export interface DocumentEvidenceLink {
   label: string;
   href: string;
   description: string;
+}
+
+export type DocumentLifecycleStageState = 'complete' | 'current' | 'upcoming';
+export type DocumentLifecycleTone = 'info' | 'success' | 'warning' | 'critical';
+
+export interface DocumentLifecycleStage {
+  id: Extract<DocumentStatus, 'DRAFT' | 'PENDING' | 'PUBLISHED' | 'ARCHIVED'>;
+  label: string;
+  description: string;
+  state: DocumentLifecycleStageState;
+  timestamp?: string;
+  actorLabel?: string;
+}
+
+export interface DocumentLifecycleNextAction {
+  label: string;
+  description: string;
+  href: string;
+  tone: DocumentLifecycleTone;
+}
+
+export interface DocumentLifecycleTimeline {
+  currentStage: DocumentLifecycleStage['id'];
+  nextAction: DocumentLifecycleNextAction | null;
+  stages: DocumentLifecycleStage[];
 }
 
 export type VersionPreviewPostureState =
@@ -168,6 +198,34 @@ export function buildDocumentEvidenceLinks(
   return links;
 }
 
+export function buildDocumentLifecycleTimeline(
+  document: DocumentDetail,
+  history: WorkflowHistoryEntry[] = [],
+): DocumentLifecycleTimeline {
+  const currentStage = normalizeLifecycleStage(document.status);
+  const currentIndex = LIFECYCLE_STAGES.findIndex((stage) => stage.id === currentStage);
+
+  return {
+    currentStage,
+    nextAction: buildLifecycleNextAction(document),
+    stages: LIFECYCLE_STAGES.map((stage, index) => {
+      const evidence = findLifecycleEvidence(document, history, stage.id);
+
+      return {
+        ...stage,
+        state:
+          index < currentIndex
+            ? 'complete'
+            : index === currentIndex
+              ? 'current'
+              : 'upcoming',
+        timestamp: evidence?.timestamp,
+        actorLabel: evidence?.actorLabel,
+      };
+    }),
+  };
+}
+
 export function getVersionPreviewPosture(
   version: DocumentVersion,
   previewDecision: DocumentAccessDecision,
@@ -262,4 +320,123 @@ function formatEnum(value: string): string {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+const LIFECYCLE_STAGES: Array<
+  Omit<DocumentLifecycleStage, 'state' | 'timestamp' | 'actorLabel'>
+> = [
+  {
+    id: 'DRAFT',
+    label: 'Draft',
+    description: 'Metadata and file preparation before review.',
+  },
+  {
+    id: 'PENDING',
+    label: 'In review',
+    description: 'Approver decision is required.',
+  },
+  {
+    id: 'PUBLISHED',
+    label: 'Published',
+    description: 'Readable and governed by download policy.',
+  },
+  {
+    id: 'ARCHIVED',
+    label: 'Archived',
+    description: 'Closed by lifecycle or retention policy.',
+  },
+];
+
+function normalizeLifecycleStage(
+  status: DocumentStatus,
+): DocumentLifecycleStage['id'] {
+  if (status === 'DELETED') return 'ARCHIVED';
+  return status;
+}
+
+function buildLifecycleNextAction(
+  document: DocumentDetail,
+): DocumentLifecycleNextAction | null {
+  if (document.status === 'DRAFT') {
+    return {
+      label: 'Submit for approval',
+      description: 'Owner or admin can send this draft into review.',
+      href: ROUTES.DOCUMENT_EDIT(document.id),
+      tone: 'info',
+    };
+  }
+
+  if (document.status === 'PENDING') {
+    return {
+      label: 'Approve or reject',
+      description: 'Approver action is the next lifecycle decision.',
+      href: ROUTES.APPROVALS,
+      tone: 'warning',
+    };
+  }
+
+  if (document.dlpStatus === 'DETECTED') {
+    return {
+      label: 'Inspect security evidence',
+      description: 'DLP findings should be reviewed before broader access.',
+      href: ROUTES.SECURITY,
+      tone: 'critical',
+    };
+  }
+
+  if (document.status === 'PUBLISHED') {
+    return {
+      label: 'Monitor retention',
+      description: 'Review retention posture and lifecycle evidence.',
+      href: ROUTES.RETENTION,
+      tone: 'success',
+    };
+  }
+
+  if (document.status === 'ARCHIVED') {
+    return {
+      label: 'Review evidence packet',
+      description: 'Archived records are best reviewed through metadata-only evidence.',
+      href: ROUTES.EVIDENCE,
+      tone: 'success',
+    };
+  }
+
+  return null;
+}
+
+function findLifecycleEvidence(
+  document: DocumentDetail,
+  history: WorkflowHistoryEntry[],
+  stage: DocumentLifecycleStage['id'],
+): { timestamp: string; actorLabel?: string } | null {
+  const matchingHistory = [...history]
+    .filter((entry) => normalizeLifecycleStage(entry.toStatus) === stage)
+    .sort(
+      (left, right) =>
+        new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime(),
+    )[0];
+
+  if (matchingHistory) {
+    return {
+      timestamp: matchingHistory.createdAt,
+      actorLabel:
+        matchingHistory.actorDisplay ?? matchingHistory.actorId ?? undefined,
+    };
+  }
+
+  if (stage === 'DRAFT') {
+    return {
+      timestamp: document.createdAt,
+      actorLabel: document.ownerDisplay ?? document.ownerId,
+    };
+  }
+  if (stage === 'PUBLISHED' && document.publishedAt) {
+    return { timestamp: document.publishedAt };
+  }
+  if (stage === 'ARCHIVED' && document.archivedAt) {
+    return { timestamp: document.archivedAt };
+  }
+
+  return null;
 }
