@@ -1,5 +1,171 @@
 import { MetadataProxyController } from './metadata.proxy.controller';
 import { ProxyService } from './proxy.service';
+import { SensitiveActionProofService } from './sensitive-action-proof.service';
+
+const STEP_UP_HEADER = 'x-docvault-step-up-proof';
+
+function makeReq(options?: {
+  user?: Record<string, unknown>;
+  headers?: Record<string, string>;
+  url?: string;
+}) {
+  return {
+    user: options?.user ?? {
+      sub: 'admin-1',
+      username: 'admin1',
+      roles: ['admin'],
+    },
+    headers: options?.headers ?? {},
+    url: options?.url ?? '/metadata/retention/run',
+  };
+}
+
+function makeController(proxyService: ProxyService): MetadataProxyController {
+  return new MetadataProxyController(
+    proxyService,
+    new SensitiveActionProofService(),
+  );
+}
+
+describe('MetadataProxyController sensitive action proof', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+    process.env.AUDIT_SERVICE_URL = 'http://audit-service:3001';
+    process.env.SENSITIVE_ACTION_PROOF_SECRET = 'test-step-up-secret';
+  });
+
+  afterEach(() => {
+    delete process.env.SENSITIVE_ACTION_PROOF_SECRET;
+  });
+
+  it('rejects retention runs before proxying when the step-up proof is missing', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { archived: 1 } }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    await expect(
+      (controller as any).runRetention(
+        makeReq({ url: '/metadata/retention/run?asOf=2026-06-01' }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 403 }),
+    });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects evidence packet exports before proxying when the step-up proof is missing', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { records: [] } }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    await expect(
+      (controller as any).getEvidencePacket(
+        'doc-1',
+        makeReq({
+          user: {
+            sub: 'co-1',
+            username: 'co1',
+            roles: ['compliance_officer'],
+          },
+          url: '/metadata/documents/doc-1/evidence-packet',
+        }),
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 403 }),
+    });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
+  it('issues a short-lived proof for a matching normalized challenge phrase', async () => {
+    const proxyService = {
+      forward: jest.fn(),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    const issued = await (controller as any).issueSensitiveActionProof(
+      makeReq(),
+      {
+        action: 'run-retention',
+        challengePhrase: ' run   retention ',
+      },
+    );
+
+    expect(issued).toMatchObject({
+      proof: expect.any(String),
+      expiresAt: expect.any(String),
+    });
+    expect(issued.proof.split('.')).toHaveLength(2);
+    expect(new Date(issued.expiresAt).getTime()).toBeGreaterThan(Date.now());
+    expect(new Date(issued.expiresAt).getTime()).toBeLessThanOrEqual(
+      Date.now() + 5 * 60 * 1000,
+    );
+  });
+
+  it('rejects proof requests when the phrase does not match the action', async () => {
+    const proxyService = {
+      forward: jest.fn(),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    await expect(
+      (controller as any).issueSensitiveActionProof(makeReq(), {
+        action: 'run-retention',
+        challengePhrase: 'EXPORT EVIDENCE',
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 400 }),
+    });
+  });
+
+  it('allows a retention run with a proof issued for the same actor and action', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { archived: 1 } }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = makeReq({ url: '/metadata/retention/run' });
+    const issued = await (controller as any).issueSensitiveActionProof(req, {
+      action: 'run-retention',
+      challengePhrase: 'RUN RETENTION',
+    });
+
+    const result = await (controller as any).runRetention({
+      ...req,
+      headers: { [STEP_UP_HEADER]: issued.proof },
+    });
+
+    expect(result).toEqual({ archived: 1 });
+    expect(proxyService.forward).toHaveBeenCalledWith(expect.anything(), {
+      method: 'POST',
+      url: `${metadataUrl}/retention/run`,
+    });
+  });
+
+  it('rejects a proof issued for a different sensitive action', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { archived: 1 } }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = makeReq({ url: '/metadata/retention/run' });
+    const issued = await (controller as any).issueSensitiveActionProof(req, {
+      action: 'export-evidence-packet',
+      challengePhrase: 'EXPORT EVIDENCE',
+    });
+
+    await expect(
+      (controller as any).runRetention({
+        ...req,
+        headers: { [STEP_UP_HEADER]: issued.proof },
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 403 }),
+    });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+});
 
 describe('MetadataProxyController evidence packet', () => {
   const metadataUrl = 'http://metadata-service:3002';
@@ -8,6 +174,7 @@ describe('MetadataProxyController evidence packet', () => {
   beforeEach(() => {
     process.env.METADATA_SERVICE_URL = metadataUrl;
     process.env.AUDIT_SERVICE_URL = auditUrl;
+    process.env.SENSITIVE_ACTION_PROOF_SECRET = 'test-step-up-secret';
   });
 
   it('assembles document metadata, retention, workflow, and audit evidence without file grants', async () => {
@@ -110,14 +277,24 @@ describe('MetadataProxyController evidence packet', () => {
         },
       ),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
-
-    const packet = await (controller as any).getEvidencePacket('doc-1', {
+    const controller = makeController(proxyService);
+    const req = {
       user: {
         sub: 'co-1',
         username: 'co1',
         roles: ['compliance_officer'],
       },
+      headers: {},
+      url: '/metadata/documents/doc-1/evidence-packet',
+    };
+    const issued = await (controller as any).issueSensitiveActionProof(req, {
+      action: 'export-evidence-packet',
+      challengePhrase: 'EXPORT EVIDENCE',
+    });
+
+    const packet = await (controller as any).getEvidencePacket('doc-1', {
+      ...req,
+      headers: { [STEP_UP_HEADER]: issued.proof },
     });
 
     expect(packet).toMatchObject({
@@ -214,7 +391,7 @@ describe('MetadataProxyController AI guardrails', () => {
     const proxyService = {
       forward: jest.fn().mockResolvedValue({ data: aiGuardrails }),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
+    const controller = makeController(proxyService);
 
     const result = await (controller as any).getAiGuardrails('doc-1', {
       user: {
@@ -249,7 +426,7 @@ describe('MetadataProxyController access impact preview', () => {
     const proxyService = {
       forward: jest.fn().mockResolvedValue({ data: preview }),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
+    const controller = makeController(proxyService);
 
     const result = await (controller as any).getAccessImpactPreview(
       'doc-1',
@@ -290,7 +467,7 @@ describe('MetadataProxyController document saved views', () => {
     const proxyService = {
       forward: jest.fn().mockResolvedValue({ data: savedViews }),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
+    const controller = makeController(proxyService);
     const req = { user: { sub: 'user-1', roles: ['viewer'] }, headers: {} };
 
     const result = await (controller as any).listDocumentSavedViews(req);
@@ -313,7 +490,7 @@ describe('MetadataProxyController document saved views', () => {
     const proxyService = {
       forward: jest.fn().mockResolvedValue({ data: created }),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
+    const controller = makeController(proxyService);
     const req = { user: { sub: 'admin-1', roles: ['admin'] }, headers: {} };
 
     const result = await (controller as any).createDocumentSavedView(req, body);
@@ -331,7 +508,7 @@ describe('MetadataProxyController document saved views', () => {
     const proxyService = {
       forward: jest.fn().mockResolvedValue({ data: deleted }),
     } as unknown as ProxyService;
-    const controller = new MetadataProxyController(proxyService);
+    const controller = makeController(proxyService);
     const req = { user: { sub: 'user-1', roles: ['viewer'] }, headers: {} };
 
     const result = await (controller as any).deleteDocumentSavedView(

@@ -21,6 +21,7 @@ import {
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { ProxyService } from './proxy.service';
+import { SensitiveActionProofService } from './sensitive-action-proof.service';
 
 const EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES = [
   'fileContent',
@@ -43,7 +44,10 @@ const EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS = [
 @ApiSecurity('cookie')
 @Controller('metadata')
 export class MetadataProxyController {
-  constructor(private readonly proxyService: ProxyService) {}
+  constructor(
+    private readonly proxyService: ProxyService,
+    private readonly sensitiveActionProofService: SensitiveActionProofService,
+  ) {}
 
   @Get('documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -95,6 +99,7 @@ export class MetadataProxyController {
       'Admin-only demo endpoint that runs the retention job. Optional `asOf` query parameter can be used as a deterministic demo clock.',
   })
   async runRetention(@Req() req: any) {
+    this.sensitiveActionProofService.assertProof(req, 'run-retention');
     const queryString = req.url.includes('?')
       ? req.url.substring(req.url.indexOf('?'))
       : '';
@@ -103,6 +108,19 @@ export class MetadataProxyController {
       url: `${process.env.METADATA_SERVICE_URL}/retention/run${queryString}`,
     });
     return response.data;
+  }
+
+  @Post('sensitive-actions/proof')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Issue sensitive action proof',
+    description:
+      'Issues a short-lived HMAC proof after typed confirmation for metadata sensitive actions.',
+  })
+  async issueSensitiveActionProof(@Req() req: any, @Body() body: any) {
+    return this.sensitiveActionProofService.issueProof(req, body);
   }
 
   @Get('documents/:docId')
@@ -134,6 +152,10 @@ export class MetadataProxyController {
     @Req() req: any,
     @Query('asOf') asOf?: string,
   ) {
+    this.sensitiveActionProofService.assertProof(
+      req,
+      'export-evidence-packet',
+    );
     const documentResponse = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,

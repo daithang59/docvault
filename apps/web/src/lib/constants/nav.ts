@@ -8,6 +8,7 @@ import {
   Bell,
   ShieldAlert,
   Shield,
+  KeyRound,
   Archive,
   ClipboardCheck,
 } from 'lucide-react';
@@ -75,6 +76,12 @@ export const NAV_ITEMS: NavItem[] = [
     label: 'Security',
     href: ROUTES.SECURITY,
     icon: ShieldAlert,
+    roles: ['compliance_officer', 'admin'],
+  },
+  {
+    label: 'Access Review',
+    href: ROUTES.ACCESS_REVIEW,
+    icon: KeyRound,
     roles: ['compliance_officer', 'admin'],
   },
   {

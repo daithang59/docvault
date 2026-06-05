@@ -1,5 +1,6 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { Archive, CalendarClock, RefreshCw, Shield, TimerReset } from 'lucide-react';
 import { toast } from 'sonner';
@@ -9,10 +10,12 @@ import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { PageHeader } from '@/components/common/page-header';
+import { StepUpConfirmDialog } from '@/components/common/step-up-confirm-dialog';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 import { formatDateTime } from '@/lib/utils/date';
+import { getSensitiveActionStepUp } from '@/features/security/sensitive-action';
 import {
   useRetentionEvidence,
   useRunRetention,
@@ -34,12 +37,13 @@ export default function RetentionPage() {
   const { session } = useAuth();
   const hasAccess = canViewAudit(session);
   const isAdmin = session?.user.roles.includes('admin') ?? false;
+  const [isRunRetentionStepUpOpen, setIsRunRetentionStepUpOpen] = useState(false);
   const { data, isLoading, isError, refetch } = useRetentionEvidence();
   const runRetention = useRunRetention();
 
-  async function handleRunRetention() {
+  async function handleRunRetention(challengePhrase: string) {
     try {
-      const result = await runRetention.mutateAsync(undefined);
+      const result = await runRetention.mutateAsync({ challengePhrase });
       toast.success(`Retention run archived ${result.archived} record${result.archived === 1 ? '' : 's'}.`);
     } catch {
       toast.error('Retention run failed.');
@@ -84,7 +88,7 @@ export default function RetentionPage() {
             isAdmin ? (
               <button
                 type="button"
-                onClick={handleRunRetention}
+                onClick={() => setIsRunRetentionStepUpOpen(true)}
                 disabled={runRetention.isPending}
                 className="btn-primary inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition disabled:cursor-not-allowed disabled:opacity-60"
               >
@@ -171,6 +175,14 @@ export default function RetentionPage() {
           </div>
         </div>
       )}
+
+      <StepUpConfirmDialog
+        open={isRunRetentionStepUpOpen}
+        onOpenChange={setIsRunRetentionStepUpOpen}
+        stepUp={getSensitiveActionStepUp('run-retention')}
+        loading={runRetention.isPending}
+        onConfirm={handleRunRetention}
+      />
     </div>
   );
 }

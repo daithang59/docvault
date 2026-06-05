@@ -18,6 +18,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { PageHeader } from '@/components/common/page-header';
+import { StepUpConfirmDialog } from '@/components/common/step-up-confirm-dialog';
 import { getSecurityRecommendationWorkflowHistory, getSecuritySummary } from '@/features/audit/audit.api';
 import { auditKeys } from '@/features/audit/audit.keys';
 import {
@@ -41,6 +42,8 @@ import {
 import { buildEvidenceReportHtml } from '@/features/evidence/evidence-report';
 import { getRetentionEvidence } from '@/features/retention/retention.api';
 import { retentionKeys } from '@/features/retention/retention.keys';
+import { requestSensitiveActionProof } from '@/features/security/sensitive-action.api';
+import { getSensitiveActionStepUp } from '@/features/security/sensitive-action';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -63,6 +66,8 @@ export default function EvidenceCenterPage() {
   const [generatedAt, setGeneratedAt] = useState(() => new Date().toISOString());
   const [pendingRecommendationId, setPendingRecommendationId] = useState<string | null>(null);
   const [pendingDocumentId, setPendingDocumentId] = useState<string | null>(null);
+  const [stepUpDocumentTarget, setStepUpDocumentTarget] =
+    useState<EvidenceDocumentPacketTarget | null>(null);
   const [downloadError, setDownloadError] = useState<string | null>(null);
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
@@ -227,18 +232,32 @@ export default function EvidenceCenterPage() {
     }
   }
 
-  async function downloadDocumentPacket(target: EvidenceDocumentPacketTarget) {
+  function downloadDocumentPacket(target: EvidenceDocumentPacketTarget) {
+    setStepUpDocumentTarget(target);
+  }
+
+  async function confirmDocumentPacketDownload(challengePhrase: string) {
+    const target = stepUpDocumentTarget;
+    if (!target) return;
+
     setPendingDocumentId(target.docId);
     setDownloadError(null);
     try {
+      const { proof } = await requestSensitiveActionProof({
+        action: 'export-evidence-packet',
+        challengePhrase,
+      });
       const packet = buildEvidenceCenterDocumentPacket(
-        await getComplianceEvidencePacket(target.docId),
+        await getComplianceEvidencePacket(target.docId, {
+          stepUpProof: proof,
+        }),
       );
       downloadJson(packet, target.packetFilename);
     } catch {
       setDownloadError('Failed to export document packet.');
     } finally {
       setPendingDocumentId(null);
+      setStepUpDocumentTarget(null);
     }
   }
 
@@ -402,6 +421,18 @@ export default function EvidenceCenterPage() {
           />
         </section>
       )}
+
+      <StepUpConfirmDialog
+        open={Boolean(stepUpDocumentTarget)}
+        onOpenChange={(open) => {
+          if (!open) setStepUpDocumentTarget(null);
+        }}
+        stepUp={getSensitiveActionStepUp('export-evidence-packet')}
+        loading={Boolean(
+          stepUpDocumentTarget && pendingDocumentId === stepUpDocumentTarget.docId,
+        )}
+        onConfirm={confirmDocumentPacketDownload}
+      />
     </div>
   );
 }
@@ -1045,7 +1076,7 @@ function DocumentPacketTargets({
   pendingId: string | null;
   selectedIds: Set<string>;
   onToggleSelection: (id: string) => void;
-  onDownload: (item: EvidenceDocumentPacketTarget) => Promise<void>;
+  onDownload: (item: EvidenceDocumentPacketTarget) => void;
 }) {
   return (
     <div

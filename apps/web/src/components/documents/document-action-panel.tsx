@@ -25,6 +25,7 @@ import {
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useExportComplianceEvidencePacket } from '@/features/documents/documents.hooks';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { StepUpConfirmDialog } from '@/components/common/step-up-confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
 import {
   Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2, FileJson
@@ -34,6 +35,7 @@ import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
+import { getSensitiveActionStepUp } from '@/features/security/sensitive-action';
 
 interface DocumentActionPanelProps {
   doc: DocumentDetail;
@@ -54,6 +56,7 @@ export function DocumentActionPanel({
   const [rejectReason, setRejectReason] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isEvidenceStepUpOpen, setIsEvidenceStepUpOpen] = useState(false);
 
   const submit = useSubmitDocument(doc.id);
   const approve = useApproveDocument(doc.id);
@@ -304,7 +307,7 @@ export function DocumentActionPanel({
 
         {canViewComplianceEvidencePacket(session) && (
           <button
-            onClick={() => exportEvidencePacket.mutate()}
+            onClick={() => setIsEvidenceStepUpOpen(true)}
             disabled={exportEvidencePacket.isPending}
             className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)] disabled:opacity-50"
           >
@@ -376,6 +379,15 @@ export function DocumentActionPanel({
             const msg = getErrorMessage(e);
             toast.error(msg);
           }
+        }}
+      />
+      <StepUpConfirmDialog
+        open={isEvidenceStepUpOpen}
+        onOpenChange={setIsEvidenceStepUpOpen}
+        stepUp={getSensitiveActionStepUp('export-evidence-packet')}
+        loading={exportEvidencePacket.isPending}
+        onConfirm={async (challengePhrase) => {
+          await exportEvidencePacket.mutateAsync(challengePhrase);
         }}
       />
     </div>

@@ -11,6 +11,7 @@ export const ROUTES = {
   NOTIFICATIONS: '/notifications',
   EVIDENCE: '/evidence',
   SECURITY: '/security',
+  ACCESS_REVIEW: '/access-review',
   AUDIT: '/audit',
   RETENTION: '/retention',
   PROFILE: '/profile',

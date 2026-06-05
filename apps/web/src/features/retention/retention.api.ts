@@ -5,6 +5,12 @@ import type {
   RetentionEvidenceResult,
   RetentionRunResult,
 } from './retention.types';
+import { SENSITIVE_ACTION_PROOF_HEADER } from '@/features/security/sensitive-action';
+
+export interface RunRetentionInput {
+  asOf?: string;
+  stepUpProof?: string;
+}
 
 export async function getRetentionEvidence(
   asOf?: string,
@@ -18,12 +24,19 @@ export async function getRetentionEvidence(
   return unwrap(res);
 }
 
-export async function runRetention(asOf?: string): Promise<RetentionRunResult> {
+export async function runRetention(
+  input: RunRetentionInput = {},
+): Promise<RetentionRunResult> {
   const res = await apiClient.post<RetentionRunResult>(
     apiEndpoints.metadata.retention.run,
     undefined,
     {
-      params: asOf ? { asOf } : undefined,
+      params: input.asOf ? { asOf: input.asOf } : undefined,
+      headers: input.stepUpProof
+        ? {
+            [SENSITIVE_ACTION_PROOF_HEADER]: input.stepUpProof,
+          }
+        : undefined,
     },
   );
   return unwrap(res);

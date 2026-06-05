@@ -23,6 +23,7 @@ import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclE
 import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
 import apiClient from '@/lib/api/client';
+import { requestSensitiveActionProof } from '@/features/security/sensitive-action.api';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -164,8 +165,14 @@ export function useDownloadDocument() {
 
 export function useExportComplianceEvidencePacket(id: string) {
   return useMutation({
-    mutationFn: async () => {
-      const packet = await getComplianceEvidencePacket(id);
+    mutationFn: async (challengePhrase: string) => {
+      const { proof } = await requestSensitiveActionProof({
+        action: 'export-evidence-packet',
+        challengePhrase,
+      });
+      const packet = await getComplianceEvidencePacket(id, {
+        stepUpProof: proof,
+      });
       const blob = new Blob([JSON.stringify(packet, null, 2)], {
         type: 'application/json',
       });

@@ -25,6 +25,18 @@ type MockDocument = {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
+  aclEntries?: MockAclEntry[];
+};
+
+type MockAclEntry = {
+  id: string;
+  docId?: string;
+  subjectType: 'USER' | 'ROLE' | 'GROUP' | 'ALL';
+  subjectId?: string | null;
+  subjectDisplay?: string;
+  permission: 'READ' | 'DOWNLOAD' | 'WRITE' | 'APPROVE';
+  effect: 'ALLOW' | 'DENY';
+  createdAt: string;
 };
 
 const SESSION = {
@@ -41,6 +53,9 @@ const SESSION = {
     groups: [],
   },
 };
+
+const STEP_UP_HEADER = 'x-docvault-step-up-proof';
+const STEP_UP_PROOF = 'playwright-step-up-proof';
 
 function hoursAgo(hours: number): string {
   return new Date(Date.now() - hours * 60 * 60 * 1000).toISOString();
@@ -73,6 +88,17 @@ function buildDocuments(): MockDocument[] {
       tags: ['security', 'dlp', 'incident'],
       createdAt: hoursAgo(72),
       updatedAt: hoursAgo(20),
+      aclEntries: [
+        {
+          id: 'acl-secret-all-download',
+          docId: 'doc-secret-overdue',
+          subjectType: 'ALL',
+          subjectDisplay: 'Everyone',
+          permission: 'DOWNLOAD',
+          effect: 'ALLOW',
+          createdAt: '2025-05-01T00:00:00.000Z',
+        },
+      ],
     },
     {
       id: 'doc-confidential-due-soon',
@@ -162,6 +188,136 @@ async function fulfillApi(route: Route) {
 
   if (pathname === '/api/metadata/documents') {
     await route.fulfill({ status: 200, json: documents });
+    return;
+  }
+
+  const documentDetailMatch = pathname.match(/^\/api\/metadata\/documents\/([^/]+)$/);
+  if (documentDetailMatch) {
+    const document = documents.find((item) => item.id === documentDetailMatch[1]);
+    if (!document) {
+      await route.fulfill({ status: 404, json: { message: 'Document not found' } });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      json: {
+        ...document,
+        versions: [],
+        aclEntries: document.aclEntries ?? [],
+        workflowHistory: [],
+      },
+    });
+    return;
+  }
+
+  if (pathname === '/api/metadata/retention/documents') {
+    await route.fulfill({
+      status: 200,
+      json: {
+        checkedAt: new Date().toISOString(),
+        summary: {
+          tracked: 1,
+          dueSoon: 1,
+          overdue: 0,
+          archived: 0,
+        },
+        records: [
+          {
+            docId: 'doc-published-library',
+            title: 'Published Library Index',
+            status: 'PUBLISHED',
+            classification: 'INTERNAL',
+            publishedAt: hoursAgo(8),
+            archivedAt: null,
+            retentionClass: 'INTERNAL_365D',
+            retentionUntil: hoursFromNow(300 * 24),
+            retentionReason: 'Published operational reference.',
+            retentionStatus: 'DUE_SOON',
+            daysRemaining: 300,
+          },
+        ],
+      },
+    });
+    return;
+  }
+
+  if (pathname === '/api/metadata/sensitive-actions/proof') {
+    const body = request.postDataJSON() as {
+      action?: string;
+      challengePhrase?: string;
+    };
+    const expectedPhrase =
+      body.action === 'run-retention'
+        ? 'RUN RETENTION'
+        : body.action === 'export-evidence-packet'
+          ? 'EXPORT EVIDENCE'
+          : null;
+
+    if (!expectedPhrase || body.challengePhrase !== expectedPhrase) {
+      await route.fulfill({
+        status: 400,
+        json: { message: 'Invalid sensitive action challenge phrase' },
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      json: {
+        proof: STEP_UP_PROOF,
+        expiresAt: hoursFromNow(1),
+      },
+    });
+    return;
+  }
+
+  if (pathname === '/api/metadata/retention/run') {
+    if (request.headers()[STEP_UP_HEADER] !== STEP_UP_PROOF) {
+      await route.fulfill({
+        status: 403,
+        json: { message: 'Invalid or expired sensitive action proof' },
+      });
+      return;
+    }
+
+    await route.fulfill({
+      status: 200,
+      json: {
+        archived: 1,
+        checkedAt: new Date().toISOString(),
+      },
+    });
+    return;
+  }
+
+  const evidencePacketMatch = pathname.match(
+    /^\/api\/metadata\/documents\/([^/]+)\/evidence-packet$/,
+  );
+  if (evidencePacketMatch) {
+    if (request.headers()[STEP_UP_HEADER] !== STEP_UP_PROOF) {
+      await route.fulfill({
+        status: 403,
+        json: { message: 'Invalid or expired sensitive action proof' },
+      });
+      return;
+    }
+
+    const document = documents.find((item) => item.id === evidencePacketMatch[1]);
+    await route.fulfill({
+      status: document ? 200 : 404,
+      json: document
+        ? {
+            generatedAt: new Date().toISOString(),
+            metadataOnly: true,
+            document,
+            versions: [],
+            aclEntries: document.aclEntries ?? [],
+            workflowHistory: [],
+            retention: { record: null },
+            audit: { chain: { valid: true }, events: [] },
+          }
+        : { message: 'Document not found' },
+    });
     return;
   }
 
@@ -364,6 +520,35 @@ test('dashboard shows business demo readiness without horizontal overflow', asyn
       readinessPanel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     )
     .toBe(true);
+});
+
+test('access review flags broad sensitive grants and retention run requires step-up', async ({
+  page,
+}) => {
+  await page.goto('/access-review');
+
+  await expect(
+    page.getByRole('heading', { name: 'Access Review', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Access review required')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'Incident Export' }).first()).toBeVisible();
+  await expect(page.getByText('Everyone').first()).toBeVisible();
+  await expect(page.getByRole('link', { name: /Review ACL/ }).first()).toBeVisible();
+
+  await page.goto('/retention');
+  await page.getByRole('button', { name: 'Run Retention' }).click();
+  const dialog = page.getByRole('dialog', {
+    name: 'Step-up verification required',
+  });
+  await expect(dialog).toBeVisible();
+  await expect(dialog.getByText('Type RUN RETENTION to continue')).toBeVisible();
+  await expect(dialog.getByRole('button', { name: 'Run retention' })).toBeDisabled();
+
+  await dialog.getByLabel(/Type RUN RETENTION/).fill('RUN RETENTION');
+  await expect(dialog.getByRole('button', { name: 'Run retention' })).toBeEnabled();
+  await dialog.getByRole('button', { name: 'Run retention' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Retention run archived 1 record.')).toBeVisible();
 });
 
 test('documents filters stay usable on a mobile viewport', async ({ page }, testInfo) => {

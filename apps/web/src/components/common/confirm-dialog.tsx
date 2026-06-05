@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   variant?: 'default' | 'destructive';
   onConfirm: () => void | Promise<void>;
   loading?: boolean;
+  confirmDisabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -26,6 +27,7 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   loading,
+  confirmDisabled = false,
   children,
 }: ConfirmDialogProps) {
   const [internalLoading, setInternalLoading] = useState(false);
@@ -131,7 +133,7 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
             className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
               variant === 'destructive'
                 ? 'bg-[var(--color-destructive)] hover:brightness-95'

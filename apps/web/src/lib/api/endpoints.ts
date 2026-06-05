@@ -29,6 +29,9 @@ export const apiEndpoints = {
       documents: '/metadata/retention/documents',
       run: '/metadata/retention/run',
     },
+    sensitiveActions: {
+      proof: '/metadata/sensitive-actions/proof',
+    },
   },
   documents: {
     upload: (docId: string) => `/documents/${docId}/upload`,

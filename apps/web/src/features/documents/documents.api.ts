@@ -20,6 +20,11 @@ import type {
   DocumentAccessImpactRequest,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
+import { SENSITIVE_ACTION_PROOF_HEADER } from '@/features/security/sensitive-action';
+
+interface SensitiveActionProofOptions {
+  stepUpProof?: string;
+}
 
 function normalizeDocumentSummary(document: DocumentListItem): DocumentListItem {
   return document;
@@ -86,9 +91,19 @@ export async function getDocument(id: string): Promise<DocumentDetail> {
   return normalizeDocumentDetail(unwrap(res));
 }
 
-export async function getComplianceEvidencePacket(id: string): Promise<ComplianceEvidencePacket> {
+export async function getComplianceEvidencePacket(
+  id: string,
+  options: SensitiveActionProofOptions = {},
+): Promise<ComplianceEvidencePacket> {
   const res = await apiClient.get<ComplianceEvidencePacket>(
     apiEndpoints.metadata.documents.evidencePacket(id),
+    options.stepUpProof
+      ? {
+          headers: {
+            [SENSITIVE_ACTION_PROOF_HEADER]: options.stepUpProof,
+          },
+        }
+      : undefined,
   );
   return unwrap(res);
 }

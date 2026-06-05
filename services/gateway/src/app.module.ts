@@ -10,6 +10,7 @@ import { DocumentsProxyController } from './proxy/documents.proxy.controller';
 import { WorkflowProxyController } from './proxy/workflow.proxy.controller';
 import { AuditProxyController } from './proxy/audit.proxy.controller';
 import { NotifyProxyController } from './proxy/notify.proxy.controller';
+import { SensitiveActionProofService } from './proxy/sensitive-action-proof.service';
 
 @Module({
   imports: [AuthModule, UsersModule, HttpModule],
@@ -22,6 +23,6 @@ import { NotifyProxyController } from './proxy/notify.proxy.controller';
     AuditProxyController,
     NotifyProxyController,
   ],
-  providers: [ProxyService],
+  providers: [ProxyService, SensitiveActionProofService],
 })
 export class AppModule {}
