@@ -464,6 +464,11 @@ function NotificationRow({
             <span className="font-medium">{documentLabel}</span>
             <span className="text-[var(--text-muted)]"> - {item.description}</span>
           </p>
+          {item.workflowSummary ? (
+            <p className="mt-1 text-xs font-medium text-[var(--text-muted)]">
+              {item.workflowSummary}
+            </p>
+          ) : null}
         </div>
 
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--text-muted)]">

@@ -21,6 +21,7 @@ export interface NotificationRecord {
   docTitle?:   string;
   reason?:     string;
   traceId?:    string;
+  metadata?:   Record<string, unknown>;
   createdAt:   string;
   read:        boolean;
 }

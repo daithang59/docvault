@@ -36,6 +36,7 @@ export interface NotificationCenterItem extends NotificationRecord {
   description: string;
   targetHref: string;
   actionLabel: string;
+  workflowSummary?: string;
 }
 
 export interface NotificationCenterModel {
@@ -146,6 +147,7 @@ export function toNotificationCenterItem(
       'A document notification needs attention.',
     targetHref: target.href,
     actionLabel: target.label,
+    workflowSummary: getWorkflowSummary(record.metadata),
   };
 }
 
@@ -222,4 +224,30 @@ function formatTypeLabel(type: string): string {
     .filter(Boolean)
     .map((part) => part[0].toUpperCase() + part.slice(1))
     .join(' ');
+}
+
+function getWorkflowSummary(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const workflow = (metadata as { workflow?: unknown }).workflow;
+  if (!workflow || typeof workflow !== 'object') return undefined;
+
+  const {
+    fromStatus,
+    toStatus,
+    actorId,
+  } = workflow as {
+    fromStatus?: unknown;
+    toStatus?: unknown;
+    actorId?: unknown;
+  };
+
+  if (
+    typeof fromStatus !== 'string' ||
+    typeof toStatus !== 'string' ||
+    typeof actorId !== 'string'
+  ) {
+    return undefined;
+  }
+
+  return `${fromStatus} -> ${toStatus} by ${actorId}`;
 }

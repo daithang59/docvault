@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { Document } from '../../generated/prisma';
+import { Document, Prisma } from '../../generated/prisma';
 import { AuditClient } from '../audit/audit.client';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
@@ -56,31 +56,7 @@ export class DocumentsService {
 
     const isAdmin = roles.includes('admin');
 
-    // Build optional text search filter
-    const searchFilter = searchQuery
-      ? {
-          OR: [
-            { title: { contains: searchQuery, mode: 'insensitive' as const } },
-            {
-              description: {
-                contains: searchQuery,
-                mode: 'insensitive' as const,
-              },
-            },
-            { tags: { has: searchQuery } },
-            {
-              versions: {
-                some: {
-                  filename: {
-                    contains: searchQuery,
-                    mode: 'insensitive' as const,
-                  },
-                },
-              },
-            },
-          ],
-        }
-      : undefined;
+    const searchFilter = this.buildDocumentSearchFilter(searchQuery);
 
     const groupSubjectIds = [
       ...new Set(groups.flatMap((group) => [group, `/${group}`])),
@@ -122,115 +98,123 @@ export class DocumentsService {
     };
 
     if (isAdmin) {
-      return this.prisma.document.findMany({
+      return this.prisma.document
+        .findMany({
+          where: {
+            AND: [
+              ...(searchFilter ? [searchFilter] : []),
+              { status: { not: 'DELETED' as const } },
+              readDenyFilter,
+            ],
+          },
+          orderBy: { createdAt: 'desc' },
+          include: this.latestVersionInclude(),
+        })
+        .then((documents) =>
+          documents.map((document) => this.toListSummary(document)),
+        );
+    }
+
+    return this.prisma.document
+      .findMany({
         where: {
           AND: [
+            // Search filter (optional)
             ...(searchFilter ? [searchFilter] : []),
+            // Always exclude DELETED documents
             { status: { not: 'DELETED' as const } },
+            // Explicit ACL DENY overrides baseline role/classification visibility.
             readDenyFilter,
+            // Visibility filter (role + classification based)
+            {
+              OR: [
+                // Documents the user owns (always visible regardless of classification)
+                { ownerId: actorId },
+                // Documents where user/role/group/all has explicit READ allow.
+                {
+                  aclEntries: {
+                    some: {
+                      ...matchingReadAcl,
+                      effect: 'ALLOW' as const,
+                    },
+                  },
+                },
+                // compliance_officer sees ALL published + archived documents (any classification) for audit
+                ...(roles.includes('compliance_officer')
+                  ? [
+                      {
+                        status: {
+                          in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                        },
+                      },
+                    ]
+                  : []),
+                // PENDING: approver sees all pending documents to review
+                ...(['approver', 'admin'].some((r) => roles.includes(r))
+                  ? [
+                      {
+                        status: 'PENDING' as const,
+                      },
+                    ]
+                  : []),
+                // DRAFT: viewer sees their own drafts to preview/download
+                { ownerId: actorId, status: 'DRAFT' as const },
+                // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
+                ...(roles.some((r) =>
+                  [
+                    'viewer',
+                    'editor',
+                    'approver',
+                    'compliance_officer',
+                    'admin',
+                  ].includes(r),
+                )
+                  ? [
+                      {
+                        status: 'PUBLISHED' as const,
+                        classification: 'PUBLIC' as const,
+                      },
+                    ]
+                  : []),
+                // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
+                ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
+                  roles.includes(r),
+                )
+                  ? [
+                      {
+                        status: 'PUBLISHED' as const,
+                        classification: 'INTERNAL' as const,
+                      },
+                    ]
+                  : []),
+                // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
+                ...(['approver', 'admin'].some((r) => roles.includes(r))
+                  ? [
+                      {
+                        status: 'PUBLISHED' as const,
+                        classification: 'CONFIDENTIAL' as const,
+                      },
+                    ]
+                  : []),
+                // SECRET: approver+ sees PUBLISHED + SECRET
+                ...(['approver', 'admin'].some((r) => roles.includes(r))
+                  ? [
+                      {
+                        status: 'PUBLISHED' as const,
+                        classification: 'SECRET' as const,
+                      },
+                    ]
+                  : []),
+              ],
+            },
           ],
         },
         orderBy: { createdAt: 'desc' },
         include: this.latestVersionInclude(),
-      }).then((documents) => documents.map((document) => this.toListSummary(document)));
-    }
-
-    return this.prisma.document.findMany({
-      where: {
-        AND: [
-          // Search filter (optional)
-          ...(searchFilter ? [searchFilter] : []),
-          // Always exclude DELETED documents
-          { status: { not: 'DELETED' as const } },
-          // Explicit ACL DENY overrides baseline role/classification visibility.
-          readDenyFilter,
-          // Visibility filter (role + classification based)
-          {
-            OR: [
-              // Documents the user owns (always visible regardless of classification)
-              { ownerId: actorId },
-              // Documents where user/role/group/all has explicit READ allow.
-              {
-                aclEntries: {
-                  some: {
-                    ...matchingReadAcl,
-                    effect: 'ALLOW' as const,
-                  },
-                },
-              },
-              // compliance_officer sees ALL published + archived documents (any classification) for audit
-              ...(roles.includes('compliance_officer')
-                ? [
-                    {
-                      status: {
-                        in: ['PUBLISHED' as const, 'ARCHIVED' as const],
-                      },
-                    },
-                  ]
-                : []),
-              // PENDING: approver sees all pending documents to review
-              ...(['approver', 'admin'].some((r) => roles.includes(r))
-                ? [
-                    {
-                      status: 'PENDING' as const,
-                    },
-                  ]
-                : []),
-              // DRAFT: viewer sees their own drafts to preview/download
-              { ownerId: actorId, status: 'DRAFT' as const },
-              // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
-              ...(roles.some((r) =>
-                [
-                  'viewer',
-                  'editor',
-                  'approver',
-                  'compliance_officer',
-                  'admin',
-                ].includes(r),
-              )
-                ? [
-                    {
-                      status: 'PUBLISHED' as const,
-                      classification: 'PUBLIC' as const,
-                    },
-                  ]
-                : []),
-              // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
-              ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
-                roles.includes(r),
-              )
-                ? [
-                    {
-                      status: 'PUBLISHED' as const,
-                      classification: 'INTERNAL' as const,
-                    },
-                  ]
-                : []),
-              // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
-              ...(['approver', 'admin'].some((r) => roles.includes(r))
-                ? [
-                    {
-                      status: 'PUBLISHED' as const,
-                      classification: 'CONFIDENTIAL' as const,
-                    },
-                  ]
-                : []),
-              // SECRET: approver+ sees PUBLISHED + SECRET
-              ...(['approver', 'admin'].some((r) => roles.includes(r))
-                ? [
-                    {
-                      status: 'PUBLISHED' as const,
-                      classification: 'SECRET' as const,
-                    },
-                  ]
-                : []),
-            ],
-          },
-        ],
-      },
-      orderBy: { createdAt: 'desc' },
-      include: this.latestVersionInclude(),
-    }).then((documents) => documents.map((document) => this.toListSummary(document)));
+      })
+      .then((documents) =>
+        documents.map((document) => this.toListSummary(document)),
+      );
   }
 
   async findOneOrThrow(id: string) {
@@ -411,6 +395,102 @@ export class DocumentsService {
     return [...new Set(tags.map((t) => t.trim()).filter(Boolean))];
   }
 
+  private buildDocumentSearchFilter(
+    searchQuery?: string,
+  ): Prisma.DocumentWhereInput | undefined {
+    const query = parseDocumentListSearch(searchQuery);
+    const filters: Prisma.DocumentWhereInput[] = [];
+
+    for (const term of query.freeText) {
+      filters.push(this.buildTextSearchFilter(term));
+    }
+
+    for (const status of query.status) {
+      const statusValue = findEnumValue(DOCUMENT_STATUSES, status);
+      if (statusValue) {
+        filters.push({ status: statusValue });
+      }
+    }
+
+    for (const classification of query.classification) {
+      const classificationValue = findEnumValue(
+        DOCUMENT_CLASSIFICATIONS,
+        classification,
+      );
+      if (classificationValue) {
+        filters.push({ classification: classificationValue });
+      }
+    }
+
+    for (const owner of query.owner) {
+      filters.push({
+        ownerId: { contains: owner, mode: 'insensitive' },
+      });
+    }
+
+    for (const tag of [...query.tag, ...query.folder]) {
+      filters.push({ tags: { has: tag } });
+    }
+
+    for (const filename of query.file) {
+      filters.push({
+        versions: {
+          some: {
+            filename: { contains: filename, mode: 'insensitive' },
+          },
+        },
+      });
+    }
+
+    for (const presence of query.presence) {
+      const presenceFilter = buildPresenceFilter(presence);
+      if (presenceFilter) filters.push(presenceFilter);
+    }
+
+    for (const dlpStatus of query.dlp) {
+      const dlpStatusFilter = buildDlpStatusFilter(dlpStatus);
+      if (dlpStatusFilter) filters.push(dlpStatusFilter);
+    }
+
+    for (const retention of query.retention) {
+      const retentionFilter = buildRetentionFilter(retention);
+      if (retentionFilter) filters.push(retentionFilter);
+    }
+
+    for (const range of query.dateRanges) {
+      filters.push(buildDateRangeFilter(range));
+    }
+
+    if (filters.length === 0) return undefined;
+    if (filters.length === 1) return filters[0];
+    return { AND: filters };
+  }
+
+  private buildTextSearchFilter(term: string): Prisma.DocumentWhereInput {
+    return {
+      OR: [
+        { title: { contains: term, mode: 'insensitive' } },
+        {
+          description: {
+            contains: term,
+            mode: 'insensitive',
+          },
+        },
+        { tags: { has: term } },
+        {
+          versions: {
+            some: {
+              filename: {
+                contains: term,
+                mode: 'insensitive',
+              },
+            },
+          },
+        },
+      ],
+    };
+  }
+
   private latestVersionInclude() {
     return {
       versions: {
@@ -572,4 +652,237 @@ export class DocumentsService {
       return { userIds: [] };
     }
   }
+}
+
+type DocumentDateField = 'createdAt' | 'updatedAt' | 'retentionUntil';
+
+interface ParsedDocumentListSearch {
+  freeText: string[];
+  status: string[];
+  classification: string[];
+  owner: string[];
+  tag: string[];
+  folder: string[];
+  file: string[];
+  presence: string[];
+  dlp: string[];
+  retention: string[];
+  dateRanges: DocumentDateRangeQuery[];
+}
+
+interface DocumentDateRangeQuery {
+  field: DocumentDateField;
+  from?: Date;
+  to?: Date;
+}
+
+const DOCUMENT_STATUSES = [
+  'DRAFT',
+  'PENDING',
+  'PUBLISHED',
+  'ARCHIVED',
+  'DELETED',
+] as const;
+
+const DOCUMENT_CLASSIFICATIONS = [
+  'PUBLIC',
+  'INTERNAL',
+  'CONFIDENTIAL',
+  'SECRET',
+] as const;
+
+const DUE_SOON_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+function parseDocumentListSearch(
+  searchQuery?: string,
+): ParsedDocumentListSearch {
+  const query: ParsedDocumentListSearch = {
+    freeText: [],
+    status: [],
+    classification: [],
+    owner: [],
+    tag: [],
+    folder: [],
+    file: [],
+    presence: [],
+    dlp: [],
+    retention: [],
+    dateRanges: [],
+  };
+  const search = searchQuery?.trim();
+  if (!search) return query;
+
+  const tokenPattern = /(\w+):"([^"]+)"|(\w+):(\S+)|"([^"]+)"|(\S+)/g;
+
+  for (const match of search.matchAll(tokenPattern)) {
+    const rawKey = match[1] ?? match[3];
+    const rawValue = match[2] ?? match[4] ?? match[5] ?? match[6] ?? '';
+    const value = rawValue.trim();
+    if (!value) continue;
+
+    const key = normalizeText(rawKey);
+    if (key === 'status') {
+      query.status.push(value);
+    } else if (key === 'class' || key === 'classification') {
+      query.classification.push(value);
+    } else if (key === 'owner') {
+      query.owner.push(value);
+    } else if (key === 'tag') {
+      query.tag.push(value);
+    } else if (key === 'folder') {
+      query.folder.push(value);
+    } else if (key === 'file' || key === 'filename') {
+      query.file.push(value);
+    } else if (key === 'has') {
+      query.presence.push(value);
+    } else if (key === 'dlp') {
+      query.dlp.push(value);
+    } else if (key === 'retention') {
+      query.retention.push(value);
+    } else if (
+      key === 'created' ||
+      key === 'updated' ||
+      key === 'retentionuntil'
+    ) {
+      const dateRange = parseDateRangeQuery(key, value);
+      if (dateRange) query.dateRanges.push(dateRange);
+    } else {
+      query.freeText.push(rawKey ? `${rawKey}:${value}` : value);
+    }
+  }
+
+  return query;
+}
+
+function buildPresenceFilter(
+  operator: string,
+): Prisma.DocumentWhereInput | null {
+  const normalized = normalizeEnumText(operator);
+  if (normalized === 'file' || normalized === 'files') {
+    return { versions: { some: {} } };
+  }
+  if (normalized === 'retention') {
+    return {
+      OR: [
+        { retentionClass: { not: null } },
+        { retentionUntil: { not: null } },
+      ],
+    };
+  }
+  if (normalized === 'dlp') {
+    return { dlpStatus: 'DETECTED' };
+  }
+  return null;
+}
+
+function buildDlpStatusFilter(
+  operator: string,
+): Prisma.DocumentWhereInput | null {
+  const normalized = normalizeEnumText(operator);
+  if (normalized === 'detected') return { dlpStatus: 'DETECTED' };
+  if (normalized === 'clear') return { dlpStatus: 'CLEAR' };
+  if (normalized === 'notscanned') return { dlpStatus: 'NOT_SCANNED' };
+  if (!normalized) return null;
+  return {
+    dlpStatus: operator
+      .trim()
+      .toUpperCase()
+      .replace(/[\s-]+/g, '_'),
+  };
+}
+
+function buildRetentionFilter(
+  operator: string,
+): Prisma.DocumentWhereInput | null {
+  const normalized = normalizeEnumText(operator);
+  const now = new Date();
+  const dueSoonLimit = new Date(now.getTime() + DUE_SOON_DAYS * DAY_MS);
+
+  if (normalized === 'unset') {
+    return {
+      AND: [{ retentionClass: null }, { retentionUntil: null }],
+    };
+  }
+  if (normalized === 'overdue') {
+    return { retentionUntil: { lt: now } };
+  }
+  if (normalized === 'duesoon') {
+    return { retentionUntil: { gte: now, lte: dueSoonLimit } };
+  }
+  if (normalized === 'active') {
+    return { retentionUntil: { gt: dueSoonLimit } };
+  }
+  if (normalized === 'archived') {
+    return { status: 'ARCHIVED' };
+  }
+  if (!operator.trim()) return null;
+
+  return {
+    OR: [
+      { retentionClass: { contains: operator, mode: 'insensitive' } },
+      { retentionReason: { contains: operator, mode: 'insensitive' } },
+    ],
+  };
+}
+
+function buildDateRangeFilter(
+  range: DocumentDateRangeQuery,
+): Prisma.DocumentWhereInput {
+  const dateFilter: Prisma.DateTimeNullableFilter = {};
+  if (range.from) dateFilter.gte = range.from;
+  if (range.to) dateFilter.lte = range.to;
+  return { [range.field]: dateFilter } as Prisma.DocumentWhereInput;
+}
+
+function parseDateRangeQuery(
+  key: string,
+  value: string,
+): DocumentDateRangeQuery | null {
+  const field: DocumentDateField =
+    key === 'created'
+      ? 'createdAt'
+      : key === 'updated'
+        ? 'updatedAt'
+        : 'retentionUntil';
+  const [rawFrom, rawTo] = value.includes('..')
+    ? value.split('..', 2)
+    : [value, value];
+  const from = rawFrom ? parseDateBound(rawFrom, false) : undefined;
+  const to = rawTo ? parseDateBound(rawTo, true) : undefined;
+
+  if (!from && !to) return null;
+  return {
+    field,
+    ...(from && { from }),
+    ...(to && { to }),
+  };
+}
+
+function parseDateBound(value: string, endOfDay: boolean): Date | undefined {
+  const trimmed = value.trim();
+  if (!trimmed) return undefined;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? `${trimmed}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
+    : trimmed;
+  const date = new Date(normalized);
+  return Number.isFinite(date.getTime()) ? date : undefined;
+}
+
+function findEnumValue<T extends string>(
+  values: readonly T[],
+  query: string,
+): T | null {
+  const normalized = normalizeEnumText(query);
+  return (
+    values.find((value) => normalizeEnumText(value) === normalized) ?? null
+  );
+}
+
+function normalizeText(value: string | null | undefined): string {
+  return (value ?? '').trim().toLowerCase();
+}
+
+function normalizeEnumText(value: string | null | undefined): string {
+  return normalizeText(value).replace(/[_\s-]+/g, '');
 }

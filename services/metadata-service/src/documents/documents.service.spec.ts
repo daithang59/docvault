@@ -232,4 +232,43 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('"filename"');
     expect(queryText).toContain('"contract-v2.pdf"');
   });
+
+  it('translates has:file query operator into latest-version existence filtering', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'viewer-1',
+        roles: ['viewer'],
+        groups: [],
+      } as any,
+      'has:file',
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"versions"');
+    expect(queryText).toContain('"some"');
+  });
+
+  it('translates dlp and retention query operators into document list filters', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'viewer-1',
+        roles: ['viewer'],
+        groups: [],
+      } as any,
+      'dlp:detected retention:due-soon created:2026-05-01..2026-06-01',
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"dlpStatus":"DETECTED"');
+    expect(queryText).toContain('"retentionUntil"');
+    expect(queryText).toContain('"gte"');
+    expect(queryText).toContain('"lte"');
+    expect(queryText).toContain('"createdAt"');
+    expect(queryText).toContain('2026-05-01T00:00:00.000Z');
+    expect(queryText).toContain('2026-06-01T23:59:59.999Z');
+  });
 });

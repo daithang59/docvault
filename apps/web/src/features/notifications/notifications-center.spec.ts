@@ -95,6 +95,47 @@ describe('buildNotificationCenterModel', () => {
       }),
     ]);
   });
+
+  it('maps workflow timeline notifications to actionable targets with transition context', () => {
+    const model = buildNotificationCenterModel(
+      [
+        {
+          id: 'n-rejected',
+          type: 'REJECTED',
+          docId: 'doc-5',
+          recipientId: 'editor-1',
+          docTitle: 'Rejected Draft',
+          reason: 'Missing retention evidence',
+          createdAt: '2026-06-01T13:00:00.000Z',
+          read: false,
+          metadata: {
+            workflow: {
+              action: 'REJECT',
+              fromStatus: 'PENDING',
+              toStatus: 'DRAFT',
+              actorId: 'approver-1',
+            },
+          },
+        } as NotificationRecord,
+      ],
+      {
+        group: 'all',
+        readState: 'all',
+      },
+    );
+
+    expect(model.items).toEqual([
+      expect.objectContaining({
+        id: 'n-rejected',
+        group: 'approvals',
+        severity: 'critical',
+        description: 'Missing retention evidence',
+        targetHref: '/documents/doc-5',
+        actionLabel: 'Open document',
+        workflowSummary: 'PENDING -> DRAFT by approver-1',
+      }),
+    ]);
+  });
 });
 
 describe('getNotificationTarget', () => {

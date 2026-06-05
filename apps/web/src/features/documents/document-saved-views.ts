@@ -8,12 +8,17 @@ import {
 import type { DocumentListItem } from './documents.types';
 
 export type DocumentSavedViewSource = 'built-in' | 'custom';
+export type DocumentSavedViewScope = 'PRIVATE' | 'TEAM';
 
 export interface DocumentSavedView {
   id: string;
   label: string;
   description: string;
   source: DocumentSavedViewSource;
+  scope?: DocumentSavedViewScope;
+  ownerId?: string;
+  createdAt?: string;
+  updatedAt?: string;
   filters: DocumentFiltersState;
 }
 

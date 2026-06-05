@@ -51,6 +51,11 @@ enum WorkflowAction {
   RETENTION
 }
 
+enum DocumentSavedViewScope {
+  PRIVATE
+  TEAM
+}
+
 model Document {
   id              String            @id @default(uuid())
   title           String
@@ -146,4 +151,19 @@ model DocumentComment {
 
   @@index([docId, createdAt])
   @@map("document_comments")
+}
+
+model DocumentSavedView {
+  id          String                 @id @default(uuid())
+  name        String
+  description String?
+  filters     Json
+  scope       DocumentSavedViewScope @default(PRIVATE)
+  ownerId     String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([ownerId, scope])
+  @@index([scope, createdAt])
+  @@map("document_saved_views")
 }

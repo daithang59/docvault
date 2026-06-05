@@ -5,6 +5,7 @@ export const documentsKeys = {
   all: ['documents'] as const,
   lists: () => [...documentsKeys.all, 'list'] as const,
   list: (filters?: DocumentListFilters) => [...documentsKeys.lists(), filters] as const,
+  savedViews: () => [...documentsKeys.all, 'saved-views'] as const,
   details: () => [...documentsKeys.all, 'detail'] as const,
   detail: (id: string) => [...documentsKeys.details(), id] as const,
   workflowHistory: (id: string) => [...documentsKeys.detail(id), 'workflow-history'] as const,

@@ -54,7 +54,10 @@ export type DocumentSearchSuggestionKind =
   | 'classification'
   | 'tag'
   | 'file'
-  | 'owner';
+  | 'owner'
+  | 'presence'
+  | 'dlp'
+  | 'retention';
 
 export interface DocumentSearchSuggestion {
   token: string;
@@ -251,6 +254,33 @@ export function buildDocumentSearchSuggestions(
     });
   }
 
+  if (documents.some(documentHasFile)) {
+    suggestions.push({
+      token: 'has:file',
+      label: 'has:file',
+      description: 'Documents with uploaded files',
+      kind: 'presence',
+    });
+  }
+
+  if (documents.some((document) => document.dlpStatus === 'DETECTED')) {
+    suggestions.push({
+      token: 'dlp:detected',
+      label: 'dlp:detected',
+      description: 'DLP-detected documents',
+      kind: 'dlp',
+    });
+  }
+
+  if (documents.some((document) => matchesRetentionOperator(document, 'due-soon'))) {
+    suggestions.push({
+      token: 'retention:due-soon',
+      label: 'retention:due-soon',
+      description: 'Retention deadlines due soon',
+      kind: 'retention',
+    });
+  }
+
   const ownerDocument = documents.find(
     (document) => document.ownerDisplay || document.ownerId,
   );
@@ -264,7 +294,7 @@ export function buildDocumentSearchSuggestions(
     });
   }
 
-  return uniqueSearchSuggestions(suggestions).slice(0, 5);
+  return uniqueSearchSuggestions(suggestions).slice(0, 8);
 }
 
 export function countActiveDocumentFilters(
@@ -422,6 +452,16 @@ interface AdvancedDocumentQuery {
   tag: string[];
   folder: string[];
   file: string[];
+  presence: string[];
+  dlp: string[];
+  retention: string[];
+  dateRanges: DocumentDateRangeQuery[];
+}
+
+interface DocumentDateRangeQuery {
+  field: 'createdAt' | 'updatedAt' | 'retentionUntil';
+  from?: number;
+  to?: number;
 }
 
 function parseAdvancedDocumentQuery(search: string): AdvancedDocumentQuery {
@@ -433,6 +473,10 @@ function parseAdvancedDocumentQuery(search: string): AdvancedDocumentQuery {
     tag: [],
     folder: [],
     file: [],
+    presence: [],
+    dlp: [],
+    retention: [],
+    dateRanges: [],
   };
   const tokenPattern = /(\w+):"([^"]+)"|(\w+):(\S+)|"([^"]+)"|(\S+)/g;
   const matches = search.matchAll(tokenPattern);
@@ -456,6 +500,21 @@ function parseAdvancedDocumentQuery(search: string): AdvancedDocumentQuery {
       query.folder.push(value);
     } else if (key === 'file' || key === 'filename') {
       query.file.push(value);
+    } else if (key === 'has') {
+      query.presence.push(value);
+    } else if (key === 'dlp') {
+      query.dlp.push(value);
+    } else if (key === 'retention') {
+      query.retention.push(value);
+    } else if (
+      key === 'created' ||
+      key === 'updated' ||
+      key === 'retentionuntil'
+    ) {
+      const dateRange = parseDateRangeQuery(key, rawValue);
+      if (dateRange) {
+        query.dateRanges.push(dateRange);
+      }
     } else {
       query.freeText.push(value);
     }
@@ -491,6 +550,16 @@ function documentMatchesAdvancedQuery(
     ) &&
     allQueryTermsMatch(query.file, (term) =>
       normalizeText(document.filename).includes(term),
+    ) &&
+    allQueryTermsMatch(query.presence, (term) =>
+      matchesPresenceOperator(document, term),
+    ) &&
+    allQueryTermsMatch(query.dlp, (term) => matchesDlpOperator(document, term)) &&
+    allQueryTermsMatch(query.retention, (term) =>
+      matchesRetentionOperator(document, term),
+    ) &&
+    query.dateRanges.every((range) =>
+      matchesDateRange(document[range.field], range),
     )
   );
 }
@@ -516,6 +585,126 @@ function documentMatchesFreeText(
     document.classification,
     ...document.tags,
   ].some((value) => normalizeText(value).includes(query));
+}
+
+function documentHasFile(document: DocumentListItem): boolean {
+  return Boolean(
+    document.filename ||
+      document.mimeType ||
+      document.fileSize != null ||
+      document.currentVersion > 0,
+  );
+}
+
+function matchesPresenceOperator(
+  document: DocumentListItem,
+  operator: string,
+): boolean {
+  const normalized = normalizeEnumText(operator);
+  if (normalized === 'file' || normalized === 'files') {
+    return documentHasFile(document);
+  }
+  if (normalized === 'retention') {
+    return Boolean(document.retentionClass || document.retentionUntil);
+  }
+  if (normalized === 'dlp') {
+    return document.dlpStatus === 'DETECTED';
+  }
+  return false;
+}
+
+function matchesDlpOperator(
+  document: DocumentListItem,
+  operator: string,
+): boolean {
+  const normalized = normalizeEnumText(operator);
+  if (normalized === 'detected') return document.dlpStatus === 'DETECTED';
+  if (normalized === 'clear') return document.dlpStatus === 'CLEAR';
+  if (normalized === 'notscanned') {
+    return !document.dlpStatus || document.dlpStatus === 'NOT_SCANNED';
+  }
+  return normalizeEnumText(document.dlpStatus).includes(normalized);
+}
+
+function matchesRetentionOperator(
+  document: DocumentListItem,
+  operator: string,
+): boolean {
+  const normalized = normalizeEnumText(operator);
+  const retentionTime = document.retentionUntil
+    ? new Date(document.retentionUntil).getTime()
+    : Number.NaN;
+  const hasDeadline = Number.isFinite(retentionTime);
+  const now = Date.now();
+  const dueSoonLimit = now + 30 * 24 * 60 * 60 * 1000;
+
+  if (normalized === 'unset') {
+    return !document.retentionClass && !document.retentionUntil;
+  }
+  if (normalized === 'overdue') {
+    return hasDeadline && retentionTime < now;
+  }
+  if (normalized === 'duesoon') {
+    return hasDeadline && retentionTime >= now && retentionTime <= dueSoonLimit;
+  }
+  if (normalized === 'active') {
+    return hasDeadline && retentionTime > dueSoonLimit;
+  }
+  if (normalized === 'archived') {
+    return document.status === 'ARCHIVED';
+  }
+
+  return [document.retentionClass, document.retentionReason].some((value) =>
+    normalizeText(value).includes(normalizeText(operator)),
+  );
+}
+
+function parseDateRangeQuery(
+  key: string,
+  value: string,
+): DocumentDateRangeQuery | null {
+  const field =
+    key === 'created'
+      ? 'createdAt'
+      : key === 'updated'
+        ? 'updatedAt'
+        : 'retentionUntil';
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+
+  const [rawFrom, rawTo] = trimmed.includes('..')
+    ? trimmed.split('..', 2)
+    : [trimmed, trimmed];
+  const from = rawFrom ? parseDateBound(rawFrom, false) : undefined;
+  const to = rawTo ? parseDateBound(rawTo, true) : undefined;
+
+  if (from == null && to == null) return null;
+  return {
+    field,
+    ...(from != null && { from }),
+    ...(to != null && { to }),
+  };
+}
+
+function parseDateBound(value: string, endOfDay: boolean): number | null {
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  const normalized = /^\d{4}-\d{2}-\d{2}$/.test(trimmed)
+    ? `${trimmed}T${endOfDay ? '23:59:59.999' : '00:00:00.000'}Z`
+    : trimmed;
+  const time = new Date(normalized).getTime();
+  return Number.isFinite(time) ? time : null;
+}
+
+function matchesDateRange(
+  value: string | null | undefined,
+  range: DocumentDateRangeQuery,
+): boolean {
+  const time = value ? new Date(value).getTime() : Number.NaN;
+  if (!Number.isFinite(time)) return false;
+  if (range.from != null && time < range.from) return false;
+  if (range.to != null && time > range.to) return false;
+  return true;
 }
 
 function compareDocuments(

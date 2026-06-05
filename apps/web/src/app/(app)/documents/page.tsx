@@ -5,7 +5,7 @@ import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument,
 import { deleteDocument } from '@/lib/api/workflow';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { submitDocument, approveDocument, archiveDocument } from '@/lib/api/workflow';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
@@ -31,6 +31,11 @@ import {
   serializeCustomDocumentSavedViews,
   type DocumentSavedView,
 } from '@/features/documents/document-saved-views';
+import {
+  createPersistedDocumentSavedView,
+  deletePersistedDocumentSavedView,
+  listPersistedDocumentSavedViews,
+} from '@/features/documents/document-saved-views.api';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -44,7 +49,7 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
-import { parseApiError } from '@/lib/api/errors';
+import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 
 export default function DocumentsPage() {
@@ -52,7 +57,7 @@ export default function DocumentsPage() {
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
-  const [customSavedViews, setCustomSavedViews] = useState<DocumentSavedView[]>(
+  const [localSavedViews, setLocalSavedViews] = useState<DocumentSavedView[]>(
     () => loadCustomDocumentSavedViews(),
   );
   const [filtersHydrated, setFiltersHydrated] = useState(false);
@@ -69,6 +74,11 @@ export default function DocumentsPage() {
   const deleteDoc = useDeleteDocument(targetDoc?.id ?? '');
   const { download } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
+  });
+  const persistedSavedViewsQuery = useQuery({
+    queryKey: documentsKeys.savedViews(),
+    queryFn: listPersistedDocumentSavedViews,
+    retry: false,
   });
 
   useEffect(() => {
@@ -106,8 +116,19 @@ export default function DocumentsPage() {
     [documents],
   );
   const savedViews = useMemo(
-    () => buildDocumentSavedViewOptions(documents, customSavedViews),
-    [documents, customSavedViews],
+    () =>
+      buildDocumentSavedViewOptions(
+        documents,
+        persistedSavedViewsQuery.isError
+          ? localSavedViews
+          : (persistedSavedViewsQuery.data ?? []),
+      ),
+    [
+      documents,
+      localSavedViews,
+      persistedSavedViewsQuery.data,
+      persistedSavedViewsQuery.isError,
+    ],
   );
   const activeSavedViewId = useMemo(
     () => findMatchingDocumentSavedViewId(savedViews, filters),
@@ -215,24 +236,45 @@ export default function DocumentsPage() {
   }
 
   function persistCustomSavedViews(nextViews: DocumentSavedView[]) {
-    setCustomSavedViews(nextViews);
+    setLocalSavedViews(nextViews);
     window.localStorage.setItem(
       DOCUMENT_SAVED_VIEWS_STORAGE_KEY,
       serializeCustomDocumentSavedViews(nextViews),
     );
   }
 
-  function handleSaveCurrentView(label: string) {
-    const nextView = createCustomDocumentSavedView(label, filters);
-    const nextViews = [...customSavedViews, nextView].slice(-8);
-    persistCustomSavedViews(nextViews);
-    toast.success(`Saved view "${nextView.label}".`);
+  async function handleSaveCurrentView(label: string) {
+    try {
+      const nextView = await createPersistedDocumentSavedView({
+        label,
+        filters,
+        scope: 'PRIVATE',
+      });
+      await qc.invalidateQueries({ queryKey: documentsKeys.savedViews() });
+      toast.success(`Saved view "${nextView.label}".`);
+    } catch {
+      const nextView = createCustomDocumentSavedView(label, filters);
+      const nextViews = [...localSavedViews, nextView].slice(-8);
+      persistCustomSavedViews(nextViews);
+      toast.success(`Saved view "${nextView.label}" locally.`);
+    }
   }
 
-  function handleDeleteSavedView(id: string) {
-    const nextViews = customSavedViews.filter((view) => view.id !== id);
-    persistCustomSavedViews(nextViews);
-    toast.success('Saved view removed.');
+  async function handleDeleteSavedView(id: string) {
+    if (id.startsWith('custom-') || persistedSavedViewsQuery.isError) {
+      const nextViews = localSavedViews.filter((view) => view.id !== id);
+      persistCustomSavedViews(nextViews);
+      toast.success('Saved view removed.');
+      return;
+    }
+
+    try {
+      await deletePersistedDocumentSavedView(id);
+      await qc.invalidateQueries({ queryKey: documentsKeys.savedViews() });
+      toast.success('Saved view removed.');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   }
 
   return (

@@ -481,6 +481,9 @@ function suggestionIcon(
   if (kind === 'status') return Clock;
   if (kind === 'classification') return Shield;
   if (kind === 'file') return FileText;
+  if (kind === 'presence') return FileText;
+  if (kind === 'dlp') return Shield;
+  if (kind === 'retention') return Clock;
   if (kind === 'owner') return User;
   return Tag;
 }

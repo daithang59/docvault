@@ -1,4 +1,10 @@
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export enum NotifyType {
   SUBMITTED = 'SUBMITTED',
@@ -38,4 +44,8 @@ export class NotifyDto {
   @IsOptional()
   @IsString()
   traceId?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }

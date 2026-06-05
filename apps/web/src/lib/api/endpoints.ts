@@ -20,6 +20,11 @@ export const apiEndpoints = {
       downloadAuthorize: (docId: string) => `/metadata/documents/${docId}/download-authorize`,
       comments: (docId: string) => `/metadata/documents/${docId}/comments`,
     },
+    savedViews: {
+      list: '/metadata/document-saved-views',
+      create: '/metadata/document-saved-views',
+      delete: (id: string) => `/metadata/document-saved-views/${id}`,
+    },
     retention: {
       documents: '/metadata/retention/documents',
       run: '/metadata/retention/run',

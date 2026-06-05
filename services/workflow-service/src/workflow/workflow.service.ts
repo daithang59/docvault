@@ -51,6 +51,12 @@ export class WorkflowService {
       docId,
       recipientIds: approverIds,
       docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'SUBMIT',
+        document.status,
+        'PENDING',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -81,6 +87,12 @@ export class WorkflowService {
       docId,
       recipientId: document.ownerId,
       docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'APPROVE',
+        document.status,
+        'PUBLISHED',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -118,6 +130,12 @@ export class WorkflowService {
       recipientId: document.ownerId,
       docTitle: document.title,
       reason,
+      metadata: buildWorkflowNotificationMetadata(
+        'REJECT',
+        document.status,
+        'DRAFT',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -154,6 +172,12 @@ export class WorkflowService {
       docId,
       recipientId: actorId,
       docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'ARCHIVE',
+        document.status,
+        'ARCHIVED',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -188,8 +212,30 @@ export class WorkflowService {
       docId,
       recipientId: actorId,
       docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'DELETE',
+        document.status,
+        'DELETED',
+        context.actorId,
+      ),
     });
 
     return { success: true };
   }
+}
+
+function buildWorkflowNotificationMetadata(
+  action: string,
+  fromStatus: string,
+  toStatus: string,
+  actorId: string,
+) {
+  return {
+    workflow: {
+      action,
+      fromStatus,
+      toStatus,
+      actorId,
+    },
+  };
 }

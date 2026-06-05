@@ -9,6 +9,7 @@ export interface NotificationRecord {
   docTitle?: string;
   reason?: string;
   traceId?: string;
+  metadata?: Record<string, unknown>;
   createdAt: string;
   read: boolean;
 }
@@ -53,6 +54,9 @@ export class NotificationService {
       docTitle: dto.docTitle,
       reason: dto.reason,
       traceId: dto.traceId,
+      ...(dto.metadata && {
+        metadata: sanitizeNotificationMetadata(dto.metadata),
+      }),
     };
 
     for (const recipientId of unique) {
@@ -126,4 +130,47 @@ export class NotificationService {
     const records = this.store.get(userId);
     if (records) records.forEach((r) => (r.read = true));
   }
+}
+
+const NOTIFICATION_SENSITIVE_FIELD_NAMES = [
+  'fileContent',
+  'objectKey',
+  'storagePath',
+  'presignedUrl',
+  'grantToken',
+  'downloadToken',
+] as const;
+
+function sanitizeNotificationMetadata(value: unknown): Record<string, unknown> {
+  const sanitized = sanitizeNotificationValue(value);
+  return sanitized && typeof sanitized === 'object' && !Array.isArray(sanitized)
+    ? (sanitized as Record<string, unknown>)
+    : {};
+}
+
+function sanitizeNotificationValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeNotificationValue);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<
+    Record<string, unknown>
+  >((acc, [key, nestedValue]) => {
+    if (isSensitiveNotificationField(key)) {
+      return acc;
+    }
+
+    acc[key] = sanitizeNotificationValue(nestedValue);
+    return acc;
+  }, {});
+}
+
+function isSensitiveNotificationField(key: string): boolean {
+  return (NOTIFICATION_SENSITIVE_FIELD_NAMES as readonly string[]).includes(
+    key,
+  );
 }

@@ -72,6 +72,22 @@ const documents: DocumentListItem[] = [
     createdAt: '2026-05-04T09:00:00.000Z',
     updatedAt: '2026-06-03T09:00:00.000Z',
   },
+  {
+    id: 'doc-5',
+    title: 'Retention Package',
+    description: 'Lifecycle evidence due soon',
+    status: 'PUBLISHED',
+    classification: 'INTERNAL',
+    dlpStatus: 'CLEAR',
+    retentionClass: 'INTERNAL_365D',
+    retentionUntil: new Date(Date.now() + 10 * 24 * 60 * 60 * 1000).toISOString(),
+    ownerId: 'owner-4',
+    ownerDisplay: 'Pham Dung',
+    currentVersion: 0,
+    tags: ['records'],
+    createdAt: '2026-05-05T09:00:00.000Z',
+    updatedAt: '2026-06-04T09:00:00.000Z',
+  },
 ];
 
 describe('filterAndSortDocuments', () => {
@@ -116,11 +132,17 @@ describe('filterAndSortDocuments', () => {
         sort: 'title',
         sortDir: 'asc',
       }).map((doc) => doc.title),
-    ).toEqual(['Board Report', 'Hiring Plan', 'Incident Export', 'Public Handbook']);
+    ).toEqual([
+      'Board Report',
+      'Hiring Plan',
+      'Incident Export',
+      'Public Handbook',
+      'Retention Package',
+    ]);
 
     expect(
       filterAndSortDocuments(documents, DEFAULT_DOCUMENT_FILTERS).map((doc) => doc.id),
-    ).toEqual(['doc-4', 'doc-3', 'doc-1', 'doc-2']);
+    ).toEqual(['doc-5', 'doc-4', 'doc-3', 'doc-1', 'doc-2']);
   });
 
   it('sorts owners by displayed owner label instead of raw owner id', () => {
@@ -194,6 +216,36 @@ describe('filterAndSortDocuments', () => {
       }).map((doc) => doc.id),
     ).toEqual(['doc-4']);
   });
+
+  it('supports commercial query operators for file presence, DLP, retention, and date ranges', () => {
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'has:file',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-4', 'doc-3', 'doc-1', 'doc-2']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'dlp:detected',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-4']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'retention:due-soon',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-5']);
+
+    expect(
+      filterAndSortDocuments(documents, {
+        ...DEFAULT_DOCUMENT_FILTERS,
+        search: 'created:2026-05-02..2026-05-04 updated:..2026-06-02',
+      }).map((doc) => doc.id),
+    ).toEqual(['doc-3', 'doc-2']);
+  });
 });
 
 describe('document filter metadata', () => {
@@ -224,6 +276,24 @@ describe('document filter metadata', () => {
         kind: 'file',
       },
       {
+        token: 'has:file',
+        label: 'has:file',
+        description: 'Documents with uploaded files',
+        kind: 'presence',
+      },
+      {
+        token: 'dlp:detected',
+        label: 'dlp:detected',
+        description: 'DLP-detected documents',
+        kind: 'dlp',
+      },
+      {
+        token: 'retention:due-soon',
+        label: 'retention:due-soon',
+        description: 'Retention deadlines due soon',
+        kind: 'retention',
+      },
+      {
         token: 'owner:"Nguyen An"',
         label: 'owner:"Nguyen An"',
         description: 'Owner handoff',
@@ -239,13 +309,22 @@ describe('document filter metadata', () => {
       { value: 'owner-1', label: 'Nguyen An' },
       { value: 'owner-2', label: 'Le Binh' },
       { value: 'owner-3', label: 'Tran Chi' },
+      { value: 'owner-4', label: 'Pham Dung' },
     ]);
-    expect(options.tags).toEqual(['board', 'finance', 'hr', 'policy', 'security']);
+    expect(options.tags).toEqual([
+      'board',
+      'finance',
+      'hr',
+      'policy',
+      'records',
+      'security',
+    ]);
     expect(options.folders).toEqual([
       { value: 'board', label: 'Board', count: 1 },
       { value: 'finance', label: 'Finance', count: 1 },
       { value: 'hr', label: 'Hr', count: 2 },
       { value: 'policy', label: 'Policy', count: 1 },
+      { value: 'records', label: 'Records', count: 1 },
       { value: 'security', label: 'Security', count: 1 },
     ]);
 
@@ -273,11 +352,11 @@ describe('document filter metadata', () => {
 
   it('builds quick view counts and active view chips', () => {
     expect(buildDocumentQuickViewOptions(documents)).toEqual([
-      expect.objectContaining({ value: 'all', count: 4 }),
+      expect.objectContaining({ value: 'all', count: 5 }),
       expect.objectContaining({ value: 'needs-action', count: 2 }),
       expect.objectContaining({ value: 'drafts', count: 1 }),
       expect.objectContaining({ value: 'pending-review', count: 1 }),
-      expect.objectContaining({ value: 'published', count: 2 }),
+      expect.objectContaining({ value: 'published', count: 3 }),
       expect.objectContaining({ value: 'sensitive', count: 2 }),
     ]);
 

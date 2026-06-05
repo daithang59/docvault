@@ -1,6 +1,7 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
@@ -272,6 +273,43 @@ export class MetadataProxyController {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents`,
       data: body,
+    });
+    return response.data;
+  }
+
+  @Get('document-saved-views')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List document saved views' })
+  async listDocumentSavedViews(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views`,
+    });
+    return response.data;
+  }
+
+  @Post('document-saved-views')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Create a document saved view' })
+  async createDocumentSavedView(@Req() req: any, @Body() body: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Delete('document-saved-views/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Delete a document saved view' })
+  async deleteDocumentSavedView(@Param('id') id: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'DELETE',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views/${id}`,
     });
     return response.data;
   }

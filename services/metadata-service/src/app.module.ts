@@ -10,6 +10,7 @@ import { StatusModule } from './status/status.module';
 import { PolicyModule } from './policy/policy.module';
 import { AuditModule } from './audit/audit.module';
 import { RetentionModule } from './retention/retention.module';
+import { DocumentSavedViewsModule } from './document-saved-views/document-saved-views.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { RetentionModule } from './retention/retention.module';
     PolicyModule,
     DocumentsModule,
     RetentionModule,
+    DocumentSavedViewsModule,
   ],
   controllers: [AppController],
 })

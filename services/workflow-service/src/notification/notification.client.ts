@@ -17,6 +17,7 @@ export interface NotificationPayload {
   recipientIds?: string[]; // multi-recipient
   docTitle?: string;
   reason?: string;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -45,6 +46,7 @@ export class NotificationClient {
             recipientIds: body.recipientIds,
             docTitle: body.docTitle,
             reason: body.reason,
+            metadata: body.metadata,
             traceId: context.traceId,
           },
           {
