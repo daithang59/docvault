@@ -36,8 +36,29 @@ export interface DashboardWorkQueueItem {
   tone: DashboardWidgetTone;
 }
 
+export interface DashboardDemoReadinessSignal {
+  key:
+    | 'lifecycle-coverage'
+    | 'approval-workflow'
+    | 'evidence-export'
+    | 'security-posture';
+  label: string;
+  value: string;
+  description: string;
+  tone: DashboardWidgetTone;
+  href: string;
+}
+
+export interface DashboardDemoReadiness {
+  score: number;
+  label: string;
+  description: string;
+  signals: DashboardDemoReadinessSignal[];
+}
+
 export interface DashboardModel {
   stats: DashboardStats;
+  demoReadiness: DashboardDemoReadiness;
   operationalWidgets: DashboardOperationalWidget[];
   workQueue: DashboardWorkQueueItem[];
   recentDocuments: DocumentListItem[];
@@ -65,6 +86,7 @@ export function buildDashboardModel(
 
   return {
     stats,
+    demoReadiness: buildDemoReadiness(documents, stats, dlpDetected, options.actor),
     operationalWidgets: [
       {
         key: 'pending-approvals',
@@ -101,6 +123,82 @@ export function buildDashboardModel(
     ],
     workQueue: buildWorkQueue(documents, now, options.actor),
     recentDocuments: sortByUpdatedDesc(documents).slice(0, 5),
+  };
+}
+
+function buildDemoReadiness(
+  documents: DocumentListItem[],
+  stats: DashboardStats,
+  dlpDetected: DocumentListItem[],
+  actor?: DashboardModelOptions['actor'],
+): DashboardDemoReadiness {
+  const governedDocuments = documents.filter(
+    (document) => document.status !== 'DRAFT',
+  );
+  const hasLifecycleCoverage = governedDocuments.length > 0;
+  const hasApprovalWorkflow = stats.PENDING > 0;
+  const hasSecurityStory = dlpDetected.length > 0;
+  const canExportEvidence = Boolean(
+    actor?.roles.some((role) => role === 'admin' || role === 'compliance_officer'),
+  );
+  const signals: DashboardDemoReadinessSignal[] = [
+    {
+      key: 'lifecycle-coverage',
+      label: 'Lifecycle coverage',
+      value: `${governedDocuments.length} governed`,
+      description: hasLifecycleCoverage
+        ? 'Governed documents demonstrate post-draft lifecycle states.'
+        : 'Seed pending, published, or archived documents to demonstrate governance.',
+      tone: hasLifecycleCoverage ? 'success' : 'warning',
+      href: ROUTES.DOCUMENTS,
+    },
+    {
+      key: 'approval-workflow',
+      label: 'Approval workflow',
+      value: `${stats.PENDING} pending`,
+      description: hasApprovalWorkflow
+        ? 'Pending items demonstrate approver queue and decision controls.'
+        : 'Seed a pending document to demonstrate approver queue controls.',
+      tone: hasApprovalWorkflow ? 'warning' : 'info',
+      href: ROUTES.APPROVALS,
+    },
+    {
+      key: 'evidence-export',
+      label: 'Evidence export',
+      value: canExportEvidence ? 'Enabled' : 'Role gated',
+      description: canExportEvidence
+        ? 'Current role can export metadata-only evidence packets.'
+        : 'Compliance Officer or Admin role is required for packet export.',
+      tone: canExportEvidence ? 'success' : 'info',
+      href: ROUTES.EVIDENCE,
+    },
+    {
+      key: 'security-posture',
+      label: 'Security posture',
+      value: `${dlpDetected.length} finding${dlpDetected.length === 1 ? '' : 's'}`,
+      description: hasSecurityStory
+        ? 'DLP findings and policy denies create a security review story.'
+        : 'Seed a DLP-detected document to demonstrate security review.',
+      tone: hasSecurityStory ? 'critical' : 'info',
+      href: ROUTES.SECURITY,
+    },
+  ];
+  const readySignals = [
+    hasLifecycleCoverage,
+    hasApprovalWorkflow,
+    canExportEvidence,
+    hasSecurityStory,
+  ].filter(Boolean).length;
+  const score = Math.round((readySignals / signals.length) * 100);
+
+  return {
+    score,
+    label: score >= 100 ? 'Demo ready' : score >= 75 ? 'Nearly ready' : 'Needs setup',
+    description:
+      score >= 100
+        ? 'Lifecycle, approval, evidence, and security stories are available.'
+        : 'Some commercial demo stories need role access or seeded data.',
+    signals,
   };
 }
 

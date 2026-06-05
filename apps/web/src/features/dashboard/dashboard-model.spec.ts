@@ -169,4 +169,74 @@ describe('buildDashboardModel', () => {
       }),
     ]);
   });
+
+  it('summarizes business demo readiness from lifecycle, approval, evidence, and security signals', () => {
+    const model = buildDashboardModel(documents, {
+      now,
+      actor: { id: 'admin-1', roles: ['admin'] },
+    });
+
+    expect(model.demoReadiness).toEqual({
+      score: 100,
+      label: 'Demo ready',
+      description: 'Lifecycle, approval, evidence, and security stories are available.',
+      signals: [
+        expect.objectContaining({
+          key: 'lifecycle-coverage',
+          label: 'Lifecycle coverage',
+          value: '3 governed',
+          tone: 'success',
+        }),
+        expect.objectContaining({
+          key: 'approval-workflow',
+          label: 'Approval workflow',
+          value: '1 pending',
+          tone: 'warning',
+        }),
+        expect.objectContaining({
+          key: 'evidence-export',
+          label: 'Evidence export',
+          value: 'Enabled',
+          tone: 'success',
+        }),
+        expect.objectContaining({
+          key: 'security-posture',
+          label: 'Security posture',
+          value: '1 finding',
+          tone: 'critical',
+        }),
+      ],
+    });
+  });
+
+  it('does not mark the business demo ready when seeded demo data is missing', () => {
+    const model = buildDashboardModel([], {
+      now,
+      actor: { id: 'admin-1', roles: ['admin'] },
+    });
+
+    expect(model.demoReadiness.score).toBe(25);
+    expect(model.demoReadiness.label).toBe('Needs setup');
+    expect(model.demoReadiness.description).toBe(
+      'Some commercial demo stories need role access or seeded data.',
+    );
+    expect(model.demoReadiness.signals).toEqual([
+      expect.objectContaining({
+        key: 'lifecycle-coverage',
+        value: '0 governed',
+      }),
+      expect.objectContaining({
+        key: 'approval-workflow',
+        value: '0 pending',
+      }),
+      expect.objectContaining({
+        key: 'evidence-export',
+        value: 'Enabled',
+      }),
+      expect.objectContaining({
+        key: 'security-posture',
+        value: '0 findings',
+      }),
+    ]);
+  });
 });

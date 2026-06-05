@@ -328,6 +328,44 @@ test('documents page supports built-in and custom saved views', async ({ page },
   await screenshot(page, testInfo.file, 'documents-saved-views-playwright.png');
 });
 
+test('dashboard shows business demo readiness without horizontal overflow', async ({
+  page,
+}) => {
+  await page.goto('/dashboard');
+
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await expect(page.getByText('Business Demo Readiness')).toBeVisible();
+  await expect(page.getByText('Demo ready')).toBeVisible();
+  await expect(page.getByText('Lifecycle coverage')).toBeVisible();
+  await expect(page.getByText('Approval workflow')).toBeVisible();
+  await expect(page.getByText('Evidence export')).toBeVisible();
+  await expect(page.getByText('Security posture')).toBeVisible();
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/dashboard');
+  const readinessPanel = page.getByTestId('business-demo-readiness');
+  await expect(readinessPanel.getByText('Business Demo Readiness')).toBeVisible();
+  const readinessBox = await readinessPanel.boundingBox();
+  expect(readinessBox).not.toBeNull();
+  if (!readinessBox) throw new Error('Business Demo Readiness panel was not measurable.');
+
+  const viewportWidth = await page.evaluate(() => window.innerWidth);
+  expect(readinessBox.x).toBeGreaterThanOrEqual(0);
+  expect(readinessBox.x + readinessBox.width).toBeLessThanOrEqual(viewportWidth + 1);
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+  await expect
+    .poll(async () =>
+      readinessPanel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
+    )
+    .toBe(true);
+});
+
 test('documents filters stay usable on a mobile viewport', async ({ page }, testInfo) => {
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/documents');
