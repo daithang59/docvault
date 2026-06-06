@@ -61,8 +61,40 @@ enum DocumentSavedViewScope {
   TEAM
 }
 
+enum OrganizationRole {
+  MEMBER
+  ADMIN
+}
+
+model Organization {
+  id          String                   @id @default(uuid())
+  name        String
+  slug        String                   @unique
+  ownerId     String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  memberships OrganizationMembership[]
+
+  @@index([ownerId])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole @default(MEMBER)
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
 model Document {
   id              String            @id @default(uuid())
+  organizationId  String
   title           String
   description     String?
   ownerId         String
@@ -93,6 +125,8 @@ model Document {
   comments        DocumentComment[]
   shareLinks      DocumentShareLink[]
 
+  @@index([organizationId])
+  @@index([organizationId, status])
   @@index([ownerId])
   @@index([status])
   @@index([retentionUntil])
@@ -168,6 +202,7 @@ model DocumentComment {
 
 model DocumentSavedView {
   id          String                 @id @default(uuid())
+  organizationId String
   name        String
   description String?
   filters     Json
@@ -176,6 +211,7 @@ model DocumentSavedView {
   createdAt   DateTime               @default(now())
   updatedAt   DateTime               @updatedAt
 
+  @@index([organizationId, scope])
   @@index([ownerId, scope])
   @@index([scope, createdAt])
   @@map("document_saved_views")

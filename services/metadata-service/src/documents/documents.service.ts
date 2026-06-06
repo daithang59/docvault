@@ -8,6 +8,7 @@ import {
 import { PrismaService } from '../prisma/prisma.service';
 import { Document, Prisma } from '../../generated/prisma';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import {
@@ -24,6 +25,7 @@ export class DocumentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   /**
@@ -39,7 +41,7 @@ export class DocumentsService {
     let groups: string[];
 
     if (!userOrContext) {
-      return [];
+      return Promise.resolve([]);
     }
 
     const isServiceUser = 'sub' in userOrContext;
@@ -54,6 +56,20 @@ export class DocumentsService {
       groups = normalizeGroups(userOrContext.groups);
     }
 
+    return this.orgService
+      .requireOrgId(actorId)
+      .then((organizationId) =>
+        this.findAllForOrg(organizationId, actorId, roles, groups, searchQuery),
+      );
+  }
+
+  private findAllForOrg(
+    organizationId: string,
+    actorId: string,
+    roles: string[],
+    groups: string[],
+    searchQuery?: string,
+  ) {
     const isAdmin = roles.includes('admin');
 
     const searchFilter = this.buildDocumentSearchFilter(searchQuery);
@@ -102,6 +118,7 @@ export class DocumentsService {
         .findMany({
           where: {
             AND: [
+              { organizationId },
               ...(searchFilter ? [searchFilter] : []),
               { status: { not: 'DELETED' as const } },
               readDenyFilter,
@@ -119,6 +136,8 @@ export class DocumentsService {
       .findMany({
         where: {
           AND: [
+            // Tenant isolation: only documents in the caller's organization.
+            { organizationId },
             // Search filter (optional)
             ...(searchFilter ? [searchFilter] : []),
             // Always exclude DELETED documents
@@ -233,13 +252,36 @@ export class DocumentsService {
     return document;
   }
 
+  /**
+   * Fetch a document, ensuring it belongs to the caller's organization.
+   * Cross-org access surfaces as NotFound (do not reveal existence).
+   */
+  private async findInOrgOrThrow(
+    id: string,
+    context: RequestContext,
+  ): Promise<Document> {
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id, organizationId },
+    });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    return document;
+  }
+
   async create(
     dto: CreateDocumentDto,
     user: ServiceUser,
     context: RequestContext,
   ) {
+    const organizationId = await this.orgService.requireOrgId(
+      context.actorId,
+      user?.username,
+    );
     const created = await this.prisma.document.create({
       data: {
+        organizationId,
         title: dto.title,
         description: dto.description,
         classification: (dto.classification ?? 'INTERNAL') as any,
@@ -273,13 +315,7 @@ export class DocumentsService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id },
-    });
-
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findInOrgOrThrow(id, context);
 
     // Use context.actorId — correct even when req.user is stripped by gateway.
     this.assertCanManage(document.ownerId, context.actorId, context.roles);
@@ -539,10 +575,7 @@ export class DocumentsService {
       throw new ForbiddenException('Only admins can change legal hold');
     }
 
-    const document = await this.prisma.document.findUnique({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findInOrgOrThrow(id, context);
 
     const reason = input.reason?.trim();
     if (input.hold && !reason) {
@@ -608,8 +641,12 @@ export class DocumentsService {
    * all. Each entry carries a recovery deadline so the UI can warn before purge.
    */
   async listTrash(context: RequestContext, now: Date = new Date()) {
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
     const isAdmin = context.roles.includes('admin');
-    const where: Record<string, unknown> = { status: 'DELETED' as const };
+    const where: Record<string, unknown> = {
+      organizationId,
+      status: 'DELETED' as const,
+    };
     if (!isAdmin) {
       where.ownerId = context.actorId;
     }
@@ -650,10 +687,7 @@ export class DocumentsService {
     context: RequestContext,
     now: Date = new Date(),
   ): Promise<Document> {
-    const document = await this.prisma.document.findUnique({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findInOrgOrThrow(id, context);
     if (document.status !== 'DELETED') {
       throw new BadRequestException('Only deleted documents can be restored');
     }
@@ -702,10 +736,7 @@ export class DocumentsService {
     input: { approvers: string[] },
     context: RequestContext,
   ): Promise<Document> {
-    const document = await this.prisma.document.findUnique({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findInOrgOrThrow(id, context);
 
     const isAdmin = context.roles.includes('admin');
     const isOwnerEditor =
@@ -751,10 +782,7 @@ export class DocumentsService {
     id: string,
     context: RequestContext,
   ): Promise<Document> {
-    const document = await this.prisma.document.findUnique({ where: { id } });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findInOrgOrThrow(id, context);
     const nextStep = ((document as any).approvalStep ?? 0) + 1;
     return this.prisma.document.update({
       where: { id },

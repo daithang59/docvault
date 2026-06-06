@@ -12,6 +12,13 @@ function makePrisma(overrides: Record<string, any> = {}) {
         legalHold: false,
         currentVersion: 2,
       }),
+      findFirst: jest.fn().mockResolvedValue({
+        id: 'doc-1',
+        title: 'Quarterly report',
+        ownerId: 'owner-1',
+        legalHold: false,
+        currentVersion: 2,
+      }),
     },
     documentShareLink: {
       create: jest.fn().mockImplementation(({ data }) =>
@@ -67,7 +74,9 @@ describe('DocumentShareLinksService', () => {
     jest.clearAllMocks();
     prisma = makePrisma();
     audit = { emitEvent: jest.fn().mockResolvedValue(undefined) };
-    service = new DocumentShareLinksService(prisma, audit);
+    service = new DocumentShareLinksService(prisma, audit, {
+      requireOrgId: jest.fn().mockResolvedValue('org-1'),
+    } as any);
   });
 
   it('creates a share link, returns the raw token once, and stores only its hash', async () => {
@@ -104,6 +113,7 @@ describe('DocumentShareLinksService', () => {
 
   it('rejects creating a share link for a non-existent document', async () => {
     prisma.document.findUnique.mockResolvedValueOnce(null);
+    prisma.document.findFirst.mockResolvedValueOnce(null);
     await expect(
       service.create('missing', { permission: 'VIEW', expiresInHours: 1 } as any, adminCtx as any),
     ).rejects.toThrow(NotFoundException);

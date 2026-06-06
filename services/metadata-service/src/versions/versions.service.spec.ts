@@ -47,9 +47,9 @@ describe('VersionsService DLP state', () => {
       }),
     );
     service = new VersionsService({
-      document: { findUnique: mockDocumentFindUnique },
+      document: { findUnique: mockDocumentFindUnique, findFirst: mockDocumentFindUnique },
       $transaction: mockTransaction,
-    } as any);
+    } as any, { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any);
   });
 
   it('persists DLP findings and escalates the document classification', async () => {
@@ -117,10 +117,10 @@ describe('VersionsService restore', () => {
       }),
     );
     service = new VersionsService({
-      document: { findUnique: mockDocumentFindUnique },
+      document: { findUnique: mockDocumentFindUnique, findFirst: mockDocumentFindUnique },
       documentVersion: { findUnique: mockVersionFindUnique },
       $transaction: mockTransaction,
-    } as any);
+    } as any, { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any);
   });
 
   it('creates a new version that copies the source version file pointer', async () => {

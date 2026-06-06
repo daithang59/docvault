@@ -14,6 +14,7 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { buildRequestContext } from '../common/request-context';
 import { RetentionService } from './retention.service';
+import { OrgService } from '../org/org.service';
 
 function parseAsOf(asOf?: string): Date | undefined {
   if (!asOf) return undefined;
@@ -28,14 +29,22 @@ function parseAsOf(asOf?: string): Date | undefined {
 @ApiBearerAuth()
 @Controller('retention')
 export class RetentionController {
-  constructor(private readonly retentionService: RetentionService) {}
+  constructor(
+    private readonly retentionService: RetentionService,
+    private readonly orgService: OrgService,
+  ) {}
 
   @Get('documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('compliance_officer', 'admin')
   @ApiOperation({ summary: 'List retention evidence for published records' })
-  list(@Query('asOf') asOf?: string) {
-    return this.retentionService.listRetentionEvidence(parseAsOf(asOf));
+  async list(@Req() req: any, @Query('asOf') asOf?: string) {
+    const context = buildRequestContext(req);
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    return this.retentionService.listRetentionEvidence(
+      parseAsOf(asOf),
+      organizationId,
+    );
   }
 
   @Post('run')

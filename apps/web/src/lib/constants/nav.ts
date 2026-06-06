@@ -12,6 +12,7 @@ import {
   Archive,
   ClipboardCheck,
   Trash2,
+  Users,
 } from 'lucide-react';
 import { UserRole } from '@/types/auth';
 import { ROUTES } from './routes';
@@ -102,5 +103,11 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.TRASH,
     icon: Trash2,
     roles: ['editor', 'admin'],
+  },
+  {
+    label: 'Members',
+    href: ROUTES.ORG_MEMBERS,
+    icon: Users,
+    roles: ['admin'],
   },
 ];

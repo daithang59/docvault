@@ -1,0 +1,34 @@
+import { Controller, Get, Req, UseGuards } from '@nestjs/common';
+import { AuthGuard } from '@nestjs/passport';
+import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
+import { Roles } from '../auth/roles.decorator';
+import { RolesGuard } from '../auth/roles.guard';
+import { OrgService } from './org.service';
+import { buildRequestContext } from '../common/request-context';
+
+@ApiTags('organizations')
+@ApiBearerAuth()
+@Controller('orgs')
+export class OrgController {
+  constructor(private readonly orgService: OrgService) {}
+
+  @Get('me')
+  @UseGuards(AuthGuard('jwt'))
+  @ApiOperation({
+    summary: 'Get the current user organization (auto-provisions on first call)',
+  })
+  getMyOrg(@Req() req: any) {
+    const ctx = buildRequestContext(req);
+    const displayName = req.user?.username ?? req.headers['x-user-id'];
+    return this.orgService.getMyOrg(ctx.actorId, displayName);
+  }
+
+  @Get('members')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({ summary: 'List members of the current user organization (admin only)' })
+  listMembers(@Req() req: any) {
+    const ctx = buildRequestContext(req);
+    return this.orgService.listMembers(ctx.actorId);
+  }
+}

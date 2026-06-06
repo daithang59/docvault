@@ -18,7 +18,7 @@ const mockTransaction = jest.fn((fn) =>
 const mockFindUnique = jest.fn();
 
 const mockPrisma = {
-  document: { findUnique: mockFindUnique, update: mockDocumentUpdate },
+  document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockDocumentUpdate },
   documentWorkflowHistory: { create: mockWorkflowHistoryCreate },
   $transaction: mockTransaction,
 };
@@ -26,6 +26,9 @@ const mockPrisma = {
 // --- Mock AuditClient ---
 const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
 const mockAuditClient = { emitEvent: mockEmitEvent };
+
+// --- Mock OrgService ---
+const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
 
 // --- Test helpers ---
 function makeDocument(overrides: Partial<Record<string, any>> = {}) {
@@ -56,7 +59,7 @@ describe('StatusService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new StatusService(mockPrisma as any, mockAuditClient as any);
+    service = new StatusService(mockPrisma as any, mockAuditClient as any, mockOrgService as any);
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockWorkflowHistoryCreate.mockResolvedValue({});
   });

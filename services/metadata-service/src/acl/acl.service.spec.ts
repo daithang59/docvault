@@ -33,12 +33,14 @@ describe('AclService', () => {
       {
         document: {
           findUnique: mockDocumentFindUnique,
+          findFirst: mockDocumentFindUnique,
         },
         documentAcl: {
           create: mockAclCreate,
         },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 

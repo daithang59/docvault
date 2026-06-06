@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { UpsertAclDto } from './dto/upsert-acl.dto';
 import {
   RequestContext,
@@ -20,6 +21,7 @@ export class AclService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   async upsert(
@@ -28,8 +30,9 @@ export class AclService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {
@@ -86,8 +89,9 @@ export class AclService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {

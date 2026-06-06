@@ -30,10 +30,12 @@ describe('DocumentsService DLP downgrade guard', () => {
       {
         document: {
           findUnique: mockDocumentFindUnique,
+          findFirst: mockDocumentFindUnique,
           update: mockDocumentUpdate,
         },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -142,6 +144,7 @@ describe('DocumentsService access-controlled list visibility', () => {
         },
       } as any,
       { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -331,9 +334,10 @@ describe('DocumentsService legal hold', () => {
     );
     service = new DocumentsService(
       {
-        document: { findUnique: mockFindUnique, update: mockUpdate },
+        document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockUpdate },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -454,10 +458,12 @@ describe('DocumentsService trash', () => {
         document: {
           findMany: mockFindMany,
           findUnique: mockFindUnique,
+          findFirst: mockFindUnique,
           update: mockUpdate,
         },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -587,9 +593,10 @@ describe('DocumentsService approval chain', () => {
     jest.clearAllMocks();
     service = new DocumentsService(
       {
-        document: { findUnique: mockFindUnique, update: mockUpdate },
+        document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockUpdate },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -703,6 +710,7 @@ describe('DocumentsService purge expired trash', () => {
         document: { findMany: mockFindMany, delete: mockDelete },
       } as any,
       { emitEvent: mockEmitEvent } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
     );
   });
 
@@ -748,5 +756,65 @@ describe('DocumentsService purge expired trash', () => {
     const result = await service.purgeExpiredTrash({ now: new Date('2026-06-10T00:00:00.000Z') });
     expect(result.purged).toBe(1);
     expect(result.failed).toBe(1);
+  });
+});
+
+
+describe('DocumentsService tenant isolation', () => {
+  const mockFindMany = jest.fn();
+  const mockFindFirst = jest.fn();
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindMany.mockResolvedValue([]);
+    service = new DocumentsService(
+      {
+        document: { findMany: mockFindMany, findFirst: mockFindFirst },
+      } as any,
+      { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-acme') } as any,
+    );
+  });
+
+  it('scopes findAll to the resolved organization', async () => {
+    await service.findAll({
+      traceId: 't',
+      actorId: 'viewer-1',
+      roles: ['viewer'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockFindMany.mock.calls[0][0]);
+    expect(queryText).toContain('"organizationId":"org-acme"');
+  });
+
+  it('scopes admin findAll to the resolved organization', async () => {
+    await service.findAll({
+      traceId: 't',
+      actorId: 'admin-1',
+      roles: ['admin'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockFindMany.mock.calls[0][0]);
+    expect(queryText).toContain('"organizationId":"org-acme"');
+  });
+
+  it('treats a document from another organization as not found', async () => {
+    // findFirst with the org filter returns null → cross-org doc is invisible.
+    mockFindFirst.mockResolvedValueOnce(null);
+
+    await expect(
+      service.update(
+        'doc-from-other-org',
+        { title: 'hack' },
+        { sub: 'editor-1', roles: ['editor'] } as any,
+        { traceId: 't', actorId: 'editor-1', roles: ['editor'] } as any,
+      ),
+    ).rejects.toThrow('Document not found');
+
+    const whereArg = JSON.stringify(mockFindFirst.mock.calls[0][0]);
+    expect(whereArg).toContain('"organizationId":"org-acme"');
   });
 });

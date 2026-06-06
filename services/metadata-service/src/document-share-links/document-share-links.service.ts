@@ -7,6 +7,7 @@ import {
 import { createHash, randomBytes } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { RequestContext } from '../common/request-context';
 import {
   CreateShareLinkDto,
@@ -46,10 +47,22 @@ export class DocumentShareLinksService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   private get shareLinks() {
     return (this.prisma as any).documentShareLink;
+  }
+
+  private async findDocInOrgOrThrow(docId: string, context: RequestContext) {
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
+    });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    return document;
   }
 
   async create(
@@ -66,12 +79,7 @@ export class DocumentShareLinksService {
       throw new BadRequestException('expiresInHours must be between 1 and 720');
     }
 
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
-    });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findDocInOrgOrThrow(docId, context);
 
     this.assertCanManageShares(document.ownerId, context);
 
@@ -108,12 +116,7 @@ export class DocumentShareLinksService {
   }
 
   async list(docId: string, context: RequestContext): Promise<ShareLinkView[]> {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
-    });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findDocInOrgOrThrow(docId, context);
     this.assertCanManageShares(document.ownerId, context);
 
     const links = await this.shareLinks.findMany({
@@ -128,12 +131,7 @@ export class DocumentShareLinksService {
     linkId: string,
     context: RequestContext,
   ): Promise<ShareLinkView> {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
-    });
-    if (!document) {
-      throw new NotFoundException('Document not found');
-    }
+    const document = await this.findDocInOrgOrThrow(docId, context);
     this.assertCanManageShares(document.ownerId, context);
 
     const link = await this.shareLinks.findUnique({ where: { id: linkId } });

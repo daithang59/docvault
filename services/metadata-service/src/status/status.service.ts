@@ -7,6 +7,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import {
   RequestContext,
@@ -36,6 +37,7 @@ export class StatusService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   async update(
@@ -44,8 +46,9 @@ export class StatusService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {

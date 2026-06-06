@@ -2,6 +2,10 @@ export const apiEndpoints = {
   auth: {
     currentUser: '/me',
   },
+  orgs: {
+    me: '/orgs/me',
+    members: '/orgs/members',
+  },
   users: {
     profile: '/users/profile',
     batch: '/users/batch',

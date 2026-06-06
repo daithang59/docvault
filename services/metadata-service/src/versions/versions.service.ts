@@ -5,16 +5,23 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrgService } from '../org/org.service';
 import { CreateVersionDto } from './dto/create-version.dto';
 import { ServiceUser, buildActorId } from '../common/request-context';
 
 @Injectable()
 export class VersionsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orgService: OrgService,
+  ) {}
 
   async create(docId: string, dto: CreateVersionDto, user: ServiceUser) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(
+      buildActorId(user),
+    );
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {
@@ -85,8 +92,11 @@ export class VersionsService {
    * overwrite) while making the chosen version current again.
    */
   async restore(docId: string, sourceVersion: number, user: ServiceUser) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(
+      buildActorId(user),
+    );
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {

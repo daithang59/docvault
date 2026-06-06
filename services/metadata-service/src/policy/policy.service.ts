@@ -13,6 +13,7 @@ import {
 import { createHash, createHmac } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { DownloadAuthorizeDto } from './dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from './dto/preview-authorize.dto';
 import { AccessImpactDto } from './dto/access-impact.dto';
@@ -72,6 +73,7 @@ export class PolicyService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   async authorizeDownload(
@@ -81,8 +83,9 @@ export class PolicyService {
     context: RequestContext,
     options: { shareToken?: string } = {},
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
       include: { aclEntries: true },
     });
 
@@ -217,8 +220,9 @@ export class PolicyService {
     context: RequestContext,
     options: { shareToken?: string } = {},
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
       include: { aclEntries: true },
     });
 
@@ -344,8 +348,9 @@ export class PolicyService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
       include: {
         versions: { orderBy: { version: 'desc' } },
         aclEntries: true,

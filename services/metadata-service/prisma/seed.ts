@@ -16,6 +16,9 @@ const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 
+// Default seed organization — all sample documents belong to this org.
+const ORG1 = '00000000-0000-0000-0000-000000000001';
+
 async function main() {
   console.log('🌱 Seeding database...');
 
@@ -25,10 +28,30 @@ async function main() {
   await prisma.documentVersion.deleteMany();
   await prisma.documentComment.deleteMany();
   await prisma.document.deleteMany();
+  await prisma.organizationMembership.deleteMany();
+  await prisma.organization.deleteMany();
+
+  // ── Organization + memberships ─────────────────────────────
+  await prisma.organization.create({
+    data: {
+      id: ORG1,
+      name: 'Acme Corporation',
+      slug: 'acme',
+      ownerId: ADMIN1,
+      memberships: {
+        create: [
+          { userId: ADMIN1, role: 'ADMIN' },
+          { userId: EDITOR1, role: 'MEMBER' },
+          { userId: APPROVER1, role: 'MEMBER' },
+        ],
+      },
+    },
+  });
 
   // ── Documents ──────────────────────────────────────────────
   const doc1 = await prisma.document.create({
     data: {
+      organizationId: ORG1,
       title: 'Q1 Financial Report 2026',
       description: 'Quarterly financial overview for Q1 2026',
       ownerId: EDITOR1,
@@ -41,6 +64,7 @@ async function main() {
 
   const doc2 = await prisma.document.create({
     data: {
+      organizationId: ORG1,
       title: 'Employee Handbook v3',
       description: 'Company-wide employee handbook',
       ownerId: ADMIN1,
@@ -53,6 +77,7 @@ async function main() {
 
   const doc3 = await prisma.document.create({
     data: {
+      organizationId: ORG1,
       title: 'Product Roadmap 2026',
       description: 'Engineering roadmap for 2026',
       ownerId: EDITOR1,
@@ -64,6 +89,7 @@ async function main() {
 
   const doc4 = await prisma.document.create({
     data: {
+      organizationId: ORG1,
       title: 'Meeting Notes — All Hands Feb',
       description: 'All-hands meeting notes February 2026',
       ownerId: ADMIN1,

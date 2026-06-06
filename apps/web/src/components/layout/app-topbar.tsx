@@ -14,6 +14,7 @@ import {
   ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useMyOrg } from '@/features/org/org.hooks';
 import { useRouter } from 'next/navigation';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
@@ -131,6 +132,7 @@ function NotificationItem({
 // ── AppTopbar ────────────────────────────────────────────────────────────────
 export function AppTopbar() {
   const { session, logout } = useAuth();
+  const { org } = useMyOrg();
   const router = useRouter();
 
   // ── Notification state ─────────────────────────────────────────────────
@@ -255,6 +257,15 @@ export function AppTopbar() {
     >
       <div className="flex items-center gap-3">
         <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />
+        {org?.name && (
+          <span
+            className="hidden items-center rounded-lg border px-2.5 py-1 text-xs font-medium text-[var(--text-main)] sm:inline-flex"
+            style={{ borderColor: 'var(--surface-border)', background: 'var(--bg-subtle)' }}
+            title={`Organization: ${org.name}`}
+          >
+            {org.name}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -408,6 +419,9 @@ export function AppTopbar() {
                 style={{ borderColor: 'var(--border-soft)' }}
               >
                 <p className="text-sm font-semibold text-[var(--text-strong)]">{displayName}</p>
+                {org?.name && (
+                  <p className="mt-0.5 text-xs font-medium text-[var(--text-main)]">{org.name}</p>
+                )}
                 {session?.user.email && (
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">{session.user.email}</p>
                 )}
