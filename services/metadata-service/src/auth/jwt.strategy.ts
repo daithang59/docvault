@@ -8,12 +8,24 @@ type KeycloakAccessToken = {
   exp?: number;
   preferred_username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   resource_access?: Record<string, { roles?: string[] }>;
   aud?: string | string[];
   azp?: string;
   iss?: string;
 };
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
+}
 
 function normalizeUrl(value: string): string {
   return value.replace(/\/$/, '');
@@ -105,6 +117,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: payload.preferred_username,
       email: payload.email,
       roles: Array.from(roles),
+      groups: normalizeGroups(payload.groups),
       raw: payload,
     };
   }

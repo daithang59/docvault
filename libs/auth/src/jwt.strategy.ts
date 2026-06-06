@@ -2,7 +2,7 @@ import { Injectable, UnauthorizedException } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
 import { ExtractJwt, Strategy } from 'passport-jwt';
 import * as jwksRsa from 'jwks-rsa';
-import { KeycloakAccessToken, ServiceUser } from './types';
+import { KeycloakAccessToken, ServiceUser, normalizeGroups } from './types';
 
 function normalizeUrl(value: string): string {
   return value.replace(/\/$/, '');
@@ -82,6 +82,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: payload.preferred_username,
       email: payload.email,
       roles: Array.from(roles),
+      groups: normalizeGroups(payload.groups),
       raw: payload,
     };
   }

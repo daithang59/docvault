@@ -1,6 +1,7 @@
 'use client';
 
-import { useForm, Controller } from 'react-hook-form';
+import type { ReactNode } from 'react';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { X } from 'lucide-react';
@@ -11,16 +12,21 @@ const documentFormSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(255),
   description: z.string().trim().max(5000).optional().or(z.literal('')),
   classification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'SECRET']),
+  classificationOverrideReason: z.string().trim().max(500).optional().or(z.literal('')),
   tags: z.array(z.string().trim().min(1).max(50)).max(50),
 });
 
 export type DocumentFormValues = z.infer<typeof documentFormSchema>;
+type DlpStatus = 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
 
 interface DocumentFormProps {
   defaultValues?: Partial<DocumentFormValues>;
   onSubmit: (values: DocumentFormValues) => void | Promise<void>;
   submitLabel?: string;
   isLoading?: boolean;
+  dlpStatus?: DlpStatus;
+  isAdmin?: boolean;
+  classificationSlot?: (classification: ClassificationLevel) => ReactNode;
   children?: React.ReactNode;
 }
 
@@ -36,20 +42,28 @@ export function DocumentForm({
   onSubmit,
   submitLabel = 'Save',
   isLoading,
+  dlpStatus,
+  isAdmin = false,
+  classificationSlot,
   children,
 }: DocumentFormProps) {
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DocumentFormValues>({
+  const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<DocumentFormValues>({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
       title: '',
       description: '',
       classification: 'INTERNAL',
+      classificationOverrideReason: '',
       tags: [],
       ...defaultValues,
     },
   });
 
-  const tags = watch('tags');
+  const tags = useWatch({ control, name: 'tags' }) ?? [];
+  const classification =
+    useWatch({ control, name: 'classification' }) ?? 'INTERNAL';
+  const showClassificationOverrideReason =
+    isAdmin && dlpStatus === 'DETECTED' && (classification === 'PUBLIC' || classification === 'INTERNAL');
 
   function addTag(e: React.KeyboardEvent<HTMLInputElement>) {
     const input = e.currentTarget;
@@ -129,6 +143,26 @@ export function DocumentForm({
           )}
         />
       </div>
+
+      {classificationSlot?.(classification)}
+
+      {showClassificationOverrideReason && (
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
+            Classification override reason <span className="text-[var(--color-destructive)]">*</span>
+          </label>
+          <textarea
+            {...register('classificationOverrideReason')}
+            rows={3}
+            required
+            placeholder="Explain why this DLP-detected document can use this classification..."
+            className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3.5 py-2.5 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)] transition resize-none"
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Required for admin DLP downgrade override.
+          </p>
+        </div>
+      )}
 
       {/* Tags */}
       <div>

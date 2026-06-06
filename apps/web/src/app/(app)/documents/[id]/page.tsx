@@ -6,6 +6,13 @@ import { useDocumentDetail } from '@/lib/hooks/use-document-detail';
 import { useWorkflowHistory } from '@/lib/hooks/use-workflow-history';
 import { useAuth } from '@/lib/auth/auth-context';
 import { DocumentHeader } from '@/components/documents/document-header';
+import { DocumentDlpFindingsCard } from '@/components/documents/document-dlp-findings-card';
+import { DocumentAiGuardrailsCard } from '@/components/documents/document-ai-guardrails-card';
+import { DocumentApprovalReadinessCard } from '@/components/documents/document-approval-readiness-card';
+import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
+import { DocumentLegalHoldCard } from '@/components/documents/document-legal-hold-card';
+import { DocumentShareLinksCard } from '@/components/documents/document-share-links-card';
+import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
@@ -14,10 +21,23 @@ import { DocumentActionPanel } from '@/components/documents/document-action-pane
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
-import { canDownloadDocument, canManageAcl, canPreviewDocument, canReadAcl } from '@/lib/auth/guards';
+import {
+  canEditDocument,
+  canManageAcl,
+  canManageLegalHold,
+  canReadAcl,
+  canViewAudit,
+  canViewComplianceEvidencePacket,
+  getDocumentAccessDecision,
+} from '@/lib/auth/permissions';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
+import { useDocumentAiGuardrails } from '@/features/documents/documents.hooks';
+import {
+  getLatestDocumentVersion,
+  getVersionPreviewPosture,
+} from '@/features/documents/document-detail-presentation';
 import { toast } from 'sonner';
 import type { DocumentVersion } from '@/features/documents/documents.types';
 
@@ -32,6 +52,11 @@ export default function DocumentDetailPage({ params }: Props) {
 
   const { data: doc, isLoading, isError, refetch } = useDocumentDetail(id);
   const { data: history = [] } = useWorkflowHistory(id);
+  const {
+    data: aiGuardrails,
+    isLoading: isAiGuardrailsLoading,
+    isError: isAiGuardrailsError,
+  } = useDocumentAiGuardrails(id);
   const { download } = useDownloadDocument({ onError: (msg) => toast.error(msg) });
 
   const [previewVersion, setPreviewVersion] = useState<DocumentVersion | null>(null);
@@ -39,10 +64,24 @@ export default function DocumentDetailPage({ params }: Props) {
   if (isLoading) return <LoadingState label="Loading document..." />;
   if (isError || !doc) return <ErrorState message="Failed to load document." onRetry={refetch} />;
 
-  const canDl = canDownloadDocument(session, doc);
-  const canPrev = canPreviewDocument(session, doc);
+  const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
+  const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
+  const latestVersion = getLatestDocumentVersion(doc.versions ?? []);
+  const latestPreviewPosture = latestVersion
+    ? getVersionPreviewPosture(latestVersion, previewDecision)
+    : null;
+  const latestPreviewSupported = latestPreviewPosture?.state === 'supported';
+  const previewUnavailableReason =
+    latestPreviewPosture && latestPreviewPosture.state !== 'supported'
+      ? latestPreviewPosture.reason
+      : undefined;
   const canAcl = canManageAcl(session, doc);
+  const canHold = canManageLegalHold(session);
+  const canShareLinks = canEditDocument(session, doc);
+  const showLegalHold = canHold || doc.legalHold === true;
   const canShowAcl = canReadAcl(session) || canAcl;
+  const canShowEvidenceLinks =
+    canViewAudit(session) || canViewComplianceEvidencePacket(session);
   const aclEntries = canShowAcl ? (doc.aclEntries ?? doc.acl ?? []) : [];
 
   function handleActionComplete() {
@@ -57,6 +96,30 @@ export default function DocumentDetailPage({ params }: Props) {
         <DocumentHeader doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
       </div>
 
+      <div className="animate-in delay-2 mb-5">
+        <DocumentMetadataSummaryCard
+          document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+        />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentApprovalReadinessCard
+          document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+        />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentDlpFindingsCard doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }} />
+      </div>
+
+      <div className="animate-in delay-2 mb-5">
+        <DocumentAiGuardrailsCard
+          guardrails={aiGuardrails}
+          isLoading={isAiGuardrailsLoading}
+          isError={isAiGuardrailsError}
+        />
+      </div>
+
       <div className="grid lg:grid-cols-3 gap-5">
         {/* Left col: versions + timeline */}
         <div className="lg:col-span-2 space-y-5">
@@ -64,14 +127,23 @@ export default function DocumentDetailPage({ params }: Props) {
             <DocumentVersionsCard
               docId={id}
               versions={doc.versions ?? []}
-              canDownload={canDl}
-              onDownload={() => download(id)}
-              canPreview={canPrev}
+              canDownload={downloadDecision.allowed}
+              onDownload={(docId, version) =>
+                download(docId, version.versionNumber ?? version.version)
+              }
+              downloadDeniedReason={downloadDecision.reason}
+              canPreview={previewDecision.allowed}
+              previewDeniedReason={previewDecision.reason}
               onPreview={(_docId, v) => setPreviewVersion(v)}
+              canRestore={canShareLinks}
+              currentVersion={doc.currentVersion}
             />
           </div>
           <div className="animate-in delay-3">
-            <DocumentWorkflowTimeline history={history} />
+            <DocumentWorkflowTimeline
+              history={history}
+              document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+            />
           </div>
         </div>
 
@@ -81,13 +153,37 @@ export default function DocumentDetailPage({ params }: Props) {
             <DocumentActionPanel
               doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
               onActionComplete={handleActionComplete}
-              onPreview={() => {
-                const versions = doc.versions ?? [];
-                const latest = versions.length > 0 ? versions[0] : null;
-                if (latest) setPreviewVersion(latest);
-              }}
+              onPreview={
+                latestVersion && latestPreviewSupported
+                  ? () => setPreviewVersion(latestVersion)
+                  : undefined
+              }
+              previewUnavailableReason={previewUnavailableReason}
             />
           </div>
+          {canShareLinks && (
+            <div className="animate-in delay-3">
+              <DocumentShareLinksCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canShareLinks}
+              />
+            </div>
+          )}
+          {showLegalHold && (
+            <div className="animate-in delay-3">
+              <DocumentLegalHoldCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canHold}
+              />
+            </div>
+          )}
+          {canShowEvidenceLinks && (
+            <div className="animate-in delay-3">
+              <DocumentEvidenceLinksCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+              />
+            </div>
+          )}
           {canShowAcl && (
             <div className="animate-in delay-3">
               <DocumentAclCard
@@ -107,6 +203,8 @@ export default function DocumentDetailPage({ params }: Props) {
         docId={id}
         version={previewVersion}
         onClose={() => setPreviewVersion(null)}
+        canDownload={downloadDecision.allowed}
+        downloadDeniedReason={downloadDecision.reason}
       />
     </div>
   );

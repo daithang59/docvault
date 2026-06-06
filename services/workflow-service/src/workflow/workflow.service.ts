@@ -44,12 +44,19 @@ export class WorkflowService {
     );
 
     // SUBMITTED → notify every approver and admin
-    const { userIds: approverIds } = await this.metadataClient.getApprovers(context);
+    const { userIds: approverIds } =
+      await this.metadataClient.getApprovers(context);
     await this.notificationClient.notify(context, {
-      type:         'SUBMITTED',
+      type: 'SUBMITTED',
       docId,
       recipientIds: approverIds,
-      docTitle:     document.title,
+      docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'SUBMIT',
+        document.status,
+        'PENDING',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -57,7 +64,6 @@ export class WorkflowService {
 
   async approve(docId: string, user: ServiceUser, context: RequestContext) {
     const document = await this.metadataClient.getDocument(docId, context);
-    const actorId = buildActorId(user);
     const roles = user.roles ?? [];
 
     if (!roles.includes('approver') && !roles.includes('admin')) {
@@ -77,10 +83,16 @@ export class WorkflowService {
 
     // Notify the document owner (document.ownerId is the owner's sub/UUID)
     await this.notificationClient.notify(context, {
-      type:        'APPROVED',
+      type: 'APPROVED',
       docId,
       recipientId: document.ownerId,
-      docTitle:    document.title,
+      docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'APPROVE',
+        document.status,
+        'PUBLISHED',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -93,7 +105,6 @@ export class WorkflowService {
     context: RequestContext,
   ) {
     const document = await this.metadataClient.getDocument(docId, context);
-    const actorId = buildActorId(user);
     const roles = user.roles ?? [];
 
     if (!roles.includes('approver') && !roles.includes('admin')) {
@@ -114,11 +125,17 @@ export class WorkflowService {
 
     // Notify the document owner (document.ownerId is the owner's sub/UUID)
     await this.notificationClient.notify(context, {
-      type:        'REJECTED',
+      type: 'REJECTED',
       docId,
       recipientId: document.ownerId,
-      docTitle:    document.title,
+      docTitle: document.title,
       reason,
+      metadata: buildWorkflowNotificationMetadata(
+        'REJECT',
+        document.status,
+        'DRAFT',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -151,10 +168,16 @@ export class WorkflowService {
 
     // Use actorId (sub/UUID) to notify the owner — matches buildActorId used in GET /notify.
     await this.notificationClient.notify(context, {
-      type:        'ARCHIVED',
+      type: 'ARCHIVED',
       docId,
       recipientId: actorId,
-      docTitle:    document.title,
+      docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'ARCHIVE',
+        document.status,
+        'ARCHIVED',
+        context.actorId,
+      ),
     });
 
     return updated;
@@ -181,21 +204,38 @@ export class WorkflowService {
     }
 
     // Transition: DRAFT → DELETED (handled by StatusService)
-    await this.metadataClient.updateStatus(
-      docId,
-      'DELETED',
-      'DELETE',
-      context,
-    );
+    await this.metadataClient.updateStatus(docId, 'DELETED', 'DELETE', context);
 
     // Notify stakeholders (fire-and-forget) — use actorId (sub/UUID).
     await this.notificationClient.notify(context, {
-      type:        'DELETED',
+      type: 'DELETED',
       docId,
       recipientId: actorId,
-      docTitle:    document.title,
+      docTitle: document.title,
+      metadata: buildWorkflowNotificationMetadata(
+        'DELETE',
+        document.status,
+        'DELETED',
+        context.actorId,
+      ),
     });
 
     return { success: true };
   }
+}
+
+function buildWorkflowNotificationMetadata(
+  action: string,
+  fromStatus: string,
+  toStatus: string,
+  actorId: string,
+) {
+  return {
+    workflow: {
+      action,
+      fromStatus,
+      toStatus,
+      actorId,
+    },
+  };
 }

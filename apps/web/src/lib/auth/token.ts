@@ -9,6 +9,7 @@ export interface JwtPayload {
   email?: string;
   given_name?: string;
   family_name?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   resource_access?: Record<string, { roles?: string[] }>;
   roles?: string[];
@@ -23,6 +24,7 @@ export interface CurrentUserDto {
   firstName?: string;
   lastName?: string;
   displayName?: string;
+  groups?: string[];
   raw?: JwtPayload;
 }
 
@@ -69,6 +71,17 @@ export function extractRoles(payload: JwtPayload): UserRole[] {
   return normalizeUserRoles([...realmRoles, ...topLevelRoles, ...resourceRoles]);
 }
 
+export function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
+}
+
 export function extractUsername(payload: JwtPayload): string {
   return (
     payload.preferred_username ||
@@ -102,6 +115,7 @@ export function buildUserInfoFromTokenPayload(payload: JwtPayload): UserInfo {
           ? [payload.given_name, payload.family_name].filter(Boolean).join(' ')
           : undefined,
     roles: extractRoles(payload),
+    groups: normalizeGroups(payload.groups),
   };
 }
 
@@ -137,5 +151,6 @@ export function buildUserInfoFromCurrentUserDto(currentUser: CurrentUserDto): Us
     lastName: typeof raw?.family_name === 'string' ? raw.family_name : undefined,
     displayName,
     roles: normalizeUserRoles(currentUser.roles),
+    groups: normalizeGroups(currentUser.groups ?? raw?.groups),
   };
 }

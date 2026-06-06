@@ -20,7 +20,7 @@ info:
     | `viewer` | Read published documents, download files |
     | `editor` | Create, upload, submit, archive documents |
     | `approver` | Approve/reject pending documents |
-    | `compliance_officer` | Read audit logs and metadata (cannot download files) |
+    | `compliance_officer` | Read audit logs and allowed metadata; cannot preview, stream, presign, or download file content |
     | `admin` | Full access |
 
     ## Document Lifecycle
@@ -29,8 +29,9 @@ info:
     ```
 
     ## Compliance Officer Restriction
-    Compliance officers (`compliance_officer`) are **never allowed** to download files,
-    regardless of ACL configuration — enforced by policy.service.ts.
+    Compliance officers (`compliance_officer`) are **never allowed** to preview,
+    stream, presign, or download file content, regardless of ACL configuration —
+    enforced by route guards and policy.service.ts.
   version: 0.1.0
 servers:
   - url: http://localhost:3000
@@ -48,7 +49,7 @@ components:
       type: http
       scheme: bearer
       bearerFormat: JWT
-      description: Keycloak-issued RS256 JWT token passed as `Authorization: Bearer <token>`
+      description: "Keycloak-issued RS256 JWT token passed as `Authorization: Bearer <token>`"
     cookieAuth:
       type: apiKey
       in: cookie
@@ -88,6 +89,12 @@ components:
         title: { type: string }
         description: { type: string }
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, nullable: true, items: { type: object } }
+        dlpDetectedAt: { type: string, format: date-time, nullable: true }
+        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionUntil: { type: string, format: date-time, nullable: true }
+        retentionReason: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/DocumentStatus' }
         currentVersion: { type: integer, nullable: true }
         ownerId: { type: string }
@@ -103,7 +110,10 @@ components:
       properties:
         title: { type: string, maxLength: 255 }
         description: { type: string, maxLength: 1000 }
-        classification: { type: string, default: INTERNAL }
+        classification:
+          allOf:
+            - $ref: '#/components/schemas/ClassificationLevel'
+          default: INTERNAL
         tags: { type: array, items: { type: string } }
 
     UpdateDocument:
@@ -111,7 +121,11 @@ components:
       properties:
         title: { type: string, maxLength: 255 }
         description: { type: string, maxLength: 1000 }
-        classification: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        classificationOverrideReason:
+          type: string
+          maxLength: 500
+          description: Required for admin override when downgrading a DLP-detected document to PUBLIC or INTERNAL.
         tags: { type: array, items: { type: string } }
 
     # ─── Versions ──────────────────────────────────────────────────────────────
@@ -126,6 +140,8 @@ components:
         size: { type: integer }
         filename: { type: string }
         contentType: { type: string }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, nullable: true, items: { type: object } }
         createdAt: { type: string, format: date-time }
 
     CreateVersion:
@@ -138,15 +154,18 @@ components:
         size: { type: integer }
         filename: { type: string }
         contentType: { type: string }
+        dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+        dlpFindings: { type: array, items: { type: object } }
+        dlpSuggestedClassification: { $ref: '#/components/schemas/ClassificationLevel' }
 
     # ─── ACL ──────────────────────────────────────────────────────────────────
     AclSubjectType:
       type: string
-      enum: [USER, ROLE, ALL]
+      enum: [USER, ROLE, GROUP, ALL]
 
     AclPermission:
       type: string
-      enum: [DOWNLOAD]
+      enum: [READ, DOWNLOAD, WRITE, APPROVE]
 
     AclEffect:
       type: string
@@ -158,7 +177,7 @@ components:
         id: { type: string }
         docId: { type: string }
         subjectType: { $ref: '#/components/schemas/AclSubjectType' }
-        subjectId: { type: string, nullable: true, description: User ID or role name. null for ALL }
+        subjectId: { type: string, nullable: true, description: User ID, role name, or normalized Keycloak group name. null for ALL }
         permission: { $ref: '#/components/schemas/AclPermission' }
         effect: { $ref: '#/components/schemas/AclEffect' }
 
@@ -167,7 +186,7 @@ components:
       required: [subjectType, permission, effect]
       properties:
         subjectType: { $ref: '#/components/schemas/AclSubjectType' }
-        subjectId: { type: string, nullable: true }
+        subjectId: { type: string, nullable: true, description: User ID, role name, or normalized Keycloak group name. null for ALL }
         permission: { $ref: '#/components/schemas/AclPermission' }
         effect: { $ref: '#/components/schemas/AclEffect' }
 
@@ -192,6 +211,49 @@ components:
         action: { type: string }
         reason: { type: string }
 
+    RetentionStatus:
+      type: string
+      enum: [ACTIVE, DUE_SOON, OVERDUE, ARCHIVED, UNSET]
+
+    RetentionEvidence:
+      type: object
+      properties:
+        docId: { type: string }
+        title: { type: string }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        publishedAt: { type: string, format: date-time, nullable: true }
+        archivedAt: { type: string, format: date-time, nullable: true }
+        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionUntil: { type: string, format: date-time, nullable: true }
+        retentionReason: { type: string, nullable: true }
+        retentionStatus: { $ref: '#/components/schemas/RetentionStatus' }
+        daysRemaining: { type: integer, nullable: true }
+
+    RetentionEvidenceResult:
+      type: object
+      properties:
+        checkedAt: { type: string, format: date-time }
+        summary:
+          type: object
+          properties:
+            tracked: { type: integer }
+            active: { type: integer }
+            dueSoon: { type: integer }
+            overdue: { type: integer }
+            archived: { type: integer }
+        records:
+          type: array
+          items:
+            $ref: '#/components/schemas/RetentionEvidence'
+
+    RetentionRunResult:
+      type: object
+      properties:
+        archived: { type: integer }
+        skipped: { type: integer }
+        checkedAt: { type: string, format: date-time }
+
     RejectWorkflow:
       type: object
       properties:
@@ -201,10 +263,9 @@ components:
     DownloadAuthorize:
       type: object
       properties:
-        version: { type: integer, description: Specific version to authorize }
         grantToken: { type: string, description: HMAC-signed grant token }
         docId: { type: string }
-        version: { type: integer }
+        version: { type: integer, description: Specific version to authorize }
         filename: { type: string }
         contentType: { type: string }
         expiresInSeconds: { type: integer }
@@ -227,15 +288,104 @@ components:
     PreviewAuthorize:
       type: object
       properties:
-        version: { type: integer, description: Specific version to authorize }
         grantToken: { type: string, description: HMAC-signed preview grant token }
         docId: { type: string }
-        version: { type: integer }
+        version: { type: integer, description: Specific version to authorize }
         filename: { type: string }
         contentType: { type: string }
         expiresInSeconds: { type: integer }
         expiresAt: { type: string, format: date-time }
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
+
+    AiGuardrails:
+      type: object
+      description: |
+        AI-ready policy decision for future classification, tagging,
+        summarization, and Q&A. This response intentionally excludes file
+        content, object keys, presigned URLs, preview grants, and download grants.
+      properties:
+        documentId: { type: string }
+        actorId: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        status: { $ref: '#/components/schemas/DocumentStatus' }
+        canUseMetadata: { type: boolean }
+        canUseContent: { type: boolean }
+        allowedOperations:
+          type: array
+          items:
+            type: string
+            enum: [METADATA_CLASSIFICATION, METADATA_TAGGING, CONTENT_SUMMARIZATION, CONTENT_QA]
+        deniedOperations:
+          type: array
+          items:
+            type: object
+            properties:
+              operation:
+                type: string
+                enum: [METADATA_CLASSIFICATION, METADATA_TAGGING, CONTENT_SUMMARIZATION, CONTENT_QA]
+              reason: { type: string }
+        guardrails:
+          type: array
+          items: { type: string }
+
+    AccessImpactRequest:
+      type: object
+      required: [classification]
+      properties:
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+
+    AccessImpact:
+      type: object
+      description: |
+        What-if access impact for a proposed document classification change.
+        This response intentionally excludes file content, object keys,
+        presigned URLs, preview grants, and download grants.
+      properties:
+        documentId: { type: string }
+        current:
+          type: object
+          properties:
+            classification: { $ref: '#/components/schemas/ClassificationLevel' }
+            status: { $ref: '#/components/schemas/DocumentStatus' }
+            watermarkRequired: { type: boolean }
+        proposed:
+          type: object
+          properties:
+            classification: { $ref: '#/components/schemas/ClassificationLevel' }
+            status: { $ref: '#/components/schemas/DocumentStatus' }
+            watermarkRequired: { type: boolean }
+        changes:
+          type: object
+          properties:
+            accessExpanded: { type: boolean }
+            accessReduced: { type: boolean }
+            watermarkReduced: { type: boolean }
+            dlpOverrideRequired: { type: boolean }
+            warnings:
+              type: array
+              items: { type: string }
+        roleImpacts:
+          type: array
+          items:
+            type: object
+            properties:
+              role: { type: string, enum: [viewer, editor, approver, compliance_officer, admin] }
+              metadata:
+                type: object
+                properties:
+                  current: { type: boolean }
+                  proposed: { type: boolean }
+              download:
+                type: object
+                properties:
+                  current: { type: boolean }
+                  proposed: { type: boolean }
+              notes:
+                type: array
+                items: { type: string }
+        guardrails:
+          type: array
+          items: { type: string }
 
     # ─── Audit ────────────────────────────────────────────────────────────────
     AuditEventResult:
@@ -258,6 +408,12 @@ components:
             DOCUMENT_CREATED, DOCUMENT_METADATA_UPDATED,
             DOCUMENT_ACL_UPDATED, DOCUMENT_ACL_DELETED,
             DOCUMENT_SUBMIT, DOCUMENT_APPROVE, DOCUMENT_REJECT, DOCUMENT_ARCHIVE,
+            DOCUMENT_AUTO_ARCHIVED,
+            MALWARE_UPLOAD_BLOCKED, DLP_PATTERN_DETECTED, DLP_CLASSIFICATION_DOWNGRADE_DENIED,
+            DLP_CLASSIFICATION_OVERRIDE_APPROVED,
+            DOCUMENT_ACCESS_IMPACT_SIMULATED, SECURITY_RECOMMENDATIONS_VIEWED,
+            SECURITY_RECOMMENDATION_STATUS_UPDATED,
+            AI_GUARDRAILS_EVALUATED,
             AUDIT_EVENT_CREATED, AUDIT_CHAIN_VERIFIED,
             REQUEST_RECEIVED, REQUEST_OK, REQUEST_DENIED
         resourceType: { type: string }
@@ -277,6 +433,7 @@ components:
         action: { type: string }
         resourceType: { type: string }
         resourceId: { type: string }
+        documentId: { type: string, description: Matches DOCUMENT resourceId and related events carrying metadata.docId }
         result: { $ref: '#/components/schemas/AuditEventResult' }
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
@@ -289,6 +446,224 @@ components:
         checked: { type: integer }
         firstBrokenIndex: { type: integer, nullable: true }
         message: { type: string, nullable: true }
+
+    RiskyDocumentSummary:
+      type: object
+      properties:
+        documentId: { type: string }
+        classification: { $ref: '#/components/schemas/ClassificationLevel' }
+        accessCount: { type: integer }
+        actorCount: { type: integer }
+        latestAccessAt: { type: string, format: date-time }
+        riskScore: { type: integer, minimum: 0, maximum: 100 }
+        reasons:
+          type: array
+          items: { type: string }
+
+    BehaviorSignalSummary:
+      type: object
+      properties:
+        signalId: { type: string }
+        type:
+          type: string
+          enum: [MASS_CONTENT_ACCESS, DENY_BURST, DESTRUCTIVE_ACTIVITY]
+        severity:
+          type: string
+          enum: [critical, warning, watch]
+        actorId: { type: string }
+        actionCount: { type: integer }
+        documentCount: { type: integer }
+        windowStartedAt: { type: string, format: date-time }
+        windowEndedAt: { type: string, format: date-time }
+        riskScore: { type: integer, minimum: 0, maximum: 100 }
+        reasons:
+          type: array
+          items: { type: string }
+
+    SecurityRecommendationWorkflowStatus:
+      type: string
+      enum: [OPEN, INVESTIGATING, REVIEWED, RESOLVED]
+
+    SecurityRecommendationWorkflowSummary:
+      type: object
+      properties:
+        status:
+          allOf:
+            - $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus'
+          default: OPEN
+        note: { type: string, nullable: true }
+        updatedAt: { type: string, format: date-time, nullable: true }
+        updatedBy: { type: string, nullable: true }
+
+    SecurityRecommendationWorkflowHistoryEntry:
+      type: object
+      description: Metadata-only workflow history entry for a security recommendation.
+      required: [eventId, status, updatedAt, updatedBy]
+      properties:
+        eventId: { type: string }
+        status: { $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus' }
+        note:
+          type: string
+          description: Optional investigation/review note with content-bearing fields excluded.
+        updatedAt: { type: string, format: date-time }
+        updatedBy: { type: string }
+
+    UpdateSecurityRecommendationWorkflow:
+      type: object
+      required: [status]
+      properties:
+        status: { $ref: '#/components/schemas/SecurityRecommendationWorkflowStatus' }
+        note:
+          type: string
+          maxLength: 500
+          description: Optional investigation/review note. Must not contain file content, object keys, presigned URLs, or grant tokens.
+
+    SecurityRecommendationSummary:
+      type: object
+      description: Deterministic, audit-metadata-only security recommendation.
+      properties:
+        id: { type: string }
+        type:
+          type: string
+          enum:
+            - AUDIT_CHAIN_REVIEW
+            - DLP_CLASSIFICATION_REVIEW
+            - MALWARE_UPLOAD_REVIEW
+            - DOCUMENT_ACCESS_REVIEW
+            - ACTOR_ACCESS_REVIEW
+        severity:
+          type: string
+          enum: [critical, warning, info]
+        title: { type: string }
+        reason: { type: string }
+        recommendedAction: { type: string }
+        evidence:
+          type: array
+          items: { type: string }
+        affectedDocumentIds:
+          type: array
+          items: { type: string }
+        affectedActorIds:
+          type: array
+          items: { type: string }
+        auditFilters:
+          type: object
+          description: Audit query filters for opening scoped evidence without exposing file content.
+          properties:
+            actorId: { type: string }
+            action: { type: string }
+            result: { $ref: '#/components/schemas/AuditEventResult' }
+            resourceType: { type: string }
+            resourceId: { type: string }
+            documentId: { type: string }
+        workflow:
+          $ref: '#/components/schemas/SecurityRecommendationWorkflowSummary'
+
+    SecuritySummary:
+      type: object
+      properties:
+        chain: { $ref: '#/components/schemas/VerifyChainResult' }
+        totals:
+          type: object
+          properties:
+            deniedEvents: { type: integer }
+            malwareBlocked: { type: integer }
+            dlpDetections: { type: integer }
+            downloadDenied: { type: integer }
+        repeatedDenyActors:
+          type: array
+          items:
+            type: object
+            properties:
+              actorId: { type: string }
+              denyCount: { type: integer }
+        riskyDocuments:
+          type: array
+          items:
+            $ref: '#/components/schemas/RiskyDocumentSummary'
+        behaviorSignals:
+          type: array
+          items:
+            $ref: '#/components/schemas/BehaviorSignalSummary'
+        recommendations:
+          type: array
+          items:
+            $ref: '#/components/schemas/SecurityRecommendationSummary'
+
+    ComplianceEvidencePacket:
+      type: object
+      properties:
+        generatedAt: { type: string, format: date-time }
+        metadataOnly: { type: boolean, enum: [true] }
+        excludedSensitiveFields:
+          type: array
+          items: { type: string }
+          example: [file-payload, storage-reference, direct-download-link, temporary-access-grant]
+        generatedBy:
+          type: object
+          properties:
+            id: { type: string, nullable: true }
+            username: { type: string, nullable: true }
+            roles: { type: array, items: { type: string } }
+        scope:
+          type: object
+          properties:
+            type: { type: string, enum: [DOCUMENT] }
+            documentId: { type: string }
+            asOf: { type: string, format: date-time, nullable: true }
+        document:
+          $ref: '#/components/schemas/Document'
+        versions:
+          type: array
+          items:
+            type: object
+            description: Version metadata with object storage keys removed.
+            properties:
+              id: { type: string }
+              docId: { type: string }
+              version: { type: integer }
+              checksum: { type: string }
+              size: { type: integer }
+              filename: { type: string }
+              contentType: { type: string, nullable: true }
+              dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
+              dlpFindings: { type: array, nullable: true, items: { type: object } }
+              createdAt: { type: string, format: date-time }
+              createdBy: { type: string }
+        aclEntries:
+          type: array
+          items:
+            $ref: '#/components/schemas/AclEntry'
+        workflowHistory:
+          type: array
+          items:
+            $ref: '#/components/schemas/WorkflowHistory'
+        retention:
+          type: object
+          properties:
+            checkedAt: { type: string, format: date-time, nullable: true }
+            summary: { type: object, nullable: true }
+            record:
+              allOf:
+                - $ref: '#/components/schemas/RetentionEvidence'
+              nullable: true
+            fields:
+              type: object
+              properties:
+                retentionClass: { type: string, nullable: true }
+                retentionUntil: { type: string, format: date-time, nullable: true }
+                retentionReason: { type: string, nullable: true }
+        audit:
+          type: object
+          properties:
+            chain: { $ref: '#/components/schemas/VerifyChainResult' }
+            events:
+              type: array
+              items:
+                $ref: '#/components/schemas/AuditEvent'
+            total: { type: integer }
+            page: { type: integer }
+            pageSize: { type: integer }
 
     # ─── Notification ─────────────────────────────────────────────────────────
     NotificationRecord:
@@ -349,6 +724,10 @@ components:
         lastName: { type: string, nullable: true }
         displayName: { type: string, nullable: true }
         roles: { type: array, items: { type: string } }
+        groups:
+          type: array
+          items: { type: string }
+          description: Normalized Keycloak group names, for example finance-team.
         raw: { type: object, description: 'Full JWT payload from Keycloak' }
 
     UserProfile:
@@ -509,6 +888,63 @@ paths:
         '403':
           description: Forbidden — editor or admin required
 
+  /metadata/retention/documents:
+    get:
+      summary: List retention evidence
+      operationId: listRetentionEvidence
+      description: |
+        Returns records-management evidence for PUBLISHED and ARCHIVED documents.
+        Compliance officers and admins can inspect retention class, retention deadline,
+        computed retention status, and days remaining.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Retention]
+      parameters:
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+          description: Optional demo clock for deterministic retention status calculation.
+      responses:
+        '200':
+          description: Retention evidence records
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionEvidenceResult'
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /metadata/retention/run:
+    post:
+      summary: Run retention auto-archive
+      operationId: runRetention
+      description: |
+        Admin-only endpoint that runs the retention auto-archive job. The optional
+        `asOf` query parameter is intended for local demo evidence.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Retention]
+      parameters:
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+          description: Optional demo clock. Records due on or before this time are archived.
+      responses:
+        '200':
+          description: Retention run completed
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RetentionRunResult'
+        '403':
+          description: Forbidden — admin required
+
   /metadata/documents/{docId}:
     get:
       summary: Get a document by ID
@@ -557,6 +993,107 @@ paths:
           description: Forbidden — owner editor or admin
         '404':
           description: Not found
+
+  /metadata/documents/{docId}/evidence-packet:
+    get:
+      summary: Export document compliance evidence packet
+      operationId: getDocumentEvidencePacket
+      description: |
+        Compliance/admin-only JSON packet for one document. Includes metadata,
+        version checksums, ACL, workflow history, retention evidence, audit
+        hash-chain status, and related audit events. It does not include file
+        content, presigned URLs, or preview/download grant tokens.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Compliance, Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+        - in: query
+          name: asOf
+          schema:
+            type: string
+            format: date-time
+          description: Optional demo clock for deterministic retention status calculation.
+      responses:
+        '200':
+          description: Document-scoped compliance evidence packet
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ComplianceEvidencePacket'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+        '404':
+          description: Document not found
+
+  /metadata/documents/{docId}/ai-guardrails:
+    get:
+      summary: Get AI-ready access guardrails for a document
+      operationId: getDocumentAiGuardrails
+      description: |
+        Returns policy decisions for future AI classification, tagging,
+        summarization, and Q&A. Metadata access must pass first. Content AI
+        operations are blocked when the user cannot preview file content, and
+        compliance officers are always metadata-only. The response never
+        includes file content, object keys, presigned URLs, preview grants, or
+        download grants.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/DocId'
+      responses:
+        '200':
+          description: AI guardrails for the current actor and document
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AiGuardrails'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden by metadata policy
+        '404':
+          description: Document not found
+
+  /metadata/documents/{docId}/access-impact:
+    post:
+      summary: Preview access impact for a proposed classification change
+      operationId: previewDocumentAccessImpact
+      description: |
+        Simulates baseline role access and watermark impact before an editor or
+        admin submits a metadata classification change. The response does not
+        enumerate real users and never includes file content, object keys,
+        presigned URLs, preview grants, or download grants.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AccessImpactRequest'
+      responses:
+        '200':
+          description: Access impact preview for the proposed metadata change
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AccessImpact'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — owner editor or admin required
+        '404':
+          description: Document not found
 
   /metadata/documents/{docId}/versions:
     post:
@@ -670,6 +1207,9 @@ paths:
             schema:
               type: object
               properties:
+                grantToken:
+                  type: string
+                  description: Optional pre-authorized download grant token. If omitted, document-service re-authorizes through metadata-service.
                 version: { type: integer }
       responses:
         '200':
@@ -691,8 +1231,8 @@ paths:
     post:
       summary: Authorize a document preview (issues HMAC preview grant token)
       description: |
-        Authorization for inline preview. Unlike download-authorize, this endpoint:
-        - Allows compliance_officer role
+        Authorization for inline preview. Preview is file content access, so this endpoint:
+        - Denies compliance_officer role
         - Requires only READ permission (not DOWNLOAD)
         - Does not apply watermarks
       operationId: authorizePreview
@@ -718,7 +1258,7 @@ paths:
         '403':
           description: |
             Forbidden. May be caused by:
-            - Document not in PUBLISHED status
+            - compliance_officer attempting preview (always denied)
             - ACL denies READ access
             - Classification level insufficient
         '404':
@@ -744,10 +1284,61 @@ paths:
                 items:
                   $ref: '#/components/schemas/WorkflowHistory'
 
+  /metadata/documents/{docId}/comments:
+    get:
+      summary: List comments for a document
+      operationId: listDocumentComments
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: List of comments
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+
+    post:
+      summary: Add a comment to a document
+      operationId: addDocumentComment
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Documents]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [content]
+              properties:
+                content: { type: string }
+      responses:
+        '201':
+          description: Comment created
+          content:
+            application/json:
+              schema:
+                type: object
+
   # ─── Documents — Blob Storage ───────────────────────────────────────────────
   /documents/{docId}/upload:
     post:
       summary: Upload a document blob and register a version
+      description: |
+        Scans uploads before storage. EICAR malware test content is rejected
+        before MinIO/object creation. DLP detections are persisted on the
+        version and parent document; PUBLIC/INTERNAL documents with DLP hits
+        are escalated to CONFIDENTIAL.
       operationId: uploadDocument
       security:
         - bearerAuth: []
@@ -775,13 +1366,16 @@ paths:
               schema:
                 $ref: '#/components/schemas/DocumentVersion'
         '400':
-          description: Bad request — file required or exceeds size limit
+          description: Bad request — file required, exceeds size limit, or malware detected
         '403':
           description: Forbidden — owner editor or admin
 
   /documents/{docId}/presign-download:
     post:
       summary: Request a presigned download URL
+      description: |
+        Issues a time-limited presigned URL after download authorization.
+        Compliance officers are denied because presign exposes file content access.
       operationId: presignDownload
       security:
         - bearerAuth: []
@@ -804,13 +1398,17 @@ paths:
               schema:
                 $ref: '#/components/schemas/PresignedDownloadUrl'
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer, invalid grant token, expired grant token, or policy denial
 
   /documents/{docId}/versions/{version}/stream:
     get:
       summary: Stream a document version directly
       description: |
         Returns the document binary as a streaming response.
+        If `token` is provided, it must be a valid download grant token bound to this
+        document and version. Without `token`, document-service re-authorizes through
+        metadata-service before streaming.
+        Compliance officers are denied because streaming exposes file content access.
 
         **Watermarking:** For documents classified as CONFIDENTIAL or SECRET,
         a watermark containing user identity, timestamp, and classification level
@@ -827,6 +1425,12 @@ paths:
           required: true
           schema:
             type: integer
+        - name: token
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Optional download grant token issued by `/metadata/documents/{docId}/download-authorize`
       responses:
         '200':
           description: Binary file stream (watermarked for CONFIDENTIAL/SECRET)
@@ -836,7 +1440,7 @@ paths:
                 type: string
                 format: binary
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer, invalid grant token, expired grant token, or policy denial
         '404':
           description: Document or version not found
 
@@ -846,6 +1450,7 @@ paths:
       description: |
         Streams the raw document binary for inline display in a browser.
         No watermark is applied. Supports HTTP Range requests for PDF.js lazy loading.
+        Compliance officers are denied because preview is file content access.
       operationId: previewDocument
       security:
         - bearerAuth: []
@@ -875,7 +1480,7 @@ paths:
                 type: string
                 format: binary
         '403':
-          description: Forbidden
+          description: Forbidden — compliance_officer or metadata preview policy denial
         '404':
           description: Document or version not found
 
@@ -957,6 +1562,28 @@ paths:
         '409':
           description: Conflict — only PUBLISHED documents can be archived
 
+  /workflow/{docId}:
+    delete:
+      summary: Delete a DRAFT document (soft delete)
+      operationId: deleteDraftDocument
+      description: |
+        Permanently deletes a DRAFT document. Only the document owner or admin
+        may delete. Deleted documents are removed from all views but retained in
+        the database.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Workflow]
+      parameters:
+        - $ref: '#/components/parameters/docId'
+      responses:
+        '200':
+          description: Deleted
+        '403':
+          description: Forbidden — owner editor or admin
+        '409':
+          description: Conflict — only DRAFT documents can be deleted
+
   # ─── Audit ─────────────────────────────────────────────────────────────────
   /audit/events:
     post:
@@ -992,6 +1619,38 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/AuditEvent'
+        '401':
+          description: Unauthorized
+
+  /users/batch:
+    post:
+      summary: Batch-fetch user profiles by IDs
+      operationId: getUserProfilesBatch
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [ids]
+              properties:
+                ids:
+                  type: array
+                  items: { type: string }
+      responses:
+        '200':
+          description: Map of user IDs to display names and usernames
+          content:
+            application/json:
+              schema:
+                type: object
+                additionalProperties:
+                  type: object
+                  properties:
+                    displayName: { type: string }
+                    username: { type: string }
         '401':
           description: Unauthorized
 
@@ -1032,6 +1691,10 @@ paths:
         - in: query
           name: resourceId
           schema: { type: string }
+        - in: query
+          name: documentId
+          schema: { type: string }
+          description: Matches direct DOCUMENT events and related events carrying metadata.docId.
         - in: query
           name: result
           schema: { $ref: '#/components/schemas/AuditEventResult' }
@@ -1081,6 +1744,100 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VerifyChainResult'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-summary:
+    get:
+      summary: Summarize security audit evidence
+      operationId: securitySummary
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      responses:
+        '200':
+          description: Security counters and audit chain status
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SecuritySummary'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-recommendations/{id}/workflow:
+    patch:
+      summary: Update security recommendation workflow state
+      operationId: updateSecurityRecommendationWorkflow
+      description: |
+        Updates the workflow state for a deterministic security recommendation.
+        Emits audit action SECURITY_RECOMMENDATION_STATUS_UPDATED with
+        resourceType SECURITY_RECOMMENDATION and resourceId equal to the
+        recommendation id. Audit metadata stores recommendationId/status/note
+        only and must not include file content, object keys, presigned URLs, or
+        grant tokens.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Security recommendation ID
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSecurityRecommendationWorkflow'
+      responses:
+        '200':
+          description: Workflow update audit event
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuditEvent'
+        '400':
+          description: Invalid workflow status or note
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/security-recommendations/{id}/workflow-history:
+    get:
+      summary: List security recommendation workflow history
+      operationId: getSecurityRecommendationWorkflowHistory
+      description: |
+        Returns the latest metadata-only workflow events for a deterministic
+        security recommendation. Entries expose eventId/status/note/updatedAt/
+        updatedBy only and exclude file content, object keys, presigned URLs,
+        and grant tokens.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema: { type: string }
+          description: Security recommendation ID
+      responses:
+        '200':
+          description: Latest workflow history entries, newest first
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SecurityRecommendationWorkflowHistoryEntry'
         '401':
           description: Unauthorized
         '403':

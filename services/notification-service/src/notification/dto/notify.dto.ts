@@ -1,11 +1,17 @@
-import { IsArray, IsEnum, IsOptional, IsString } from 'class-validator';
+import {
+  IsArray,
+  IsEnum,
+  IsObject,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 
 export enum NotifyType {
   SUBMITTED = 'SUBMITTED',
-  APPROVED  = 'APPROVED',
-  REJECTED  = 'REJECTED',
-  ARCHIVED  = 'ARCHIVED',
-  DELETED   = 'DELETED',
+  APPROVED = 'APPROVED',
+  REJECTED = 'REJECTED',
+  ARCHIVED = 'ARCHIVED',
+  DELETED = 'DELETED',
 }
 
 export class NotifyDto {
@@ -38,4 +44,8 @@ export class NotifyDto {
   @IsOptional()
   @IsString()
   traceId?: string;
+
+  @IsOptional()
+  @IsObject()
+  metadata?: Record<string, unknown>;
 }

@@ -2,22 +2,23 @@ import { Injectable, Logger } from '@nestjs/common';
 import { NotifyDto, NotifyType } from './dto/notify.dto';
 
 export interface NotificationRecord {
-  id:          string;
-  type:        NotifyType;
-  docId:       string;
+  id: string;
+  type: NotifyType;
+  docId: string;
   recipientId: string; // who should see this notification
-  docTitle?:   string;
-  reason?:     string;
-  traceId?:    string;
-  createdAt:   string;
-  read:        boolean;
+  docTitle?: string;
+  reason?: string;
+  traceId?: string;
+  metadata?: Record<string, unknown>;
+  createdAt: string;
+  read: boolean;
 }
 
 export interface NotificationPage {
   records: NotificationRecord[];
-  total:   number;
-  page:    number;
-  pages:   number;
+  total: number;
+  page: number;
+  pages: number;
 }
 
 @Injectable()
@@ -35,7 +36,12 @@ export class NotificationService {
    * Creates one record per unique recipient and stores it under that recipient's key.
    * Either recipientId or recipientIds (or both) may be supplied.
    */
-  notify(dto: NotifyDto): { accepted: boolean; type: string; docId: string; recipients: string[] } {
+  notify(dto: NotifyDto): {
+    accepted: boolean;
+    type: string;
+    docId: string;
+    recipients: string[];
+  } {
     const recipients = [
       ...(dto.recipientIds ?? []),
       ...(dto.recipientId ? [dto.recipientId] : []),
@@ -43,20 +49,23 @@ export class NotificationService {
     const unique = [...new Set(recipients)];
 
     const base = {
-      type:    dto.type,
-      docId:   dto.docId,
+      type: dto.type,
+      docId: dto.docId,
       docTitle: dto.docTitle,
-      reason:  dto.reason,
+      reason: dto.reason,
       traceId: dto.traceId,
+      ...(dto.metadata && {
+        metadata: sanitizeNotificationMetadata(dto.metadata),
+      }),
     };
 
     for (const recipientId of unique) {
       const record: NotificationRecord = {
         ...base,
         recipientId,
-        id:        this.uid(),
+        id: this.uid(),
         createdAt: new Date().toISOString(),
-        read:      false,
+        read: false,
       };
       const existing = this.store.get(recipientId) ?? [];
       // Cap at 100 per user to bound memory
@@ -64,22 +73,28 @@ export class NotificationService {
     }
 
     this.logger.log(
-      JSON.stringify({ stored: true, type: dto.type, docId: dto.docId, recipients: unique }),
+      JSON.stringify({
+        stored: true,
+        type: dto.type,
+        docId: dto.docId,
+        recipients: unique,
+      }),
     );
 
-    return { accepted: true, type: dto.type, docId: dto.docId, recipients: unique };
+    return {
+      accepted: true,
+      type: dto.type,
+      docId: dto.docId,
+      recipients: unique,
+    };
   }
 
   /**
    * Returns a paginated slice of the user's notifications.
    * page is 1-based; limit is clamped to 1..100.
    */
-  getForUser(
-    userId: string,
-    page = 1,
-    limit = 20,
-  ): NotificationPage {
-    const all   = this.store.get(userId) ?? [];
+  getForUser(userId: string, page = 1, limit = 20): NotificationPage {
+    const all = this.store.get(userId) ?? [];
     const total = all.length;
     const safeL = Math.min(Math.max(1, limit), 100);
     const safeP = Math.max(1, page);
@@ -87,8 +102,8 @@ export class NotificationService {
     return {
       records: all.slice(start, start + safeL),
       total,
-      page:    safeP,
-      pages:   Math.ceil(total / safeL),
+      page: safeP,
+      pages: Math.ceil(total / safeL),
     };
   }
 
@@ -115,4 +130,47 @@ export class NotificationService {
     const records = this.store.get(userId);
     if (records) records.forEach((r) => (r.read = true));
   }
+}
+
+const NOTIFICATION_SENSITIVE_FIELD_NAMES = [
+  'fileContent',
+  'objectKey',
+  'storagePath',
+  'presignedUrl',
+  'grantToken',
+  'downloadToken',
+] as const;
+
+function sanitizeNotificationMetadata(value: unknown): Record<string, unknown> {
+  const sanitized = sanitizeNotificationValue(value);
+  return sanitized && typeof sanitized === 'object' && !Array.isArray(sanitized)
+    ? (sanitized as Record<string, unknown>)
+    : {};
+}
+
+function sanitizeNotificationValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeNotificationValue);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<
+    Record<string, unknown>
+  >((acc, [key, nestedValue]) => {
+    if (isSensitiveNotificationField(key)) {
+      return acc;
+    }
+
+    acc[key] = sanitizeNotificationValue(nestedValue);
+    return acc;
+  }, {});
+}
+
+function isSensitiveNotificationField(key: string): boolean {
+  return (NOTIFICATION_SENSITIVE_FIELD_NAMES as readonly string[]).includes(
+    key,
+  );
 }

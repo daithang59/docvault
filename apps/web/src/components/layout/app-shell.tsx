@@ -2,6 +2,7 @@
 
 import { AppSidebar } from './app-sidebar';
 import { AppTopbar } from './app-topbar';
+import { CommandPalette } from '@/components/command-palette/command-palette';
 
 interface AppShellProps {
   children: React.ReactNode;
@@ -10,6 +11,7 @@ interface AppShellProps {
 export function AppShell({ children }: AppShellProps) {
   return (
     <div className="flex h-[100dvh] overflow-hidden bg-[var(--bg-app)] text-[var(--text-main)]">
+      <CommandPalette />
       <AppSidebar />
       <div className="flex flex-col flex-1 min-w-0 overflow-hidden h-full">
         <AppTopbar />

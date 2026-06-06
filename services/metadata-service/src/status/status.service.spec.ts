@@ -34,6 +34,7 @@ function makeDocument(overrides: Partial<Record<string, any>> = {}) {
     title: 'Test',
     ownerId: 'user-1',
     status: 'DRAFT',
+    classification: 'SECRET',
     currentVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -84,7 +85,7 @@ describe('StatusService', () => {
     );
   });
 
-  it('APPROVE: PENDING -> PUBLISHED (sets publishedAt)', async () => {
+  it('APPROVE: PENDING -> PUBLISHED (sets publishedAt and retention evidence)', async () => {
     mockFindUnique.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PUBLISHED' }));
 
@@ -100,6 +101,10 @@ describe('StatusService', () => {
         data: expect.objectContaining({
           status: 'PUBLISHED',
           publishedAt: expect.any(Date),
+          retentionClass: 'SECRET_30D',
+          retentionUntil: expect.any(Date),
+          retentionReason:
+            'SECRET records are retained for 30 days after publication',
         }),
       }),
     );

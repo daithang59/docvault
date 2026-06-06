@@ -4,7 +4,9 @@ import { MetadataClient } from '../metadata/metadata.client';
 import { NotificationClient } from '../notification/notification.client';
 import { WorkflowService } from './workflow.service';
 
-const mockDoc = (overrides?: Partial<{ id: string; ownerId: string; status: string }>) => ({
+const mockDoc = (
+  overrides?: Partial<{ id: string; ownerId: string; status: string }>,
+) => ({
   id: 'doc-1',
   ownerId: 'alice',
   status: 'DRAFT',
@@ -39,7 +41,9 @@ describe('WorkflowService', () => {
           useValue: {
             getDocument: jest.fn(),
             updateStatus: jest.fn(),
-            getApprovers: jest.fn().mockResolvedValue({ userIds: ['approver1'] }),
+            getApprovers: jest
+              .fn()
+              .mockResolvedValue({ userIds: ['approver1'] }),
           },
         },
         {
@@ -62,7 +66,10 @@ describe('WorkflowService', () => {
     it('should transition DRAFT → PENDING when called by owner editor', async () => {
       const doc = mockDoc({ ownerId: 'alice' });
       metadataClient.getDocument.mockResolvedValue(doc);
-      metadataClient.updateStatus.mockResolvedValue({ ...doc, status: 'PENDING' });
+      metadataClient.updateStatus.mockResolvedValue({
+        ...doc,
+        status: 'PENDING',
+      });
 
       const result = await workflowService.submit(
         'doc-1',
@@ -82,6 +89,14 @@ describe('WorkflowService', () => {
         docId: 'doc-1',
         docTitle: 'Test Doc',
         recipientIds: ['approver1'],
+        metadata: {
+          workflow: {
+            action: 'SUBMIT',
+            fromStatus: 'DRAFT',
+            toStatus: 'PENDING',
+            actorId: 'alice',
+          },
+        },
       });
     });
 
@@ -100,9 +115,7 @@ describe('WorkflowService', () => {
     });
 
     it('should throw ForbiddenException when non-owner non-admin editor submits', async () => {
-      metadataClient.getDocument.mockResolvedValue(
-        mockDoc({ ownerId: 'bob' }),
-      );
+      metadataClient.getDocument.mockResolvedValue(mockDoc({ ownerId: 'bob' }));
 
       await expect(
         workflowService.submit(
@@ -165,8 +178,44 @@ describe('WorkflowService', () => {
       );
     });
 
+    it('notifies document owner with workflow timeline context when a document is approved', async () => {
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({ ownerId: 'alice', status: 'PENDING' }),
+      );
+      metadataClient.updateStatus.mockResolvedValue({
+        ...mockDoc({ ownerId: 'alice', status: 'PENDING' }),
+        status: 'PUBLISHED',
+      });
+
+      await workflowService.approve(
+        'doc-1',
+        mockUser({ sub: 'approver1', roles: ['approver'] }),
+        { ...mockContext, actorId: 'approver1', roles: ['approver'] },
+      );
+
+      expect(notificationClient.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'approver1' }),
+        {
+          type: 'APPROVED',
+          docId: 'doc-1',
+          recipientId: 'alice',
+          docTitle: 'Test Doc',
+          metadata: {
+            workflow: {
+              action: 'APPROVE',
+              fromStatus: 'PENDING',
+              toStatus: 'PUBLISHED',
+              actorId: 'approver1',
+            },
+          },
+        },
+      );
+    });
+
     it('should throw ConflictException when document is not PENDING', async () => {
-      metadataClient.getDocument.mockResolvedValue(mockDoc({ status: 'DRAFT' }));
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({ status: 'DRAFT' }),
+      );
 
       await expect(
         workflowService.approve(
@@ -217,12 +266,53 @@ describe('WorkflowService', () => {
       );
       expect(notificationClient.notify).toHaveBeenCalledWith(
         expect.any(Object),
-        expect.objectContaining({ type: 'REJECTED', reason: 'Insufficient coverage' }),
+        expect.objectContaining({
+          type: 'REJECTED',
+          reason: 'Insufficient coverage',
+        }),
+      );
+    });
+
+    it('notifies document owner with rejection reason and workflow timeline context when rejected', async () => {
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({ ownerId: 'alice', status: 'PENDING' }),
+      );
+      metadataClient.updateStatus.mockResolvedValue({
+        ...mockDoc({ ownerId: 'alice', status: 'PENDING' }),
+        status: 'DRAFT',
+      });
+
+      await workflowService.reject(
+        'doc-1',
+        'Missing retention evidence',
+        mockUser({ sub: 'approver1', roles: ['approver'] }),
+        { ...mockContext, actorId: 'approver1', roles: ['approver'] },
+      );
+
+      expect(notificationClient.notify).toHaveBeenCalledWith(
+        expect.objectContaining({ actorId: 'approver1' }),
+        {
+          type: 'REJECTED',
+          docId: 'doc-1',
+          recipientId: 'alice',
+          docTitle: 'Test Doc',
+          reason: 'Missing retention evidence',
+          metadata: {
+            workflow: {
+              action: 'REJECT',
+              fromStatus: 'PENDING',
+              toStatus: 'DRAFT',
+              actorId: 'approver1',
+            },
+          },
+        },
       );
     });
 
     it('should throw ConflictException when document is not PENDING', async () => {
-      metadataClient.getDocument.mockResolvedValue(mockDoc({ status: 'PUBLISHED' }));
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({ status: 'PUBLISHED' }),
+      );
 
       await expect(
         workflowService.reject(
@@ -261,7 +351,9 @@ describe('WorkflowService', () => {
     });
 
     it('should throw ConflictException when document is not PUBLISHED', async () => {
-      metadataClient.getDocument.mockResolvedValue(mockDoc({ status: 'DRAFT' }));
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({ status: 'DRAFT' }),
+      );
 
       await expect(
         workflowService.archive(

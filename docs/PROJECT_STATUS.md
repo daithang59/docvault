@@ -1,6 +1,6 @@
 # PROJECT_STATUS
 
-Updated: 2026-03-17
+Updated: 2026-05-30
 
 Tài liệu này phản ánh trạng thái hiện tại của repo dựa trên code runtime trong `apps/web`, `services/*`, `infra/*`, `libs/*` và `scripts/e2e-check.mjs`, không chỉ dựa trên các file markdown cũ.
 
@@ -23,9 +23,10 @@ Frontend là một ứng dụng Next.js chạy thật, không còn là scaffold 
 
 - Luồng MVP chính đã được hiện thực ở backend.
 - Frontend đã bao phủ phần lớn user flow quan trọng.
-- Hạ tầng local development đã có đủ Postgres, MinIO, Keycloak.
+- Hạ tầng local development đã có đủ Postgres, MongoDB, MinIO, Keycloak và init script chịu được Windows checkout.
+- E2E runtime hiện bao phủ GROUP ACL, malware block, DLP escalation, retention auto-archive, audit security summary, và confidential stream-only download posture.
 - Tầng thư viện dùng chung và contract còn mỏng.
-- Vẫn còn một số điểm lệch giữa tài liệu, UI và runtime cần dọn tiếp.
+- Phần Web/runtime đã đủ evidence demo chính; phần còn lại chủ yếu là contract/shared-code cleanup và polish.
 
 ## Dự án đang giải quyết bài toán gì
 
@@ -94,6 +95,7 @@ Các màn hình đã có:
 - approvals
 - audit
 - settings
+- retention
 
 Frontend gọi gateway qua biến:
 
@@ -115,9 +117,10 @@ Trang login hiện hỗ trợ 2 chế độ:
 - proxy request xuống các service phía sau
 - forward các header:
   - `authorization`
-  - `x-request-id`
-  - `x-user-id`
-  - `x-roles`
+- `x-request-id`
+- `x-user-id`
+- `x-roles`
+- `x-groups`
 
 Các nhóm route đang được proxy:
 
@@ -438,84 +441,46 @@ Kết luận ngắn:
 - ranh giới service đã tương đối rõ ở runtime
 - nhưng shared contracts và shared auth chưa trưởng thành thành package dùng chung thực thụ
 
-## Các điểm lệch và khoảng trống hiện tại
+## Trạng thái Web/runtime sau Sprint 4A
 
-### 1. Workflow history có ở metadata-service nhưng chưa được gateway proxy
+### 1. Workflow history đã đi qua gateway
 
-Trạng thái quan sát được:
+- Frontend gọi `/metadata/documents/:docId/workflow-history`.
+- Gateway đã proxy route này xuống metadata-service.
+- E2E kiểm tra workflow history cho retention archive và actor `system:retention`.
 
-- frontend gọi `/metadata/documents/:docId/workflow-history`
-- metadata-service có `GET /documents/:docId/workflow-history`
-- gateway hiện chưa có route proxy tương ứng
+### 2. ACL `GROUP` đã được evaluate trong policy runtime và có live evidence
 
-Hệ quả có thể xảy ra:
+- Prisma schema, DTO, OpenAPI và frontend ACL form đều hỗ trợ `GROUP`.
+- Keycloak `groups` claim được normalize, ví dụ `/finance-team` thành `finance-team`.
+- Gateway forward `x-groups` xuống metadata-service.
+- `PolicyService` xử lý `ALL`, `USER`, `ROLE`, `GROUP`.
+- `READ DENY` override baseline visibility, kể cả list/detail metadata.
+- Local E2E đã chạy live GROUP probe với `finance-team` và pass.
 
-- workflow timeline trên web có thể lỗi khi đi qua gateway
+### 3. Archive role đã nhất quán
 
-### 2. ACL `GROUP` có trong schema và UI nhưng policy download chưa evaluate
+- Gateway `POST /workflow/:docId/archive` cho `editor` và `admin`.
+- Workflow-service controller cũng cho `editor` và `admin`.
+- Business rule vẫn giữ đúng: owner editor hoặc admin mới archive được document.
 
-Trạng thái quan sát được:
+### 4. Enterprise security evidence đã có runtime proof
 
-- Prisma schema hỗ trợ `GROUP`
-- form ACL trên frontend cho chọn `GROUP`
-- DTO cho phép `GROUP`
-- `PolicyService.matchesAcl()` hiện chỉ xử lý:
-  - `ALL`
-  - `USER`
-  - `ROLE`
+- Malware: EICAR upload bị chặn trước khi ghi MinIO và không tạo version metadata.
+- DLP: sensitive text được detect, document bị escalate lên `CONFIDENTIAL`, downgrade xuống `PUBLIC` bị từ chối.
+- Retention: published records có `retentionClass`, `retentionUntil`, retention run archive record, workflow history ghi `system:retention`.
+- Audit: compliance officer query audit, verify-chain, security summary; viewer bị chặn audit query/ingest.
+- Download posture: `CONFIDENTIAL` document không nhận direct presigned URL, response trả `url: null`, `watermarkRequired: true`, và stream endpoint.
 
-Hệ quả có thể xảy ra:
+### 5. Local stack evidence đã ổn định hơn
 
-- rule download theo group có thể tạo được nhưng không có tác dụng khi authorize
+- `infra/keycloak/seed-roles.sh` wait theo realm OIDC endpoint thay vì `/health/ready`.
+- `.gitattributes` giữ shell scripts ở LF để container Linux chạy được từ Windows checkout.
+- Reimport Keycloak realm hiện cấp group `finance-team` cho `editor1`, giúp GROUP ACL E2E chạy thật.
 
-### 3. Kiểm tra owner ở frontend đang lệch với cách backend lưu owner
+## Khoảng trống còn lại
 
-Trạng thái quan sát được:
-
-- backend lưu owner/actor theo `username ?? sub`
-- frontend so `doc.ownerId` với `session.user.sub`
-
-Hệ quả có thể xảy ra:
-
-- các action chỉ dành cho owner như edit, upload, submit, archive, quản lý ACL có thể bị ẩn sai trên UI với user Keycloak thật
-
-### 4. Quyền archive đang không nhất quán giữa các layer
-
-Trạng thái quan sát được:
-
-- gateway `POST /workflow/:docId/archive` cho `approver` và `admin`
-- workflow-service controller lại cho `editor` và `admin`
-- workflow-service business logic thực tế chỉ cho owner editor hoặc admin
-
-Hệ quả có thể xảy ra:
-
-- approver có thể qua được lớp role ở gateway nhưng vẫn bị từ chối ở downstream
-- hành vi runtime và tài liệu dễ bị lệch nhau
-
-### 5. Tài liệu hiện chưa theo kịp runtime code
-
-Trạng thái quan sát được:
-
-- `docs/PROJECT_STATUS.md` trước đó là snapshot cũ
-- `apps/web/README.md` vẫn là README mặc định của Next.js
-- một số markdown mô tả hành vi khác với runtime hiện tại
-
-Hệ quả có thể xảy ra:
-
-- source code đang là nguồn sự thật đáng tin hơn tài liệu ở một số phần
-
-### 6. ACL chưa phải mô hình kiểm soát đọc metadata chặt chẽ
-
-Trạng thái quan sát được:
-
-- mọi business role đã xác thực đều có thể list/read metadata
-- ACL chủ yếu được áp vào download authorization
-
-Hệ quả có thể xảy ra:
-
-- hệ thống hiện gần với mô hình "metadata đọc được, file thì bị kiểm soát" hơn là "mọi thứ đều bị ACL-gate"
-
-### 7. Tầng shared contract còn non
+### 1. Tầng shared contract còn non
 
 Trạng thái quan sát được:
 
@@ -526,8 +491,14 @@ Hệ quả có thể xảy ra:
 
 - boundary microservice đã tách rõ, nhưng code reuse và contract hygiene còn chưa tốt
 
+### 2. Frontend polish vẫn còn một số việc không chặn demo
+
+- `apps/web/README.md` vẫn là README mặc định của Next.js.
+- Một số bảng vẫn filter/paginate phía client, chưa phải server-side pagination thật.
+- Notification service mới là dev sink, chưa có email/webhook delivery.
+
 ## Kết luận thực tế
 
 Nếu mô tả ngắn gọn trong một câu:
 
-DocVault hiện là một MVP microservice hoạt động được cho bài toán quản lý vòng đời tài liệu an toàn, có frontend usable và backend đã tách boundary khá rõ, nhưng vẫn còn một số bất nhất về contract, policy, ownership và tài liệu cần xử lý trước khi xem là đủ chín cho production.
+DocVault hiện là một Web/runtime MVP hoạt động được cho bài toán quản lý vòng đời tài liệu an toàn, có frontend usable, backend microservice, và bộ evidence E2E cho RBAC/ACL/status/classification/audit/malware/DLP/retention/download posture; phần còn lại trước production chủ yếu là chuẩn hóa shared auth/contracts, frontend polish, và hardening vận hành.

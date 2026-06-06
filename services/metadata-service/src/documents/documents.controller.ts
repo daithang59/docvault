@@ -19,6 +19,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { LegalHoldDto } from './dto/legal-hold.dto';
 import { AclService } from '../acl/acl.service';
 import { UpsertAclDto } from '../acl/dto/upsert-acl.dto';
 import { VersionsService } from '../versions/versions.service';
@@ -28,6 +29,7 @@ import { UpdateStatusDto } from '../status/dto/update-status.dto';
 import { PolicyService } from '../policy/policy.service';
 import { DownloadAuthorizeDto } from '../policy/dto/download-authorize.dto';
 import { PreviewAuthorizeDto } from '../policy/dto/preview-authorize.dto';
+import { AccessImpactDto } from '../policy/dto/access-impact.dto';
 import { CommentsService } from '../comments/comments.service';
 import { buildRequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
@@ -58,8 +60,50 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Get a document metadata record by id' })
-  findOne(@Param('docId') docId: string) {
-    return this.documentsService.findOneOrThrow(docId);
+  findOne(@Param('docId') docId: string, @Req() req: any) {
+    return this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Get(':docId/ai-guardrails')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Get AI-ready access guardrails for a document',
+    description:
+      'Returns metadata/content policy decisions for future AI classification, tagging, summarization, and QA. It never returns file content, object keys, presigned URLs, preview grants, or download grants.',
+  })
+  getAiGuardrails(@Param('docId') docId: string, @Req() req: any) {
+    return this.policyService.getAiGuardrails(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Post(':docId/access-impact')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview access impact for a proposed metadata policy change',
+    description:
+      'Simulates baseline role access changes for a proposed document classification without returning file content, object keys, presigned URLs, or grant tokens.',
+  })
+  getAccessImpactPreview(
+    @Param('docId') docId: string,
+    @Body() body: AccessImpactDto,
+    @Req() req: any,
+  ) {
+    return this.policyService.getAccessImpactPreview(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post()
@@ -91,6 +135,26 @@ export class DocumentsController {
     );
   }
 
+  @Post(':docId/legal-hold')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Place or release a legal hold on a document',
+    description:
+      'Admin-only. While a legal hold is active, the retention job will not auto-archive the document. Placing a hold requires a reason.',
+  })
+  setLegalHold(
+    @Param('docId') docId: string,
+    @Body() body: LegalHoldDto,
+    @Req() req: any,
+  ) {
+    return this.documentsService.setLegalHold(
+      docId,
+      body,
+      buildRequestContext(req),
+    );
+  }
+
   @Post(':docId/acl')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
@@ -112,7 +176,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List ACL rules for a document' })
-  listAcl(@Param('docId') docId: string) {
+  async listAcl(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.aclService.list(docId);
   }
 
@@ -125,7 +194,12 @@ export class DocumentsController {
     @Param('aclId') aclId: string,
     @Req() req: any,
   ) {
-    return this.aclService.delete(docId, aclId, req.user, buildRequestContext(req));
+    return this.aclService.delete(
+      docId,
+      aclId,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/versions')
@@ -137,11 +211,23 @@ export class DocumentsController {
     @Body() body: CreateVersionDto,
     @Req() req: any,
   ) {
-    return this.versionsService.create(
-      docId,
-      body,
-      req.user,
-    );
+    return this.versionsService.create(docId, body, req.user);
+  }
+
+  @Post(':docId/versions/:version/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a previous version as a new current version',
+    description:
+      'Owner editor or admin only. Creates a new version that re-points to the chosen older version file, preserving full history.',
+  })
+  restoreVersion(
+    @Param('docId') docId: string,
+    @Param('version') version: string,
+    @Req() req: any,
+  ) {
+    return this.versionsService.restore(docId, Number(version), req.user);
   }
 
   @Post(':docId/status')
@@ -165,7 +251,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List workflow history for a document' })
-  getWorkflowHistory(@Param('docId') docId: string) {
+  async getWorkflowHistory(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.prisma.documentWorkflowHistory.findMany({
       where: { docId },
       orderBy: { createdAt: 'desc' },
@@ -180,14 +271,14 @@ export class DocumentsController {
       'Used internally by the workflow service to route SUBMITTED notifications. ' +
       'No auth required — returns only user IDs, no sensitive data.',
   })
-  getApprovers(@Param('docId') _docId: string) {
+  getApprovers() {
     // docId is required by REST convention; the result is global role membership.
     return this.documentsService.getApprovers();
   }
 
   @Post(':docId/download-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Authorize a download using metadata status and ACL policy',
   })
@@ -202,12 +293,13 @@ export class DocumentsController {
       body,
       req.user,
       buildRequestContext(req),
+      { shareToken: body.shareToken },
     );
   }
 
   @Post(':docId/preview-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary:
       'Authorize a document preview using metadata status and ACL policy',
@@ -223,6 +315,7 @@ export class DocumentsController {
       body,
       req.user,
       buildRequestContext(req),
+      { shareToken: body.shareToken },
     );
   }
 
@@ -230,7 +323,12 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'List comments for a document' })
-  listComments(@Param('docId') docId: string) {
+  async listComments(@Param('docId') docId: string, @Req() req: any) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.commentsService.findByDoc(docId);
   }
 
@@ -238,11 +336,16 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Add a comment to a document' })
-  addComment(
+  async addComment(
     @Param('docId') docId: string,
     @Body() body: { content: string },
     @Req() req: any,
   ) {
+    await this.policyService.assertCanReadMetadata(
+      docId,
+      req.user,
+      buildRequestContext(req),
+    );
     return this.commentsService.create(
       docId,
       body.content,
@@ -255,17 +358,20 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Update a comment' })
-  updateComment(
+  async updateComment(
     @Param('docId') docId: string,
     @Param('commentId') commentId: string,
     @Body() body: { content: string },
     @Req() req: any,
   ) {
+    const context = buildRequestContext(req);
+    await this.policyService.assertCanReadMetadata(docId, req.user, context);
     return this.commentsService.update(
+      docId,
       commentId,
       body.content,
       req.user,
-      buildRequestContext(req),
+      context,
     );
   }
 
@@ -273,11 +379,13 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Delete a comment' })
-  deleteComment(
+  async deleteComment(
     @Param('docId') docId: string,
     @Param('commentId') commentId: string,
     @Req() req: any,
   ) {
-    return this.commentsService.delete(commentId, req.user, buildRequestContext(req));
+    const context = buildRequestContext(req);
+    await this.policyService.assertCanReadMetadata(docId, req.user, context);
+    return this.commentsService.delete(docId, commentId, req.user, context);
   }
 }

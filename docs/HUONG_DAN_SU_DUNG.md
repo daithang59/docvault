@@ -252,7 +252,7 @@ Sử dụng các bộ lọc phía trên bảng để thu hẹp kết quả:
 #### Quy tắc đặc biệt cho Compliance Officer
 
 - **Được xem** metadata (chi tiết) của tất cả tài liệu PUBLISHED và ARCHIVED.
-- **Được xem trước** (preview) tài liệu phân loại **PUBLIC** — không xem được INTERNAL, CONFIDENTIAL, SECRET.
+- **Không được xem trước** (preview) nội dung file. Compliance Officer chỉ xem metadata/audit/retention evidence.
 - **Không được tải xuống** bất kỳ file nào, dù ACL cho phép. Đây là quy tắc cứng trong hệ thống.
 
 ---
@@ -308,6 +308,7 @@ ACL cho phép kiểm soát quyền truy cập chi tiết trên từng tài liệ
 2. Ở cột phải, phần **Access Control** hiển thị các rule hiện tại.
 3. Nhấn thêm rule mới:
    - **Subject**: Chọn USER / ROLE / GROUP / ALL
+     - Với GROUP, nhập tên group Keycloak đã chuẩn hóa, ví dụ `/finance-team` trong token sẽ dùng `finance-team` trong ACL.
    - **Permission**: READ / DOWNLOAD / WRITE / APPROVE
    - **Effect**: ALLOW hoặc DENY
 
@@ -383,7 +384,7 @@ Sau khi tất cả service đang chạy:
 pnpm test:e2e
 ```
 
-Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log...
+Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log, GROUP ACL, confidential stream-only posture, malware block, DLP escalation, retention evidence và audit security summary.
 
 ### Mở Swagger UI (tài liệu API)
 

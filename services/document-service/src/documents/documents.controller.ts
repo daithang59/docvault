@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Get,
@@ -63,7 +64,7 @@ export class DocumentsController {
 
   @Post(':docId/presign-download')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Create a presigned URL after metadata authorizes download',
   })
@@ -82,9 +83,10 @@ export class DocumentsController {
 
   @Get(':docId/versions/:version/stream')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
-    summary: 'Stream a document version by grant token (already authorized, no metadata call)',
+    summary:
+      'Stream a document version by grant token (already authorized, no metadata call)',
   })
   async streamVersion(
     @Param('docId') docId: string,
@@ -94,13 +96,20 @@ export class DocumentsController {
     @Res({ passthrough: true }) res: Response,
   ) {
     const context = buildRequestContext(req);
+    const parsedVersion = Number(version);
+    if (!Number.isInteger(parsedVersion) || parsedVersion < 1) {
+      throw new BadRequestException('Invalid document version');
+    }
 
     try {
-      const response = await this.documentsService.getStreamWithToken(
-        docId,
-        token,
-        context.actorId,
-      );
+      const response = token
+        ? await this.documentsService.getStreamWithToken(
+            docId,
+            parsedVersion,
+            token,
+            context.actorId,
+          )
+        : await this.documentsService.getStream(docId, parsedVersion, context);
 
       if (response.contentType) {
         res.setHeader('Content-Type', response.contentType);
@@ -112,20 +121,25 @@ export class DocumentsController {
 
       return response.stream;
     } catch (err) {
-      console.error('[StreamVersion] Error streaming document:', (err as Error).message, (err as Error).stack);
+      console.error(
+        '[StreamVersion] Error streaming document:',
+        (err as Error).message,
+        (err as Error).stack,
+      );
       throw err;
     }
   }
 
   @Get(':docId/preview')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Stream a document for inline preview (supports Range requests)',
   })
   async preview(
     @Param('docId') docId: string,
     @Query('version') version: string,
+    @Query('shareToken') shareToken: string,
     @Req() req: any,
     @Res() res: Response,
   ) {
@@ -145,6 +159,7 @@ export class DocumentsController {
       docId,
       version: parsedVersion,
       range,
+      ...(shareToken ? { shareToken } : {}),
       context: buildRequestContext(req),
     });
 
@@ -179,7 +194,9 @@ export class DocumentsController {
 
     bodyStream.on('error', (err: Error) => {
       if (!res.headersSent) {
-        res.status(500).json({ message: ['Preview stream failed'], detail: err.message });
+        res
+          .status(500)
+          .json({ message: ['Preview stream failed'], detail: err.message });
       } else {
         res.destroy(err);
       }

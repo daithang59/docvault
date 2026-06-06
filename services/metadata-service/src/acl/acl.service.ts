@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   NotFoundException,
@@ -10,7 +11,9 @@ import {
   RequestContext,
   ServiceUser,
   buildActorId,
+  normalizeGroups,
 } from '../common/request-context';
+import { AclSubjectType } from '../../generated/prisma';
 
 @Injectable()
 export class AclService {
@@ -35,11 +38,18 @@ export class AclService {
 
     this.assertCanManage(document.ownerId, user);
 
+    const subjectId = this.normalizeSubjectId(dto);
+    if (dto.subjectType !== AclSubjectType.ALL && !subjectId) {
+      throw new BadRequestException(
+        'Subject ID is required unless subject type is ALL',
+      );
+    }
+
     const aclEntry = await this.prisma.documentAcl.create({
       data: {
         docId,
         subjectType: dto.subjectType,
-        subjectId: dto.subjectId,
+        subjectId,
         permission: dto.permission,
         effect: dto.effect,
       },
@@ -54,7 +64,7 @@ export class AclService {
         docId,
         aclId: aclEntry.id,
         subjectType: dto.subjectType,
-        subjectId: dto.subjectId,
+        subjectId,
         permission: dto.permission,
         effect: dto.effect,
       },
@@ -124,5 +134,17 @@ export class AclService {
         'Only the owner editor or admin can update ACL',
       );
     }
+  }
+
+  private normalizeSubjectId(dto: UpsertAclDto): string | undefined {
+    if (dto.subjectType === AclSubjectType.ALL) {
+      return undefined;
+    }
+
+    if (dto.subjectType === AclSubjectType.GROUP) {
+      return normalizeGroups([dto.subjectId ?? ''])[0];
+    }
+
+    return dto.subjectId?.trim() || undefined;
   }
 }

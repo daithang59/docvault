@@ -16,6 +16,13 @@
     ]
   },
 
+  "groups": [
+    {
+      "name": "finance-team",
+      "path": "/finance-team"
+    }
+  ],
+
   "requiredActions": [
     {
       "alias": "UPDATE_PASSWORD",
@@ -42,6 +49,15 @@
       "enabled": true,
       "defaultAction": false,
       "priority": 50,
+      "config": {}
+    },
+    {
+      "alias": "CONFIGURE_TOTP",
+      "name": "Configure OTP",
+      "providerId": "CONFIGURE_TOTP",
+      "enabled": true,
+      "defaultAction": false,
+      "priority": 60,
       "config": {}
     }
   ],
@@ -72,7 +88,23 @@
         "access.token.lifespan": "900",
         "post.logout.redirect.uris": "+"
       },
-      "fullScopeAllowed": true
+      "fullScopeAllowed": true,
+      "protocolMappers": [
+        {
+          "name": "groups",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-group-membership-mapper",
+          "consentRequired": false,
+          "config": {
+            "full.path": "false",
+            "id.token.claim": "true",
+            "access.token.claim": "true",
+            "userinfo.token.claim": "true",
+            "claim.name": "groups",
+            "jsonType.label": "String"
+          }
+        }
+      ]
     }
   ],
 
@@ -96,6 +128,7 @@
       "lastName": "One",
       "email": "editor1@docvault.local",
       "requiredActions": [],
+      "groups": ["/finance-team"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["editor"]
     },
@@ -129,6 +162,28 @@
       "lastName": "One",
       "email": "admin1@docvault.local",
       "requiredActions": [],
+      "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
+      "realmRoles": ["admin"]
+    },
+    {
+      "username": "co-mfa-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "CO MFA",
+      "lastName": "Demo",
+      "email": "co-mfa-demo@docvault.local",
+      "requiredActions": ["CONFIGURE_TOTP"],
+      "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
+      "realmRoles": ["co", "compliance_officer"]
+    },
+    {
+      "username": "admin-mfa-demo",
+      "enabled": true,
+      "emailVerified": true,
+      "firstName": "Admin MFA",
+      "lastName": "Demo",
+      "email": "admin-mfa-demo@docvault.local",
+      "requiredActions": ["CONFIGURE_TOTP"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["admin"]
     }

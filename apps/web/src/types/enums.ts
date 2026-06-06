@@ -18,7 +18,13 @@ export type UserRole =
   | 'compliance_officer'
   | 'admin';
 
-export type WorkflowAction = 'SUBMIT' | 'APPROVE' | 'REJECT' | 'ARCHIVE' | 'DELETE';
+export type WorkflowAction =
+  | 'SUBMIT'
+  | 'APPROVE'
+  | 'REJECT'
+  | 'ARCHIVE'
+  | 'DELETE'
+  | 'RETENTION';
 
 export type AuditResult = 'SUCCESS' | 'DENY' | 'ERROR' | 'CONFLICT';
 

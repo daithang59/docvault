@@ -9,24 +9,43 @@ type AuditEventPayload = {
   resourceId?: string;
   result: 'SUCCESS' | 'DENY' | 'CONFLICT' | 'ERROR';
   reason?: string;
+  metadata?: Record<string, unknown>;
 };
 
 @Injectable()
 export class AuditClient {
   private readonly logger = new Logger(AuditClient.name);
-  private readonly baseUrl = process.env.AUDIT_SERVICE_URL;
 
   constructor(private readonly http: HttpService) {}
 
+  private get baseUrl(): string | undefined {
+    return process.env.AUDIT_SERVICE_URL;
+  }
+
+  private get ingestToken(): string | undefined {
+    return process.env.AUDIT_INGEST_TOKEN;
+  }
+
   async emitEvent(context: RequestContext, event: AuditEventPayload) {
-    if (!this.baseUrl) {
+    const url = this.baseUrl;
+    if (!url) {
+      this.logger.warn(
+        `AUDIT_SERVICE_URL not set — audit event "${event.action}" dropped`,
+      );
+      return;
+    }
+    const ingestToken = this.ingestToken;
+    if (!ingestToken) {
+      this.logger.warn(
+        `AUDIT_INGEST_TOKEN not set — audit event "${event.action}" dropped`,
+      );
       return;
     }
 
     try {
       await firstValueFrom(
         this.http.post(
-          `${this.baseUrl}/audit/events`,
+          `${url}/audit/events`,
           {
             timestamp: new Date().toISOString(),
             actorId: context.actorId,
@@ -38,10 +57,11 @@ export class AuditClient {
             reason: event.reason,
             ip: context.ip,
             traceId: context.traceId,
+            ...(event.metadata !== undefined && { metadata: event.metadata }),
           },
           {
             headers: {
-              authorization: context.authorization,
+              'x-docvault-service-token': ingestToken,
               'x-request-id': context.traceId,
               'x-user-id': context.actorId,
               'x-roles': context.roles.join(','),

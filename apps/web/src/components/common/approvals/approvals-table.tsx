@@ -7,14 +7,15 @@ import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { Eye } from 'lucide-react';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
+import type { ApprovalQueueSlaRow } from '@/features/approvals/approval-sla';
 
 interface ApprovalsTableProps {
-  data: DocumentListItem[];
+  rows: ApprovalQueueSlaRow[];
   onReview: (doc: DocumentListItem) => void;
 }
 
-export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
-  const ownerIds = [...new Set(data.map((d) => d.ownerId))];
+export function ApprovalsTable({ rows, onReview }: ApprovalsTableProps) {
+  const ownerIds = [...new Set(rows.map((row) => row.document.ownerId))];
   const { data: displayNames } = useOwnerDisplayNames(ownerIds);
 
   return (
@@ -26,6 +27,8 @@ export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
               <Th>Title</Th>
               <Th>Classification</Th>
               <Th>Owner</Th>
+              <Th>Assignment</Th>
+              <Th>SLA</Th>
               <Th>Version</Th>
               <Th>Updated</Th>
               <Th>Status</Th>
@@ -33,7 +36,9 @@ export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
             </tr>
           </thead>
           <tbody>
-            {data.map((doc) => {
+            {rows.map((row) => {
+              const doc = row.document;
+              const sla = row.sla;
               const display = displayNames?.[doc.ownerId]?.displayName ?? doc.ownerId ?? 'Unknown';
               return (
                 <tr
@@ -53,9 +58,25 @@ export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
                       </div>
                     )}
                   </td>
-                  <td className="px-4 py-3"><ClassificationBadge classification={doc.classificationLevel ?? doc.classification} /></td>
+                  <td className="px-4 py-3"><ClassificationBadge classification={doc.classification} /></td>
                   <td className="px-4 py-3 text-xs text-[var(--text-muted)]">{display}</td>
-                  <td className="px-4 py-3 font-mono text-sm text-[var(--text-muted)]">v{doc.currentVersionNumber ?? doc.currentVersion}</td>
+                  <td className="px-4 py-3">
+                    <p className="whitespace-nowrap text-sm font-medium text-[var(--text-main)]">
+                      {sla.assignment.label}
+                    </p>
+                    <p className="mt-1 max-w-[190px] text-xs leading-4 text-[var(--text-muted)]">
+                      {sla.assignment.reason}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3">
+                    <span className={`inline-flex whitespace-nowrap rounded-full px-2 py-1 text-xs font-semibold ${slaBadgeClass(sla.tone)}`}>
+                      {sla.stateLabel}
+                    </span>
+                    <p className="mt-1 whitespace-nowrap text-[11px] text-[var(--text-faint)]">
+                      Due {formatDateTime(sla.dueAt)}
+                    </p>
+                  </td>
+                  <td className="px-4 py-3 font-mono text-sm text-[var(--text-muted)]">v{doc.currentVersion}</td>
                   <td className="whitespace-nowrap px-4 py-3 text-sm text-[var(--text-muted)]">{formatDateTime(doc.updatedAt)}</td>
                   <td className="px-4 py-3"><StatusBadge status={doc.status} /></td>
                   <td className="px-4 py-3">
@@ -74,7 +95,7 @@ export function ApprovalsTable({ data, onReview }: ApprovalsTableProps) {
         </table>
       </div>
       <div className="border-t bg-[var(--bg-subtle)] px-4 py-3" style={{ borderColor: 'var(--border-soft)' }}>
-        <p className="text-xs text-[var(--text-faint)]">{data.length} pending document{data.length !== 1 ? 's' : ''}</p>
+        <p className="text-xs text-[var(--text-faint)]">{rows.length} pending document{rows.length !== 1 ? 's' : ''}</p>
       </div>
     </div>
   );
@@ -86,4 +107,16 @@ function Th({ children }: { children: React.ReactNode }) {
       {children}
     </th>
   );
+}
+
+function slaBadgeClass(tone: ApprovalQueueSlaRow['sla']['tone']): string {
+  if (tone === 'danger') {
+    return 'bg-red-50 text-red-700 ring-1 ring-red-200';
+  }
+
+  if (tone === 'warning') {
+    return 'bg-amber-50 text-amber-700 ring-1 ring-amber-200';
+  }
+
+  return 'bg-emerald-50 text-emerald-700 ring-1 ring-emerald-200';
 }

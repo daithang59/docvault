@@ -123,13 +123,15 @@ function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-function pnpmCommand() {
-  return process.platform === 'win32' ? 'pnpm.cmd' : 'pnpm';
-}
+function pnpmSpawn(command) {
+  if (process.platform === 'win32') {
+    return {
+      command: process.env.ComSpec ?? 'cmd.exe',
+      args: ['/d', '/s', '/c', 'pnpm', ...command],
+    };
+  }
 
-function shouldUseShell() {
-  // Windows requires shell:true to spawn .cmd / .bat files.
-  return process.platform === 'win32';
+  return { command: 'pnpm', args: command };
 }
 
 function shouldRunOptionalStep(envFlag) {
@@ -146,10 +148,10 @@ async function runPnpmStep({ label, command, optional = false, envFlag }) {
   log(`${label}...`);
 
   await new Promise((resolve, reject) => {
-    const child = spawn(pnpmCommand(), command, {
+    const pnpm = pnpmSpawn(command);
+    const child = spawn(pnpm.command, pnpm.args, {
       env: process.env,
       stdio: 'inherit',
-      shell: shouldUseShell(),
     });
 
     child.on('error', reject);
@@ -200,15 +202,11 @@ function startService(service, colorIdx) {
     : `[${service.name}] `;
   const stderrTransform = createPrefixTransformStream(stderrPrefix, process.stderr);
 
-  const child = spawn(
-    pnpmCommand(),
-    ['--filter', service.name, 'start:dev'],
-    {
-      env: process.env,
-      stdio: ['ignore', 'pipe', 'pipe'],
-      shell: shouldUseShell(),
-    },
-  );
+  const pnpm = pnpmSpawn(['--filter', service.name, 'start:dev']);
+  const child = spawn(pnpm.command, pnpm.args, {
+    env: process.env,
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
 
   // Wire up prefixed output
   child.stdout?.on('data', (chunk) => stdoutTransform.write(chunk));

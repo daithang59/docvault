@@ -1,12 +1,18 @@
 export const ROUTES = {
   LOGIN: '/login',
   DASHBOARD: '/dashboard',
+  DEMO_KIT: '/demo-kit',
   DOCUMENTS: '/documents',
   DOCUMENTS_NEW: '/documents/new',
   DOCUMENT_DETAIL: (id: string) => `/documents/${id}`,
   DOCUMENT_EDIT: (id: string) => `/documents/${id}/edit`,
   APPROVALS: '/approvals',
   MY_DOCUMENTS: '/my-documents',
+  NOTIFICATIONS: '/notifications',
+  EVIDENCE: '/evidence',
+  SECURITY: '/security',
+  ACCESS_REVIEW: '/access-review',
   AUDIT: '/audit',
+  RETENTION: '/retention',
   PROFILE: '/profile',
 } as const;

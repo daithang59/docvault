@@ -6,6 +6,7 @@ import type {
   AclSubjectType,
   WorkflowAction,
 } from '@/types/enums';
+import type { AuditChainStatus, AuditLogEntry } from '@/features/audit/audit.types';
 import type { PaginationParams } from '@/types/pagination';
 
 export interface DocumentSummaryDto {
@@ -14,6 +15,16 @@ export interface DocumentSummaryDto {
   description?: string | null;
   status: DocumentStatus;
   classification: ClassificationLevel;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
+  dlpDetectedAt?: string | null;
+  retentionClass?: string | null;
+  retentionUntil?: string | null;
+  retentionReason?: string | null;
+  legalHold?: boolean;
+  legalHoldReason?: string | null;
+  legalHoldBy?: string | null;
+  legalHoldAt?: string | null;
   ownerId: string;
   ownerDisplay?: string;
   currentVersion: number;
@@ -25,8 +36,6 @@ export interface DocumentSummaryDto {
   archivedAt?: string | null;
   createdAt: string;
   updatedAt: string;
-  classificationLevel?: ClassificationLevel;
-  currentVersionNumber?: number;
 }
 
 export type DocumentListItem = DocumentSummaryDto;
@@ -40,6 +49,8 @@ export interface DocumentVersionDto {
   size: number;
   filename: string;
   contentType?: string | null;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
   createdAt: string;
   createdBy: string;
   versionNumber?: number;
@@ -100,17 +111,60 @@ export interface UpdateDocumentRequest {
   title?: string;
   description?: string;
   classification?: ClassificationLevel;
+  classificationOverrideReason?: string;
   tags?: string[];
 }
 
 export type CreateDocumentDto = CreateDocumentRequest;
 export type UpdateDocumentDto = UpdateDocumentRequest;
 
+export interface LegalHoldRequest {
+  hold: boolean;
+  reason?: string;
+}
+
+export interface DocumentAccessImpactRequest {
+  classification: ClassificationLevel;
+}
+
+export interface DocumentAccessImpact {
+  documentId: string;
+  current: {
+    classification: ClassificationLevel;
+    status: DocumentStatus;
+    watermarkRequired: boolean;
+  };
+  proposed: {
+    classification: ClassificationLevel;
+    status: DocumentStatus;
+    watermarkRequired: boolean;
+  };
+  changes: {
+    accessExpanded: boolean;
+    accessReduced: boolean;
+    watermarkReduced: boolean;
+    dlpOverrideRequired: boolean;
+    warnings: string[];
+  };
+  roleImpacts: Array<{
+    role: string;
+    metadata: {
+      current: boolean;
+      proposed: boolean;
+    };
+    download: {
+      current: boolean;
+      proposed: boolean;
+    };
+    notes: string[];
+  }>;
+  guardrails: string[];
+}
+
 export interface DocumentListFilters extends PaginationParams {
   q?: string;
   status?: DocumentStatus;
   classification?: ClassificationLevel;
-  classificationLevel?: ClassificationLevel;
   ownerId?: string;
   tags?: string[];
 }
@@ -133,6 +187,8 @@ export interface UploadVersionResponse {
   contentType?: string | null;
   createdAt: string;
   createdBy: string;
+  dlpStatus?: 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
+  dlpFindings?: Array<Record<string, unknown>> | null;
 }
 
 export type SubmitDocumentRequest = Record<string, never>;
@@ -176,4 +232,86 @@ export interface PreviewAuthorizationResult {
   expiresInSeconds: number;
   expiresAt: string;
   grantToken: string;
+}
+
+export interface RetentionEvidenceRecord {
+  docId: string;
+  title?: string;
+  status?: DocumentStatus;
+  classification?: ClassificationLevel;
+  publishedAt?: string | null;
+  archivedAt?: string | null;
+  retentionClass?: string | null;
+  retentionUntil?: string | null;
+  retentionReason?: string | null;
+  retentionStatus?: 'ACTIVE' | 'DUE_SOON' | 'OVERDUE' | 'ARCHIVED' | 'UNSET';
+  daysRemaining?: number | null;
+}
+
+export type ComplianceEvidenceVersionDto = Omit<
+  DocumentVersionDto,
+  'objectKey' | 'storagePath'
+> & {
+  objectKey?: never;
+  storagePath?: never;
+};
+
+export interface ComplianceEvidencePacket {
+  generatedAt: string;
+  metadataOnly?: true;
+  excludedSensitiveFields?: string[];
+  generatedBy: {
+    id: string | null;
+    username: string | null;
+    roles: string[];
+  };
+  scope: {
+    type: 'DOCUMENT';
+    documentId: string;
+    asOf?: string | null;
+  };
+  document: Omit<DocumentDetailDto, 'versions' | 'aclEntries' | 'acl' | 'workflowHistory'>;
+  versions: ComplianceEvidenceVersionDto[];
+  aclEntries: DocumentAclEntryDto[];
+  workflowHistory: WorkflowHistoryItemDto[];
+  retention: {
+    checkedAt?: string | null;
+    summary?: Record<string, number> | null;
+    record?: RetentionEvidenceRecord | null;
+    fields: {
+      retentionClass?: string | null;
+      retentionUntil?: string | null;
+      retentionReason?: string | null;
+    };
+  };
+  audit: {
+    chain: AuditChainStatus;
+    events: AuditLogEntry[];
+    total: number;
+    page: number;
+    pageSize: number;
+  };
+}
+
+export type DocumentAiOperation =
+  | 'METADATA_CLASSIFICATION'
+  | 'METADATA_TAGGING'
+  | 'CONTENT_SUMMARIZATION'
+  | 'CONTENT_QA';
+
+export interface DocumentAiDeniedOperation {
+  operation: DocumentAiOperation;
+  reason: string;
+}
+
+export interface DocumentAiGuardrails {
+  documentId: string;
+  actorId: string;
+  classification: ClassificationLevel;
+  status: DocumentStatus;
+  canUseMetadata: boolean;
+  canUseContent: boolean;
+  allowedOperations: DocumentAiOperation[];
+  deniedOperations: DocumentAiDeniedOperation[];
+  guardrails: string[];
 }

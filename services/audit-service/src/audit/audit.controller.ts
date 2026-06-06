@@ -1,13 +1,23 @@
-import { Body, Controller, Get, Post, Query, UseGuards } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  Param,
+  Patch,
+  Post,
+  Query,
+  Req,
+  UseGuards,
+} from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
 import { ApiBearerAuth, ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { ServiceTokenGuard } from '../auth/service-token.guard';
 import { AuditService } from './audit.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
-import { IsOptional, IsInt, Min } from 'class-validator';
-import { Type } from 'class-transformer';
+import { SecurityRecommendationWorkflowDto } from './dto/security-recommendation-workflow.dto';
 
 @ApiTags('audit')
 @ApiBearerAuth()
@@ -17,10 +27,10 @@ export class AuditController {
 
   /**
    * Append a new audit event to the immutable log.
-   * Called by the gateway audit middleware with a forwarded JWT.
+   * Called by trusted services with the internal audit ingest token.
    */
   @Post('events')
-  @UseGuards(AuthGuard('jwt'))
+  @UseGuards(ServiceTokenGuard)
   @ApiOperation({ summary: 'Append an audit event' })
   create(@Body() body: CreateAuditEventDto) {
     return this.auditService.create(body);
@@ -41,5 +51,43 @@ export class AuditController {
   verifyChain(@Query('limit') limitStr?: string) {
     const limit = limitStr ? Math.min(Number(limitStr), 5000) : 1000;
     return this.auditService.verifyChain(limit);
+  }
+
+  @Get('security-summary')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Summarize security audit evidence' })
+  securitySummary(@Req() req: any) {
+    return this.auditService.securitySummary({
+      actorId: req.user?.username ?? req.user?.sub,
+      roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      ip: req.ip,
+      traceId: req.headers?.['x-trace-id'],
+    });
+  }
+
+  @Patch('security-recommendations/:id/workflow')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Update security recommendation workflow state' })
+  updateSecurityRecommendationWorkflow(
+    @Param('id') id: string,
+    @Body() body: SecurityRecommendationWorkflowDto,
+    @Req() req: any,
+  ) {
+    return this.auditService.updateSecurityRecommendationWorkflow(id, body, {
+      actorId: req.user?.username ?? req.user?.sub,
+      roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      ip: req.ip,
+      traceId: req.headers?.['x-trace-id'],
+    });
+  }
+
+  @Get('security-recommendations/:id/workflow-history')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Get security recommendation workflow history' })
+  getSecurityRecommendationWorkflowHistory(@Param('id') id: string) {
+    return this.auditService.getSecurityRecommendationWorkflowHistory(id);
   }
 }
