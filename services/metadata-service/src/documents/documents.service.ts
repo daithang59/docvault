@@ -763,6 +763,61 @@ export class DocumentsService {
   }
 
   /**
+   * Permanently delete documents whose trash recovery window has elapsed.
+   * Intended for a scheduled job. Failures on individual rows are counted and
+   * do not abort the whole run.
+   */
+  async purgeExpiredTrash(
+    options: { now?: Date } = {},
+  ): Promise<{ purged: number; failed: number; checkedAt: string }> {
+    const now = options.now ?? new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const cutoff = new Date(now.getTime() - this.trashRecoveryDays * dayMs);
+
+    const expired = (await this.prisma.document.findMany({
+      where: {
+        status: 'DELETED' as any,
+        deletedAt: { lt: cutoff },
+      } as any,
+      select: { id: true, title: true, deletedAt: true },
+    })) as Array<{ id: string; title: string; deletedAt: Date | null }>;
+
+    const context = {
+      traceId: 'trash-purge-job',
+      actorId: 'system:trash-purge',
+      roles: ['admin'],
+      authorization: '',
+      ip: '127.0.0.1',
+    } as any;
+
+    let purged = 0;
+    let failed = 0;
+    for (const doc of expired) {
+      try {
+        await this.prisma.document.delete({ where: { id: doc.id } });
+        purged++;
+        await this.auditClient.emitEvent(context, {
+          action: 'DOCUMENT_TRASH_PURGED',
+          resourceType: 'DOCUMENT',
+          resourceId: doc.id,
+          result: 'SUCCESS',
+          reason: 'Trash recovery window elapsed',
+          metadata: {
+            docId: doc.id,
+            title: doc.title,
+            deletedAt: doc.deletedAt ?? null,
+            purgedAt: now.toISOString(),
+          },
+        });
+      } catch {
+        failed++;
+      }
+    }
+
+    return { purged, failed, checkedAt: now.toISOString() };
+  }
+
+  /**
    * Soft-delete a document by marking it as DELETED.
    * Called exclusively by the workflow service after it has authorized the action.
    */

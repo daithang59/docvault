@@ -681,3 +681,72 @@ describe('DocumentsService approval chain', () => {
     expect(result.approvalStep).toBe(1);
   });
 });
+
+
+describe('DocumentsService purge expired trash', () => {
+  const systemContext = {
+    traceId: 'purge-job',
+    actorId: 'system:trash-purge',
+    roles: ['admin'],
+    authorization: '',
+    ip: '127.0.0.1',
+  };
+  const mockFindMany = jest.fn();
+  const mockDelete = jest.fn();
+  const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DocumentsService(
+      {
+        document: { findMany: mockFindMany, delete: mockDelete },
+      } as any,
+      { emitEvent: mockEmitEvent } as any,
+    );
+  });
+
+  it('permanently deletes DELETED documents past the recovery window', async () => {
+    const now = new Date('2026-06-10T00:00:00.000Z');
+    mockFindMany.mockResolvedValueOnce([
+      { id: 'old-1', title: 'Old one', deletedAt: new Date('2026-04-01T00:00:00.000Z') },
+      { id: 'old-2', title: 'Old two', deletedAt: new Date('2026-05-01T00:00:00.000Z') },
+    ]);
+    mockDelete.mockResolvedValue({});
+
+    const result = await service.purgeExpiredTrash({ now });
+
+    // query targets DELETED docs with deletedAt before the cutoff (now - 30d)
+    const where = mockFindMany.mock.calls[0][0].where;
+    expect(where.status).toBe('DELETED');
+    expect(where.deletedAt.lt).toBeInstanceOf(Date);
+    expect(mockDelete).toHaveBeenCalledTimes(2);
+    expect(mockDelete).toHaveBeenCalledWith({ where: { id: 'old-1' } });
+    expect(result.purged).toBe(2);
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'system:trash-purge' }),
+      expect.objectContaining({ action: 'DOCUMENT_TRASH_PURGED', result: 'SUCCESS' }),
+    );
+  });
+
+  it('does nothing when there are no expired documents', async () => {
+    mockFindMany.mockResolvedValueOnce([]);
+    const result = await service.purgeExpiredTrash({ now: new Date() });
+    expect(mockDelete).not.toHaveBeenCalled();
+    expect(result.purged).toBe(0);
+  });
+
+  it('counts failures without aborting the whole run', async () => {
+    mockFindMany.mockResolvedValueOnce([
+      { id: 'a', title: 'A', deletedAt: new Date('2026-01-01T00:00:00.000Z') },
+      { id: 'b', title: 'B', deletedAt: new Date('2026-01-01T00:00:00.000Z') },
+    ]);
+    mockDelete
+      .mockRejectedValueOnce(new Error('locked'))
+      .mockResolvedValueOnce({});
+
+    const result = await service.purgeExpiredTrash({ now: new Date('2026-06-10T00:00:00.000Z') });
+    expect(result.purged).toBe(1);
+    expect(result.failed).toBe(1);
+  });
+});

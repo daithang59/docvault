@@ -32,7 +32,9 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 
 - **Rate-limit toàn hệ thống** — đã wire `ThrottlerModule` + `APP_GUARD` (InternalAwareThrottlerGuard) cho cả 5 backend service (metadata/document/workflow/audit/notification), không chỉ gateway. Internal service-to-service call được miễn qua header `x-internal-call`.
 - **Migration kiểm chứng trên DB thật** — đã áp toàn bộ và xác nhận schema up to date.
-- Còn lại: integration test thật (giảm phụ thuộc mock), backup/restore, logging/metrics tập trung, MFA cho vai trò nhạy cảm, purge job cho trash.
+- **Purge job cho trash** — cron 02:00 hằng ngày (`TrashPurgeService`) xóa vĩnh viễn tài liệu DELETED quá hạn khôi phục 30 ngày; ghi audit `DOCUMENT_TRASH_PURGED`, đếm thành công/thất bại không abort cả run.
+- **Integration test rate-limit** — test dựng app Nest thật với `InternalAwareThrottlerGuard`, xác nhận 429 khi quá ngưỡng và miễn internal call qua `x-internal-call`.
+- Còn lại (cần hạ tầng/đầu tư lớn hơn): integration test end-to-end thật cho luồng lõi (upload/duyệt/tải/share) với DB + storage thật thay vì mock; backup/restore dữ liệu; logging/metrics tập trung + alerting; MFA/OTP trên Keycloak cho vai trò nhạy cảm; multi-tenant.
 
 ## 2. Còn lại nên làm (xếp theo ưu tiên)
 
