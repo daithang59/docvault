@@ -333,6 +333,40 @@ async function fulfillApi(route: Route) {
     return;
   }
 
+  const shareLinksMatch = pathname.match(
+    /^\/api\/metadata\/documents\/([^/]+)\/share-links$/,
+  );
+  if (shareLinksMatch) {
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON() as {
+        permission?: string;
+        expiresInHours?: number;
+        maxAccessCount?: number;
+      };
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'link-e2e-1',
+          docId: shareLinksMatch[1],
+          permission: body.permission ?? 'VIEW',
+          createdBy: 'admin1',
+          createdAt: new Date().toISOString(),
+          expiresAt: hoursFromNow(body.expiresInHours ?? 24),
+          maxAccessCount: body.maxAccessCount ?? null,
+          accessCount: 0,
+          lastAccessedAt: null,
+          revokedAt: null,
+          revokedBy: null,
+          status: 'ACTIVE',
+          token: 'playwright-share-token',
+        },
+      });
+      return;
+    }
+    await route.fulfill({ status: 200, json: [] });
+    return;
+  }
+
   if (pathname.endsWith('/workflow-history')) {
     const docId = pathname.split('/').at(-2) ?? 'unknown';
     await route.fulfill({
@@ -649,4 +683,24 @@ test('approvals page renders SLA queue and review drawer context', async ({ page
   await expect(page.getByRole('dialog', { name: 'Review Document' })).toBeVisible();
 
   await screenshot(page, testInfo.file, 'approvals-sla-readiness-playwright.png');
+});
+
+
+test('creates a time-limited share link and reveals the token once', async ({
+  page,
+}) => {
+  await page.goto('/documents/doc-published-library');
+
+  await expect(
+    page.getByRole('heading', { name: 'Share links' }),
+  ).toBeVisible();
+
+  await page
+    .getByRole('button', { name: 'Create share link' })
+    .click();
+
+  await expect(
+    page.getByText('Copy this link now. The token is not shown again.'),
+  ).toBeVisible();
+  await expect(page.getByRole('button', { name: /Copy/ })).toBeVisible();
 });

@@ -139,6 +139,7 @@ export class DocumentsController {
   async preview(
     @Param('docId') docId: string,
     @Query('version') version: string,
+    @Query('shareToken') shareToken: string,
     @Req() req: any,
     @Res() res: Response,
   ) {
@@ -158,6 +159,7 @@ export class DocumentsController {
       docId,
       version: parsedVersion,
       range,
+      ...(shareToken ? { shareToken } : {}),
       context: buildRequestContext(req),
     });
 

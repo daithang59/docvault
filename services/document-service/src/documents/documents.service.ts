@@ -330,6 +330,7 @@ export class DocumentsService {
     docId: string;
     version?: number;
     range?: { start: number; end: number };
+    shareToken?: string;
     context: RequestContext;
   }): Promise<{
     filename: string;
@@ -341,11 +342,11 @@ export class DocumentsService {
       ? T
       : never;
   }> {
-    const { docId, version, range, context } = params;
+    const { docId, version, range, shareToken, context } = params;
 
     const authorization = await this.metadataClient.authorizePreview(
       docId,
-      { version },
+      { version, ...(shareToken ? { shareToken } : {}) },
       context,
     );
 
