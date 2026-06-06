@@ -28,6 +28,12 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 
 ---
 
+## Nhóm độ-tin-cậy (tiến tới thương mại)
+
+- **Rate-limit toàn hệ thống** — đã wire `ThrottlerModule` + `APP_GUARD` (InternalAwareThrottlerGuard) cho cả 5 backend service (metadata/document/workflow/audit/notification), không chỉ gateway. Internal service-to-service call được miễn qua header `x-internal-call`.
+- **Migration kiểm chứng trên DB thật** — đã áp toàn bộ và xác nhận schema up to date.
+- Còn lại: integration test thật (giảm phụ thuộc mock), backup/restore, logging/metrics tập trung, MFA cho vai trò nhạy cảm, purge job cho trash.
+
 ## 2. Còn lại nên làm (xếp theo ưu tiên)
 
 ### Ưu tiên cao — dễ thấy khác biệt, tận dụng hạ tầng sẵn có
@@ -76,5 +82,5 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 
 ## 4. Lưu ý vận hành (chưa xử lý)
 
-- **Migration chưa áp vào DB thật**: hai migration `add_legal_hold` và `add_document_share_links` chưa chạy `prisma migrate deploy`. Cần chạy khi deploy, nếu không các tính năng legal hold / share link sẽ lỗi ở runtime dù test đã xanh.
+- **Migration đã áp vào DB thật**: toàn bộ migration (gồm `add_legal_hold`, `add_document_share_links`, `add_approval_chain`) đã chạy `prisma migrate deploy`; `prisma migrate status` báo "Database schema is up to date". Khi deploy môi trường mới vẫn cần chạy lại `migrate deploy`.
 - **E2E còn thiếu**: chưa có e2e cho redeem share link ở `/shared` và revoke share link end-to-end (đã có unit test cho các phần này).
