@@ -77,6 +77,8 @@ model Document {
   legalHoldReason String?
   legalHoldBy     String?
   legalHoldAt     DateTime?
+  approvalChain   String[]          @default([])
+  approvalStep    Int               @default(0)
   tags            String[]          @default([])
   status          DocumentStatus    @default(DRAFT)
   currentVersion  Int               @default(0)

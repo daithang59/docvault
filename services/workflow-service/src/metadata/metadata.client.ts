@@ -74,6 +74,18 @@ export class MetadataClient {
     );
   }
 
+  async advanceApprovalStep(docId: string, context: RequestContext) {
+    return this.request(() =>
+      firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/documents/${docId}/approval-step/advance`,
+          {},
+          { headers: this.buildHeaders(context) },
+        ),
+      ),
+    );
+  }
+
   private async request<T>(execute: () => Promise<{ data: T }>): Promise<T> {
     try {
       const response = await execute();

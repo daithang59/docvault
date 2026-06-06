@@ -20,6 +20,7 @@ import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
 import { LegalHoldDto } from './dto/legal-hold.dto';
+import { ApprovalChainDto } from './dto/approval-chain.dto';
 import { AclService } from '../acl/acl.service';
 import { UpsertAclDto } from '../acl/dto/upsert-acl.dto';
 import { VersionsService } from '../versions/versions.service';
@@ -153,6 +154,30 @@ export class DocumentsController {
       req.user,
       buildRequestContext(req),
     );
+  }
+
+  @Post(':docId/approval-chain')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Set an ordered approval chain for a document',
+  })
+  setApprovalChain(
+    @Param('docId') docId: string,
+    @Body() body: ApprovalChainDto,
+    @Req() req: any,
+  ) {
+    return this.documentsService.setApprovalChain(docId, body, buildRequestContext(req));
+  }
+
+  @Post(':docId/approval-step/advance')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('approver', 'admin')
+  @ApiOperation({
+    summary: 'Advance the approval chain to the next step (internal, used by workflow)',
+  })
+  advanceApprovalStep(@Param('docId') docId: string, @Req() req: any) {
+    return this.documentsService.advanceApprovalStep(docId, buildRequestContext(req));
   }
 
   @Post(':docId/legal-hold')

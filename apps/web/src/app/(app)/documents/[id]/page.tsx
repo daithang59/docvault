@@ -12,6 +12,7 @@ import { DocumentApprovalReadinessCard } from '@/components/documents/document-a
 import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
 import { DocumentLegalHoldCard } from '@/components/documents/document-legal-hold-card';
 import { DocumentShareLinksCard } from '@/components/documents/document-share-links-card';
+import { DocumentApprovalChainCard } from '@/components/documents/document-approval-chain-card';
 import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
@@ -162,6 +163,14 @@ export default function DocumentDetailPage({ params }: Props) {
               previewUnavailableReason={previewUnavailableReason}
             />
           </div>
+          {canShareLinks && (
+            <div className="animate-in delay-3">
+              <DocumentApprovalChainCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canShareLinks}
+              />
+            </div>
+          )}
           {canShareLinks && (
             <div className="animate-in delay-3">
               <DocumentShareLinksCard

@@ -906,6 +906,33 @@ describe('MetadataProxyController trash', () => {
   });
 });
 
+describe('MetadataProxyController approval chain', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies approval chain config to metadata service', async () => {
+    const updated = { id: 'doc-1', approvalChain: ['a', 'b'], approvalStep: 0 };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: updated }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+    const body = { approvers: ['a', 'b'] };
+
+    const result = await (controller as any).setApprovalChain('doc-1', req, body);
+
+    expect(result).toBe(updated);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/approval-chain`,
+      data: body,
+    });
+  });
+});
+
 describe('MetadataProxyController legal hold', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

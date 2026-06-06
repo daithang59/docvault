@@ -21,6 +21,7 @@ import {
   restoreDocumentVersion,
   listTrash,
   restoreDocumentFromTrash,
+  setApprovalChain,
 } from './documents.api';
 import type { ClassificationLevel } from '@/types/enums';
 import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto, LegalHoldRequest } from './documents.types';
@@ -152,6 +153,18 @@ export function useRestoreFromTrash() {
       qc.invalidateQueries({ queryKey: [...documentsKeys.all, 'trash'] });
       qc.invalidateQueries({ queryKey: documentsKeys.lists() });
       toast.success('Document restored');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useSetApprovalChain(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (approvers: string[]) => setApprovalChain(id, approvers),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      toast.success('Approval chain saved');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

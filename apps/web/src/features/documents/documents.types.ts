@@ -25,6 +25,8 @@ export interface DocumentSummaryDto {
   legalHoldReason?: string | null;
   legalHoldBy?: string | null;
   legalHoldAt?: string | null;
+  approvalChain?: string[];
+  approvalStep?: number;
   ownerId: string;
   ownerDisplay?: string;
   currentVersion: number;

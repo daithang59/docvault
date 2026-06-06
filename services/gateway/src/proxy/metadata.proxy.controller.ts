@@ -620,6 +620,27 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/approval-chain')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Set an ordered approval chain for a document',
+    description:
+      'Owner editor or admin only. Each listed approver must approve in order before the document is published.',
+  })
+  async setApprovalChain(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/approval-chain`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/legal-hold')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')

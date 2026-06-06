@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { NotificationClient } from '../notification/notification.client';
+import { parseMentions } from './mentions.util';
 import {
   RequestContext,
   ServiceUser,
@@ -16,6 +18,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly notificationClient?: NotificationClient,
   ) {}
 
   async create(
@@ -49,6 +52,18 @@ export class CommentsService {
         createdAt: comment.createdAt,
       },
     });
+
+    const mentioned = parseMentions(content).filter(
+      (username) => username !== authorId,
+    );
+    if (mentioned.length > 0 && this.notificationClient) {
+      await this.notificationClient.notify(context, {
+        type: 'MENTIONED',
+        docId,
+        recipientIds: mentioned,
+        metadata: { commentId: comment.id, mentionedBy: authorId },
+      });
+    }
 
     return comment;
   }

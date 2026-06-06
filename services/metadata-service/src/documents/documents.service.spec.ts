@@ -568,3 +568,116 @@ describe('DocumentsService trash', () => {
     expect(mockUpdate).not.toHaveBeenCalled();
   });
 });
+
+
+describe('DocumentsService approval chain', () => {
+  const ownerContext = {
+    traceId: 't',
+    actorId: 'editor-1',
+    roles: ['editor'],
+    authorization: 'Bearer x',
+    ip: '127.0.0.1',
+  };
+  const mockFindUnique = jest.fn();
+  const mockUpdate = jest.fn();
+  const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DocumentsService(
+      {
+        document: { findUnique: mockFindUnique, update: mockUpdate },
+      } as any,
+      { emitEvent: mockEmitEvent } as any,
+    );
+  });
+
+  it('sets an ordered approval chain and resets the step', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DRAFT',
+    });
+    mockUpdate.mockResolvedValueOnce({
+      id: 'doc-1',
+      approvalChain: ['app-1', 'app-2'],
+      approvalStep: 0,
+    });
+
+    await service.setApprovalChain(
+      'doc-1',
+      { approvers: ['app-1', 'app-2'] },
+      ownerContext as any,
+    );
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: { approvalChain: ['app-1', 'app-2'], approvalStep: 0 },
+    });
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      ownerContext,
+      expect.objectContaining({ action: 'DOCUMENT_APPROVAL_CHAIN_SET' }),
+    );
+  });
+
+  it('rejects an empty approval chain', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DRAFT',
+    });
+    await expect(
+      service.setApprovalChain('doc-1', { approvers: [] }, ownerContext as any),
+    ).rejects.toThrow();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects duplicate approvers in the chain', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DRAFT',
+    });
+    await expect(
+      service.setApprovalChain(
+        'doc-1',
+        { approvers: ['app-1', 'app-1'] },
+        ownerContext as any,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('forbids a non-owner non-admin from setting the chain', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'someone-else',
+      status: 'DRAFT',
+    });
+    await expect(
+      service.setApprovalChain(
+        'doc-1',
+        { approvers: ['app-1'] },
+        ownerContext as any,
+      ),
+    ).rejects.toThrow();
+  });
+
+  it('advances the approval step', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      approvalChain: ['app-1', 'app-2'],
+      approvalStep: 0,
+    });
+    mockUpdate.mockResolvedValueOnce({ id: 'doc-1', approvalStep: 1 });
+
+    const result = await service.advanceApprovalStep('doc-1', ownerContext as any);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: { approvalStep: 1 },
+    });
+    expect(result.approvalStep).toBe(1);
+  });
+});

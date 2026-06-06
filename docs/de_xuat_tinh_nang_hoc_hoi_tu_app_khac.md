@@ -21,6 +21,9 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 - **Bulk actions có undo** — hành động hàng loạt (submit/approve/archive/delete) hoãn 5s kèm toast Undo; nếu Undo, không có request nào gửi lên server.
 - **Watermark động khi preview** — PDF CONFIDENTIAL/SECRET được đóng dấu user + thời gian + phân loại khi xem inline (tận dụng WatermarkService đã có, nối vào luồng preview của document-service).
 - **Trash với khôi phục có hạn** — trang Trash liệt kê tài liệu DELETED với hạn khôi phục 30 ngày; khôi phục DELETED→DRAFT trong cửa sổ cho phép, ghi audit; chỉ owner-editor/admin.
+- **Sequential approvers** — chuỗi duyệt nhiều bước có thứ tự; mỗi approver duyệt đúng lượt, chỉ publish sau bước cuối; card cấu hình + tiến độ trên trang chi tiết.
+- **@mention trong comment** — parse @username trong nội dung, gửi thông báo MENTIONED cho người được nhắc (bỏ qua tự nhắc); gợi ý cú pháp ở ô nhập.
+- **Smart folder (tag phân cấp)** — lọc folder theo path slash-style (chọn `finance` gồm cả `finance/q1`), kèm helper dựng cây thư mục.
 
 ---
 
@@ -64,7 +67,8 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 2. ~~Bulk actions có undo~~ — đã xong
 3. ~~Watermark preview~~ — đã xong
 4. ~~Trash khôi phục~~ — đã xong
-5. Các mục còn lại theo nhu cầu (folder/cây thư mục, @mention, smart folder, sequential approvers)
+5. ~~Sequential approvers, @mention, smart folder~~ — đã xong
+6. Còn lại: folder/cây thư mục dạng UI điều hướng đầy đủ (mới làm phần lọc phân cấp), và nhóm độ-tin-cậy để thương mại (xem mục 4)
 
 ---
 

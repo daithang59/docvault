@@ -694,6 +694,75 @@ export class DocumentsService {
     return restored;
   }
   /**
+   * Define an ordered list of approvers for a document. Resets progress to the
+   * first step. Only the owner editor or an admin can configure the chain.
+   */
+  async setApprovalChain(
+    id: string,
+    input: { approvers: string[] },
+    context: RequestContext,
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const isAdmin = context.roles.includes('admin');
+    const isOwnerEditor =
+      document.ownerId === context.actorId &&
+      (context.roles.includes('editor') || context.roles.includes('admin'));
+    if (!isAdmin && !isOwnerEditor) {
+      throw new ForbiddenException(
+        'Only the owner editor or an admin can configure the approval chain',
+      );
+    }
+
+    const approvers = (input.approvers ?? [])
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (approvers.length === 0) {
+      throw new BadRequestException('Approval chain must have at least one approver');
+    }
+    if (new Set(approvers).size !== approvers.length) {
+      throw new BadRequestException('Approval chain cannot contain duplicates');
+    }
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data: { approvalChain: approvers, approvalStep: 0 } as any,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_APPROVAL_CHAIN_SET',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+      metadata: { docId: id, approverCount: approvers.length },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Advance the approval chain to the next step. Called by workflow-service after
+   * a valid step approval. Returns the updated document.
+   */
+  async advanceApprovalStep(
+    id: string,
+    context: RequestContext,
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    const nextStep = ((document as any).approvalStep ?? 0) + 1;
+    return this.prisma.document.update({
+      where: { id },
+      data: { approvalStep: nextStep } as any,
+    });
+  }
+
+  /**
    * Soft-delete a document by marking it as DELETED.
    * Called exclusively by the workflow service after it has authorized the action.
    */

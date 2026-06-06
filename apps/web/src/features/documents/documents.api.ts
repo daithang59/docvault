@@ -195,6 +195,21 @@ export async function restoreDocumentVersion(
   });
 }
 
+export async function setApprovalChain(
+  id: string,
+  approvers: string[],
+): Promise<DocumentDetail> {
+  const res = await apiClient.post<DocumentListItem>(
+    apiEndpoints.metadata.documents.approvalChain(id),
+    { approvers },
+  );
+  return normalizeDocumentDetail({
+    ...unwrap(res),
+    versions: [],
+    aclEntries: [],
+  });
+}
+
 export async function getWorkflowHistory(id: string): Promise<WorkflowHistoryEntry[]> {
   const res = await apiClient.get<WorkflowHistoryEntry[]>(
     apiEndpoints.metadata.documents.workflowHistory(id),
