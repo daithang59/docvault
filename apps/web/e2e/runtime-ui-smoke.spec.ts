@@ -164,6 +164,47 @@ function buildDocuments(): MockDocument[] {
   ];
 }
 
+function buildVersionsFor(docId: string) {
+  return [
+    {
+      id: `${docId}-v1`,
+      docId,
+      version: 1,
+      versionNumber: 1,
+      objectKey: `doc/${docId}/v1/report-v1.pdf`,
+      checksum: 'sha256:1111111111111111',
+      size: 100_000,
+      fileSize: 100_000,
+      filename: 'report-v1.pdf',
+      contentType: 'application/pdf',
+      mimeType: 'application/pdf',
+      dlpStatus: 'CLEAR',
+      createdAt: hoursAgo(60),
+      uploadedAt: hoursAgo(60),
+      createdBy: 'editor1',
+      uploadedById: 'editor1',
+    },
+    {
+      id: `${docId}-v2`,
+      docId,
+      version: 2,
+      versionNumber: 2,
+      objectKey: `doc/${docId}/v2/report-v2.pdf`,
+      checksum: 'sha256:2222222222222222',
+      size: 220_000,
+      fileSize: 220_000,
+      filename: 'report-v2.pdf',
+      contentType: 'application/pdf',
+      mimeType: 'application/pdf',
+      dlpStatus: 'CLEAR',
+      createdAt: hoursAgo(10),
+      uploadedAt: hoursAgo(10),
+      createdBy: 'editor1',
+      uploadedById: 'editor1',
+    },
+  ];
+}
+
 async function mockRuntimeApi(page: Page) {
   await page.addInitScript((session) => {
     window.localStorage.setItem('docvault_session', JSON.stringify(session));
@@ -214,10 +255,21 @@ async function fulfillApi(route: Route) {
       status: 200,
       json: {
         ...document,
-        versions: [],
+        versions: buildVersionsFor(document.id),
         aclEntries: document.aclEntries ?? [],
         workflowHistory: [],
       },
+    });
+    return;
+  }
+
+  const restoreMatch = pathname.match(
+    /^\/api\/metadata\/documents\/([^/]+)\/versions\/(\d+)\/restore$/,
+  );
+  if (restoreMatch) {
+    await route.fulfill({
+      status: 200,
+      json: { id: 'version-restored', docId: restoreMatch[1], version: 3 },
     });
     return;
   }
@@ -703,4 +755,46 @@ test('creates a time-limited share link and reveals the token once', async ({
     page.getByText('Copy this link now. The token is not shown again.'),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: /Copy/ })).toBeVisible();
+});
+
+
+test('command palette opens with Ctrl+K and navigates to a page', async ({
+  page,
+}) => {
+  await page.goto('/dashboard');
+  await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
+  await page.locator('body').click();
+
+  await page.keyboard.press('Control+KeyK');
+
+  const dialog = page.getByRole('dialog', { name: 'Command palette' });
+  await expect(dialog).toBeVisible();
+
+  await dialog.getByPlaceholder('Search pages and actions...').fill('retention');
+  await page.keyboard.press('Enter');
+
+  await expect(page).toHaveURL(/\/retention$/);
+});
+
+test('version history compares two versions and restores an older one', async ({
+  page,
+}) => {
+  await page.goto('/documents/doc-published-library');
+
+  await expect(page.getByRole('heading', { name: 'Version History' })).toBeVisible();
+  await expect(page.getByText('report-v1.pdf')).toBeVisible();
+  await expect(page.getByText('report-v2.pdf')).toBeVisible();
+
+  await page.getByRole('checkbox', { name: 'Compare version 1' }).check();
+  await page.getByRole('checkbox', { name: 'Compare version 2' }).check();
+
+  await expect(page.getByText(/Comparing v1 to v2/)).toBeVisible();
+  await expect(page.getByText('report-v1.pdf').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Restore version 1' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Restore version 1' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('button', { name: 'Restore version' }).click();
+  await expect(dialog).toBeHidden();
+  await expect(page.getByText('Version restored')).toBeVisible();
 });

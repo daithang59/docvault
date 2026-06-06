@@ -1,12 +1,16 @@
 'use client';
 
+import { useState } from 'react';
 import { DocumentVersion } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
 import { formatBytes } from '@/lib/utils/file';
 import { truncateMiddle } from '@/lib/utils/format';
-import { AlertTriangle, CheckCircle, Download, Eye, FileText } from 'lucide-react';
+import { AlertTriangle, CheckCircle, Download, Eye, FileText, GitCompareArrows, History, RotateCcw } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { getVersionPreviewPosture } from '@/features/documents/document-detail-presentation';
+import { buildVersionDiff } from '@/features/documents/version-diff';
+import { useRestoreDocumentVersion } from '@/features/documents/documents.hooks';
+import { ConfirmDialog } from '@/components/common/confirm-dialog';
 
 interface DocumentVersionsCardProps {
   docId: string;
@@ -17,6 +21,8 @@ interface DocumentVersionsCardProps {
   canPreview: boolean;
   downloadDeniedReason?: string;
   previewDeniedReason?: string;
+  canRestore?: boolean;
+  currentVersion?: number;
 }
 
 export function DocumentVersionsCard({
@@ -28,7 +34,39 @@ export function DocumentVersionsCard({
   canPreview,
   downloadDeniedReason,
   previewDeniedReason,
+  canRestore = false,
+  currentVersion,
 }: DocumentVersionsCardProps) {
+  const restore = useRestoreDocumentVersion(docId);
+  const [selected, setSelected] = useState<number[]>([]);
+  const [restoreTarget, setRestoreTarget] = useState<number | null>(null);
+
+  const latestVersion =
+    currentVersion ??
+    Math.max(0, ...versions.map((v) => v.versionNumber ?? v.version ?? 0));
+
+  function toggleCompare(versionNumber: number) {
+    setSelected((prev) => {
+      if (prev.includes(versionNumber)) {
+        return prev.filter((n) => n !== versionNumber);
+      }
+      return [...prev, versionNumber].slice(-2);
+    });
+  }
+
+  const diff =
+    selected.length === 2
+      ? (() => {
+          const a = versions.find(
+            (v) => (v.versionNumber ?? v.version) === selected[0],
+          );
+          const b = versions.find(
+            (v) => (v.versionNumber ?? v.version) === selected[1],
+          );
+          return a && b ? buildVersionDiff(a, b) : null;
+        })()
+      : null;
+
   const sorted = [...versions].sort(
     (a, b) => (b.versionNumber ?? b.version ?? 0) - (a.versionNumber ?? a.version ?? 0)
   );
@@ -160,12 +198,98 @@ export function DocumentVersionsCard({
                       reason={downloadDeniedReason}
                     />
                   )}
+                  <label
+                    className="flex items-center gap-1 rounded-lg px-1.5 py-1 text-xs cursor-pointer"
+                    style={{ color: 'var(--text-faint)' }}
+                    title="Select to compare (pick two versions)"
+                  >
+                    <input
+                      type="checkbox"
+                      className="h-3.5 w-3.5 accent-[var(--color-primary)]"
+                      checked={selected.includes(v.versionNumber ?? v.version ?? 0)}
+                      onChange={() => toggleCompare(v.versionNumber ?? v.version ?? 0)}
+                      aria-label={`Compare version ${v.versionNumber ?? v.version}`}
+                    />
+                    <GitCompareArrows className="h-3.5 w-3.5" />
+                  </label>
+                  {canRestore &&
+                    (v.versionNumber ?? v.version ?? 0) !== latestVersion && (
+                      <button
+                        onClick={() =>
+                          setRestoreTarget(v.versionNumber ?? v.version ?? 0)
+                        }
+                        className="p-1.5 rounded-lg transition-colors"
+                        style={{ color: 'var(--text-faint)' }}
+                        title="Restore this version"
+                        aria-label={`Restore version ${v.versionNumber ?? v.version}`}
+                      >
+                        <RotateCcw className="h-4 w-4" />
+                      </button>
+                    )}
                 </div>
               </div>
             );
           })}
         </div>
       )}
+      {diff && (
+        <div
+          className="border-t px-5 py-4"
+          style={{ borderColor: 'var(--border-soft)' }}
+        >
+          <div className="mb-2 flex items-center gap-2 text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>
+            <History className="h-4 w-4" style={{ color: 'var(--color-primary)' }} />
+            Comparing v{diff.fromVersion} to v{diff.toVersion}
+            <span className="text-xs font-normal" style={{ color: 'var(--text-faint)' }}>
+              ({diff.changedCount} change{diff.changedCount === 1 ? '' : 's'})
+            </span>
+          </div>
+          <div className="overflow-hidden rounded-lg border" style={{ borderColor: 'var(--border-soft)' }}>
+            <table className="w-full text-left text-xs">
+              <thead style={{ background: 'var(--table-header-bg)' }}>
+                <tr>
+                  <th className="px-3 py-2 font-semibold" style={{ color: 'var(--table-header-text)' }}>Field</th>
+                  <th className="px-3 py-2 font-semibold" style={{ color: 'var(--table-header-text)' }}>v{diff.fromVersion}</th>
+                  <th className="px-3 py-2 font-semibold" style={{ color: 'var(--table-header-text)' }}>v{diff.toVersion}</th>
+                </tr>
+              </thead>
+              <tbody>
+                {diff.fields.map((field) => (
+                  <tr
+                    key={field.label}
+                    className="border-t"
+                    style={{
+                      borderColor: 'var(--table-row-border)',
+                      background: field.changed ? 'var(--status-pending-bg)' : 'transparent',
+                    }}
+                  >
+                    <td className="px-3 py-2 font-medium" style={{ color: 'var(--text-muted)' }}>{field.label}</td>
+                    <td className="px-3 py-2" style={{ color: 'var(--text-main)' }}>{field.from}</td>
+                    <td className="px-3 py-2" style={{ color: field.changed ? 'var(--status-published-text)' : 'var(--text-main)' }}>{field.to}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      <ConfirmDialog
+        open={restoreTarget !== null}
+        onOpenChange={(open) => {
+          if (!open) setRestoreTarget(null);
+        }}
+        title={`Restore version ${restoreTarget ?? ''}`}
+        description="This creates a new current version pointing to the selected version's file. History is preserved."
+        confirmLabel="Restore version"
+        loading={restore.isPending}
+        onConfirm={async () => {
+          if (restoreTarget !== null) {
+            await restore.mutateAsync(restoreTarget);
+            setRestoreTarget(null);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -135,6 +135,8 @@ export default function DocumentDetailPage({ params }: Props) {
               canPreview={previewDecision.allowed}
               previewDeniedReason={previewDecision.reason}
               onPreview={(_docId, v) => setPreviewVersion(v)}
+              canRestore={canShareLinks}
+              currentVersion={doc.currentVersion}
             />
           </div>
           <div className="animate-in delay-3">

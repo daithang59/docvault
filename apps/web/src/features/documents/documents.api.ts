@@ -160,6 +160,21 @@ export async function setDocumentLegalHold(
   });
 }
 
+export async function restoreDocumentVersion(
+  id: string,
+  version: number,
+): Promise<DocumentDetail> {
+  const res = await apiClient.post<DocumentListItem>(
+    apiEndpoints.metadata.documents.restoreVersion(id, version),
+    {},
+  );
+  return normalizeDocumentDetail({
+    ...unwrap(res),
+    versions: [],
+    aclEntries: [],
+  });
+}
+
 export async function getWorkflowHistory(id: string): Promise<WorkflowHistoryEntry[]> {
   const res = await apiClient.get<WorkflowHistoryEntry[]>(
     apiEndpoints.metadata.documents.workflowHistory(id),

@@ -839,6 +839,31 @@ describe('MetadataProxyController share links', () => {
   });
 });
 
+describe('MetadataProxyController version restore', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies version restore to metadata service', async () => {
+    const restored = { id: 'version-new', version: 4 };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: restored }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).restoreVersion('doc-1', '1', req);
+
+    expect(result).toBe(restored);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/versions/1/restore`,
+    });
+  });
+});
+
 describe('MetadataProxyController legal hold', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

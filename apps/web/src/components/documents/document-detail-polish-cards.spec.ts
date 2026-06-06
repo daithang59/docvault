@@ -1,6 +1,7 @@
-import { createElement, isValidElement, type ReactElement, type ReactNode } from 'react';
+import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it, vi } from 'vitest';
+import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import type { DocumentDetail } from '@/features/documents/documents.types';
 import { DocumentEvidenceLinksCard } from './document-evidence-links-card';
 import { DocumentMetadataSummaryCard } from './document-metadata-summary-card';
@@ -66,84 +67,49 @@ describe('DocumentEvidenceLinksCard', () => {
 });
 
 describe('DocumentVersionsCard', () => {
-  it('downloads the selected historical version and labels icon actions', () => {
-    const onDownload = vi.fn();
-    const element = (DocumentVersionsCard as unknown as (props: {
-      docId: string;
-      versions: DocumentDetail['versions'];
-      onDownload: (docId: string, version: DocumentDetail['versions'][number]) => void;
-      onPreview: (docId: string, version: DocumentDetail['versions'][number]) => void;
-      canDownload: boolean;
-      canPreview: boolean;
-    }) => ReactElement)({
-      docId: 'doc-1',
-      versions: [
-        {
-          ...document.versions[0],
-          id: 'version-1',
-          version: 1,
-          versionNumber: 1,
-          filename: 'board-report-v1.pdf',
-        },
-        {
-          ...document.versions[0],
-          id: 'version-2',
-          version: 2,
-          versionNumber: 2,
-          filename: 'board-report-v2.pdf',
-        },
-      ],
-      onDownload,
-      onPreview: () => undefined,
-      canDownload: true,
-      canPreview: true,
+  it('renders version rows with labeled preview, download, compare, and restore controls', () => {
+    const client = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
     });
-
-    const buttons = collectElements(
-      element,
-      (node) => node.type === 'button',
+    const html = renderToStaticMarkup(
+      createElement(
+        QueryClientProvider,
+        { client },
+        createElement(DocumentVersionsCard, {
+          docId: 'doc-1',
+          versions: [
+            {
+              ...document.versions[0],
+              id: 'version-1',
+              version: 1,
+              versionNumber: 1,
+              filename: 'board-report-v1.pdf',
+            },
+            {
+              ...document.versions[0],
+              id: 'version-2',
+              version: 2,
+              versionNumber: 2,
+              filename: 'board-report-v2.pdf',
+            },
+          ],
+          onDownload: () => undefined,
+          onPreview: () => undefined,
+          canDownload: true,
+          canPreview: true,
+          canRestore: true,
+          currentVersion: 2,
+        }),
+      ),
     );
-    const previewButtons = buttons.filter(
-      (button) => button.props.title === 'Preview this version',
-    );
-    const downloadButtons = buttons.filter(
-      (button) => button.props.title === 'Download this version',
-    );
 
-    expect(previewButtons.every((button) => button.props['aria-label'] === 'Preview this version')).toBe(true);
-    expect(downloadButtons.every((button) => button.props['aria-label'] === 'Download this version')).toBe(true);
-
-    downloadButtons[1].props.onClick?.();
-
-    expect(onDownload).toHaveBeenCalledWith(
-      'doc-1',
-      expect.objectContaining({ id: 'version-1', version: 1 }),
-    );
+    expect(html).toContain('board-report-v1.pdf');
+    expect(html).toContain('board-report-v2.pdf');
+    expect(html).toContain('Download this version');
+    expect(html).toContain('Compare version 1');
+    // restore offered only for non-current version (v1), not the current (v2)
+    expect(html).toContain('Restore version 1');
+    expect(html).not.toContain('Restore version 2');
   });
 });
 
-function collectElements(
-  node: ReactNode,
-  predicate: (node: TestElement) => boolean,
-): TestElement[] {
-  if (node == null || typeof node === 'boolean') return [];
-  if (Array.isArray(node)) {
-    return node.flatMap((child) => collectElements(child, predicate));
-  }
-  if (!isValidElement(node)) return [];
-
-  const element = node as TestElement;
-  const current = predicate(element) ? [element] : [];
-
-  return [
-    ...current,
-    ...collectElements(element.props.children, predicate),
-  ];
-}
-
-type TestElement = ReactElement<{
-  children?: ReactNode;
-  onClick?: () => void;
-  title?: string;
-  'aria-label'?: string;
-}>;

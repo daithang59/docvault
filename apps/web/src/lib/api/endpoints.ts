@@ -23,6 +23,8 @@ export const apiEndpoints = {
       shareLinks: (docId: string) => `/metadata/documents/${docId}/share-links`,
       shareLink: (docId: string, linkId: string) =>
         `/metadata/documents/${docId}/share-links/${linkId}`,
+      restoreVersion: (docId: string, version: number) =>
+        `/metadata/documents/${docId}/versions/${version}/restore`,
     },
     savedViews: {
       list: '/metadata/document-saved-views',

@@ -214,6 +214,22 @@ export class DocumentsController {
     return this.versionsService.create(docId, body, req.user);
   }
 
+  @Post(':docId/versions/:version/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a previous version as a new current version',
+    description:
+      'Owner editor or admin only. Creates a new version that re-points to the chosen older version file, preserving full history.',
+  })
+  restoreVersion(
+    @Param('docId') docId: string,
+    @Param('version') version: string,
+    @Req() req: any,
+  ) {
+    return this.versionsService.restore(docId, Number(version), req.user);
+  }
+
   @Post(':docId/status')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'admin')

@@ -18,6 +18,7 @@ import {
   authorizeDownload,
   presignDownload,
   setDocumentLegalHold,
+  restoreDocumentVersion,
 } from './documents.api';
 import type { ClassificationLevel } from '@/types/enums';
 import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto, LegalHoldRequest } from './documents.types';
@@ -129,6 +130,20 @@ export function useSetLegalHold(id: string) {
       toast.success(
         variables.hold ? 'Legal hold placed' : 'Legal hold released',
       );
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useRestoreDocumentVersion(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) => restoreDocumentVersion(id, version),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      toast.success('Version restored');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

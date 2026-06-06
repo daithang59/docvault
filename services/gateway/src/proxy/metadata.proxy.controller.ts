@@ -633,6 +633,26 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/versions/:version/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a previous version as a new current version',
+    description:
+      'Owner editor or admin only. Creates a new version pointing to the chosen older version file.',
+  })
+  async restoreVersion(
+    @Param('docId') docId: string,
+    @Param('version') version: string,
+    @Req() req: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/versions/${version}/restore`,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/status')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'approver', 'admin')
