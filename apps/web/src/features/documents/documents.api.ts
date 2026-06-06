@@ -180,10 +180,14 @@ export async function addAclEntry(id: string, dto: AddAclEntryDto): Promise<AclE
 export async function authorizeDownload(
   id: string,
   version?: number,
+  shareToken?: string,
 ): Promise<DownloadAuthorizationResult> {
   const res = await apiClient.post<DownloadAuthorizationResult>(
     apiEndpoints.metadata.documents.downloadAuthorize(id),
-    version ? { version } : {},
+    {
+      ...(version ? { version } : {}),
+      ...(shareToken ? { shareToken } : {}),
+    },
   );
   const authorization = unwrap(res);
 
@@ -218,10 +222,14 @@ export async function presignDownload(
 export async function authorizePreview(
   id: string,
   version?: number,
+  shareToken?: string,
 ): Promise<PreviewAuthorizationResult> {
   const res = await apiClient.post<PreviewAuthorizationResult>(
     apiEndpoints.documents.previewAuthorize(id),
-    version ? { version } : {},
+    {
+      ...(version ? { version } : {}),
+      ...(shareToken ? { shareToken } : {}),
+    },
   );
   return unwrap(res);
 }

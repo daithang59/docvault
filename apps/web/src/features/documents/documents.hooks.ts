@@ -25,6 +25,7 @@ import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
 import apiClient from '@/lib/api/client';
 import { requestSensitiveActionProof } from '@/features/security/sensitive-action.api';
+import { getShareToken } from '@/features/share-links/share-token-store';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -163,7 +164,7 @@ export function useAddAclEntry(id: string) {
 export function useDownloadDocument() {
   return useMutation({
     mutationFn: async ({ id, filename }: { id: string; filename?: string }) => {
-      const authorization = await authorizeDownload(id);
+      const authorization = await authorizeDownload(id, undefined, getShareToken(id));
       const result = await presignDownload(id, authorization.version, authorization.grantToken);
       const resolvedFilename = filename ?? result.filename ?? authorization.filename ?? `document-${id}`;
       const resolvedVersion = result.version ?? authorization.version;

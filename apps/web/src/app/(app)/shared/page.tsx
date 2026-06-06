@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
 import { ShieldAlert } from 'lucide-react';
 import { redeemShareLink } from '@/features/share-links/share-links.api';
+import { rememberShareToken } from '@/features/share-links/share-token-store';
 import { getErrorMessage } from '@/lib/api/errors';
 import { ROUTES } from '@/lib/constants/routes';
 import { LoadingState } from '@/components/common/loading-state';
@@ -19,7 +20,11 @@ export default function SharedRedeemPage() {
     let cancelled = false;
     redeemShareLink(token)
       .then((res) => {
-        if (!cancelled) router.replace(ROUTES.DOCUMENT_DETAIL(res.docId));
+        if (cancelled) return;
+        // Remember the raw token so download/preview can re-authorize using the
+        // link's permission for this document during the session.
+        rememberShareToken(res.docId, token);
+        router.replace(ROUTES.DOCUMENT_DETAIL(res.docId));
       })
       .catch((err) => {
         if (!cancelled) setError(getErrorMessage(err));

@@ -10,6 +10,7 @@ import { PolicyService } from './policy.service';
 
 const mockDocumentFindUnique = jest.fn();
 const mockVersionFindUnique = jest.fn();
+const mockShareLinkFindUnique = jest.fn();
 const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
 
 const mockPrisma = {
@@ -18,6 +19,9 @@ const mockPrisma = {
   },
   documentVersion: {
     findUnique: mockVersionFindUnique,
+  },
+  documentShareLink: {
+    findUnique: mockShareLinkFindUnique,
   },
 };
 
@@ -68,6 +72,7 @@ describe('PolicyService', () => {
     service = new PolicyService(mockPrisma as any, auditClient as any);
     mockDocumentFindUnique.mockResolvedValue(makeDocument());
     mockVersionFindUnique.mockResolvedValue(makeVersion());
+    mockShareLinkFindUnique.mockResolvedValue(null);
   });
 
   afterEach(() => {
@@ -486,4 +491,116 @@ describe('PolicyService', () => {
       }),
     );
   });
+
+  describe('share link grants', () => {
+    const { createHash } = require('crypto');
+
+    function activeShareLink(overrides = {}) {
+      return {
+        id: 'link-1',
+        docId: 'doc-1',
+        tokenHash: createHash('sha256').update('rawtoken').digest('hex'),
+        permission: 'DOWNLOAD',
+        expiresAt: new Date(Date.now() + 3600_000),
+        maxAccessCount: null,
+        accessCount: 0,
+        revokedAt: null,
+        ...overrides,
+      };
+    }
+
+    it('lets a DOWNLOAD share token bypass classification denial for download', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(activeShareLink());
+
+      const result = await service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+        { shareToken: 'rawtoken' },
+      );
+
+      expect(result.grantToken).toEqual(expect.any(String));
+    });
+
+    it('lets a VIEW share token bypass classification denial for preview', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      const result = await service.authorizePreview(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+        { shareToken: 'rawtoken' },
+      );
+
+      expect(result.grantToken).toEqual(expect.any(String));
+    });
+
+    it('does not let a VIEW share token authorize a download', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ignores a share token issued for a different document', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ docId: 'other-doc' }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ignores an expired share token', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
 });

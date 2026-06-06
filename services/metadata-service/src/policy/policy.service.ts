@@ -10,7 +10,7 @@ import {
   ClassificationLevel,
   DocumentPermission,
 } from '../../generated/prisma';
-import { createHmac } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
 import { DownloadAuthorizeDto } from './dto/download-authorize.dto';
@@ -79,6 +79,7 @@ export class PolicyService {
     dto: DownloadAuthorizeDto,
     user: ServiceUser,
     context: RequestContext,
+    options: { shareToken?: string } = {},
   ) {
     const document = await this.prisma.document.findUnique({
       where: { id: docId },
@@ -88,6 +89,9 @@ export class PolicyService {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+
+    const shareGrant = await this.resolveShareGrant(docId, options.shareToken);
+    const shareAllowsDownload = shareGrant === 'DOWNLOAD';
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];
@@ -116,37 +120,39 @@ export class PolicyService {
       throw new ForbiddenException(deniedReason);
     }
 
-    if (
-      this.matchesAcl(
+    if (!shareAllowsDownload) {
+      if (
+        this.matchesAcl(
+          document.aclEntries,
+          actorId,
+          roles,
+          groups,
+          AclEffect.DENY,
+        )
+      ) {
+        throw new ForbiddenException('Download denied by ACL');
+      }
+
+      const hasExplicitAllow = this.matchesAcl(
         document.aclEntries,
         actorId,
         roles,
         groups,
-        AclEffect.DENY,
-      )
-    ) {
-      throw new ForbiddenException('Download denied by ACL');
-    }
+        AclEffect.ALLOW,
+      );
 
-    const hasExplicitAllow = this.matchesAcl(
-      document.aclEntries,
-      actorId,
-      roles,
-      groups,
-      AclEffect.ALLOW,
-    );
+      // --- Classification-based access check ---
+      const classificationReason = this.getClassificationDeniedReason(
+        document.classification as ClassificationLevel,
+        roles,
+        actorId,
+        document.ownerId,
+        hasExplicitAllow,
+      );
 
-    // --- Classification-based access check ---
-    const classificationReason = this.getClassificationDeniedReason(
-      document.classification as ClassificationLevel,
-      roles,
-      actorId,
-      document.ownerId,
-      hasExplicitAllow,
-    );
-
-    if (classificationReason) {
-      throw new ForbiddenException(classificationReason);
+      if (classificationReason) {
+        throw new ForbiddenException(classificationReason);
+      }
     }
 
     const expiresAt = new Date(Date.now() + this.expiresInSeconds * 1000);
@@ -209,6 +215,7 @@ export class PolicyService {
     dto: PreviewAuthorizeDto,
     user: ServiceUser,
     context: RequestContext,
+    options: { shareToken?: string } = {},
   ) {
     const document = await this.prisma.document.findUnique({
       where: { id: docId },
@@ -218,6 +225,9 @@ export class PolicyService {
     if (!document) {
       throw new NotFoundException('Document not found');
     }
+
+    const shareGrant = await this.resolveShareGrant(docId, options.shareToken);
+    const shareAllowsPreview = shareGrant === 'VIEW' || shareGrant === 'DOWNLOAD';
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];
@@ -252,36 +262,38 @@ export class PolicyService {
       throw new ForbiddenException(statusDeniedReason);
     }
 
-    if (
-      this.matchesPreviewAcl(
+    if (!shareAllowsPreview) {
+      if (
+        this.matchesPreviewAcl(
+          document.aclEntries,
+          actorId,
+          roles,
+          groups,
+          AclEffect.DENY,
+        )
+      ) {
+        throw new ForbiddenException('Preview denied by ACL');
+      }
+
+      const hasExplicitAllow = this.matchesPreviewAcl(
         document.aclEntries,
         actorId,
         roles,
         groups,
-        AclEffect.DENY,
-      )
-    ) {
-      throw new ForbiddenException('Preview denied by ACL');
-    }
+        AclEffect.ALLOW,
+      );
 
-    const hasExplicitAllow = this.matchesPreviewAcl(
-      document.aclEntries,
-      actorId,
-      roles,
-      groups,
-      AclEffect.ALLOW,
-    );
+      const classificationReason = this.getPreviewClassificationDeniedReason(
+        document.classification as ClassificationLevel,
+        roles,
+        actorId,
+        document.ownerId,
+        hasExplicitAllow,
+      );
 
-    const classificationReason = this.getPreviewClassificationDeniedReason(
-      document.classification as ClassificationLevel,
-      roles,
-      actorId,
-      document.ownerId,
-      hasExplicitAllow,
-    );
-
-    if (classificationReason) {
-      throw new ForbiddenException(classificationReason);
+      if (classificationReason) {
+        throw new ForbiddenException(classificationReason);
+      }
     }
 
     const expiresAt = new Date(Date.now() + this.expiresInSeconds * 1000);
@@ -994,6 +1006,44 @@ export class PolicyService {
   ): boolean {
     const normalizedSubject = normalizeGroups(subjectId ? [subjectId] : [])[0];
     return normalizedSubject ? groups.includes(normalizedSubject) : false;
+  }
+
+  /**
+   * Validate an optional share token for this document and return the granted
+   * permission, or null when no valid share token applies. A token is valid
+   * only when it matches the document, is not revoked, not expired, and has
+   * not exceeded its access cap.
+   */
+  private async resolveShareGrant(
+    docId: string,
+    shareToken?: string,
+  ): Promise<'VIEW' | 'DOWNLOAD' | null> {
+    if (!shareToken || shareToken.trim().length === 0) {
+      return null;
+    }
+
+    const tokenHash = createHash('sha256').update(shareToken).digest('hex');
+    const link = await (this.prisma as any).documentShareLink.findUnique({
+      where: { tokenHash },
+    });
+
+    if (!link || link.docId !== docId) {
+      return null;
+    }
+    if (link.revokedAt) {
+      return null;
+    }
+    if (new Date(link.expiresAt).getTime() <= Date.now()) {
+      return null;
+    }
+    if (
+      link.maxAccessCount != null &&
+      link.accessCount >= link.maxAccessCount
+    ) {
+      return null;
+    }
+
+    return link.permission === 'DOWNLOAD' ? 'DOWNLOAD' : 'VIEW';
   }
 
   private createGrantToken(payload: {

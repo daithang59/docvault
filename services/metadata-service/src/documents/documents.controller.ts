@@ -277,6 +277,7 @@ export class DocumentsController {
       body,
       req.user,
       buildRequestContext(req),
+      { shareToken: body.shareToken },
     );
   }
 
@@ -298,6 +299,7 @@ export class DocumentsController {
       body,
       req.user,
       buildRequestContext(req),
+      { shareToken: body.shareToken },
     );
   }
 
