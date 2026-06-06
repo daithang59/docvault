@@ -4,9 +4,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Monorepo Setup
 
-- **Package manager**: pnpm 9+, **Node.js**: 18+
+- **Package manager**: pnpm 9+ (`pnpm@9.15.0`), **Node.js**: 18+
 - **Build orchestrator**: Turbo (configured in `turbo.json`)
 - **Workspaces**: `apps/*`, `services/*`, `libs/*`
+- **Test runners**: Backend services use **Jest** (`*.spec.ts`, ts-jest). Frontend (`apps/web`) uses **Vitest** (unit) + **Playwright** (E2E).
+- **Shared packages**: `@docvault/auth` (libs/auth) and `@docvault/throttler` (libs/throttler) are consumed via `workspace:*`. Both must be built (or their consumers run via ts-node which resolves source) — `libs/throttler` exposes rate-limit constants and `isInternalServiceCall()`.
 
 ## Commands
 
@@ -29,6 +31,10 @@ pnpm --filter <service-name> start:dev
 
 # Run a specific test file in a service
 pnpm --filter <service-name> test -- --testPathPattern=foo.spec.ts
+
+# Frontend (apps/web) uses Vitest for unit tests and Playwright for E2E
+pnpm --filter web test          # Vitest unit tests
+pnpm --filter web e2e           # Playwright E2E (wrapper script)
 
 # Prisma migration (run after Docker infra is healthy)
 pnpm --filter metadata-service prisma:deploy
@@ -94,6 +100,18 @@ Every service uses `@nestjs/passport` + `passport-jwt` + `jwks-rsa` to self-veri
   - **Special rule**: `compliance_officer` is **always denied** file downloads regardless of ACL — logic lives in `policy.service.ts`, not at the gateway or document-service.
 - **Archive** is only allowed for editors who own the document or admins.
 
+### metadata-service Modules
+
+`metadata-service` is the largest service and owns most domain logic. Beyond core CRUD, its `src/` contains: `acl/`, `policy/`, `status/`, `versions/`, `comments/`, `retention/`, `document-saved-views/`, `document-share-links/`, plus `documents/trash-purge.service.ts` (a scheduled `@nestjs/schedule` job that hard-deletes trashed documents past their retention window). Soft-delete/trash and restore live in the `documents/` module.
+
+### Cross-cutting: Rate Limiting
+
+All services apply `@nestjs/throttler` via `ThrottlerModule`, configured with shared constants from `@docvault/throttler` (`GATEWAY_LIMIT`, `GATEWAY_AUTH_LIMIT`, `BACKEND_LIMIT`, `THROTTLE_TTL`). Internal service-to-service calls bypass throttling using the `INTERNAL_CALL_HEADER` — `isInternalServiceCall()` detects this so HTTP calls between services (e.g. workflow → metadata) are not rate-limited.
+
+### Scheduled Jobs
+
+`metadata-service` boots `ScheduleModule.forRoot()`. `TrashPurgeService` runs on a cron to purge expired trashed documents. When reasoning about background behavior, check `documents/trash-purge.service.ts`.
+
 ### Document Lifecycle
 
 ```
@@ -106,8 +124,9 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
 
 ### Prisma Schema
 
-- `metadata-service/prisma/schema.prisma` — 4 tables: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
+- `metadata-service/prisma/schema.prisma` — 7 models: `Document`, `DocumentVersion`, `DocumentAcl`, `DocumentWorkflowHistory`, `DocumentComment`, `DocumentSavedView`, `DocumentShareLink`.
 - Generated client lives in `generated/prisma/` — **do not edit manually**.
+- Prisma 7 with the `@prisma/adapter-pg` driver adapter (not the default engine).
 
 ### MongoDB Schema
 
@@ -127,6 +146,10 @@ DRAFT → PENDING → PUBLISHED → ARCHIVED
   - `ServiceUser`, `RequestContext`, `buildActorId()`, `buildRequestContext()` — Shared types & helpers
   - `ROLES`, `READER_ROLES` — Canonical role constants
 - **Migration**: All 6 services still have inline auth files; should migrate to use `@docvault/auth`.
+
+### libs/throttler
+
+- `@docvault/throttler` — Shared rate-limit primitives consumed by every service: throttle constants and `isInternalServiceCall()` to exempt internal HTTP calls (identified by `INTERNAL_CALL_HEADER`).
 
 ## Infrastructure
 
@@ -150,7 +173,7 @@ RUN_PRISMA_DEPLOY=1 pnpm start:sequential  # with Prisma migrations
 2. `pnpm --filter metadata-service prisma:deploy` (MongoDB does not need migration)
 3. Backend services: metadata → document → workflow → notification → audit
 4. Gateway
-5. Frontend (`apps/web/` — Next.js on port 3010)
+5. Frontend (`apps/web/` — Next.js 16). The `pnpm --filter web dev` script binds port **3006**; the README/manual flow uses `next dev -p 3010`. Confirm the intended port before relying on either.
 
 > `migrate:to-mongo` is a one-time migration from PostgreSQL → MongoDB for old audit logs; run while audit-service is **stopped**.
 

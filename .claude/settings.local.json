@@ -17,7 +17,8 @@
       "Bash(powershell -Command \"Stop-Process -Id 15292 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed PID 15292''\")",
       "Bash(findstr \":3001 :3002 :3003 :3004 :3005\")",
       "Bash(findstr \"LISTENING\")",
-      "Bash(powershell -Command \"Stop-Process -Id 18736 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed 3005 stale process''\")"
+      "Bash(powershell -Command \"Stop-Process -Id 18736 -Force -ErrorAction SilentlyContinue; Write-Host ''Killed 3005 stale process''\")",
+      "Bash(node:*)"
     ]
   }
 }

@@ -60,6 +60,15 @@ package-lock.json
 # Optional REPL history
 .node_repl_history
 
+# Python caches and local environments
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
 # Output of 'npm pack'
 *.tgz
 
@@ -139,11 +148,29 @@ dist
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
 
+# OS and editor files
+.DS_Store
+Thumbs.db
+Desktop.ini
+.idea/
+.vscode/
 
-# Turbo 
+# Local tool state and caches
 .turbo/
+.pnpm-store/
+.tmp/
+.omc/
+.codex/
+.omx/state/
+.omx/logs/
+.omx/notepad.md
+.omx/project-memory.json
 
-# Claude 
+# Test runner artifacts
+**/playwright-report/
+**/test-results/
+
+# Claude
 .claude/
 
 # Terraform
@@ -159,4 +186,16 @@ crash.*.log
 
 # Generated kubeconfigs / cluster credentials
 *.kubeconfig
-jenkins-argocd-reader.kubeconfig
+*.pem
+*.key
+*.p12
+*.pfx
+
+# Local scratch and manual test artifacts
+/downloaded_file.md
+/downloaded_file.pdf
+/lint_out.txt
+/test-output.txt
+/test_out.txt
+/test_big_file.pdf
+/text.txt
