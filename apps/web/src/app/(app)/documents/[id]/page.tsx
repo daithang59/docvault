@@ -11,6 +11,7 @@ import { DocumentAiGuardrailsCard } from '@/components/documents/document-ai-gua
 import { DocumentApprovalReadinessCard } from '@/components/documents/document-approval-readiness-card';
 import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
 import { DocumentLegalHoldCard } from '@/components/documents/document-legal-hold-card';
+import { DocumentShareLinksCard } from '@/components/documents/document-share-links-card';
 import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
@@ -21,6 +22,7 @@ import { DocumentPreviewDialog } from '@/components/documents/document-preview-d
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import {
+  canEditDocument,
   canManageAcl,
   canManageLegalHold,
   canReadAcl,
@@ -75,6 +77,7 @@ export default function DocumentDetailPage({ params }: Props) {
       : undefined;
   const canAcl = canManageAcl(session, doc);
   const canHold = canManageLegalHold(session);
+  const canShareLinks = canEditDocument(session, doc);
   const showLegalHold = canHold || doc.legalHold === true;
   const canShowAcl = canReadAcl(session) || canAcl;
   const canShowEvidenceLinks =
@@ -156,6 +159,14 @@ export default function DocumentDetailPage({ params }: Props) {
               previewUnavailableReason={previewUnavailableReason}
             />
           </div>
+          {canShareLinks && (
+            <div className="animate-in delay-3">
+              <DocumentShareLinksCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canShareLinks}
+              />
+            </div>
+          )}
           {showLegalHold && (
             <div className="animate-in delay-3">
               <DocumentLegalHoldCard

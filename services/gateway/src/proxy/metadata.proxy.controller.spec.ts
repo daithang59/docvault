@@ -759,6 +759,86 @@ describe('MetadataProxyController access impact preview', () => {
   });
 });
 
+describe('MetadataProxyController share links', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies share link creation body to metadata service', async () => {
+    const created = { id: 'link-1', token: 'raw-token' };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: created }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'owner-1', roles: ['editor'] }, headers: {} };
+    const body = { permission: 'VIEW', expiresInHours: 24 };
+
+    const result = await (controller as any).createShareLink('doc-1', req, body);
+
+    expect(result).toBe(created);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/share-links`,
+      data: body,
+    });
+  });
+
+  it('proxies share link listing to metadata service', async () => {
+    const links = [{ id: 'link-1', status: 'ACTIVE' }];
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: links }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'owner-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).listShareLinks('doc-1', req);
+
+    expect(result).toBe(links);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'GET',
+      url: `${metadataUrl}/documents/doc-1/share-links`,
+    });
+  });
+
+  it('proxies share link revocation to metadata service', async () => {
+    const revoked = { id: 'link-1', status: 'REVOKED' };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: revoked }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'owner-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).revokeShareLink('doc-1', 'link-1', req);
+
+    expect(result).toBe(revoked);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'DELETE',
+      url: `${metadataUrl}/documents/doc-1/share-links/link-1`,
+    });
+  });
+
+  it('proxies share link redemption body to metadata service', async () => {
+    const redeemed = { docId: 'doc-1', permission: 'VIEW' };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: redeemed }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'viewer-1', roles: ['viewer'] }, headers: {} };
+    const body = { token: 'raw-token' };
+
+    const result = await (controller as any).redeemShareLink(req, body);
+
+    expect(result).toBe(redeemed);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/share-links/redeem`,
+      data: body,
+    });
+  });
+});
+
 describe('MetadataProxyController legal hold', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

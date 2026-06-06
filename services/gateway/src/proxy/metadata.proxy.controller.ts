@@ -523,6 +523,73 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/share-links')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Create a time-limited share link for a document',
+    description:
+      'Owner editor or admin only. Returns a one-time raw token; the gateway stores only its hash downstream.',
+  })
+  async createShareLink(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Get('documents/:docId/share-links')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'List share links for a document' })
+  async listShareLinks(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links`,
+    });
+    return response.data;
+  }
+
+  @Delete('documents/:docId/share-links/:linkId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Revoke a share link' })
+  async revokeShareLink(
+    @Param('docId') docId: string,
+    @Param('linkId') linkId: string,
+    @Req() req: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'DELETE',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links/${linkId}`,
+    });
+    return response.data;
+  }
+
+  @Post('share-links/redeem')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Redeem a share link token',
+    description:
+      'Authenticated recipient redeems a share token to gain scoped access to the linked document.',
+  })
+  async redeemShareLink(@Req() req: any, @Body() body: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/share-links/redeem`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/legal-hold')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')

@@ -20,6 +20,9 @@ export const apiEndpoints = {
       downloadAuthorize: (docId: string) => `/metadata/documents/${docId}/download-authorize`,
       comments: (docId: string) => `/metadata/documents/${docId}/comments`,
       legalHold: (docId: string) => `/metadata/documents/${docId}/legal-hold`,
+      shareLinks: (docId: string) => `/metadata/documents/${docId}/share-links`,
+      shareLink: (docId: string, linkId: string) =>
+        `/metadata/documents/${docId}/share-links/${linkId}`,
     },
     savedViews: {
       list: '/metadata/document-saved-views',
@@ -35,6 +38,9 @@ export const apiEndpoints = {
     },
     sensitiveActions: {
       proof: '/metadata/sensitive-actions/proof',
+    },
+    shareLinks: {
+      redeem: '/metadata/share-links/redeem',
     },
   },
   documents: {

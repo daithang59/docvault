@@ -51,6 +51,11 @@ enum WorkflowAction {
   RETENTION
 }
 
+enum DocumentSharePermission {
+  VIEW
+  DOWNLOAD
+}
+
 enum DocumentSavedViewScope {
   PRIVATE
   TEAM
@@ -84,6 +89,7 @@ model Document {
   aclEntries      DocumentAcl[]
   workflowHistory DocumentWorkflowHistory[]
   comments        DocumentComment[]
+  shareLinks      DocumentShareLink[]
 
   @@index([ownerId])
   @@index([status])
@@ -171,4 +177,24 @@ model DocumentSavedView {
   @@index([ownerId, scope])
   @@index([scope, createdAt])
   @@map("document_saved_views")
+}
+
+model DocumentShareLink {
+  id            String                 @id @default(uuid())
+  docId         String
+  tokenHash     String                 @unique
+  permission    DocumentSharePermission @default(VIEW)
+  createdBy     String
+  expiresAt     DateTime
+  maxAccessCount Int?
+  accessCount   Int                    @default(0)
+  lastAccessedAt DateTime?
+  revokedAt     DateTime?
+  revokedBy     String?
+  createdAt     DateTime               @default(now())
+  document      Document               @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, createdAt])
+  @@index([expiresAt])
+  @@map("document_share_links")
 }
