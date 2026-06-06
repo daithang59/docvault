@@ -173,7 +173,9 @@ List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady
 void buildTarget(cfg, Map target, String tag) {
     def repository = target.repository
     def dockerfile = target.dockerfile
-    def buildArgs = target.buildArgs ?: [:]
+    def buildArgs = (target.buildArgs ?: [:]) + [
+        ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
+    ]
     def cacheFrom = "${repository}:latest"
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
@@ -183,6 +185,7 @@ void buildTarget(cfg, Map target, String tag) {
         export DOCKER_BUILDKIT=1
         docker pull '${cacheFrom}' >/dev/null 2>&1 || true
         docker build \\
+            --pull \\
             --build-arg BUILDKIT_INLINE_CACHE=1 \\
             --cache-from '${cacheFrom}' \\
             ${buildArgsToFlags(buildArgs)} \\
