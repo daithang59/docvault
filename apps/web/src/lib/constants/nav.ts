@@ -11,6 +11,7 @@ import {
   KeyRound,
   Archive,
   ClipboardCheck,
+  Trash2,
 } from 'lucide-react';
 import { UserRole } from '@/types/auth';
 import { ROUTES } from './routes';
@@ -95,5 +96,11 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.RETENTION,
     icon: Archive,
     roles: ['compliance_officer', 'admin'],
+  },
+  {
+    label: 'Trash',
+    href: ROUTES.TRASH,
+    icon: Trash2,
+    roles: ['editor', 'admin'],
   },
 ];

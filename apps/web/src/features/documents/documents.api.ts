@@ -160,6 +160,26 @@ export async function setDocumentLegalHold(
   });
 }
 
+export interface TrashEntry {
+  docId: string;
+  title: string;
+  ownerId: string;
+  classification: string;
+  deletedAt: string | null;
+  purgeAt: string | null;
+  daysUntilPurge: number | null;
+  recoverable: boolean;
+}
+
+export async function listTrash(): Promise<TrashEntry[]> {
+  const res = await apiClient.get<TrashEntry[]>(apiEndpoints.metadata.documents.trash);
+  return unwrap(res);
+}
+
+export async function restoreDocumentFromTrash(docId: string): Promise<void> {
+  await apiClient.post(apiEndpoints.metadata.documents.restore(docId), {});
+}
+
 export async function restoreDocumentVersion(
   id: string,
   version: number,

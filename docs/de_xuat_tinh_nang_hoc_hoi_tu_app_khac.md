@@ -18,6 +18,9 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 - **Rate-limit** — bật ở gateway cho proof + login (đang dùng được).
 - **Security headers** — thêm HSTS, đã có sẵn CSP/X-Frame-Options/Referrer-Policy/Permissions-Policy/COOP/COEP/CORP.
 - **Activity feed hợp nhất** — dòng thời gian gộp workflow history + comments + audit events (lọc trùng) trên trang chi tiết tài liệu; audit chỉ hiển thị cho người có quyền xem audit.
+- **Bulk actions có undo** — hành động hàng loạt (submit/approve/archive/delete) hoãn 5s kèm toast Undo; nếu Undo, không có request nào gửi lên server.
+- **Watermark động khi preview** — PDF CONFIDENTIAL/SECRET được đóng dấu user + thời gian + phân loại khi xem inline (tận dụng WatermarkService đã có, nối vào luồng preview của document-service).
+- **Trash với khôi phục có hạn** — trang Trash liệt kê tài liệu DELETED với hạn khôi phục 30 ngày; khôi phục DELETED→DRAFT trong cửa sổ cho phép, ghi audit; chỉ owner-editor/admin.
 
 ---
 
@@ -25,20 +28,7 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 
 ### Ưu tiên cao — dễ thấy khác biệt, tận dụng hạ tầng sẵn có
 
-#### 2.2. Bulk actions có undo trên danh sách (Linear/Jira)
-- Bảng tài liệu đã hỗ trợ chọn nhiều dòng.
-- Thêm hành động hàng loạt (submit / archive / đổi tag) kèm toast undo.
-
-#### 2.3. Watermark động khi preview tài liệu mật (DocuSign/Adobe)
-- Đóng dấu user + thời gian khi preview tài liệu CONFIDENTIAL/SECRET.
-- `WatermarkService` đã tồn tại ở document-service nhưng chưa nối vào luồng preview — đây là việc "kết nối phần đã có".
-- Tăng khả năng truy vết rò rỉ.
-
 ### Ưu tiên trung bình
-
-#### 2.4. Trash với khôi phục có hạn (Google Drive/Dropbox)
-- Đã có trạng thái DELETED và mô hình "tạo bản ghi mới giữ lịch sử" từ version restore.
-- Mở khu Trash + nút restore trong cửa sổ giữ.
 
 #### 2.5. Folder/cây thư mục thật (Google Drive/Dropbox)
 - Hiện phân loại theo tag/classification.
@@ -71,10 +61,10 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 ## 3. Thứ tự đề xuất triển khai
 
 1. ~~Activity feed hợp nhất~~ — đã xong
-2. Bulk actions có undo (2.2)
-3. Watermark preview (2.3) — phần lõi đã có sẵn
-4. Trash khôi phục (2.4)
-5. Các mục còn lại theo nhu cầu
+2. ~~Bulk actions có undo~~ — đã xong
+3. ~~Watermark preview~~ — đã xong
+4. ~~Trash khôi phục~~ — đã xong
+5. Các mục còn lại theo nhu cầu (folder/cây thư mục, @mention, smart folder, sequential approvers)
 
 ---
 

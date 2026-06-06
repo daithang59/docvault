@@ -14,5 +14,6 @@ export const ROUTES = {
   ACCESS_REVIEW: '/access-review',
   AUDIT: '/audit',
   RETENTION: '/retention',
+  TRASH: '/trash',
   PROFILE: '/profile',
 } as const;

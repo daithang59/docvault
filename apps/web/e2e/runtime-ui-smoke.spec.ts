@@ -244,6 +244,36 @@ async function fulfillApi(route: Route) {
     return;
   }
 
+  if (pathname === '/api/metadata/documents/trash') {
+    await route.fulfill({
+      status: 200,
+      json: [
+        {
+          docId: 'doc-trashed',
+          title: 'Deleted draft proposal',
+          ownerId: 'admin1',
+          classification: 'INTERNAL',
+          deletedAt: hoursAgo(48),
+          purgeAt: hoursFromNow(28 * 24),
+          daysUntilPurge: 28,
+          recoverable: true,
+        },
+      ],
+    });
+    return;
+  }
+
+  const restoreTrashMatch = pathname.match(
+    /^\/api\/metadata\/documents\/([^/]+)\/restore$/,
+  );
+  if (restoreTrashMatch) {
+    await route.fulfill({
+      status: 200,
+      json: { id: restoreTrashMatch[1], status: 'DRAFT' },
+    });
+    return;
+  }
+
   const documentDetailMatch = pathname.match(/^\/api\/metadata\/documents\/([^/]+)$/);
   if (documentDetailMatch) {
     const document = documents.find((item) => item.id === documentDetailMatch[1]);
@@ -866,4 +896,46 @@ test('activity feed merges workflow, comments, and audit events', async ({
 
   await expect(feed.getByText('Please double-check the figures.')).toBeVisible();
   await expect(feed.getByText(/document share link created/i)).toBeVisible();
+});
+
+
+test('bulk delete can be undone before it reaches the server', async ({
+  page,
+}) => {
+  const deleteRequests: string[] = [];
+  page.on('request', (req) => {
+    if (req.method() === 'DELETE' && req.url().includes('/api/workflow/')) {
+      deleteRequests.push(req.url());
+    }
+  });
+
+  await page.goto('/documents');
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+
+  const firstRowCheckbox = page.getByRole('checkbox', { name: 'Select row' }).first();
+  await firstRowCheckbox.check();
+
+  await page.getByRole('button', { name: /^Delete \(/ }).click();
+
+  const undo = page.getByRole('button', { name: 'Undo' });
+  await expect(undo).toBeVisible();
+  await undo.click();
+
+  await expect(page.getByText('Delete cancelled')).toBeVisible();
+
+  // Wait past the deferred window and confirm nothing was sent.
+  await page.waitForTimeout(5500);
+  expect(deleteRequests).toHaveLength(0);
+});
+
+
+test('trash lists deleted documents and restores one', async ({ page }) => {
+  await page.goto('/trash');
+
+  await expect(page.getByRole('heading', { name: 'Trash', exact: true })).toBeVisible();
+  await expect(page.getByText('Deleted draft proposal')).toBeVisible();
+  await expect(page.getByText('28 days left')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await expect(page.getByText('Document restored')).toBeVisible();
 });

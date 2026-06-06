@@ -51,6 +51,7 @@ import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { scheduleDeferredAction } from '@/features/documents/deferred-action';
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
@@ -197,7 +198,7 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleBulkAction(
+  async function runBulkAction(
     docs: DocumentListItem[],
     action: (id: string) => Promise<unknown>,
     label: string,
@@ -218,21 +219,43 @@ export default function DocumentsPage() {
     setPage(1);
   }
 
-  async function handleBulkDelete(docs: DocumentListItem[]) {
-    let ok = 0;
-    let fail = 0;
-    for (const doc of docs) {
-      try {
-        await deleteDocument(doc.id);
-        ok++;
-      } catch {
-        fail++;
-      }
-    }
-    if (ok > 0) toast.success(`Deleted: ${ok} succeeded${fail > 0 ? `, ${fail} failed` : ''}`);
-    else toast.error(`Delete failed for all ${fail} documents`);
-    qc.invalidateQueries({ queryKey: documentsKeys.lists() });
-    setPage(1);
+  function scheduleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    if (docs.length === 0) return;
+    const toastId = `bulk-${label}-${Date.now()}`;
+    const deferred = scheduleDeferredAction(
+      () => runBulkAction(docs, action, label),
+      { delayMs: 5000 },
+    );
+    toast(`${label}: ${docs.length} document${docs.length === 1 ? '' : 's'}`, {
+      id: toastId,
+      description: 'Applying in 5s',
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (deferred.cancel()) {
+            toast.dismiss(toastId);
+            toast.info(`${label} cancelled`);
+          }
+        },
+      },
+    });
+  }
+
+  function handleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    scheduleBulkAction(docs, action, label);
+  }
+
+  function handleBulkDelete(docs: DocumentListItem[]) {
+    scheduleBulkAction(docs, (id) => deleteDocument(id), 'Delete');
   }
 
   function persistCustomSavedViews(nextViews: DocumentSavedView[]) {

@@ -21,6 +21,8 @@ import { WatermarkService } from '../watermark/watermark.service';
 import { DlpScannerService } from '../security/dlp-scanner.service';
 import { MalwareScannerService } from '../security/malware-scanner.service';
 
+const WATERMARK_CLASSIFICATIONS = new Set(['CONFIDENTIAL', 'SECRET']);
+
 @Injectable()
 export class DocumentsService {
   constructor(
@@ -336,7 +338,9 @@ export class DocumentsService {
     filename: string;
     contentType?: string;
     fileSize?: number;
-    object: ReturnType<StorageService['getObjectStream']> extends Promise<
+    watermarked?: boolean;
+    buffer?: Buffer;
+    object?: ReturnType<StorageService['getObjectStream']> extends Promise<
       infer T
     >
       ? T
@@ -359,6 +363,36 @@ export class DocumentsService {
       throw new ForbiddenException('Requested version is not authorized');
     }
 
+    // CONFIDENTIAL/SECRET documents must be watermarked even for inline preview.
+    // Buffer the object and stamp it; range requests are not honored for these
+    // because the watermarked bytes differ from the stored object.
+    const watermarkRequired = WATERMARK_CLASSIFICATIONS.has(
+      grantPayload.classification,
+    );
+
+    if (watermarkRequired) {
+      const object = await this.storageService.getObjectStream(
+        grantPayload.objectKey,
+      );
+      const rawBuffer = await this.readStreamToBuffer(object.Body as any);
+      const buffer = await this.watermarkService.applyWatermark(
+        rawBuffer,
+        {
+          username: context.actorId,
+          timestamp: new Date().toISOString(),
+          classification: grantPayload.classification,
+        },
+        grantPayload.contentType,
+      );
+      return {
+        filename: grantPayload.filename,
+        contentType: grantPayload.contentType,
+        fileSize: buffer.length,
+        watermarked: true,
+        buffer,
+      };
+    }
+
     const object = await this.storageService.getObjectStream(
       grantPayload.objectKey,
       range,
@@ -368,6 +402,7 @@ export class DocumentsService {
       filename: grantPayload.filename,
       contentType: grantPayload.contentType,
       fileSize: (object as any).ContentLength,
+      watermarked: false,
       object,
     };
   }

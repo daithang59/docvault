@@ -56,6 +56,26 @@ export class DocumentsController {
     return this.documentsService.findAll(buildRequestContext(req), q);
   }
 
+  @Get('trash')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'List soft-deleted documents (trash) with recovery deadlines',
+  })
+  listTrash(@Req() req: any) {
+    return this.documentsService.listTrash(buildRequestContext(req));
+  }
+
+  @Post(':docId/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a soft-deleted document back to DRAFT within the recovery window',
+  })
+  restoreFromTrash(@Param('docId') docId: string, @Req() req: any) {
+    return this.documentsService.restoreFromTrash(docId, buildRequestContext(req));
+  }
+
   @Get(':docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')

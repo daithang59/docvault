@@ -424,3 +424,147 @@ describe('DocumentsService legal hold', () => {
     ).rejects.toThrow('Document not found');
   });
 });
+
+
+describe('DocumentsService trash', () => {
+  const adminContext = {
+    traceId: 't',
+    actorId: 'admin-1',
+    roles: ['admin'],
+    authorization: 'Bearer x',
+    ip: '127.0.0.1',
+  };
+  const ownerContext = {
+    traceId: 't',
+    actorId: 'editor-1',
+    roles: ['editor'],
+    authorization: 'Bearer x',
+    ip: '127.0.0.1',
+  };
+  const mockFindMany = jest.fn();
+  const mockFindUnique = jest.fn();
+  const mockUpdate = jest.fn();
+  const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    service = new DocumentsService(
+      {
+        document: {
+          findMany: mockFindMany,
+          findUnique: mockFindUnique,
+          update: mockUpdate,
+        },
+      } as any,
+      { emitEvent: mockEmitEvent } as any,
+    );
+  });
+
+  it('lists deleted documents for the owner with a recovery deadline', async () => {
+    const deletedAt = new Date('2026-06-01T00:00:00.000Z');
+    mockFindMany.mockResolvedValueOnce([
+      {
+        id: 'doc-1',
+        title: 'Trashed draft',
+        ownerId: 'editor-1',
+        classification: 'INTERNAL',
+        status: 'DELETED',
+        deletedAt,
+        updatedAt: deletedAt,
+      },
+    ]);
+
+    const now = new Date('2026-06-10T00:00:00.000Z');
+    const result = await service.listTrash(ownerContext as any, now);
+
+    expect(mockFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ status: 'DELETED', ownerId: 'editor-1' }),
+      }),
+    );
+    expect(result[0]).toMatchObject({
+      docId: 'doc-1',
+      title: 'Trashed draft',
+      recoverable: true,
+    });
+    // 30-day window: deleted 2026-06-01, now 2026-06-10 => 21 days left
+    expect(result[0].daysUntilPurge).toBe(21);
+  });
+
+  it('lists all deleted documents for an admin (no owner filter)', async () => {
+    mockFindMany.mockResolvedValueOnce([]);
+    await service.listTrash(adminContext as any, new Date());
+    const where = mockFindMany.mock.calls[0][0].where;
+    expect(where.status).toBe('DELETED');
+    expect(where.ownerId).toBeUndefined();
+  });
+
+  it('restores a deleted document back to DRAFT within the recovery window', async () => {
+    const deletedAt = new Date('2026-06-01T00:00:00.000Z');
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      title: 'Trashed draft',
+      status: 'DELETED',
+      deletedAt,
+    });
+    mockUpdate.mockResolvedValueOnce({ id: 'doc-1', status: 'DRAFT' });
+
+    const now = new Date('2026-06-10T00:00:00.000Z');
+    await service.restoreFromTrash('doc-1', ownerContext as any, now);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: expect.objectContaining({ status: 'DRAFT', deletedAt: null }),
+    });
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      ownerContext,
+      expect.objectContaining({
+        action: 'DOCUMENT_RESTORED_FROM_TRASH',
+        result: 'SUCCESS',
+      }),
+    );
+  });
+
+  it('rejects restoring after the recovery window has elapsed', async () => {
+    const deletedAt = new Date('2026-01-01T00:00:00.000Z');
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DELETED',
+      deletedAt,
+    });
+    const now = new Date('2026-06-10T00:00:00.000Z');
+    await expect(
+      service.restoreFromTrash('doc-1', ownerContext as any, now),
+    ).rejects.toThrow();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects restoring a document that is not deleted', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DRAFT',
+      deletedAt: null,
+    });
+    await expect(
+      service.restoreFromTrash('doc-1', ownerContext as any, new Date()),
+    ).rejects.toThrow();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('forbids restoring a document the actor does not own', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'someone-else',
+      status: 'DELETED',
+      deletedAt: new Date(),
+    });
+    await expect(
+      service.restoreFromTrash('doc-1', ownerContext as any, new Date()),
+    ).rejects.toThrow();
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+});

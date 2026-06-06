@@ -598,6 +598,102 @@ export class DocumentsService {
   }
 
   /**
+   * Trash recovery window: a DELETED document can be restored within this many
+   * days of deletion before it is considered permanently purged.
+   */
+  private readonly trashRecoveryDays = 30;
+
+  /**
+   * List soft-deleted documents. Owners/editors see their own trash; admins see
+   * all. Each entry carries a recovery deadline so the UI can warn before purge.
+   */
+  async listTrash(context: RequestContext, now: Date = new Date()) {
+    const isAdmin = context.roles.includes('admin');
+    const where: Record<string, unknown> = { status: 'DELETED' as const };
+    if (!isAdmin) {
+      where.ownerId = context.actorId;
+    }
+
+    const documents = await this.prisma.document.findMany({
+      where: where as any,
+      orderBy: { deletedAt: 'desc' } as any,
+    });
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    return documents.map((doc: any) => {
+      const deletedAt: Date | null = doc.deletedAt ?? null;
+      const purgeAt = deletedAt
+        ? new Date(deletedAt.getTime() + this.trashRecoveryDays * dayMs)
+        : null;
+      const daysUntilPurge = purgeAt
+        ? Math.ceil((purgeAt.getTime() - now.getTime()) / dayMs)
+        : null;
+      return {
+        docId: doc.id,
+        title: doc.title,
+        ownerId: doc.ownerId,
+        classification: doc.classification,
+        deletedAt: deletedAt ? deletedAt.toISOString() : null,
+        purgeAt: purgeAt ? purgeAt.toISOString() : null,
+        daysUntilPurge,
+        recoverable: daysUntilPurge != null && daysUntilPurge > 0,
+      };
+    });
+  }
+
+  /**
+   * Restore a soft-deleted document back to DRAFT, if still within the recovery
+   * window and the actor owns it (or is admin).
+   */
+  async restoreFromTrash(
+    id: string,
+    context: RequestContext,
+    now: Date = new Date(),
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    if (document.status !== 'DELETED') {
+      throw new BadRequestException('Only deleted documents can be restored');
+    }
+
+    const isAdmin = context.roles.includes('admin');
+    if (!isAdmin && document.ownerId !== context.actorId) {
+      throw new ForbiddenException(
+        'Only the owner or an admin can restore this document',
+      );
+    }
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const deletedAt: Date | null = (document as any).deletedAt ?? null;
+    if (deletedAt) {
+      const purgeAt = new Date(
+        deletedAt.getTime() + this.trashRecoveryDays * dayMs,
+      );
+      if (now.getTime() > purgeAt.getTime()) {
+        throw new BadRequestException(
+          'The recovery window for this document has elapsed',
+        );
+      }
+    }
+
+    const restored = await this.prisma.document.update({
+      where: { id },
+      data: { status: 'DRAFT' as any, deletedAt: null } as any,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_RESTORED_FROM_TRASH',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+      metadata: { docId: id, restoredTo: 'DRAFT' },
+    });
+
+    return restored;
+  }
+  /**
    * Soft-delete a document by marking it as DELETED.
    * Called exclusively by the workflow service after it has authorized the action.
    */
