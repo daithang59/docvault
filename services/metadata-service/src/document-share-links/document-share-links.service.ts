@@ -246,16 +246,15 @@ function hashToken(token: string): string {
 }
 
 function toIso(value: Date | string): string {
-  return value instanceof Date ? value.toISOString() : new Date(value).toISOString();
+  return value instanceof Date
+    ? value.toISOString()
+    : new Date(value).toISOString();
 }
 
 function computeStatus(link: any): ShareLinkStatus {
   if (link.revokedAt) return 'REVOKED';
   if (new Date(link.expiresAt).getTime() <= Date.now()) return 'EXPIRED';
-  if (
-    link.maxAccessCount != null &&
-    link.accessCount >= link.maxAccessCount
-  ) {
+  if (link.maxAccessCount != null && link.accessCount >= link.maxAccessCount) {
     return 'EXHAUSTED';
   }
   return 'ACTIVE';

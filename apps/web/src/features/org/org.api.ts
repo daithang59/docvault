@@ -27,3 +27,20 @@ export async function fetchOrgMembers(): Promise<OrganizationMember[]> {
   );
   return data;
 }
+
+/** Update a member's role (admin only). */
+export async function updateMemberRole(
+  userId: string,
+  role: 'MEMBER' | 'ADMIN',
+): Promise<OrganizationMember> {
+  const { data } = await apiClient.patch<OrganizationMember>(
+    apiEndpoints.orgs.member(userId),
+    { role },
+  );
+  return data;
+}
+
+/** Remove a member from the organization (admin only). */
+export async function removeMember(userId: string): Promise<void> {
+  await apiClient.delete(apiEndpoints.orgs.member(userId));
+}

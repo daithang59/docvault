@@ -1,4 +1,8 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { createHash } from 'crypto';
 import { DocumentShareLinksService } from './document-share-links.service';
 
@@ -92,7 +96,9 @@ describe('DocumentShareLinksService', () => {
     const createArg = prisma.documentShareLink.create.mock.calls[0][0].data;
     // raw token must never be persisted
     expect(JSON.stringify(createArg)).not.toContain(result.token);
-    const expectedHash = createHash('sha256').update(result.token).digest('hex');
+    const expectedHash = createHash('sha256')
+      .update(result.token)
+      .digest('hex');
     expect(createArg.tokenHash).toBe(expectedHash);
     expect(createArg.permission).toBe('VIEW');
     expect(createArg.docId).toBe('doc-1');
@@ -115,14 +121,22 @@ describe('DocumentShareLinksService', () => {
     prisma.document.findUnique.mockResolvedValueOnce(null);
     prisma.document.findFirst.mockResolvedValueOnce(null);
     await expect(
-      service.create('missing', { permission: 'VIEW', expiresInHours: 1 } as any, adminCtx as any),
+      service.create(
+        'missing',
+        { permission: 'VIEW', expiresInHours: 1 } as any,
+        adminCtx as any,
+      ),
     ).rejects.toThrow(NotFoundException);
     expect(prisma.documentShareLink.create).not.toHaveBeenCalled();
   });
 
   it('rejects an invalid expiry window', async () => {
     await expect(
-      service.create('doc-1', { permission: 'VIEW', expiresInHours: 0 } as any, adminCtx as any),
+      service.create(
+        'doc-1',
+        { permission: 'VIEW', expiresInHours: 0 } as any,
+        adminCtx as any,
+      ),
     ).rejects.toThrow(BadRequestException);
   });
 
@@ -177,7 +191,10 @@ describe('DocumentShareLinksService', () => {
     expect(updateArg.data.revokedBy).toBe('owner-1');
     expect(audit.emitEvent).toHaveBeenCalledWith(
       adminCtx,
-      expect.objectContaining({ action: 'DOCUMENT_SHARE_LINK_REVOKED', result: 'SUCCESS' }),
+      expect.objectContaining({
+        action: 'DOCUMENT_SHARE_LINK_REVOKED',
+        result: 'SUCCESS',
+      }),
     );
   });
 
@@ -222,26 +239,34 @@ describe('DocumentShareLinksService', () => {
       prisma.documentShareLink.findUnique.mockResolvedValueOnce(
         activeLink({ expiresAt: new Date(Date.now() - 1000) }),
       );
-      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(ForbiddenException);
+      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('rejects a revoked token', async () => {
       prisma.documentShareLink.findUnique.mockResolvedValueOnce(
         activeLink({ revokedAt: new Date(Date.now() - 1000) }),
       );
-      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(ForbiddenException);
+      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('rejects a token that exceeded its max access count', async () => {
       prisma.documentShareLink.findUnique.mockResolvedValueOnce(
         activeLink({ maxAccessCount: 3, accessCount: 3 }),
       );
-      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(ForbiddenException);
+      await expect(service.redeem('rawtoken', adminCtx as any)).rejects.toThrow(
+        ForbiddenException,
+      );
     });
 
     it('rejects an unknown token', async () => {
       prisma.documentShareLink.findUnique.mockResolvedValueOnce(null);
-      await expect(service.redeem('nope', adminCtx as any)).rejects.toThrow(NotFoundException);
+      await expect(service.redeem('nope', adminCtx as any)).rejects.toThrow(
+        NotFoundException,
+      );
     });
   });
 });

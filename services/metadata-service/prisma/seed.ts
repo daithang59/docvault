@@ -3,13 +3,21 @@ import 'dotenv/config';
 // Load .env from project root (two levels up from prisma/seed.ts)
 require('dotenv').config({ path: '../../.env' });
 
-import { PrismaClient, DocumentStatus, ClassificationLevel, AclSubjectType, DocumentPermission, AclEffect, WorkflowAction } from '../generated/prisma';
+import {
+  PrismaClient,
+  DocumentStatus,
+  ClassificationLevel,
+  AclSubjectType,
+  DocumentPermission,
+  AclEffect,
+  WorkflowAction,
+} from '../generated/prisma';
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
 // Keycloak user sub UUIDs (from Keycloak Admin API)
-const EDITOR1   = '0e23e8e2-8f9d-4381-a7d6-9f181550de7f';
-const ADMIN1    = '8c5c10f1-187f-4f21-9430-76c6a852f9e1';
+const EDITOR1 = '0e23e8e2-8f9d-4381-a7d6-9f181550de7f';
+const ADMIN1 = '8c5c10f1-187f-4f21-9430-76c6a852f9e1';
 const APPROVER1 = '181882a9-1394-4f5c-93e8-0dd5105620ae';
 
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
@@ -103,35 +111,101 @@ async function main() {
   // ── ACL: doc1 (CONFIDENTIAL) ────────────────────────────────
   await prisma.documentAcl.createMany({
     data: [
-      { docId: doc1.id, subjectType: AclSubjectType.ROLE, subjectId: 'editor', permission: DocumentPermission.READ, effect: AclEffect.ALLOW },
-      { docId: doc1.id, subjectType: AclSubjectType.ROLE, subjectId: 'approver', permission: DocumentPermission.READ, effect: AclEffect.ALLOW },
-      { docId: doc1.id, subjectType: AclSubjectType.ROLE, subjectId: 'admin', permission: DocumentPermission.WRITE, effect: AclEffect.ALLOW },
-      { docId: doc1.id, subjectType: AclSubjectType.ALL, subjectId: null, permission: DocumentPermission.READ, effect: AclEffect.DENY },
+      {
+        docId: doc1.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'editor',
+        permission: DocumentPermission.READ,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc1.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'approver',
+        permission: DocumentPermission.READ,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc1.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'admin',
+        permission: DocumentPermission.WRITE,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc1.id,
+        subjectType: AclSubjectType.ALL,
+        subjectId: null,
+        permission: DocumentPermission.READ,
+        effect: AclEffect.DENY,
+      },
     ],
   });
 
   // ── ACL: doc2 (INTERNAL) ────────────────────────────────────
   await prisma.documentAcl.createMany({
     data: [
-      { docId: doc2.id, subjectType: AclSubjectType.ROLE, subjectId: 'viewer', permission: DocumentPermission.READ, effect: AclEffect.ALLOW },
-      { docId: doc2.id, subjectType: AclSubjectType.ROLE, subjectId: 'editor', permission: DocumentPermission.WRITE, effect: AclEffect.ALLOW },
-      { docId: doc2.id, subjectType: AclSubjectType.ROLE, subjectId: 'admin', permission: DocumentPermission.WRITE, effect: AclEffect.ALLOW },
+      {
+        docId: doc2.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'viewer',
+        permission: DocumentPermission.READ,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc2.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'editor',
+        permission: DocumentPermission.WRITE,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc2.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'admin',
+        permission: DocumentPermission.WRITE,
+        effect: AclEffect.ALLOW,
+      },
     ],
   });
 
   // ── ACL: doc3 (CONFIDENTIAL, DRAFT) ─────────────────────────
   await prisma.documentAcl.createMany({
     data: [
-      { docId: doc3.id, subjectType: AclSubjectType.USER, subjectId: EDITOR1, permission: DocumentPermission.WRITE, effect: AclEffect.ALLOW },
-      { docId: doc3.id, subjectType: AclSubjectType.USER, subjectId: EDITOR1, permission: DocumentPermission.READ, effect: AclEffect.ALLOW },
-      { docId: doc3.id, subjectType: AclSubjectType.ROLE, subjectId: 'admin', permission: DocumentPermission.WRITE, effect: AclEffect.ALLOW },
+      {
+        docId: doc3.id,
+        subjectType: AclSubjectType.USER,
+        subjectId: EDITOR1,
+        permission: DocumentPermission.WRITE,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc3.id,
+        subjectType: AclSubjectType.USER,
+        subjectId: EDITOR1,
+        permission: DocumentPermission.READ,
+        effect: AclEffect.ALLOW,
+      },
+      {
+        docId: doc3.id,
+        subjectType: AclSubjectType.ROLE,
+        subjectId: 'admin',
+        permission: DocumentPermission.WRITE,
+        effect: AclEffect.ALLOW,
+      },
     ],
   });
 
   // ── ACL: doc4 (PUBLIC) ──────────────────────────────────────
   await prisma.documentAcl.createMany({
     data: [
-      { docId: doc4.id, subjectType: AclSubjectType.ALL, subjectId: null, permission: DocumentPermission.READ, effect: AclEffect.ALLOW },
+      {
+        docId: doc4.id,
+        subjectType: AclSubjectType.ALL,
+        subjectId: null,
+        permission: DocumentPermission.READ,
+        effect: AclEffect.ALLOW,
+      },
     ],
   });
 
@@ -139,16 +213,32 @@ async function main() {
   await prisma.documentWorkflowHistory.createMany({
     data: [
       {
-        docId: doc1.id, fromStatus: DocumentStatus.DRAFT, toStatus: DocumentStatus.PENDING, action: WorkflowAction.SUBMIT, actorId: EDITOR1,
+        docId: doc1.id,
+        fromStatus: DocumentStatus.DRAFT,
+        toStatus: DocumentStatus.PENDING,
+        action: WorkflowAction.SUBMIT,
+        actorId: EDITOR1,
       },
       {
-        docId: doc1.id, fromStatus: DocumentStatus.PENDING, toStatus: DocumentStatus.PUBLISHED, action: WorkflowAction.APPROVE, actorId: APPROVER1,
+        docId: doc1.id,
+        fromStatus: DocumentStatus.PENDING,
+        toStatus: DocumentStatus.PUBLISHED,
+        action: WorkflowAction.APPROVE,
+        actorId: APPROVER1,
       },
       {
-        docId: doc2.id, fromStatus: DocumentStatus.DRAFT, toStatus: DocumentStatus.PENDING, action: WorkflowAction.SUBMIT, actorId: ADMIN1,
+        docId: doc2.id,
+        fromStatus: DocumentStatus.DRAFT,
+        toStatus: DocumentStatus.PENDING,
+        action: WorkflowAction.SUBMIT,
+        actorId: ADMIN1,
       },
       {
-        docId: doc2.id, fromStatus: DocumentStatus.PENDING, toStatus: DocumentStatus.PUBLISHED, action: WorkflowAction.APPROVE, actorId: APPROVER1,
+        docId: doc2.id,
+        fromStatus: DocumentStatus.PENDING,
+        toStatus: DocumentStatus.PUBLISHED,
+        action: WorkflowAction.APPROVE,
+        actorId: APPROVER1,
       },
     ],
   });
@@ -161,5 +251,8 @@ async function main() {
 }
 
 main()
-  .catch((e) => { console.error(e); process.exit(1); })
+  .catch((e) => {
+    console.error(e);
+    process.exit(1);
+  })
   .finally(() => prisma.$disconnect());

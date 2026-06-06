@@ -96,4 +96,24 @@ describe('AclService', () => {
       expect(mockAclCreate).not.toHaveBeenCalled();
     },
   );
+
+  it('treats a document from another organization as not found on upsert', async () => {
+    mockDocumentFindUnique.mockResolvedValueOnce(null); // findFirst scoped by org → null
+
+    await expect(
+      service.upsert(
+        'doc-other-org',
+        {
+          subjectType: AclSubjectType.USER,
+          subjectId: 'attacker',
+          permission: DocumentPermission.READ,
+          effect: AclEffect.ALLOW,
+        },
+        { sub: 'admin-1', roles: ['admin'] },
+        context,
+      ),
+    ).rejects.toThrow('Document not found');
+
+    expect(mockAclCreate).not.toHaveBeenCalled();
+  });
 });

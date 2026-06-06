@@ -18,7 +18,11 @@ const mockTransaction = jest.fn((fn) =>
 const mockFindUnique = jest.fn();
 
 const mockPrisma = {
-  document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockDocumentUpdate },
+  document: {
+    findUnique: mockFindUnique,
+    findFirst: mockFindUnique,
+    update: mockDocumentUpdate,
+  },
   documentWorkflowHistory: { create: mockWorkflowHistoryCreate },
   $transaction: mockTransaction,
 };
@@ -59,7 +63,11 @@ describe('StatusService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new StatusService(mockPrisma as any, mockAuditClient as any, mockOrgService as any);
+    service = new StatusService(
+      mockPrisma as any,
+      mockAuditClient as any,
+      mockOrgService as any,
+    );
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockWorkflowHistoryCreate.mockResolvedValue({});
   });
@@ -235,5 +243,19 @@ describe('StatusService', () => {
         context,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('scopes the document lookup to the resolved organization', async () => {
+    mockFindUnique.mockResolvedValue(makeDocument({ status: 'DRAFT' }));
+
+    await service.update(
+      'doc-1',
+      { status: 'PENDING', action: 'SUBMIT' },
+      adminUser,
+      context,
+    );
+
+    const lookupArg = JSON.stringify(mockFindUnique.mock.calls[0][0]);
+    expect(lookupArg).toContain('"organizationId":"org-1"');
   });
 });

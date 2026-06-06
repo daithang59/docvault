@@ -231,7 +231,8 @@ export class PolicyService {
     }
 
     const shareGrant = await this.resolveShareGrant(docId, options.shareToken);
-    const shareAllowsPreview = shareGrant === 'VIEW' || shareGrant === 'DOWNLOAD';
+    const shareAllowsPreview =
+      shareGrant === 'VIEW' || shareGrant === 'DOWNLOAD';
 
     const actorId = buildActorId(user);
     const roles = user.roles ?? [];

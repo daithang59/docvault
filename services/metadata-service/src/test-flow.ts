@@ -20,8 +20,12 @@ async function run() {
     },
   } as any;
 
-  const orgService = new OrgService(prisma);
-  const documentsService = new DocumentsService(prisma, mockAuditClient, orgService);
+  const orgService = new OrgService(prisma, mockAuditClient);
+  const documentsService = new DocumentsService(
+    prisma,
+    mockAuditClient,
+    orgService,
+  );
   const statusService = new StatusService(prisma, mockAuditClient, orgService);
   const aclService = new AclService(prisma, mockAuditClient, orgService);
 

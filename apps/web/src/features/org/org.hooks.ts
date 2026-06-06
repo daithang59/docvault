@@ -1,11 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
   fetchMyOrg,
   fetchOrgMembers,
+  updateMemberRole,
+  removeMember,
   type OrganizationInfo,
 } from './org.api';
 
@@ -50,5 +52,28 @@ export function useOrgMembers(enabled = true) {
     queryFn: fetchOrgMembers,
     enabled,
     staleTime: 60 * 1000,
+  });
+}
+
+/** Change a member's role; invalidates the member list on success. */
+export function useUpdateMemberRole() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ userId, role }: { userId: string; role: 'MEMBER' | 'ADMIN' }) =>
+      updateMemberRole(userId, role),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org', 'members'] });
+    },
+  });
+}
+
+/** Remove a member; invalidates the member list on success. */
+export function useRemoveMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: string) => removeMember(userId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org', 'members'] });
+    },
   });
 }

@@ -292,7 +292,6 @@ describe('DocumentsService access-controlled list visibility', () => {
   });
 });
 
-
 describe('DocumentsService legal hold', () => {
   const adminContext = {
     traceId: 'trace-lh',
@@ -334,7 +333,11 @@ describe('DocumentsService legal hold', () => {
     );
     service = new DocumentsService(
       {
-        document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockUpdate },
+        document: {
+          findUnique: mockFindUnique,
+          findFirst: mockFindUnique,
+          update: mockUpdate,
+        },
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
@@ -429,7 +432,6 @@ describe('DocumentsService legal hold', () => {
   });
 });
 
-
 describe('DocumentsService trash', () => {
   const adminContext = {
     traceId: 't',
@@ -486,7 +488,10 @@ describe('DocumentsService trash', () => {
 
     expect(mockFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: expect.objectContaining({ status: 'DELETED', ownerId: 'editor-1' }),
+        where: expect.objectContaining({
+          status: 'DELETED',
+          ownerId: 'editor-1',
+        }),
       }),
     );
     expect(result[0]).toMatchObject({
@@ -575,7 +580,6 @@ describe('DocumentsService trash', () => {
   });
 });
 
-
 describe('DocumentsService approval chain', () => {
   const ownerContext = {
     traceId: 't',
@@ -593,7 +597,11 @@ describe('DocumentsService approval chain', () => {
     jest.clearAllMocks();
     service = new DocumentsService(
       {
-        document: { findUnique: mockFindUnique, findFirst: mockFindUnique, update: mockUpdate },
+        document: {
+          findUnique: mockFindUnique,
+          findFirst: mockFindUnique,
+          update: mockUpdate,
+        },
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
@@ -679,7 +687,10 @@ describe('DocumentsService approval chain', () => {
     });
     mockUpdate.mockResolvedValueOnce({ id: 'doc-1', approvalStep: 1 });
 
-    const result = await service.advanceApprovalStep('doc-1', ownerContext as any);
+    const result = await service.advanceApprovalStep(
+      'doc-1',
+      ownerContext as any,
+    );
 
     expect(mockUpdate).toHaveBeenCalledWith({
       where: { id: 'doc-1' },
@@ -688,7 +699,6 @@ describe('DocumentsService approval chain', () => {
     expect(result.approvalStep).toBe(1);
   });
 });
-
 
 describe('DocumentsService purge expired trash', () => {
   const systemContext = {
@@ -717,8 +727,16 @@ describe('DocumentsService purge expired trash', () => {
   it('permanently deletes DELETED documents past the recovery window', async () => {
     const now = new Date('2026-06-10T00:00:00.000Z');
     mockFindMany.mockResolvedValueOnce([
-      { id: 'old-1', title: 'Old one', deletedAt: new Date('2026-04-01T00:00:00.000Z') },
-      { id: 'old-2', title: 'Old two', deletedAt: new Date('2026-05-01T00:00:00.000Z') },
+      {
+        id: 'old-1',
+        title: 'Old one',
+        deletedAt: new Date('2026-04-01T00:00:00.000Z'),
+      },
+      {
+        id: 'old-2',
+        title: 'Old two',
+        deletedAt: new Date('2026-05-01T00:00:00.000Z'),
+      },
     ]);
     mockDelete.mockResolvedValue({});
 
@@ -733,7 +751,10 @@ describe('DocumentsService purge expired trash', () => {
     expect(result.purged).toBe(2);
     expect(mockEmitEvent).toHaveBeenCalledWith(
       expect.objectContaining({ actorId: 'system:trash-purge' }),
-      expect.objectContaining({ action: 'DOCUMENT_TRASH_PURGED', result: 'SUCCESS' }),
+      expect.objectContaining({
+        action: 'DOCUMENT_TRASH_PURGED',
+        result: 'SUCCESS',
+      }),
     );
   });
 
@@ -753,12 +774,13 @@ describe('DocumentsService purge expired trash', () => {
       .mockRejectedValueOnce(new Error('locked'))
       .mockResolvedValueOnce({});
 
-    const result = await service.purgeExpiredTrash({ now: new Date('2026-06-10T00:00:00.000Z') });
+    const result = await service.purgeExpiredTrash({
+      now: new Date('2026-06-10T00:00:00.000Z'),
+    });
     expect(result.purged).toBe(1);
     expect(result.failed).toBe(1);
   });
 });
-
 
 describe('DocumentsService tenant isolation', () => {
   const mockFindMany = jest.fn();

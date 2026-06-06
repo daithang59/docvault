@@ -579,7 +579,9 @@ export class DocumentsService {
 
     const reason = input.reason?.trim();
     if (input.hold && !reason) {
-      throw new BadRequestException('A reason is required to place a legal hold');
+      throw new BadRequestException(
+        'A reason is required to place a legal hold',
+      );
     }
 
     const now = new Date();
@@ -752,7 +754,9 @@ export class DocumentsService {
       .map((value) => value.trim())
       .filter(Boolean);
     if (approvers.length === 0) {
-      throw new BadRequestException('Approval chain must have at least one approver');
+      throw new BadRequestException(
+        'Approval chain must have at least one approver',
+      );
     }
     if (new Set(approvers).size !== approvers.length) {
       throw new BadRequestException('Approval chain cannot contain duplicates');

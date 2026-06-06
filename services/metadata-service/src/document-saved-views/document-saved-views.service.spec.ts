@@ -44,15 +44,18 @@ describe('DocumentSavedViewsService', () => {
     mockFindUnique.mockResolvedValue(privateView);
     mockDelete.mockResolvedValue(privateView);
 
-    service = new DocumentSavedViewsService({
-      documentSavedView: {
-        create: mockCreate,
-        findMany: mockFindMany,
-        findUnique: mockFindUnique,
-        findFirst: mockFindUnique,
-        delete: mockDelete,
-      },
-    } as any, { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any);
+    service = new DocumentSavedViewsService(
+      {
+        documentSavedView: {
+          create: mockCreate,
+          findMany: mockFindMany,
+          findUnique: mockFindUnique,
+          findFirst: mockFindUnique,
+          delete: mockDelete,
+        },
+      } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+    );
   });
 
   it('creates a private saved view owned by the current actor', async () => {

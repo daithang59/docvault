@@ -1,5 +1,12 @@
-import { Injectable, Logger } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { AuditClient } from '../audit/audit.client';
+import { RequestContext } from '../common/request-context';
 
 interface CacheEntry {
   orgId: string;
@@ -21,7 +28,10 @@ export class OrgService {
   private readonly cache = new Map<string, CacheEntry>();
   private static readonly CACHE_TTL_MS = 60_000;
 
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly auditClient: AuditClient,
+  ) {}
 
   /**
    * Return the orgId for a user, provisioning a new org if the user has none.
@@ -47,7 +57,9 @@ export class OrgService {
     const [org, membership] = await Promise.all([
       this.prisma.organization.findUnique({ where: { id: orgId } }),
       this.prisma.organizationMembership.findUnique({
-        where: { organizationId_userId: { organizationId: orgId, userId: actorId } },
+        where: {
+          organizationId_userId: { organizationId: orgId, userId: actorId },
+        },
       }),
     ]);
     return {
@@ -72,9 +84,118 @@ export class OrgService {
     }));
   }
 
+  /**
+   * Change a member's role within the caller's organization.
+   * Refuses to demote the last remaining ADMIN (an org must keep one admin).
+   */
+  async updateMemberRole(
+    context: RequestContext,
+    targetUserId: string,
+    role: 'MEMBER' | 'ADMIN',
+  ) {
+    const adminActorId = context.actorId;
+    const organizationId = await this.requireOrgId(adminActorId);
+
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: {
+        organizationId_userId: { organizationId, userId: targetUserId },
+      },
+    });
+    if (!membership) {
+      throw new NotFoundException('Member not found in this organization');
+    }
+
+    if (membership.role === 'ADMIN' && role === 'MEMBER') {
+      await this.assertNotLastAdmin(organizationId);
+    }
+
+    const updated = await this.prisma.organizationMembership.update({
+      where: {
+        organizationId_userId: { organizationId, userId: targetUserId },
+      },
+      data: { role },
+    });
+
+    this.invalidate(targetUserId);
+
+    await this.auditClient.emitEvent(context, {
+      action: 'ORG_MEMBER_ROLE_CHANGED',
+      resourceType: 'ORGANIZATION_MEMBER',
+      resourceId: targetUserId,
+      result: 'SUCCESS',
+      metadata: {
+        organizationId,
+        targetUserId,
+        fromRole: membership.role,
+        toRole: updated.role,
+      },
+    });
+
+    return {
+      userId: updated.userId,
+      role: updated.role,
+      joinedAt: updated.createdAt,
+    };
+  }
+
+  /**
+   * Remove a member from the caller's organization.
+   * Refuses to remove the last remaining ADMIN.
+   */
+  async removeMember(context: RequestContext, targetUserId: string) {
+    const adminActorId = context.actorId;
+    const organizationId = await this.requireOrgId(adminActorId);
+
+    const membership = await this.prisma.organizationMembership.findUnique({
+      where: {
+        organizationId_userId: { organizationId, userId: targetUserId },
+      },
+    });
+    if (!membership) {
+      throw new NotFoundException('Member not found in this organization');
+    }
+
+    if (membership.role === 'ADMIN') {
+      await this.assertNotLastAdmin(organizationId);
+    }
+
+    await this.prisma.organizationMembership.delete({
+      where: {
+        organizationId_userId: { organizationId, userId: targetUserId },
+      },
+    });
+
+    this.invalidate(targetUserId);
+
+    await this.auditClient.emitEvent(context, {
+      action: 'ORG_MEMBER_REMOVED',
+      resourceType: 'ORGANIZATION_MEMBER',
+      resourceId: targetUserId,
+      result: 'SUCCESS',
+      metadata: {
+        organizationId,
+        targetUserId,
+        removedRole: membership.role,
+      },
+    });
+
+    return { userId: targetUserId, removed: true };
+  }
+
   /** Drop a user's cached org (e.g. after membership changes). */
   invalidate(actorId: string): void {
     this.cache.delete(actorId);
+  }
+
+  private async assertNotLastAdmin(organizationId: string): Promise<void> {
+    const adminCount = await this.prisma.organizationMembership.count({
+      where: { organizationId, role: 'ADMIN' },
+    });
+    if (adminCount <= 1) {
+      throw new BadRequestException(
+        'Cannot remove or demote the last admin of an organization',
+      );
+    }
   }
 
   private async resolveOrProvision(

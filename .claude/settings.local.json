@@ -76,7 +76,8 @@
       "Bash(powershell.exe -NoProfile -Command \"& 'C:\\\\Users\\\\THANG\\\\bin-omc\\\\tmux.cmd' -V; Write-Host \\('exit=' + \\\\$LASTEXITCODE\\)\" 2>&1)",
       "Bash(done)",
       "Skill(update-config)",
-      "Bash(ls -la \"app/\\(app\\)/org/members/page.tsx\")"
+      "Bash(ls -la \"app/\\(app\\)/org/members/page.tsx\")",
+      "Bash(/dev/null echo:*)"
     ],
     "deny": [
       "Bash(rm -rf /:*)",

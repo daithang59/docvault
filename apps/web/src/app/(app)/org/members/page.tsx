@@ -1,14 +1,19 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Building2, RefreshCw, Shield, Users } from 'lucide-react';
+import { Building2, RefreshCw, Shield, Users, Trash2, ShieldCheck, UserMinus } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { PageHeader } from '@/components/common/page-header';
 import { useAuth } from '@/lib/auth/auth-context';
-import { useMyOrg, useOrgMembers } from '@/features/org/org.hooks';
+import {
+  useMyOrg,
+  useOrgMembers,
+  useUpdateMemberRole,
+  useRemoveMember,
+} from '@/features/org/org.hooks';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { formatDateTime } from '@/lib/utils/date';
 import { cn } from '@/lib/utils/cn';
@@ -24,6 +29,34 @@ export default function OrgMembersPage() {
 
   const { org } = useMyOrg();
   const membersQuery = useOrgMembers(isAdmin);
+  const updateRole = useUpdateMemberRole();
+  const removeMemberMut = useRemoveMember();
+  const [actionError, setActionError] = useState<string | null>(null);
+
+  function readError(err: unknown): string {
+    const anyErr = err as { response?: { data?: { message?: unknown } } };
+    const msg = anyErr?.response?.data?.message;
+    if (Array.isArray(msg)) return msg.join('; ');
+    if (typeof msg === 'string') return msg;
+    return 'Action failed. Please try again.';
+  }
+
+  function handleToggleRole(userId: string, current: 'MEMBER' | 'ADMIN') {
+    setActionError(null);
+    const role = current === 'ADMIN' ? 'MEMBER' : 'ADMIN';
+    updateRole.mutate(
+      { userId, role },
+      { onError: (err) => setActionError(readError(err)) },
+    );
+  }
+
+  function handleRemove(userId: string, name: string) {
+    setActionError(null);
+    if (!window.confirm(`Remove ${name} from this organization?`)) return;
+    removeMemberMut.mutate(userId, {
+      onError: (err) => setActionError(readError(err)),
+    });
+  }
 
   const members = membersQuery.data ?? [];
   const memberIds = useMemo(() => members.map((m) => m.userId), [members]);
@@ -110,6 +143,15 @@ export default function OrgMembersPage() {
         ))}
       </section>
 
+      {actionError && (
+        <div
+          className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"
+          role="alert"
+        >
+          {actionError}
+        </div>
+      )}
+
       {members.length === 0 ? (
         <EmptyState
           icon="list"
@@ -127,6 +169,7 @@ export default function OrgMembersPage() {
                 <th className="px-4 py-3 font-medium">Member</th>
                 <th className="px-4 py-3 font-medium">Role</th>
                 <th className="px-4 py-3 font-medium">Joined</th>
+                <th className="px-4 py-3 text-right font-medium">Actions</th>
               </tr>
             </thead>
             <tbody>
@@ -170,6 +213,36 @@ export default function OrgMembersPage() {
                     </td>
                     <td className="px-4 py-3 text-[var(--text-muted)]">
                       {formatDateTime(member.joinedAt)}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center justify-end gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleRole(member.userId, member.role)}
+                          disabled={isSelf || updateRole.isPending}
+                          title={
+                            isSelf
+                              ? 'You cannot change your own role'
+                              : member.role === 'ADMIN'
+                                ? 'Demote to Member'
+                                : 'Promote to Admin'
+                          }
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-[var(--border-soft)] px-2.5 py-1.5 text-xs font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          <ShieldCheck className="h-3.5 w-3.5" />
+                          {member.role === 'ADMIN' ? 'Make Member' : 'Make Admin'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleRemove(member.userId, name)}
+                          disabled={isSelf || removeMemberMut.isPending}
+                          title={isSelf ? 'You cannot remove yourself' : 'Remove member'}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 px-2.5 py-1.5 text-xs font-medium text-red-600 transition hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-900 dark:text-red-300 dark:hover:bg-red-950/35"
+                        >
+                          <UserMinus className="h-3.5 w-3.5" />
+                          Remove
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 );
