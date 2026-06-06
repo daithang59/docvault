@@ -16,3 +16,15 @@ node_disk_size      = 30
 # false = lower-cost MVP, nodes in public subnets.
 # true = better practice, nodes in private subnets with NAT Gateway cost.
 enable_nat_gateway = false
+
+# Optional: manage Jenkins IAM Roles Anywhere resources with Terraform.
+# The path must point to the public CA certificate, not docvault-ca.key.
+# enable_jenkins_roles_anywhere              = true
+# jenkins_rolesanywhere_ca_certificate_path  = "C:/Users/<user>/rolesanywhere-certs/docvault-ca.pem"
+# jenkins_rolesanywhere_certificate_common_name = "jenkins-controller"
+# jenkins_rolesanywhere_trust_anchor_name = "docvault-jenkins-local-ca"
+# jenkins_rolesanywhere_profile_name      = "docvault-jenkins-profile"
+# jenkins_rolesanywhere_role_name         = "docvault-jenkins-secretsmanager-read"
+# jenkins_secretsmanager_secret_names = [
+#   "harbor-docvault-dev-robot-token",
+# ]
