@@ -29,6 +29,9 @@ export const apiEndpoints = {
       documents: '/metadata/retention/documents',
       run: '/metadata/retention/run',
     },
+    accessReview: {
+      documents: '/metadata/access-review/documents',
+    },
     sensitiveActions: {
       proof: '/metadata/sensitive-actions/proof',
     },

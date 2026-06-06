@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useMemo } from 'react';
-import { useQueries, useQuery } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import {
   AlertTriangle,
   CheckCircle2,
@@ -18,8 +18,7 @@ import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { PageHeader } from '@/components/common/page-header';
 import { buildAccessReviewModel } from '@/features/access-review/access-review';
-import { getDocument, getDocuments } from '@/features/documents/documents.api';
-import { documentsKeys } from '@/features/documents/documents.keys';
+import { getAccessReviewDocuments } from '@/features/access-review/access-review.api';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -35,47 +34,20 @@ export default function AccessReviewPage() {
   const { session } = useAuth();
   const hasAccess = canViewAudit(session);
   const documentsQuery = useQuery({
-    queryKey: documentsKeys.lists(),
-    queryFn: () => getDocuments(),
+    queryKey: ['access-review', 'documents'] as const,
+    queryFn: getAccessReviewDocuments,
     enabled: hasAccess,
   });
-  const documentIds = useMemo(
-    () => documentsQuery.data?.data.map((document) => document.id) ?? [],
-    [documentsQuery.data?.data],
-  );
-  const detailQueries = useQueries({
-    queries: documentIds.map((id) => ({
-      queryKey: documentsKeys.detail(id),
-      queryFn: () => getDocument(id),
-      enabled: hasAccess,
-      staleTime: 60_000,
-    })),
-  });
-  const details = useMemo(
-    () =>
-      detailQueries
-        .map((query) => query.data)
-        .filter((document): document is NonNullable<typeof document> =>
-          Boolean(document),
-        ),
-    [detailQueries],
-  );
   const model = useMemo(
-    () => buildAccessReviewModel(details),
-    [details],
+    () => buildAccessReviewModel(documentsQuery.data ?? []),
+    [documentsQuery.data],
   );
-  const isLoading =
-    documentsQuery.isLoading || detailQueries.some((query) => query.isLoading);
-  const isError =
-    documentsQuery.isError || detailQueries.some((query) => query.isError);
-  const isFetching =
-    documentsQuery.isFetching || detailQueries.some((query) => query.isFetching);
+  const isLoading = documentsQuery.isLoading;
+  const isError = documentsQuery.isError;
+  const isFetching = documentsQuery.isFetching;
 
   async function refreshAccessReview() {
-    await Promise.all([
-      documentsQuery.refetch(),
-      ...detailQueries.map((query) => query.refetch()),
-    ]);
+    await documentsQuery.refetch();
   }
 
   if (!hasAccess) {

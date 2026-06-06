@@ -191,6 +191,18 @@ async function fulfillApi(route: Route) {
     return;
   }
 
+  if (pathname === '/api/metadata/access-review/documents') {
+    await route.fulfill({
+      status: 200,
+      json: documents.map((document) => ({
+        ...document,
+        versions: [],
+        aclEntries: document.aclEntries ?? [],
+      })),
+    });
+    return;
+  }
+
   const documentDetailMatch = pathname.match(/^\/api\/metadata\/documents\/([^/]+)$/);
   if (documentDetailMatch) {
     const document = documents.find((item) => item.id === documentDetailMatch[1]);

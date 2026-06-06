@@ -20,10 +20,20 @@ function makeReq(options?: {
   };
 }
 
-function makeController(proxyService: ProxyService): MetadataProxyController {
-  return new MetadataProxyController(
+function makeAuditClient() {
+  return {
+    emitEvent: jest.fn().mockResolvedValue(undefined),
+  };
+}
+
+function makeController(
+  proxyService: ProxyService,
+  auditClient = makeAuditClient(),
+): MetadataProxyController {
+  return new (MetadataProxyController as any)(
     proxyService,
     new SensitiveActionProofService(),
+    auditClient,
   );
 }
 
@@ -38,6 +48,8 @@ describe('MetadataProxyController sensitive action proof', () => {
 
   afterEach(() => {
     delete process.env.SENSITIVE_ACTION_PROOF_SECRET;
+    delete process.env.SENSITIVE_ACTION_REQUIRE_RECENT_AUTH;
+    delete process.env.SENSITIVE_ACTION_REAUTH_MAX_AGE_SECONDS;
   });
 
   it('rejects retention runs before proxying when the step-up proof is missing', async () => {
@@ -84,7 +96,8 @@ describe('MetadataProxyController sensitive action proof', () => {
     const proxyService = {
       forward: jest.fn(),
     } as unknown as ProxyService;
-    const controller = makeController(proxyService);
+    const auditClient = makeAuditClient();
+    const controller = makeController(proxyService, auditClient);
 
     const issued = await (controller as any).issueSensitiveActionProof(
       makeReq(),
@@ -103,13 +116,24 @@ describe('MetadataProxyController sensitive action proof', () => {
     expect(new Date(issued.expiresAt).getTime()).toBeLessThanOrEqual(
       Date.now() + 5 * 60 * 1000,
     );
+    expect(auditClient.emitEvent).toHaveBeenCalledWith(expect.anything(), {
+      action: 'SENSITIVE_ACTION_PROOF_ISSUED',
+      resourceType: 'SENSITIVE_ACTION',
+      resourceId: 'run-retention',
+      result: 'SUCCESS',
+      metadata: expect.objectContaining({
+        sensitiveAction: 'run-retention',
+        reauthChecked: false,
+      }),
+    });
   });
 
   it('rejects proof requests when the phrase does not match the action', async () => {
     const proxyService = {
       forward: jest.fn(),
     } as unknown as ProxyService;
-    const controller = makeController(proxyService);
+    const auditClient = makeAuditClient();
+    const controller = makeController(proxyService, auditClient);
 
     await expect(
       (controller as any).issueSensitiveActionProof(makeReq(), {
@@ -119,6 +143,37 @@ describe('MetadataProxyController sensitive action proof', () => {
     ).rejects.toMatchObject({
       response: expect.objectContaining({ statusCode: 400 }),
     });
+    expect(auditClient.emitEvent).toHaveBeenCalledWith(expect.anything(), {
+      action: 'SENSITIVE_ACTION_PROOF_DENIED',
+      resourceType: 'SENSITIVE_ACTION',
+      resourceId: 'run-retention',
+      result: 'DENY',
+      reason: 'Invalid sensitive action challenge phrase',
+      metadata: {
+        sensitiveAction: 'run-retention',
+      },
+    });
+  });
+
+  it('does not block proof issuance when audit logging is unavailable', async () => {
+    const proxyService = {
+      forward: jest.fn(),
+    } as unknown as ProxyService;
+    const auditClient = {
+      emitEvent: jest.fn().mockRejectedValue(new Error('audit unavailable')),
+    };
+    const controller = makeController(proxyService, auditClient);
+
+    const issued = await (controller as any).issueSensitiveActionProof(
+      makeReq(),
+      {
+        action: 'run-retention',
+        challengePhrase: 'RUN RETENTION',
+      },
+    );
+
+    expect(issued.proof).toEqual(expect.any(String));
+    expect(auditClient.emitEvent).toHaveBeenCalled();
   });
 
   it('allows a retention run with a proof issued for the same actor and action', async () => {
@@ -164,6 +219,202 @@ describe('MetadataProxyController sensitive action proof', () => {
       response: expect.objectContaining({ statusCode: 403 }),
     });
     expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
+  it('rejects proof requests when recent re-auth is required but auth_time is stale', async () => {
+    process.env.SENSITIVE_ACTION_REQUIRE_RECENT_AUTH = 'true';
+    process.env.SENSITIVE_ACTION_REAUTH_MAX_AGE_SECONDS = '300';
+    const proxyService = {
+      forward: jest.fn(),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    await expect(
+      (controller as any).issueSensitiveActionProof(
+        makeReq({
+          user: {
+            sub: 'admin-1',
+            username: 'admin1',
+            roles: ['admin'],
+            raw: {
+              auth_time: Math.floor(Date.now() / 1000) - 600,
+            },
+          },
+        }),
+        {
+          action: 'run-retention',
+          challengePhrase: 'RUN RETENTION',
+        },
+      ),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 403 }),
+    });
+  });
+
+  it('issues proof when recent re-auth is required and auth_time is fresh', async () => {
+    process.env.SENSITIVE_ACTION_REQUIRE_RECENT_AUTH = 'true';
+    process.env.SENSITIVE_ACTION_REAUTH_MAX_AGE_SECONDS = '300';
+    const proxyService = {
+      forward: jest.fn(),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    const issued = await (controller as any).issueSensitiveActionProof(
+      makeReq({
+        user: {
+          sub: 'admin-1',
+          username: 'admin1',
+          roles: ['admin'],
+          raw: {
+            auth_time: Math.floor(Date.now() / 1000) - 60,
+          },
+        },
+      }),
+      {
+        action: 'run-retention',
+        challengePhrase: 'RUN RETENTION',
+      },
+    );
+
+    expect(issued).toMatchObject({
+      proof: expect.any(String),
+      expiresAt: expect.any(String),
+      reauth: {
+        checked: true,
+        maxAgeSeconds: 300,
+      },
+    });
+  });
+});
+
+describe('MetadataProxyController access review documents', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('returns a batch review dataset while only fetching ACL detail for sensitive documents', async () => {
+    const listDocuments = [
+      {
+        id: 'doc-public',
+        title: 'Public handbook',
+        status: 'PUBLISHED',
+        classification: 'PUBLIC',
+        ownerId: 'viewer-1',
+        currentVersion: 1,
+        filename: 'public.pdf',
+        tags: [],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        id: 'doc-secret',
+        title: 'Secret plan',
+        status: 'PUBLISHED',
+        classification: 'SECRET',
+        ownerId: 'owner-1',
+        currentVersion: 1,
+        filename: 'secret.pdf',
+        tags: ['board'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+      {
+        id: 'doc-confidential',
+        title: 'Confidential plan',
+        status: 'PUBLISHED',
+        classification: 'CONFIDENTIAL',
+        ownerId: 'owner-2',
+        currentVersion: 1,
+        filename: 'confidential.pdf',
+        tags: ['finance'],
+        createdAt: '2026-01-01T00:00:00.000Z',
+        updatedAt: '2026-01-02T00:00:00.000Z',
+      },
+    ];
+    const secretDetail = {
+      ...listDocuments[1],
+      aclEntries: [
+        {
+          id: 'acl-secret-all',
+          subjectType: 'ALL',
+          permission: 'DOWNLOAD',
+          effect: 'ALLOW',
+          createdAt: '2025-01-01T00:00:00.000Z',
+        },
+      ],
+      versions: [],
+    };
+    const confidentialDetail = {
+      ...listDocuments[2],
+      aclEntries: [],
+      versions: [],
+    };
+    const proxyService = {
+      forward: jest.fn((_req: unknown, config: { url: string }) => {
+        if (config.url === `${metadataUrl}/documents`) {
+          return Promise.resolve({ data: listDocuments });
+        }
+        if (config.url === `${metadataUrl}/documents/doc-secret`) {
+          return Promise.resolve({ data: secretDetail });
+        }
+        if (config.url === `${metadataUrl}/documents/doc-confidential`) {
+          return Promise.resolve({ data: confidentialDetail });
+        }
+        throw new Error(`Unexpected proxy call: ${config.url}`);
+      }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = makeReq({
+      user: {
+        sub: 'co-1',
+        username: 'co1',
+        roles: ['compliance_officer'],
+      },
+      url: '/metadata/access-review/documents',
+    });
+
+    const result = await (controller as any).listAccessReviewDocuments(req);
+
+    expect(result).toEqual([
+      {
+        ...listDocuments[0],
+        aclEntries: [],
+        versions: [],
+      },
+      secretDetail,
+      confidentialDetail,
+    ]);
+    expect(proxyService.forward).toHaveBeenCalledTimes(3);
+    expect(proxyService.forward).not.toHaveBeenCalledWith(expect.anything(), {
+      method: 'GET',
+      url: `${metadataUrl}/documents/doc-public`,
+    });
+  });
+
+  it('forwards access review list query params to the metadata service', async () => {
+    const proxyService = {
+      forward: jest.fn((_req: unknown, config: { url: string }) => {
+        if (config.url === `${metadataUrl}/documents?q=secret`) {
+          return Promise.resolve({ data: [] });
+        }
+        throw new Error(`Unexpected proxy call: ${config.url}`);
+      }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+
+    const result = await (controller as any).listAccessReviewDocuments(
+      makeReq({
+        url: '/metadata/access-review/documents?q=secret',
+      }),
+    );
+
+    expect(result).toEqual([]);
+    expect(proxyService.forward).toHaveBeenCalledWith(expect.anything(), {
+      method: 'GET',
+      url: `${metadataUrl}/documents?q=secret`,
+    });
   });
 });
 

@@ -20,6 +20,12 @@ export interface SensitiveActionProofRequest {
 export interface SensitiveActionProofResponse {
   proof: string;
   expiresAt: string;
+  reauth?: {
+    checked: boolean;
+    maxAgeSeconds: number;
+    authTime?: string;
+    ageSeconds?: number;
+  };
 }
 
 const STEP_UP_BY_ACTION: Record<SensitiveActionKey, SensitiveActionStepUp> = {

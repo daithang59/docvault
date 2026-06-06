@@ -33,12 +33,19 @@ interface SensitiveActionProofPayload {
   nonce: string;
 }
 
+export interface RecentAuthStatus {
+  checked: boolean;
+  maxAgeSeconds: number;
+  authTime?: string;
+  ageSeconds?: number;
+}
+
 @Injectable()
 export class SensitiveActionProofService {
   issueProof(
     req: any,
     body: { action?: unknown; challengePhrase?: unknown },
-  ): { proof: string; expiresAt: string } {
+  ): { proof: string; expiresAt: string; reauth: RecentAuthStatus } {
     const action = this.parseAction(body.action);
     const expectedPhrase = SENSITIVE_ACTIONS[action].challengePhrase;
 
@@ -49,6 +56,7 @@ export class SensitiveActionProofService {
     }
 
     const actor = this.getActor(req);
+    const reauth = this.getRecentAuthStatus(req);
     const expiresAt = Date.now() + PROOF_TTL_MS;
     const payload: SensitiveActionProofPayload = {
       actor,
@@ -60,6 +68,7 @@ export class SensitiveActionProofService {
     return {
       proof: this.signPayload(payload),
       expiresAt: new Date(expiresAt).toISOString(),
+      reauth,
     };
   }
 
@@ -111,6 +120,47 @@ export class SensitiveActionProofService {
       ([key]) => key.toLowerCase() === STEP_UP_PROOF_HEADER,
     )?.[1];
     return firstHeaderValue(header);
+  }
+
+  private getRecentAuthStatus(req: any): RecentAuthStatus {
+    const maxAgeSeconds = this.getRecentAuthMaxAgeSeconds();
+    const authTimeSeconds = Number(req?.user?.raw?.auth_time);
+    const requireRecentAuth = isEnabled(
+      process.env.SENSITIVE_ACTION_REQUIRE_RECENT_AUTH,
+    );
+
+    if (!Number.isFinite(authTimeSeconds)) {
+      if (requireRecentAuth) {
+        throw new ForbiddenException(
+          'Recent authentication is required for sensitive actions',
+        );
+      }
+
+      return {
+        checked: false,
+        maxAgeSeconds,
+      };
+    }
+
+    const nowSeconds = Math.floor(Date.now() / 1000);
+    const ageSeconds = nowSeconds - authTimeSeconds;
+    if (ageSeconds > maxAgeSeconds) {
+      throw new ForbiddenException(
+        'Recent authentication is required for sensitive actions',
+      );
+    }
+
+    return {
+      checked: true,
+      maxAgeSeconds,
+      authTime: new Date(authTimeSeconds * 1000).toISOString(),
+      ageSeconds,
+    };
+  }
+
+  private getRecentAuthMaxAgeSeconds(): number {
+    const value = Number(process.env.SENSITIVE_ACTION_REAUTH_MAX_AGE_SECONDS);
+    return Number.isFinite(value) && value > 0 ? Math.floor(value) : 600;
   }
 
   private signPayload(payload: SensitiveActionProofPayload): string {
@@ -192,6 +242,10 @@ function firstHeaderValue(value: unknown): string | undefined {
   }
 
   return typeof value === 'string' ? value : undefined;
+}
+
+function isEnabled(value: string | undefined): boolean {
+  return ['1', 'true', 'yes', 'on'].includes(String(value ?? '').toLowerCase());
 }
 
 function isProofPayload(value: unknown): value is SensitiveActionProofPayload {

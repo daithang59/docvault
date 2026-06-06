@@ -1,5 +1,6 @@
 'use client';
 
+import Link from 'next/link';
 import { useId, useState } from 'react';
 import { ShieldCheck } from 'lucide-react';
 import { ConfirmDialog } from './confirm-dialog';
@@ -56,6 +57,12 @@ export function StepUpConfirmDialog({
               {stepUp.auditHint}
             </p>
           </div>
+          <Link
+            href="/api/auth/login?reauth=1"
+            className="mt-2 inline-flex text-xs font-semibold text-[var(--color-primary)] hover:underline"
+          >
+            Refresh sign-in
+          </Link>
         </div>
         <label
           htmlFor={inputId}

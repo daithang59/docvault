@@ -18,6 +18,7 @@ describe('StepUpConfirmDialog', () => {
     expect(html).toContain('Step-up verification required');
     expect(html).toContain('EXPORT EVIDENCE');
     expect(html).toContain('The export is protected by backend authorization');
+    expect(html).toContain('/api/auth/login?reauth=1');
     expect(html).toContain('disabled=""');
   });
 });

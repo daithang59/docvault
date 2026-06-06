@@ -20,6 +20,7 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { GatewayAuditClient } from '../audit/audit.client';
 import { ProxyService } from './proxy.service';
 import { SensitiveActionProofService } from './sensitive-action-proof.service';
 
@@ -47,6 +48,7 @@ export class MetadataProxyController {
   constructor(
     private readonly proxyService: ProxyService,
     private readonly sensitiveActionProofService: SensitiveActionProofService,
+    private readonly auditClient: GatewayAuditClient,
   ) {}
 
   @Get('documents')
@@ -89,6 +91,42 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Get('access-review/documents')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'List access review documents',
+    description:
+      'Returns a gateway-batched access review dataset. Sensitive documents include ACL detail; non-sensitive rows are returned from the list response without extra detail fan-out.',
+  })
+  async listAccessReviewDocuments(@Req() req: any) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const listResponse = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents${queryString}`,
+    });
+    const documents = normalizeDocumentArray(listResponse.data);
+    const sensitiveDocuments = documents.filter((document: any) =>
+      isAccessReviewSensitiveClassification(document.classification),
+    );
+    const details = await Promise.all(
+      sensitiveDocuments.map(async (document: any) => {
+        const detailResponse = await this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/documents/${document.id}`,
+        });
+        return [document.id, detailResponse.data] as const;
+      }),
+    );
+    const detailsById = new Map(details);
+
+    return documents.map((document: any) =>
+      normalizeAccessReviewDocument(detailsById.get(document.id) ?? document),
+    );
+  }
+
   @Post('retention/run')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')
@@ -120,7 +158,55 @@ export class MetadataProxyController {
       'Issues a short-lived HMAC proof after typed confirmation for metadata sensitive actions.',
   })
   async issueSensitiveActionProof(@Req() req: any, @Body() body: any) {
-    return this.sensitiveActionProofService.issueProof(req, body);
+    const sensitiveAction = readSensitiveActionResourceId(body?.action);
+    try {
+      const issued = this.sensitiveActionProofService.issueProof(req, body);
+      await this.emitSensitiveActionProofAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_ISSUED',
+        resourceId: sensitiveAction,
+        result: 'SUCCESS',
+        metadata: {
+          sensitiveAction,
+          reauthChecked: issued.reauth.checked,
+          reauthMaxAgeSeconds: issued.reauth.maxAgeSeconds,
+          ...(issued.reauth.ageSeconds !== undefined && {
+            reauthAgeSeconds: issued.reauth.ageSeconds,
+          }),
+        },
+      });
+      return issued;
+    } catch (error) {
+      await this.emitSensitiveActionProofAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_DENIED',
+        resourceId: sensitiveAction,
+        result: 'DENY',
+        reason: getAuditReason(error),
+        metadata: {
+          sensitiveAction,
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async emitSensitiveActionProofAudit(
+    req: any,
+    event: {
+      action: 'SENSITIVE_ACTION_PROOF_ISSUED' | 'SENSITIVE_ACTION_PROOF_DENIED';
+      resourceId?: string;
+      result: 'SUCCESS' | 'DENY';
+      reason?: string;
+      metadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.auditClient.emitEvent(req, {
+        ...event,
+        resourceType: 'SENSITIVE_ACTION',
+      });
+    } catch {
+      // Sensitive actions should not fail solely because audit transport is down.
+    }
   }
 
   @Get('documents/:docId')
@@ -547,4 +633,63 @@ function isExcludedEvidenceField(key: string): boolean {
   return (EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES as readonly string[]).includes(
     key,
   );
+}
+
+function normalizeDocumentArray(value: any): any[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (Array.isArray(value?.data)) {
+    return value.data;
+  }
+
+  return [];
+}
+
+function normalizeAccessReviewDocument(document: any): any {
+  return {
+    ...document,
+    versions: Array.isArray(document?.versions) ? document.versions : [],
+    aclEntries: Array.isArray(document?.aclEntries)
+      ? document.aclEntries
+      : Array.isArray(document?.acl)
+        ? document.acl
+        : [],
+  };
+}
+
+function isAccessReviewSensitiveClassification(
+  classification: unknown,
+): boolean {
+  return classification === 'CONFIDENTIAL' || classification === 'SECRET';
+}
+
+function readSensitiveActionResourceId(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed.slice(0, 120) : undefined;
+}
+
+function getAuditReason(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const response = (error as { response?: unknown }).response;
+  if (response && typeof response === 'object') {
+    const message = (response as { message?: unknown }).message;
+    if (typeof message === 'string') {
+      return message;
+    }
+    if (Array.isArray(message)) {
+      return message.filter((item) => typeof item === 'string').join('; ');
+    }
+  }
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
 }

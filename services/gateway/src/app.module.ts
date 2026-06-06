@@ -11,6 +11,7 @@ import { WorkflowProxyController } from './proxy/workflow.proxy.controller';
 import { AuditProxyController } from './proxy/audit.proxy.controller';
 import { NotifyProxyController } from './proxy/notify.proxy.controller';
 import { SensitiveActionProofService } from './proxy/sensitive-action-proof.service';
+import { GatewayAuditClient } from './audit/audit.client';
 
 @Module({
   imports: [AuthModule, UsersModule, HttpModule],
@@ -23,6 +24,6 @@ import { SensitiveActionProofService } from './proxy/sensitive-action-proof.serv
     AuditProxyController,
     NotifyProxyController,
   ],
-  providers: [ProxyService, SensitiveActionProofService],
+  providers: [ProxyService, SensitiveActionProofService, GatewayAuditClient],
 })
 export class AppModule {}
