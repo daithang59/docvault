@@ -864,6 +864,75 @@ describe('MetadataProxyController version restore', () => {
   });
 });
 
+describe('MetadataProxyController trash', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies trash listing to metadata service', async () => {
+    const trash = [{ docId: 'doc-1', recoverable: true }];
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: trash }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).listTrash(req);
+
+    expect(result).toBe(trash);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'GET',
+      url: `${metadataUrl}/documents/trash`,
+    });
+  });
+
+  it('proxies restore-from-trash to metadata service', async () => {
+    const restored = { id: 'doc-1', status: 'DRAFT' };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: restored }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).restoreFromTrash('doc-1', req);
+
+    expect(result).toBe(restored);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/restore`,
+    });
+  });
+});
+
+describe('MetadataProxyController approval chain', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies approval chain config to metadata service', async () => {
+    const updated = { id: 'doc-1', approvalChain: ['a', 'b'], approvalStep: 0 };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: updated }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+    const body = { approvers: ['a', 'b'] };
+
+    const result = await (controller as any).setApprovalChain('doc-1', req, body);
+
+    expect(result).toBe(updated);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/approval-chain`,
+      data: body,
+    });
+  });
+});
+
 describe('MetadataProxyController legal hold', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

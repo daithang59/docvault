@@ -116,7 +116,7 @@ function buildDocuments(): MockDocument[] {
       filename: 'board-report.pdf',
       mimeType: 'application/pdf',
       fileSize: 256_000,
-      tags: ['finance', 'board'],
+      tags: ['finance', 'board', 'finance/q1'],
       createdAt: hoursAgo(48),
       updatedAt: hoursAgo(18),
     },
@@ -240,6 +240,36 @@ async function fulfillApi(route: Route) {
         versions: [],
         aclEntries: document.aclEntries ?? [],
       })),
+    });
+    return;
+  }
+
+  if (pathname === '/api/metadata/documents/trash') {
+    await route.fulfill({
+      status: 200,
+      json: [
+        {
+          docId: 'doc-trashed',
+          title: 'Deleted draft proposal',
+          ownerId: 'admin1',
+          classification: 'INTERNAL',
+          deletedAt: hoursAgo(48),
+          purgeAt: hoursFromNow(28 * 24),
+          daysUntilPurge: 28,
+          recoverable: true,
+        },
+      ],
+    });
+    return;
+  }
+
+  const restoreTrashMatch = pathname.match(
+    /^\/api\/metadata\/documents\/([^/]+)\/restore$/,
+  );
+  if (restoreTrashMatch) {
+    await route.fulfill({
+      status: 200,
+      json: { id: restoreTrashMatch[1], status: 'DRAFT' },
     });
     return;
   }
@@ -416,6 +446,62 @@ async function fulfillApi(route: Route) {
       return;
     }
     await route.fulfill({ status: 200, json: [] });
+    return;
+  }
+
+  // activity feed sources
+  if (pathname.match(/^\/api\/metadata\/documents\/[^/]+\/comments$/)) {
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON() as { content?: string };
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'comment-new',
+          docId: pathname.split('/').at(-2),
+          authorId: 'admin1',
+          content: body.content ?? '',
+          createdAt: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 'comment-1',
+          docId: pathname.split('/').at(-2),
+          authorId: 'editor1',
+          content: 'Please double-check the figures.',
+          createdAt: hoursAgo(12),
+        },
+      ],
+    });
+    return;
+  }
+
+  if (pathname === '/api/audit/query') {
+    await route.fulfill({
+      status: 200,
+      json: {
+        data: [
+          {
+            eventId: 'evt-share-1',
+            action: 'DOCUMENT_SHARE_LINK_CREATED',
+            actorId: 'admin1',
+            actorRoles: ['admin'],
+            result: 'SUCCESS',
+            resourceType: 'DOCUMENT',
+            resourceId: 'doc-published-library',
+            timestamp: hoursAgo(4),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 50,
+        totalPages: 1,
+      },
+    });
     return;
   }
 
@@ -797,4 +883,74 @@ test('version history compares two versions and restores an older one', async ({
   await dialog.getByRole('button', { name: 'Restore version' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Version restored')).toBeVisible();
+});
+
+
+test('activity feed merges workflow, comments, and audit events', async ({
+  page,
+}) => {
+  await page.goto('/documents/doc-published-library');
+
+  const feed = page.getByRole('region', { name: 'Activity' });
+  await expect(feed.getByRole('heading', { name: 'Activity' })).toBeVisible();
+
+  await expect(feed.getByText('Please double-check the figures.')).toBeVisible();
+  await expect(feed.getByText(/document share link created/i)).toBeVisible();
+});
+
+
+test('bulk delete can be undone before it reaches the server', async ({
+  page,
+}) => {
+  const deleteRequests: string[] = [];
+  page.on('request', (req) => {
+    if (req.method() === 'DELETE' && req.url().includes('/api/workflow/')) {
+      deleteRequests.push(req.url());
+    }
+  });
+
+  await page.goto('/documents');
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+
+  const firstRowCheckbox = page.getByRole('checkbox', { name: 'Select row' }).first();
+  await firstRowCheckbox.check();
+
+  await page.getByRole('button', { name: /^Delete \(/ }).click();
+
+  const undo = page.getByRole('button', { name: 'Undo' });
+  await expect(undo).toBeVisible();
+  await undo.click();
+
+  await expect(page.getByText('Delete cancelled')).toBeVisible();
+
+  // Wait past the deferred window and confirm nothing was sent.
+  await page.waitForTimeout(5500);
+  expect(deleteRequests).toHaveLength(0);
+});
+
+
+test('trash lists deleted documents and restores one', async ({ page }) => {
+  await page.goto('/trash');
+
+  await expect(page.getByRole('heading', { name: 'Trash', exact: true })).toBeVisible();
+  await expect(page.getByText('Deleted draft proposal')).toBeVisible();
+  await expect(page.getByText('28 days left')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Restore' }).click();
+  await expect(page.getByText('Document restored')).toBeVisible();
+});
+
+
+test('folder tree filters documents by hierarchical tag', async ({ page }) => {
+  await page.goto('/documents');
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+
+  const folders = page.getByRole('complementary', { name: 'Folders' });
+  await expect(folders).toBeVisible();
+
+  // The slash tag finance/q1 yields a "finance" root node.
+  await folders.getByRole('button', { name: /^finance/ }).first().click();
+
+  // After selecting the folder, the active filter should be reflected in the URL.
+  await expect(page).toHaveURL(/folder=finance/);
 });

@@ -44,6 +44,7 @@ describe('WorkflowService', () => {
             getApprovers: jest
               .fn()
               .mockResolvedValue({ userIds: ['approver1'] }),
+            advanceApprovalStep: jest.fn().mockResolvedValue({}),
           },
         },
         {
@@ -234,6 +235,78 @@ describe('WorkflowService', () => {
           mockContext,
         ),
       ).rejects.toThrow(ForbiddenException);
+    });
+  });
+
+  describe('sequential approval chain', () => {
+    it('rejects approval from an approver who is not at the current step', async () => {
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({
+          status: 'PENDING',
+          approvalChain: ['app-1', 'app-2'],
+          approvalStep: 0,
+        } as any),
+      );
+
+      await expect(
+        workflowService.approve(
+          'doc-1',
+          mockUser({ sub: 'app-2', roles: ['approver'] }),
+          { ...mockContext, actorId: 'app-2', roles: ['approver'] },
+        ),
+      ).rejects.toThrow();
+      expect(metadataClient.updateStatus).not.toHaveBeenCalled();
+    });
+
+    it('advances the step but keeps PENDING when not the final approver', async () => {
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({
+          status: 'PENDING',
+          approvalChain: ['app-1', 'app-2'],
+          approvalStep: 0,
+        } as any),
+      );
+
+      const result = await workflowService.approve(
+        'doc-1',
+        mockUser({ sub: 'app-1', roles: ['approver'] }),
+        { ...mockContext, actorId: 'app-1', roles: ['approver'] },
+      );
+
+      expect(metadataClient.advanceApprovalStep).toHaveBeenCalledWith(
+        'doc-1',
+        expect.any(Object),
+      );
+      expect(metadataClient.updateStatus).not.toHaveBeenCalled();
+      expect(result.status).toBe('PENDING');
+    });
+
+    it('publishes when the final approver in the chain approves', async () => {
+      metadataClient.getDocument.mockResolvedValue(
+        mockDoc({
+          status: 'PENDING',
+          approvalChain: ['app-1', 'app-2'],
+          approvalStep: 1,
+        } as any),
+      );
+      metadataClient.updateStatus.mockResolvedValue({
+        ...mockDoc({ status: 'PENDING' }),
+        status: 'PUBLISHED',
+      });
+
+      const result = await workflowService.approve(
+        'doc-1',
+        mockUser({ sub: 'app-2', roles: ['approver'] }),
+        { ...mockContext, actorId: 'app-2', roles: ['approver'] },
+      );
+
+      expect(metadataClient.updateStatus).toHaveBeenCalledWith(
+        'doc-1',
+        'PUBLISHED',
+        'APPROVE',
+        expect.any(Object),
+      );
+      expect(result.status).toBe('PUBLISHED');
     });
   });
 

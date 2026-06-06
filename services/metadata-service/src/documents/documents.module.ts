@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DocumentsController } from './documents.controller';
 import { DocumentsService } from './documents.service';
+import { TrashPurgeService } from './trash-purge.service';
 import { CommentsModule } from '../comments/comments.module';
 import { AclModule } from '../acl/acl.module';
 import { AuditModule } from '../audit/audit.module';
@@ -18,6 +19,6 @@ import { VersionsModule } from '../versions/versions.module';
     CommentsModule,
   ],
   controllers: [DocumentsController],
-  providers: [DocumentsService],
+  providers: [DocumentsService, TrashPurgeService],
 })
 export class DocumentsModule {}

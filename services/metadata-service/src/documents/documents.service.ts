@@ -598,6 +598,226 @@ export class DocumentsService {
   }
 
   /**
+   * Trash recovery window: a DELETED document can be restored within this many
+   * days of deletion before it is considered permanently purged.
+   */
+  private readonly trashRecoveryDays = 30;
+
+  /**
+   * List soft-deleted documents. Owners/editors see their own trash; admins see
+   * all. Each entry carries a recovery deadline so the UI can warn before purge.
+   */
+  async listTrash(context: RequestContext, now: Date = new Date()) {
+    const isAdmin = context.roles.includes('admin');
+    const where: Record<string, unknown> = { status: 'DELETED' as const };
+    if (!isAdmin) {
+      where.ownerId = context.actorId;
+    }
+
+    const documents = await this.prisma.document.findMany({
+      where: where as any,
+      orderBy: { deletedAt: 'desc' } as any,
+    });
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    return documents.map((doc: any) => {
+      const deletedAt: Date | null = doc.deletedAt ?? null;
+      const purgeAt = deletedAt
+        ? new Date(deletedAt.getTime() + this.trashRecoveryDays * dayMs)
+        : null;
+      const daysUntilPurge = purgeAt
+        ? Math.ceil((purgeAt.getTime() - now.getTime()) / dayMs)
+        : null;
+      return {
+        docId: doc.id,
+        title: doc.title,
+        ownerId: doc.ownerId,
+        classification: doc.classification,
+        deletedAt: deletedAt ? deletedAt.toISOString() : null,
+        purgeAt: purgeAt ? purgeAt.toISOString() : null,
+        daysUntilPurge,
+        recoverable: daysUntilPurge != null && daysUntilPurge > 0,
+      };
+    });
+  }
+
+  /**
+   * Restore a soft-deleted document back to DRAFT, if still within the recovery
+   * window and the actor owns it (or is admin).
+   */
+  async restoreFromTrash(
+    id: string,
+    context: RequestContext,
+    now: Date = new Date(),
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    if (document.status !== 'DELETED') {
+      throw new BadRequestException('Only deleted documents can be restored');
+    }
+
+    const isAdmin = context.roles.includes('admin');
+    if (!isAdmin && document.ownerId !== context.actorId) {
+      throw new ForbiddenException(
+        'Only the owner or an admin can restore this document',
+      );
+    }
+
+    const dayMs = 24 * 60 * 60 * 1000;
+    const deletedAt: Date | null = (document as any).deletedAt ?? null;
+    if (deletedAt) {
+      const purgeAt = new Date(
+        deletedAt.getTime() + this.trashRecoveryDays * dayMs,
+      );
+      if (now.getTime() > purgeAt.getTime()) {
+        throw new BadRequestException(
+          'The recovery window for this document has elapsed',
+        );
+      }
+    }
+
+    const restored = await this.prisma.document.update({
+      where: { id },
+      data: { status: 'DRAFT' as any, deletedAt: null } as any,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_RESTORED_FROM_TRASH',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+      metadata: { docId: id, restoredTo: 'DRAFT' },
+    });
+
+    return restored;
+  }
+  /**
+   * Define an ordered list of approvers for a document. Resets progress to the
+   * first step. Only the owner editor or an admin can configure the chain.
+   */
+  async setApprovalChain(
+    id: string,
+    input: { approvers: string[] },
+    context: RequestContext,
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const isAdmin = context.roles.includes('admin');
+    const isOwnerEditor =
+      document.ownerId === context.actorId &&
+      (context.roles.includes('editor') || context.roles.includes('admin'));
+    if (!isAdmin && !isOwnerEditor) {
+      throw new ForbiddenException(
+        'Only the owner editor or an admin can configure the approval chain',
+      );
+    }
+
+    const approvers = (input.approvers ?? [])
+      .map((value) => value.trim())
+      .filter(Boolean);
+    if (approvers.length === 0) {
+      throw new BadRequestException('Approval chain must have at least one approver');
+    }
+    if (new Set(approvers).size !== approvers.length) {
+      throw new BadRequestException('Approval chain cannot contain duplicates');
+    }
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data: { approvalChain: approvers, approvalStep: 0 } as any,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: 'DOCUMENT_APPROVAL_CHAIN_SET',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+      metadata: { docId: id, approverCount: approvers.length },
+    });
+
+    return updated;
+  }
+
+  /**
+   * Advance the approval chain to the next step. Called by workflow-service after
+   * a valid step approval. Returns the updated document.
+   */
+  async advanceApprovalStep(
+    id: string,
+    context: RequestContext,
+  ): Promise<Document> {
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+    const nextStep = ((document as any).approvalStep ?? 0) + 1;
+    return this.prisma.document.update({
+      where: { id },
+      data: { approvalStep: nextStep } as any,
+    });
+  }
+
+  /**
+   * Permanently delete documents whose trash recovery window has elapsed.
+   * Intended for a scheduled job. Failures on individual rows are counted and
+   * do not abort the whole run.
+   */
+  async purgeExpiredTrash(
+    options: { now?: Date } = {},
+  ): Promise<{ purged: number; failed: number; checkedAt: string }> {
+    const now = options.now ?? new Date();
+    const dayMs = 24 * 60 * 60 * 1000;
+    const cutoff = new Date(now.getTime() - this.trashRecoveryDays * dayMs);
+
+    const expired = (await this.prisma.document.findMany({
+      where: {
+        status: 'DELETED' as any,
+        deletedAt: { lt: cutoff },
+      } as any,
+      select: { id: true, title: true, deletedAt: true },
+    })) as Array<{ id: string; title: string; deletedAt: Date | null }>;
+
+    const context = {
+      traceId: 'trash-purge-job',
+      actorId: 'system:trash-purge',
+      roles: ['admin'],
+      authorization: '',
+      ip: '127.0.0.1',
+    } as any;
+
+    let purged = 0;
+    let failed = 0;
+    for (const doc of expired) {
+      try {
+        await this.prisma.document.delete({ where: { id: doc.id } });
+        purged++;
+        await this.auditClient.emitEvent(context, {
+          action: 'DOCUMENT_TRASH_PURGED',
+          resourceType: 'DOCUMENT',
+          resourceId: doc.id,
+          result: 'SUCCESS',
+          reason: 'Trash recovery window elapsed',
+          metadata: {
+            docId: doc.id,
+            title: doc.title,
+            deletedAt: doc.deletedAt ?? null,
+            purgedAt: now.toISOString(),
+          },
+        });
+      } catch {
+        failed++;
+      }
+    }
+
+    return { purged, failed, checkedAt: now.toISOString() };
+  }
+
+  /**
    * Soft-delete a document by marking it as DELETED.
    * Called exclusively by the workflow service after it has authorized the action.
    */

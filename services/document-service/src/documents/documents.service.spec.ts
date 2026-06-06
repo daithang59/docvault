@@ -1,3 +1,4 @@
+import { Readable } from 'stream';
 import { createHmac } from 'crypto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
@@ -182,5 +183,104 @@ describe('DocumentsService upload security controls', () => {
         }),
       }),
     );
+  });
+});
+
+
+describe('DocumentsService preview watermark', () => {
+  const PREVIEW_SECRET = 'test-preview-secret';
+
+  function previewToken(payload: Record<string, unknown>) {
+    const full = {
+      actorId: 'viewer-1',
+      docId: 'doc-1',
+      version: 1,
+      objectKey: 'doc/doc-1/v1/file.pdf',
+      filename: 'file.pdf',
+      contentType: 'application/pdf',
+      expiresAt: new Date(Date.now() + 60_000).toISOString(),
+      classification: 'PUBLIC',
+      ...payload,
+    };
+    const encoded = Buffer.from(JSON.stringify(full)).toString('base64url');
+    const signature = createHmac('sha256', PREVIEW_SECRET)
+      .update(encoded)
+      .digest('base64url');
+    return `${encoded}.${signature}`;
+  }
+
+  const baseContext = {
+    traceId: 't',
+    actorId: 'viewer-1',
+    roles: ['viewer'],
+    authorization: 'Bearer x',
+    ip: '127.0.0.1',
+  };
+
+  function makeService(opts: {
+    classification: string;
+    applyWatermark: jest.Mock;
+    getObjectStream: jest.Mock;
+  }) {
+    const metadataClient = {
+      authorizePreview: jest.fn().mockResolvedValue({
+        grantToken: previewToken({ classification: opts.classification }),
+        classification: opts.classification,
+      }),
+    };
+    return new DocumentsService(
+      metadataClient as any,
+      { getObjectStream: opts.getObjectStream } as any,
+      { emitEvent: jest.fn() } as any,
+      { applyWatermark: opts.applyWatermark } as any,
+      { scan: jest.fn() } as any,
+      { scan: jest.fn() } as any,
+    );
+  }
+
+  beforeEach(() => {
+    process.env.PREVIEW_GRANT_SECRET = PREVIEW_SECRET;
+  });
+  afterEach(() => {
+    delete process.env.PREVIEW_GRANT_SECRET;
+  });
+
+  it('watermarks the preview buffer for a SECRET document', async () => {
+    const watermarked = Buffer.from('WATERMARKED');
+    const applyWatermark = jest.fn().mockResolvedValue(watermarked);
+    const getObjectStream = jest.fn().mockResolvedValue({
+      Body: Readable.from([Buffer.from('original-bytes')]),
+      ContentLength: 14,
+    });
+    const service = makeService({
+      classification: 'SECRET',
+      applyWatermark,
+      getObjectStream,
+    });
+
+    const result = await service.preview({ docId: 'doc-1', context: baseContext as any });
+
+    expect(applyWatermark).toHaveBeenCalledTimes(1);
+    expect(result.watermarked).toBe(true);
+    expect(result.buffer?.equals(watermarked)).toBe(true);
+  });
+
+  it('does not watermark the preview for a PUBLIC document', async () => {
+    const applyWatermark = jest.fn();
+    const getObjectStream = jest.fn().mockResolvedValue({
+      Body: Readable.from([Buffer.from('plain')]),
+      ContentLength: 5,
+    });
+    const service = makeService({
+      classification: 'PUBLIC',
+      applyWatermark,
+      getObjectStream,
+    });
+
+    const result = await service.preview({ docId: 'doc-1', context: baseContext as any });
+
+    expect(applyWatermark).not.toHaveBeenCalled();
+    expect(result.watermarked).toBeFalsy();
+    expect(result.object).toBeDefined();
   });
 });

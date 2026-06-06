@@ -134,3 +134,75 @@ describe('CommentsService document comment pairing', () => {
     );
   });
 });
+
+
+describe('CommentsService mentions', () => {
+  const context = {
+    traceId: 'trace-1',
+    actorId: 'author-1',
+    roles: ['editor'],
+    authorization: 'Bearer token',
+    ip: '127.0.0.1',
+  };
+  const author = { sub: 'author-1', roles: ['editor'] };
+  const mockCreate = jest.fn();
+  const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+  const mockNotify = jest.fn().mockResolvedValue(undefined);
+  let service: CommentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockCreate.mockImplementation(({ data }) =>
+      Promise.resolve({
+        id: 'comment-9',
+        createdAt: new Date('2026-02-01T00:00:00.000Z'),
+        ...data,
+      }),
+    );
+    service = new CommentsService(
+      { documentComment: { create: mockCreate } } as any,
+      { emitEvent: mockEmitEvent } as any,
+      { notify: mockNotify } as any,
+    );
+  });
+
+  it('notifies mentioned users when a comment includes @mentions', async () => {
+    await service.create('doc-1', 'cc @bob and @carol please look', author as any, context as any);
+
+    expect(mockNotify).toHaveBeenCalledWith(
+      context,
+      expect.objectContaining({
+        type: 'MENTIONED',
+        docId: 'doc-1',
+        recipientIds: ['bob', 'carol'],
+      }),
+    );
+  });
+
+  it('does not notify the author when they mention themselves', async () => {
+    await service.create('doc-1', 'note to self @author-1', author as any, context as any);
+
+    const mentionCall = mockNotify.mock.calls.find(
+      ([, payload]) => payload.type === 'MENTIONED',
+    );
+    expect(mentionCall).toBeUndefined();
+  });
+
+  it('does not call notify when there are no mentions', async () => {
+    await service.create('doc-1', 'plain comment', author as any, context as any);
+
+    const mentionCall = mockNotify.mock.calls.find(
+      ([, payload]) => payload.type === 'MENTIONED',
+    );
+    expect(mentionCall).toBeUndefined();
+  });
+
+  it('still creates the comment when notification is unavailable', async () => {
+    const service2 = new CommentsService(
+      { documentComment: { create: mockCreate } } as any,
+      { emitEvent: mockEmitEvent } as any,
+    );
+    const result = await service2.create('doc-1', 'hi @bob', author as any, context as any);
+    expect(result.id).toBe('comment-9');
+  });
+});

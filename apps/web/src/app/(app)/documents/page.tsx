@@ -10,6 +10,7 @@ import { documentsKeys } from '@/features/documents/documents.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters } from '@/components/documents/document-filters';
+import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
@@ -51,6 +52,7 @@ import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
+import { scheduleDeferredAction } from '@/features/documents/deferred-action';
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
@@ -197,7 +199,7 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleBulkAction(
+  async function runBulkAction(
     docs: DocumentListItem[],
     action: (id: string) => Promise<unknown>,
     label: string,
@@ -218,21 +220,43 @@ export default function DocumentsPage() {
     setPage(1);
   }
 
-  async function handleBulkDelete(docs: DocumentListItem[]) {
-    let ok = 0;
-    let fail = 0;
-    for (const doc of docs) {
-      try {
-        await deleteDocument(doc.id);
-        ok++;
-      } catch {
-        fail++;
-      }
-    }
-    if (ok > 0) toast.success(`Deleted: ${ok} succeeded${fail > 0 ? `, ${fail} failed` : ''}`);
-    else toast.error(`Delete failed for all ${fail} documents`);
-    qc.invalidateQueries({ queryKey: documentsKeys.lists() });
-    setPage(1);
+  function scheduleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    if (docs.length === 0) return;
+    const toastId = `bulk-${label}-${Date.now()}`;
+    const deferred = scheduleDeferredAction(
+      () => runBulkAction(docs, action, label),
+      { delayMs: 5000 },
+    );
+    toast(`${label}: ${docs.length} document${docs.length === 1 ? '' : 's'}`, {
+      id: toastId,
+      description: 'Applying in 5s',
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (deferred.cancel()) {
+            toast.dismiss(toastId);
+            toast.info(`${label} cancelled`);
+          }
+        },
+      },
+    });
+  }
+
+  function handleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    scheduleBulkAction(docs, action, label);
+  }
+
+  function handleBulkDelete(docs: DocumentListItem[]) {
+    scheduleBulkAction(docs, (id) => deleteDocument(id), 'Delete');
   }
 
   function persistCustomSavedViews(nextViews: DocumentSavedView[]) {
@@ -324,49 +348,63 @@ export default function DocumentsPage() {
         />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="animate-in delay-3">
-          <EmptyState
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="lg:w-64 lg:shrink-0">
+          <DocumentFolderTree
+            documents={documents}
+            selectedFolder={filters.folder}
+            onSelect={(folder) => {
+              setFilters({ ...filters, folder });
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          {filtered.length === 0 ? (
+            <div className="animate-in delay-3">
+              <EmptyState
             title="No documents found"
           description={emptyDescription}
           icon="document"
           action={
-            <ProtectedAction roles={['editor', 'admin']}>
-              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
-                Create Document
-              </Link>
-            </ProtectedAction>
-          }
-          />
+                <ProtectedAction roles={['editor', 'admin']}>
+                  <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
+                    Create Document
+                  </Link>
+                </ProtectedAction>
+              }
+              />
+            </div>
+          ) : (
+            <>
+              <div className="animate-in delay-3">
+                <DocumentsTable
+                  data={paginated}
+                  enableSelection
+                  onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+                  onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+                  onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+                  onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+                  onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
+                  onDownload={(doc) => download(doc.id)}
+                  onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
+                  onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
+                  onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
+                  onBulkDelete={handleBulkDelete}
+                />
+                <TablePagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={filtered.length}
+                  totalPages={totalPages}
+                  onPageChange={(p) => setPage(p)}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                />
+              </div>
+            </>
+          )}
         </div>
-      ) : (
-        <>
-          <div className="animate-in delay-3">
-            <DocumentsTable
-              data={paginated}
-              enableSelection
-              onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
-              onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
-              onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
-              onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
-              onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
-              onDownload={(doc) => download(doc.id)}
-              onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
-              onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
-              onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
-              onBulkDelete={handleBulkDelete}
-            />
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              total={filtered.length}
-              totalPages={totalPages}
-              onPageChange={(p) => setPage(p)}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-            />
-          </div>
-        </>
-      )}
+      </div>
 
       <ConfirmDialog
         open={actionType === 'submit'}

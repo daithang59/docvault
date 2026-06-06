@@ -76,6 +76,36 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Get('documents/trash')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'List soft-deleted documents (trash)',
+    description:
+      'Returns the current user\'s deleted documents (admins see all) with recovery deadlines.',
+  })
+  async listTrash(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/trash`,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a soft-deleted document back to DRAFT',
+  })
+  async restoreFromTrash(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/restore`,
+    });
+    return response.data;
+  }
+
   @Get('retention/documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('compliance_officer', 'admin')
@@ -585,6 +615,27 @@ export class MetadataProxyController {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/share-links/redeem`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/approval-chain')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Set an ordered approval chain for a document',
+    description:
+      'Owner editor or admin only. Each listed approver must approve in order before the document is published.',
+  })
+  async setApprovalChain(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/approval-chain`,
       data: body,
     });
     return response.data;

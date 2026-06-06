@@ -1,5 +1,6 @@
 import type { ClassificationLevel, DocumentStatus } from '@/types/enums';
 import type { DocumentListItem } from './documents.types';
+import { documentMatchesFolder } from './folder-tree';
 
 export type DocumentSortField =
   | 'updatedAt'
@@ -152,7 +153,7 @@ export function filterAndSortDocuments(
       ) {
         return false;
       }
-      if (filters.folder && !document.tags.includes(filters.folder)) return false;
+      if (filters.folder && !documentMatchesFolder(document.tags, filters.folder)) return false;
       if (filters.ownerId && document.ownerId !== filters.ownerId) return false;
       if (filters.tag && !document.tags.includes(filters.tag)) return false;
       return true;

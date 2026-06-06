@@ -172,6 +172,15 @@ export class DocumentsController {
     );
     res.setHeader('Accept-Ranges', 'bytes');
 
+    // Watermarked previews are buffered (range not honored); send bytes directly.
+    if (result.watermarked && result.buffer) {
+      res.setHeader('Content-Length', result.buffer.length);
+      res.status(HttpStatus.OK);
+      res.end(result.buffer);
+      return;
+    }
+
+
     const sdkResponse = result.object as any;
 
     if (range && sdkResponse.ContentRange) {

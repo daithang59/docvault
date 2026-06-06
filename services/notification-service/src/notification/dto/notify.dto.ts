@@ -12,6 +12,8 @@ export enum NotifyType {
   REJECTED = 'REJECTED',
   ARCHIVED = 'ARCHIVED',
   DELETED = 'DELETED',
+  MENTIONED = 'MENTIONED',
+  COMMENTED = 'COMMENTED',
 }
 
 export class NotifyDto {

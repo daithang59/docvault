@@ -74,6 +74,43 @@ export class WorkflowService {
       throw new ConflictException('Only PENDING documents can be approved');
     }
 
+    // Sequential approval chain: when configured, each approver must approve in
+    // order. Only the approver at the current step may act; the document is
+    // published only after the final step.
+    const approvalChain: string[] = Array.isArray(
+      (document as any).approvalChain,
+    )
+      ? (document as any).approvalChain
+      : [];
+
+    if (approvalChain.length > 0 && !roles.includes('admin')) {
+      const step: number = (document as any).approvalStep ?? 0;
+      const expectedApprover = approvalChain[step];
+      if (context.actorId !== expectedApprover) {
+        throw new ForbiddenException(
+          'It is not your turn to approve this document',
+        );
+      }
+
+      const isFinalStep = step >= approvalChain.length - 1;
+      if (!isFinalStep) {
+        await this.metadataClient.advanceApprovalStep(docId, context);
+        await this.notificationClient.notify(context, {
+          type: 'APPROVED',
+          docId,
+          recipientId: approvalChain[step + 1],
+          docTitle: document.title,
+          metadata: buildWorkflowNotificationMetadata(
+            'APPROVE',
+            document.status,
+            'PENDING',
+            context.actorId,
+          ),
+        });
+        return { ...document, status: 'PENDING' };
+      }
+    }
+
     const updated = await this.metadataClient.updateStatus(
       docId,
       'PUBLISHED',

@@ -12,11 +12,13 @@ import { DocumentApprovalReadinessCard } from '@/components/documents/document-a
 import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
 import { DocumentLegalHoldCard } from '@/components/documents/document-legal-hold-card';
 import { DocumentShareLinksCard } from '@/components/documents/document-share-links-card';
+import { DocumentApprovalChainCard } from '@/components/documents/document-approval-chain-card';
 import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
 import { DocumentCommentsCard } from '@/components/documents/document-comments-card';
+import { DocumentActivityFeedCard } from '@/components/documents/document-activity-feed-card';
 import { DocumentActionPanel } from '@/components/documents/document-action-panel';
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { LoadingState } from '@/components/common/loading-state';
@@ -163,6 +165,14 @@ export default function DocumentDetailPage({ params }: Props) {
           </div>
           {canShareLinks && (
             <div className="animate-in delay-3">
+              <DocumentApprovalChainCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canShareLinks}
+              />
+            </div>
+          )}
+          {canShareLinks && (
+            <div className="animate-in delay-3">
               <DocumentShareLinksCard
                 document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
                 canManage={canShareLinks}
@@ -195,6 +205,9 @@ export default function DocumentDetailPage({ params }: Props) {
           )}
           <div className="animate-in delay-4">
             <DocumentCommentsCard docId={id} />
+          </div>
+          <div className="animate-in delay-4">
+            <DocumentActivityFeedCard docId={id} />
           </div>
         </div>
       </div>
