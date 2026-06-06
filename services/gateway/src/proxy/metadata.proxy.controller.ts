@@ -523,6 +523,27 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/legal-hold')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Place or release a legal hold on a document',
+    description:
+      'Admin-only. While a legal hold is active, retention auto-archive is suspended for the document.',
+  })
+  async setLegalHold(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/legal-hold`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/versions')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')

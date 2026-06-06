@@ -21,6 +21,10 @@ export interface DocumentSummaryDto {
   retentionClass?: string | null;
   retentionUntil?: string | null;
   retentionReason?: string | null;
+  legalHold?: boolean;
+  legalHoldReason?: string | null;
+  legalHoldBy?: string | null;
+  legalHoldAt?: string | null;
   ownerId: string;
   ownerDisplay?: string;
   currentVersion: number;
@@ -113,6 +117,11 @@ export interface UpdateDocumentRequest {
 
 export type CreateDocumentDto = CreateDocumentRequest;
 export type UpdateDocumentDto = UpdateDocumentRequest;
+
+export interface LegalHoldRequest {
+  hold: boolean;
+  reason?: string;
+}
 
 export interface DocumentAccessImpactRequest {
   classification: ClassificationLevel;

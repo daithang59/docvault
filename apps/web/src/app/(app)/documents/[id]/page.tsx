@@ -10,6 +10,7 @@ import { DocumentDlpFindingsCard } from '@/components/documents/document-dlp-fin
 import { DocumentAiGuardrailsCard } from '@/components/documents/document-ai-guardrails-card';
 import { DocumentApprovalReadinessCard } from '@/components/documents/document-approval-readiness-card';
 import { DocumentEvidenceLinksCard } from '@/components/documents/document-evidence-links-card';
+import { DocumentLegalHoldCard } from '@/components/documents/document-legal-hold-card';
 import { DocumentMetadataSummaryCard } from '@/components/documents/document-metadata-summary-card';
 import { DocumentVersionsCard } from '@/components/documents/document-versions-card';
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
@@ -21,6 +22,7 @@ import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import {
   canManageAcl,
+  canManageLegalHold,
   canReadAcl,
   canViewAudit,
   canViewComplianceEvidencePacket,
@@ -72,6 +74,8 @@ export default function DocumentDetailPage({ params }: Props) {
       ? latestPreviewPosture.reason
       : undefined;
   const canAcl = canManageAcl(session, doc);
+  const canHold = canManageLegalHold(session);
+  const showLegalHold = canHold || doc.legalHold === true;
   const canShowAcl = canReadAcl(session) || canAcl;
   const canShowEvidenceLinks =
     canViewAudit(session) || canViewComplianceEvidencePacket(session);
@@ -152,6 +156,14 @@ export default function DocumentDetailPage({ params }: Props) {
               previewUnavailableReason={previewUnavailableReason}
             />
           </div>
+          {showLegalHold && (
+            <div className="animate-in delay-3">
+              <DocumentLegalHoldCard
+                document={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
+                canManage={canHold}
+              />
+            </div>
+          )}
           {canShowEvidenceLinks && (
             <div className="animate-in delay-3">
               <DocumentEvidenceLinksCard

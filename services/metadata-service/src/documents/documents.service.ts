@@ -523,6 +523,70 @@ export class DocumentsService {
     };
   }
 
+  /**
+   * Place or release a legal hold on a document.
+   *
+   * Legal hold is a compliance control: while active, the retention job will
+   * never auto-archive the document. Only admins can change a hold, and placing
+   * a hold requires a reason for the audit trail.
+   */
+  async setLegalHold(
+    id: string,
+    input: { hold: boolean; reason?: string },
+    context: RequestContext,
+  ): Promise<Document> {
+    if (!context.roles.includes('admin')) {
+      throw new ForbiddenException('Only admins can change legal hold');
+    }
+
+    const document = await this.prisma.document.findUnique({ where: { id } });
+    if (!document) {
+      throw new NotFoundException('Document not found');
+    }
+
+    const reason = input.reason?.trim();
+    if (input.hold && !reason) {
+      throw new BadRequestException('A reason is required to place a legal hold');
+    }
+
+    const now = new Date();
+    const data = input.hold
+      ? {
+          legalHold: true,
+          legalHoldReason: reason ?? null,
+          legalHoldBy: context.actorId,
+          legalHoldAt: now,
+        }
+      : {
+          legalHold: false,
+          legalHoldReason: null,
+          legalHoldBy: null,
+          legalHoldAt: null,
+        };
+
+    const updated = await this.prisma.document.update({
+      where: { id },
+      data,
+    });
+
+    await this.auditClient.emitEvent(context, {
+      action: input.hold
+        ? 'DOCUMENT_LEGAL_HOLD_PLACED'
+        : 'DOCUMENT_LEGAL_HOLD_RELEASED',
+      resourceType: 'DOCUMENT',
+      resourceId: id,
+      result: 'SUCCESS',
+      reason: input.hold ? reason : 'Legal hold released',
+      metadata: {
+        docId: id,
+        legalHold: input.hold,
+        ...(input.hold && reason ? { legalHoldReason: reason } : {}),
+      },
+    });
+
+    return updated;
+  }
+
   private assertCanManage(ownerId: string, actorId: string, roles: string[]) {
     const isEditor = roles.includes('editor') || roles.includes('admin');
 
@@ -772,6 +836,9 @@ function buildPresenceFilter(
   }
   if (normalized === 'dlp') {
     return { dlpStatus: 'DETECTED' };
+  }
+  if (normalized === 'legalhold' || normalized === 'hold') {
+    return { legalHold: true };
   }
   return null;
 }

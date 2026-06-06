@@ -302,6 +302,28 @@ describe('document filter metadata', () => {
     ]);
   });
 
+  it('suggests has:legal-hold when a document is under legal hold', () => {
+    const held: DocumentListItem[] = [
+      { ...documents[0], legalHold: true },
+    ];
+
+    const suggestions = buildDocumentSearchSuggestions(held);
+
+    expect(suggestions).toContainEqual({
+      token: 'has:legal-hold',
+      label: 'has:legal-hold',
+      description: 'Documents under legal hold',
+      kind: 'presence',
+    });
+  });
+
+  it('does not suggest has:legal-hold when no document is held', () => {
+    const suggestions = buildDocumentSearchSuggestions(documents);
+    expect(
+      suggestions.some((suggestion) => suggestion.token === 'has:legal-hold'),
+    ).toBe(false);
+  });
+
   it('builds unique owner/tag options and active chips', () => {
     const options = buildDocumentFilterOptions(documents);
 

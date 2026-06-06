@@ -387,6 +387,10 @@ export function canViewComplianceEvidencePacket(session: Session | null): boolea
   return hasAnyRole(session, ['compliance_officer', 'admin']);
 }
 
+export function canManageLegalHold(session: Session | null): boolean {
+  return hasAnyRole(session, ['admin']);
+}
+
 export function canViewApprovals(session: Session | null): boolean {
   return hasAnyRole(session, ['approver', 'admin']);
 }

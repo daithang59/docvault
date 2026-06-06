@@ -263,6 +263,15 @@ export function buildDocumentSearchSuggestions(
     });
   }
 
+  if (documents.some((document) => document.legalHold === true)) {
+    suggestions.push({
+      token: 'has:legal-hold',
+      label: 'has:legal-hold',
+      description: 'Documents under legal hold',
+      kind: 'presence',
+    });
+  }
+
   if (documents.some((document) => document.dlpStatus === 'DETECTED')) {
     suggestions.push({
       token: 'dlp:detected',

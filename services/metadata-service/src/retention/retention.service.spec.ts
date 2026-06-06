@@ -98,6 +98,35 @@ describe('RetentionService', () => {
     );
   });
 
+  it('excludes documents under legal hold from auto-archive candidates', async () => {
+    const now = new Date('2026-05-30T00:00:00.000Z');
+    mockDocumentFindMany.mockResolvedValueOnce([]);
+
+    await service.runRetention({ now, requestedBy: 'admin1' });
+
+    expect(mockDocumentFindMany).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: expect.objectContaining({ legalHold: false }),
+      }),
+    );
+  });
+
+  it('skips an overdue document that is under legal hold', async () => {
+    const now = new Date('2026-05-30T00:00:00.000Z');
+    mockDocumentFindMany.mockResolvedValueOnce([
+      makeDocument({
+        id: 'doc-held',
+        legalHold: true,
+        retentionUntil: new Date('2026-05-01T00:00:00.000Z'),
+      }),
+    ]);
+
+    const result = await service.runRetention({ now, requestedBy: 'admin1' });
+
+    expect(result.archived).toBe(0);
+    expect(mockDocumentUpdate).not.toHaveBeenCalled();
+  });
+
   it('lists retention evidence with status and days remaining', async () => {
     const now = new Date('2026-05-30T00:00:00.000Z');
     mockDocumentFindMany.mockResolvedValueOnce([

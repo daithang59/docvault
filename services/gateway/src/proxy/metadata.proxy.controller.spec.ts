@@ -759,6 +759,33 @@ describe('MetadataProxyController access impact preview', () => {
   });
 });
 
+describe('MetadataProxyController legal hold', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('proxies legal hold placement body to metadata service', async () => {
+    const updated = { id: 'doc-1', legalHold: true };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: updated }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'admin-1', roles: ['admin'] }, headers: {} };
+    const body = { hold: true, reason: 'Litigation 2026-CV-01' };
+
+    const result = await (controller as any).setLegalHold('doc-1', req, body);
+
+    expect(result).toBe(updated);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'POST',
+      url: `${metadataUrl}/documents/doc-1/legal-hold`,
+      data: body,
+    });
+  });
+});
+
 describe('MetadataProxyController document saved views', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

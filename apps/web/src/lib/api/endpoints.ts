@@ -19,6 +19,7 @@ export const apiEndpoints = {
       acl: (docId: string) => `/metadata/documents/${docId}/acl`,
       downloadAuthorize: (docId: string) => `/metadata/documents/${docId}/download-authorize`,
       comments: (docId: string) => `/metadata/documents/${docId}/comments`,
+      legalHold: (docId: string) => `/metadata/documents/${docId}/legal-hold`,
     },
     savedViews: {
       list: '/metadata/document-saved-views',

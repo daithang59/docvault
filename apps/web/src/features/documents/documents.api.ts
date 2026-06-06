@@ -18,6 +18,7 @@ import type {
   DocumentAiGuardrails,
   DocumentAccessImpact,
   DocumentAccessImpactRequest,
+  LegalHoldRequest,
 } from './documents.types';
 import type { PaginatedResponse } from '@/types/pagination';
 import { SENSITIVE_ACTION_PROOF_HEADER } from '@/features/security/sensitive-action';
@@ -137,6 +138,21 @@ export async function createDocument(dto: CreateDocumentDto): Promise<DocumentDe
 
 export async function updateDocument(id: string, dto: UpdateDocumentDto): Promise<DocumentDetail> {
   const res = await apiClient.patch<DocumentListItem>(apiEndpoints.metadata.documents.update(id), dto);
+  return normalizeDocumentDetail({
+    ...unwrap(res),
+    versions: [],
+    aclEntries: [],
+  });
+}
+
+export async function setDocumentLegalHold(
+  id: string,
+  dto: LegalHoldRequest,
+): Promise<DocumentDetail> {
+  const res = await apiClient.post<DocumentListItem>(
+    apiEndpoints.metadata.documents.legalHold(id),
+    dto,
+  );
   return normalizeDocumentDetail({
     ...unwrap(res),
     versions: [],

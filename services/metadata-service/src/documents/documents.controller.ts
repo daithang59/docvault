@@ -19,6 +19,7 @@ import { RolesGuard } from '../auth/roles.guard';
 import { DocumentsService } from './documents.service';
 import { CreateDocumentDto } from './dto/create-document.dto';
 import { UpdateDocumentDto } from './dto/update-document.dto';
+import { LegalHoldDto } from './dto/legal-hold.dto';
 import { AclService } from '../acl/acl.service';
 import { UpsertAclDto } from '../acl/dto/upsert-acl.dto';
 import { VersionsService } from '../versions/versions.service';
@@ -130,6 +131,26 @@ export class DocumentsController {
       docId,
       body,
       req.user,
+      buildRequestContext(req),
+    );
+  }
+
+  @Post(':docId/legal-hold')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Place or release a legal hold on a document',
+    description:
+      'Admin-only. While a legal hold is active, the retention job will not auto-archive the document. Placing a hold requires a reason.',
+  })
+  setLegalHold(
+    @Param('docId') docId: string,
+    @Body() body: LegalHoldDto,
+    @Req() req: any,
+  ) {
+    return this.documentsService.setLegalHold(
+      docId,
+      body,
       buildRequestContext(req),
     );
   }

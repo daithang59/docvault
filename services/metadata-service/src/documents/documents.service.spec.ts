@@ -271,4 +271,156 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('2026-05-01T00:00:00.000Z');
     expect(queryText).toContain('2026-06-01T23:59:59.999Z');
   });
+
+  it('translates has:legal-hold query operator into a legal hold filter', async () => {
+    await service.findAll(
+      {
+        traceId: 'trace-1',
+        actorId: 'viewer-1',
+        roles: ['viewer'],
+        groups: [],
+      } as any,
+      'has:legal-hold',
+    );
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"legalHold":true');
+  });
+});
+
+
+describe('DocumentsService legal hold', () => {
+  const adminContext = {
+    traceId: 'trace-lh',
+    actorId: 'admin-1',
+    roles: ['admin'],
+    authorization: 'Bearer token',
+    ip: '127.0.0.1',
+  };
+  const editorContext = {
+    traceId: 'trace-lh',
+    actorId: 'editor-1',
+    roles: ['editor'],
+    authorization: 'Bearer token',
+    ip: '127.0.0.1',
+  };
+  const mockFindUnique = jest.fn();
+  const mockUpdate = jest.fn();
+  const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+  let service: DocumentsService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    mockFindUnique.mockResolvedValue({
+      id: 'doc-1',
+      ownerId: 'someone-else',
+      title: 'Held doc',
+      classification: 'CONFIDENTIAL',
+      legalHold: false,
+    });
+    mockUpdate.mockImplementation(({ data }) =>
+      Promise.resolve({
+        id: 'doc-1',
+        ownerId: 'someone-else',
+        title: 'Held doc',
+        classification: 'CONFIDENTIAL',
+        legalHold: false,
+        ...data,
+      }),
+    );
+    service = new DocumentsService(
+      {
+        document: { findUnique: mockFindUnique, update: mockUpdate },
+      } as any,
+      { emitEvent: mockEmitEvent } as any,
+    );
+  });
+
+  it('places a document under legal hold with reason and actor stamp', async () => {
+    const result = await service.setLegalHold(
+      'doc-1',
+      { hold: true, reason: 'Litigation 2026-CV-01' },
+      adminContext as any,
+    );
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: expect.objectContaining({
+        legalHold: true,
+        legalHoldReason: 'Litigation 2026-CV-01',
+        legalHoldBy: 'admin-1',
+        legalHoldAt: expect.any(Date),
+      }),
+    });
+    expect(result.legalHold).toBe(true);
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      adminContext,
+      expect.objectContaining({
+        action: 'DOCUMENT_LEGAL_HOLD_PLACED',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-1',
+        result: 'SUCCESS',
+      }),
+    );
+  });
+
+  it('clears a legal hold and resets the hold metadata', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'someone-else',
+      title: 'Held doc',
+      classification: 'CONFIDENTIAL',
+      legalHold: true,
+      legalHoldReason: 'Litigation 2026-CV-01',
+    });
+
+    await service.setLegalHold('doc-1', { hold: false }, adminContext as any);
+
+    expect(mockUpdate).toHaveBeenCalledWith({
+      where: { id: 'doc-1' },
+      data: expect.objectContaining({
+        legalHold: false,
+        legalHoldReason: null,
+        legalHoldBy: null,
+        legalHoldAt: null,
+      }),
+    });
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      adminContext,
+      expect.objectContaining({
+        action: 'DOCUMENT_LEGAL_HOLD_RELEASED',
+        result: 'SUCCESS',
+      }),
+    );
+  });
+
+  it('requires a reason when placing a legal hold', async () => {
+    await expect(
+      service.setLegalHold('doc-1', { hold: true }, adminContext as any),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('rejects legal hold changes from non-admin roles', async () => {
+    await expect(
+      service.setLegalHold(
+        'doc-1',
+        { hold: true, reason: 'x' },
+        editorContext as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+    expect(mockUpdate).not.toHaveBeenCalled();
+  });
+
+  it('throws when the document does not exist', async () => {
+    mockFindUnique.mockResolvedValueOnce(null);
+    await expect(
+      service.setLegalHold(
+        'missing',
+        { hold: true, reason: 'x' },
+        adminContext as any,
+      ),
+    ).rejects.toThrow('Document not found');
+  });
 });

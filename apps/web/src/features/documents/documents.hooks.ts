@@ -17,9 +17,10 @@ import {
   addAclEntry,
   authorizeDownload,
   presignDownload,
+  setDocumentLegalHold,
 } from './documents.api';
 import type { ClassificationLevel } from '@/types/enums';
-import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto } from './documents.types';
+import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto, LegalHoldRequest } from './documents.types';
 import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
 import apiClient from '@/lib/api/client';
@@ -111,6 +112,22 @@ export function useUpdateDocument(id: string) {
       qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
       qc.invalidateQueries({ queryKey: documentsKeys.lists() });
       toast.success('Document updated successfully');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useSetLegalHold(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: LegalHoldRequest) => setDocumentLegalHold(id, dto),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
+      toast.success(
+        variables.hold ? 'Legal hold placed' : 'Legal hold released',
+      );
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });

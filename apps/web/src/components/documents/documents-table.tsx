@@ -12,7 +12,7 @@ import {
   SortingState,
   RowSelectionState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
@@ -166,9 +166,20 @@ export function DocumentsTable({
         const isHovered = hoveredRow === doc.id;
         return (
           <div className="relative">
-            <Link href={ROUTES.DOCUMENT_DETAIL(doc.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
-              {truncateEnd(doc.title, 60)}
-            </Link>
+            <span className="inline-flex items-center gap-1.5">
+              {doc.legalHold && (
+                <span
+                  title="Legal hold active — exempt from retention auto-archive"
+                  aria-label="Legal hold active"
+                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-amber-600"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <Link href={ROUTES.DOCUMENT_DETAIL(doc.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
+                {truncateEnd(doc.title, 60)}
+              </Link>
+            </span>
             {doc.tags.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {doc.tags.slice(0, 3).map((tag) => (

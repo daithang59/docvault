@@ -68,6 +68,10 @@ model Document {
   retentionClass  String?
   retentionUntil  DateTime?
   retentionReason String?
+  legalHold       Boolean           @default(false)
+  legalHoldReason String?
+  legalHoldBy     String?
+  legalHoldAt     DateTime?
   tags            String[]          @default([])
   status          DocumentStatus    @default(DRAFT)
   currentVersion  Int               @default(0)
@@ -85,6 +89,7 @@ model Document {
   @@index([status])
   @@index([retentionUntil])
   @@index([status, retentionUntil])
+  @@index([legalHold])
   @@index([tags], type: Gin)
   @@map("documents")
 }

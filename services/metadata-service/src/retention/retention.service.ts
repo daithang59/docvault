@@ -82,6 +82,8 @@ export class RetentionService {
         status: 'PUBLISHED',
         publishedAt: { not: null },
         archivedAt: null,
+        // Documents under legal hold are exempt from retention auto-archive.
+        legalHold: false,
       },
       select: {
         id: true,
@@ -93,6 +95,7 @@ export class RetentionService {
         retentionClass: true,
         retentionUntil: true,
         retentionReason: true,
+        legalHold: true,
       },
     });
 
@@ -100,6 +103,11 @@ export class RetentionService {
     let skipped = 0;
 
     for (const doc of candidates) {
+      // Defense in depth: never auto-archive a document under legal hold,
+      // even if a caller passed an unfiltered candidate set.
+      if ((doc as any).legalHold) {
+        continue;
+      }
       const evidence = this.toEvidenceRecord(doc as any, now);
       if (!evidence.retentionUntil || evidence.retentionStatus !== 'OVERDUE') {
         continue;
