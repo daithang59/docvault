@@ -419,6 +419,62 @@ async function fulfillApi(route: Route) {
     return;
   }
 
+  // activity feed sources
+  if (pathname.match(/^\/api\/metadata\/documents\/[^/]+\/comments$/)) {
+    if (request.method() === 'POST') {
+      const body = request.postDataJSON() as { content?: string };
+      await route.fulfill({
+        status: 200,
+        json: {
+          id: 'comment-new',
+          docId: pathname.split('/').at(-2),
+          authorId: 'admin1',
+          content: body.content ?? '',
+          createdAt: new Date().toISOString(),
+        },
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      json: [
+        {
+          id: 'comment-1',
+          docId: pathname.split('/').at(-2),
+          authorId: 'editor1',
+          content: 'Please double-check the figures.',
+          createdAt: hoursAgo(12),
+        },
+      ],
+    });
+    return;
+  }
+
+  if (pathname === '/api/audit/query') {
+    await route.fulfill({
+      status: 200,
+      json: {
+        data: [
+          {
+            eventId: 'evt-share-1',
+            action: 'DOCUMENT_SHARE_LINK_CREATED',
+            actorId: 'admin1',
+            actorRoles: ['admin'],
+            result: 'SUCCESS',
+            resourceType: 'DOCUMENT',
+            resourceId: 'doc-published-library',
+            timestamp: hoursAgo(4),
+          },
+        ],
+        total: 1,
+        page: 1,
+        pageSize: 50,
+        totalPages: 1,
+      },
+    });
+    return;
+  }
+
   if (pathname.endsWith('/workflow-history')) {
     const docId = pathname.split('/').at(-2) ?? 'unknown';
     await route.fulfill({
@@ -797,4 +853,17 @@ test('version history compares two versions and restores an older one', async ({
   await dialog.getByRole('button', { name: 'Restore version' }).click();
   await expect(dialog).toBeHidden();
   await expect(page.getByText('Version restored')).toBeVisible();
+});
+
+
+test('activity feed merges workflow, comments, and audit events', async ({
+  page,
+}) => {
+  await page.goto('/documents/doc-published-library');
+
+  const feed = page.getByRole('region', { name: 'Activity' });
+  await expect(feed.getByRole('heading', { name: 'Activity' })).toBeVisible();
+
+  await expect(feed.getByText('Please double-check the figures.')).toBeVisible();
+  await expect(feed.getByText(/document share link created/i)).toBeVisible();
 });

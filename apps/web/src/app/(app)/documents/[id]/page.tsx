@@ -17,6 +17,7 @@ import { DocumentVersionsCard } from '@/components/documents/document-versions-c
 import { DocumentWorkflowTimeline } from '@/components/documents/document-workflow-timeline';
 import { DocumentAclCard } from '@/components/documents/document-acl-card';
 import { DocumentCommentsCard } from '@/components/documents/document-comments-card';
+import { DocumentActivityFeedCard } from '@/components/documents/document-activity-feed-card';
 import { DocumentActionPanel } from '@/components/documents/document-action-panel';
 import { DocumentPreviewDialog } from '@/components/documents/document-preview-dialog';
 import { LoadingState } from '@/components/common/loading-state';
@@ -195,6 +196,9 @@ export default function DocumentDetailPage({ params }: Props) {
           )}
           <div className="animate-in delay-4">
             <DocumentCommentsCard docId={id} />
+          </div>
+          <div className="animate-in delay-4">
+            <DocumentActivityFeedCard docId={id} />
           </div>
         </div>
       </div>
