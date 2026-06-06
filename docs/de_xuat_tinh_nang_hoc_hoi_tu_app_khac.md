@@ -24,6 +24,7 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 - **Sequential approvers** — chuỗi duyệt nhiều bước có thứ tự; mỗi approver duyệt đúng lượt, chỉ publish sau bước cuối; card cấu hình + tiến độ trên trang chi tiết.
 - **@mention trong comment** — parse @username trong nội dung, gửi thông báo MENTIONED cho người được nhắc (bỏ qua tự nhắc); gợi ý cú pháp ở ô nhập.
 - **Smart folder (tag phân cấp)** — lọc folder theo path slash-style (chọn `finance` gồm cả `finance/q1`), kèm helper dựng cây thư mục.
+- **UI cây thư mục điều hướng** — sidebar cây thư mục có thể mở/đóng trên trang Documents, đếm số tài liệu mỗi nhánh, click để lọc theo folder (phản ánh vào URL).
 
 ---
 
@@ -68,7 +69,8 @@ Các tính năng dưới đây đã được triển khai theo TDD và đã ch�
 3. ~~Watermark preview~~ — đã xong
 4. ~~Trash khôi phục~~ — đã xong
 5. ~~Sequential approvers, @mention, smart folder~~ — đã xong
-6. Còn lại: folder/cây thư mục dạng UI điều hướng đầy đủ (mới làm phần lọc phân cấp), và nhóm độ-tin-cậy để thương mại (xem mục 4)
+6. ~~UI cây thư mục điều hướng~~ — đã xong
+7. Còn lại: nhóm độ-tin-cậy để thương mại (xem mục 4)
 
 ---
 

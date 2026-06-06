@@ -10,6 +10,7 @@ import { documentsKeys } from '@/features/documents/documents.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters } from '@/components/documents/document-filters';
+import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
@@ -347,49 +348,63 @@ export default function DocumentsPage() {
         />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="animate-in delay-3">
-          <EmptyState
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="lg:w-64 lg:shrink-0">
+          <DocumentFolderTree
+            documents={documents}
+            selectedFolder={filters.folder}
+            onSelect={(folder) => {
+              setFilters({ ...filters, folder });
+              setPage(1);
+            }}
+          />
+        </div>
+        <div className="min-w-0 flex-1">
+          {filtered.length === 0 ? (
+            <div className="animate-in delay-3">
+              <EmptyState
             title="No documents found"
           description={emptyDescription}
           icon="document"
           action={
-            <ProtectedAction roles={['editor', 'admin']}>
-              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
-                Create Document
-              </Link>
-            </ProtectedAction>
-          }
-          />
+                <ProtectedAction roles={['editor', 'admin']}>
+                  <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
+                    Create Document
+                  </Link>
+                </ProtectedAction>
+              }
+              />
+            </div>
+          ) : (
+            <>
+              <div className="animate-in delay-3">
+                <DocumentsTable
+                  data={paginated}
+                  enableSelection
+                  onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+                  onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+                  onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+                  onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+                  onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
+                  onDownload={(doc) => download(doc.id)}
+                  onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
+                  onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
+                  onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
+                  onBulkDelete={handleBulkDelete}
+                />
+                <TablePagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={filtered.length}
+                  totalPages={totalPages}
+                  onPageChange={(p) => setPage(p)}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                />
+              </div>
+            </>
+          )}
         </div>
-      ) : (
-        <>
-          <div className="animate-in delay-3">
-            <DocumentsTable
-              data={paginated}
-              enableSelection
-              onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
-              onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
-              onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
-              onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
-              onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
-              onDownload={(doc) => download(doc.id)}
-              onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
-              onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
-              onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
-              onBulkDelete={handleBulkDelete}
-            />
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              total={filtered.length}
-              totalPages={totalPages}
-              onPageChange={(p) => setPage(p)}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-            />
-          </div>
-        </>
-      )}
+      </div>
 
       <ConfirmDialog
         open={actionType === 'submit'}

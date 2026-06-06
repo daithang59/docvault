@@ -116,7 +116,7 @@ function buildDocuments(): MockDocument[] {
       filename: 'board-report.pdf',
       mimeType: 'application/pdf',
       fileSize: 256_000,
-      tags: ['finance', 'board'],
+      tags: ['finance', 'board', 'finance/q1'],
       createdAt: hoursAgo(48),
       updatedAt: hoursAgo(18),
     },
@@ -938,4 +938,19 @@ test('trash lists deleted documents and restores one', async ({ page }) => {
 
   await page.getByRole('button', { name: 'Restore' }).click();
   await expect(page.getByText('Document restored')).toBeVisible();
+});
+
+
+test('folder tree filters documents by hierarchical tag', async ({ page }) => {
+  await page.goto('/documents');
+  await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
+
+  const folders = page.getByRole('complementary', { name: 'Folders' });
+  await expect(folders).toBeVisible();
+
+  // The slash tag finance/q1 yields a "finance" root node.
+  await folders.getByRole('button', { name: /^finance/ }).first().click();
+
+  // After selecting the folder, the active filter should be reflected in the URL.
+  await expect(page).toHaveURL(/folder=finance/);
 });
