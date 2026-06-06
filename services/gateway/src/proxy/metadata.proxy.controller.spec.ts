@@ -221,6 +221,66 @@ describe('MetadataProxyController sensitive action proof', () => {
     expect(proxyService.forward).not.toHaveBeenCalled();
   });
 
+  it('audits a sensitive proof use when a retention run is authorized', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { archived: 1 } }),
+    } as unknown as ProxyService;
+    const auditClient = makeAuditClient();
+    const controller = makeController(proxyService, auditClient);
+    const req = makeReq({ url: '/metadata/retention/run' });
+    const issued = await (controller as any).issueSensitiveActionProof(req, {
+      action: 'run-retention',
+      challengePhrase: 'RUN RETENTION',
+    });
+    auditClient.emitEvent.mockClear();
+
+    await (controller as any).runRetention({
+      ...req,
+      headers: { [STEP_UP_HEADER]: issued.proof },
+    });
+
+    expect(auditClient.emitEvent).toHaveBeenCalledWith(expect.anything(), {
+      action: 'SENSITIVE_ACTION_PROOF_USED',
+      resourceType: 'SENSITIVE_ACTION',
+      resourceId: 'run-retention',
+      result: 'SUCCESS',
+      metadata: { sensitiveAction: 'run-retention' },
+    });
+  });
+
+  it('audits a denied sensitive proof use when the retention proof is invalid', async () => {
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: { archived: 1 } }),
+    } as unknown as ProxyService;
+    const auditClient = makeAuditClient();
+    const controller = makeController(proxyService, auditClient);
+    const req = makeReq({ url: '/metadata/retention/run' });
+    const issued = await (controller as any).issueSensitiveActionProof(req, {
+      action: 'export-evidence-packet',
+      challengePhrase: 'EXPORT EVIDENCE',
+    });
+    auditClient.emitEvent.mockClear();
+
+    await expect(
+      (controller as any).runRetention({
+        ...req,
+        headers: { [STEP_UP_HEADER]: issued.proof },
+      }),
+    ).rejects.toMatchObject({
+      response: expect.objectContaining({ statusCode: 403 }),
+    });
+
+    expect(auditClient.emitEvent).toHaveBeenCalledWith(expect.anything(), {
+      action: 'SENSITIVE_ACTION_PROOF_USE_DENIED',
+      resourceType: 'SENSITIVE_ACTION',
+      resourceId: 'run-retention',
+      result: 'DENY',
+      reason: expect.any(String),
+      metadata: { sensitiveAction: 'run-retention' },
+    });
+    expect(proxyService.forward).not.toHaveBeenCalled();
+  });
+
   it('rejects proof requests when recent re-auth is required but auth_time is stale', async () => {
     process.env.SENSITIVE_ACTION_REQUIRE_RECENT_AUTH = 'true';
     process.env.SENSITIVE_ACTION_REAUTH_MAX_AGE_SECONDS = '300';

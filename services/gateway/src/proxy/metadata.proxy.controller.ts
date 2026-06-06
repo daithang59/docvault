@@ -12,6 +12,7 @@ import {
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -22,7 +23,10 @@ import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
 import { GatewayAuditClient } from '../audit/audit.client';
 import { ProxyService } from './proxy.service';
-import { SensitiveActionProofService } from './sensitive-action-proof.service';
+import {
+  SensitiveActionProofService,
+  type SensitiveMetadataAction,
+} from './sensitive-action-proof.service';
 
 const EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES = [
   'fileContent',
@@ -137,7 +141,7 @@ export class MetadataProxyController {
       'Admin-only demo endpoint that runs the retention job. Optional `asOf` query parameter can be used as a deterministic demo clock.',
   })
   async runRetention(@Req() req: any) {
-    this.sensitiveActionProofService.assertProof(req, 'run-retention');
+    await this.assertSensitiveActionUse(req, 'run-retention');
     const queryString = req.url.includes('?')
       ? req.url.substring(req.url.indexOf('?'))
       : '';
@@ -149,6 +153,7 @@ export class MetadataProxyController {
   }
 
   @Post('sensitive-actions/proof')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('compliance_officer', 'admin')
   @HttpCode(200)
@@ -209,6 +214,51 @@ export class MetadataProxyController {
     }
   }
 
+  private async assertSensitiveActionUse(
+    req: any,
+    action: SensitiveMetadataAction,
+  ): Promise<void> {
+    try {
+      this.sensitiveActionProofService.assertProof(req, action);
+    } catch (error) {
+      await this.emitSensitiveActionUseAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_USE_DENIED',
+        resourceId: action,
+        result: 'DENY',
+        reason: getAuditReason(error),
+        metadata: { sensitiveAction: action },
+      });
+      throw error;
+    }
+
+    await this.emitSensitiveActionUseAudit(req, {
+      action: 'SENSITIVE_ACTION_PROOF_USED',
+      resourceId: action,
+      result: 'SUCCESS',
+      metadata: { sensitiveAction: action },
+    });
+  }
+
+  private async emitSensitiveActionUseAudit(
+    req: any,
+    event: {
+      action: 'SENSITIVE_ACTION_PROOF_USED' | 'SENSITIVE_ACTION_PROOF_USE_DENIED';
+      resourceId?: string;
+      result: 'SUCCESS' | 'DENY';
+      reason?: string;
+      metadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.auditClient.emitEvent(req, {
+        ...event,
+        resourceType: 'SENSITIVE_ACTION',
+      });
+    } catch {
+      // Sensitive actions should not fail solely because audit transport is down.
+    }
+  }
+
   @Get('documents/:docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
@@ -238,10 +288,7 @@ export class MetadataProxyController {
     @Req() req: any,
     @Query('asOf') asOf?: string,
   ) {
-    this.sensitiveActionProofService.assertProof(
-      req,
-      'export-evidence-packet',
-    );
+    await this.assertSensitiveActionUse(req, 'export-evidence-packet');
     const documentResponse = await this.proxyService.forward(req, {
       method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,

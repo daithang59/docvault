@@ -8,6 +8,7 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import axios from 'axios';
 import * as jwt from 'jsonwebtoken';
@@ -67,6 +68,7 @@ export class AuthController {
    * app directly — it handles the flow without involving the gateway's /auth routes.
    */
   @Get('login')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({
     summary: 'Initiate Keycloak OIDC login (redirect to Keycloak)',
     description:
