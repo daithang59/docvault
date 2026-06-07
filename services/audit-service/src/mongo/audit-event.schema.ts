@@ -47,6 +47,17 @@ export class AuditEvent {
   @Prop({ required: true })
   hash: string;
 
+  // HMAC-SHA256 signature over the event hash, keyed by a server-side secret.
+  // Defends against an attacker who can write the DB recomputing the whole
+  // chain: without the secret they cannot forge a valid signature.
+  // Optional so pre-signing events remain valid (verified as "unsigned").
+  @Prop()
+  signature?: string;
+
+  // Key id of the secret used to sign, for zero-downtime secret rotation.
+  @Prop()
+  signatureKid?: string;
+
   // Compound indexes matching the original Prisma schema
 }
 
