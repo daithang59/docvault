@@ -41,10 +41,22 @@ describe('InternalAwareThrottlerGuard (integration)', () => {
   it('returns 429 once the per-window limit is exceeded', async () => {
     const server = app.getHttpServer();
     // limit is 3 per window; the 4th request from the same tracker should 429.
-    await request(server).get('/ping').set('x-user-id', 'rate-user').expect(200);
-    await request(server).get('/ping').set('x-user-id', 'rate-user').expect(200);
-    await request(server).get('/ping').set('x-user-id', 'rate-user').expect(200);
-    await request(server).get('/ping').set('x-user-id', 'rate-user').expect(429);
+    await request(server)
+      .get('/ping')
+      .set('x-user-id', 'rate-user')
+      .expect(200);
+    await request(server)
+      .get('/ping')
+      .set('x-user-id', 'rate-user')
+      .expect(200);
+    await request(server)
+      .get('/ping')
+      .set('x-user-id', 'rate-user')
+      .expect(200);
+    await request(server)
+      .get('/ping')
+      .set('x-user-id', 'rate-user')
+      .expect(429);
   });
 
   it('exempts internal service-to-service calls carrying the shared secret', async () => {
@@ -94,7 +106,9 @@ describe('isInternalServiceCall', () => {
   it('accepts the exact configured secret', () => {
     process.env.INTERNAL_CALL_SECRET = 'internal-secret';
     expect(
-      isInternalServiceCall({ headers: { 'x-internal-call': 'internal-secret' } }),
+      isInternalServiceCall({
+        headers: { 'x-internal-call': 'internal-secret' },
+      }),
     ).toBe(true);
   });
 
