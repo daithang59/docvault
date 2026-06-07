@@ -12,7 +12,10 @@ function makeMockModel() {
 
   const applyFilter = (filter: Record<string, any>) =>
     docs.filter((d) => {
-      if (filter.recipientId !== undefined && d.recipientId !== filter.recipientId) {
+      if (
+        filter.recipientId !== undefined &&
+        d.recipientId !== filter.recipientId
+      ) {
         return false;
       }
       if (filter.read !== undefined && d.read !== filter.read) return false;
@@ -59,8 +62,8 @@ function makeMockModel() {
     find: jest.fn((filter: Record<string, any> = {}) =>
       makeQuery(applyFilter(filter)),
     ),
-    countDocuments: jest.fn(async (filter: Record<string, any> = {}) =>
-      applyFilter(filter).length,
+    countDocuments: jest.fn(
+      async (filter: Record<string, any> = {}) => applyFilter(filter).length,
     ),
     updateOne: jest.fn(async (filter: Record<string, any>, update: any) => {
       const target = applyFilter(filter)[0];
