@@ -6,6 +6,8 @@ import {
   Notification,
   NotificationDocument,
 } from '../mongo/notification.schema';
+import { EmailService } from './email.service';
+import { UserEmailResolver } from './user-email.resolver';
 
 export interface NotificationRecord {
   id: string;
@@ -29,13 +31,34 @@ export interface NotificationPage {
 
 const MAX_PER_RECIPIENT = 100;
 
+/**
+ * NotifyTypes that also trigger an email (in addition to in-app storage).
+ * Configurable via EMAIL_NOTIFY_TYPES (comma-separated); defaults to REJECTED
+ * — the workflow event a recipient most needs to act on.
+ */
+function emailTriggerTypes(): Set<string> {
+  const configured = process.env.EMAIL_NOTIFY_TYPES?.trim();
+  if (configured) {
+    return new Set(
+      configured
+        .split(',')
+        .map((t) => t.trim().toUpperCase())
+        .filter(Boolean),
+    );
+  }
+  return new Set<string>([NotifyType.REJECTED]);
+}
+
 @Injectable()
 export class NotificationService {
   private readonly logger = new Logger(NotificationService.name);
+  private readonly emailTriggers = emailTriggerTypes();
 
   constructor(
     @InjectModel(Notification.name)
     private readonly model: Model<NotificationDocument>,
+    private readonly email: EmailService,
+    private readonly emailResolver: UserEmailResolver,
   ) {}
 
   private uid(): string {
@@ -100,6 +123,12 @@ export class NotificationService {
       await this.pruneRecipient(recipientId);
     }
 
+    // Fire-and-forget email for trigger types (in addition to in-app storage).
+    // Never blocks or fails the notify call.
+    if (this.emailTriggers.has(String(dto.type).toUpperCase())) {
+      void this.sendEmails(unique, base);
+    }
+
     this.logger.log(
       JSON.stringify({
         stored: true,
@@ -115,6 +144,34 @@ export class NotificationService {
       docId: dto.docId,
       recipients: unique,
     };
+  }
+
+  /**
+   * Resolve each recipient's email via Keycloak and send. Best-effort: any
+   * failure (no email transport, unresolved address, provider error) is
+   * logged and skipped — it never affects the stored in-app notification.
+   */
+  private async sendEmails(
+    recipientIds: string[],
+    base: { type: string; docId: string; docTitle?: string; reason?: string },
+  ): Promise<void> {
+    if (!this.email.isEnabled()) return;
+
+    const subject = `[DocVault] ${base.type}: ${base.docTitle ?? base.docId}`;
+    const text =
+      `A document notification requires your attention.\n\n` +
+      `Type: ${base.type}\n` +
+      `Document: ${base.docTitle ?? base.docId}\n` +
+      (base.reason ? `Reason: ${base.reason}\n` : '') +
+      `\nOpen DocVault to view details.`;
+
+    await Promise.allSettled(
+      recipientIds.map(async (sub) => {
+        const email = await this.emailResolver.resolveEmail(sub);
+        if (!email) return;
+        await this.email.send({ to: email, subject, text });
+      }),
+    );
   }
 
   /** Delete the oldest records beyond the per-recipient cap. */

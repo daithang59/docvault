@@ -89,7 +89,11 @@ function makeMockModel() {
 describe('NotificationService', () => {
   it('persists timeline metadata without exposing file content or grant data', async () => {
     const model = makeMockModel();
-    const service = new NotificationService(model as any);
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => false, send: jest.fn() } as any,
+      { isEnabled: () => false, resolveEmail: jest.fn() } as any,
+    );
 
     await service.notify({
       type: NotifyType.REJECTED,
@@ -141,7 +145,11 @@ describe('NotificationService', () => {
 
   it('fans out one record per unique recipient', async () => {
     const model = makeMockModel();
-    const service = new NotificationService(model as any);
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => false, send: jest.fn() } as any,
+      { isEnabled: () => false, resolveEmail: jest.fn() } as any,
+    );
 
     await service.notify({
       type: NotifyType.SUBMITTED,
@@ -156,7 +164,11 @@ describe('NotificationService', () => {
 
   it('marks a single notification as read by id', async () => {
     const model = makeMockModel();
-    const service = new NotificationService(model as any);
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => false, send: jest.fn() } as any,
+      { isEnabled: () => false, resolveEmail: jest.fn() } as any,
+    );
 
     await service.notify({
       type: NotifyType.APPROVED,
@@ -174,7 +186,11 @@ describe('NotificationService', () => {
 
   it('marks all notifications read for a user', async () => {
     const model = makeMockModel();
-    const service = new NotificationService(model as any);
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => false, send: jest.fn() } as any,
+      { isEnabled: () => false, resolveEmail: jest.fn() } as any,
+    );
 
     await service.notify({
       type: NotifyType.SUBMITTED,
@@ -190,5 +206,52 @@ describe('NotificationService', () => {
     expect(await service.getUnreadCount('user-2')).toBe(2);
     await service.markAllRead('user-2');
     expect(await service.getUnreadCount('user-2')).toBe(0);
+  });
+
+  it('sends email for REJECTED and resolves recipient address', async () => {
+    const model = makeMockModel();
+    const send = jest.fn().mockResolvedValue(true);
+    const resolveEmail = jest.fn().mockResolvedValue('editor-1@docvault.local');
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => true, send } as any,
+      { isEnabled: () => true, resolveEmail } as any,
+    );
+
+    await service.notify({
+      type: NotifyType.REJECTED,
+      docId: 'doc-9',
+      recipientId: 'editor-1',
+      docTitle: 'Board Report',
+      reason: 'Missing evidence',
+    } as any);
+
+    // Email send is fire-and-forget; allow the microtask queue to drain.
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(resolveEmail).toHaveBeenCalledWith('editor-1');
+    expect(send).toHaveBeenCalledTimes(1);
+    expect(send.mock.calls[0][0]).toMatchObject({
+      to: 'editor-1@docvault.local',
+    });
+  });
+
+  it('does NOT send email for non-trigger types (e.g. SUBMITTED)', async () => {
+    const model = makeMockModel();
+    const send = jest.fn().mockResolvedValue(true);
+    const service = new NotificationService(
+      model as any,
+      { isEnabled: () => true, send } as any,
+      { isEnabled: () => true, resolveEmail: jest.fn().mockResolvedValue('x@y.z') } as any,
+    );
+
+    await service.notify({
+      type: NotifyType.SUBMITTED,
+      docId: 'doc-10',
+      recipientId: 'approver-1',
+    } as any);
+    await new Promise((r) => setTimeout(r, 0));
+
+    expect(send).not.toHaveBeenCalled();
   });
 });
