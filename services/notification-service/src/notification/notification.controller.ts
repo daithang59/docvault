@@ -53,10 +53,10 @@ export class NotificationController {
   /** Lightweight — returns unread count for the authenticated user. */
   @Get('notify/unread-count')
   @ApiOperation({ summary: 'Get unread notification count' })
-  unreadCount(@Req() req: any) {
+  async unreadCount(@Req() req: any) {
     // Use sub (UUID) to match buildActorId() — sub ?? username ?? 'unknown'.
     const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
-    return { count: this.ns.getUnreadCount(userId) };
+    return { count: await this.ns.getUnreadCount(userId) };
   }
 
   // ── POST /notify/:id/read ────────────────────────────────────────────────
@@ -64,8 +64,8 @@ export class NotificationController {
   @Post('notify/:id/read')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Mark a single notification as read' })
-  markAsRead(@Param('id') id: string) {
-    return { ok: this.ns.markAsRead(id) };
+  async markAsRead(@Param('id') id: string) {
+    return { ok: await this.ns.markAsRead(id) };
   }
 
   // ── POST /notify/mark-read ───────────────────────────────────────────────
@@ -73,9 +73,9 @@ export class NotificationController {
   @Post('notify/mark-read')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({ summary: 'Mark all notifications as read' })
-  markAllRead(@Req() req: any) {
+  async markAllRead(@Req() req: any) {
     const userId = req.user?.sub ?? req.user?.username ?? 'anonymous';
-    this.ns.markAllRead(userId);
+    await this.ns.markAllRead(userId);
     return { ok: true };
   }
 }
