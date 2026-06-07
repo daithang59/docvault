@@ -300,7 +300,11 @@ describe('AuditService — HMAC signing', () => {
     const service = new AuditService(model as any);
 
     await service.create(dto);
-    await service.create({ ...dto, eventId: 'sig-event-2', action: 'DOCUMENT_APPROVED' });
+    await service.create({
+      ...dto,
+      eventId: 'sig-event-2',
+      action: 'DOCUMENT_APPROVED',
+    });
 
     const result = await service.verifyChain();
     expect(result.valid).toBe(true);
@@ -315,7 +319,11 @@ describe('AuditService — HMAC signing', () => {
     const service = new AuditService(model as any);
 
     await service.create(dto);
-    await service.create({ ...dto, eventId: 'sig-event-2', action: 'DOCUMENT_APPROVED' });
+    await service.create({
+      ...dto,
+      eventId: 'sig-event-2',
+      action: 'DOCUMENT_APPROVED',
+    });
 
     // Attacker with DB write access tampers an event and recomputes hash+prevHash,
     // but cannot produce a valid signature without the secret. Simulate by
