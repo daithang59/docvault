@@ -62,9 +62,33 @@ ALTER TABLE "documents" DISABLE ROW LEVEL SECURITY;    -- undo Stage 1
 -- repeat per table
 ```
 
+## Critical: the app must connect as a NON-superuser role
+
+RLS is **bypassed** by `SUPERUSER` and `BYPASSRLS` roles. The default
+`docvault` role is a superuser, so RLS never applies when the app connects as
+it. `create-app-role.sql` creates `docvault_app` (NOSUPERUSER, NOBYPASSRLS)
+with DML grants. Migrations/seed keep using the owner role (DDL); the app
+runtime must connect as `docvault_app` for RLS to take effect.
+
+## Verified isolation (live Postgres, role docvault_app)
+
+With FORCE RLS applied and connecting as `docvault_app`:
+
+| Context | Result |
+|---------|--------|
+| no context (NULL) | sees all rows (system jobs keep working) |
+| correct org | sees that org's rows |
+| **wrong org** | **0 rows — isolation enforced** |
+
+The same wrong-org query as the superuser `docvault` role returns all rows,
+confirming the bypass and that the app must use the restricted role.
+
 ## Status
 
-- Policies + force scripts: written, **not** auto-applied (not under migrations).
+- Policies + force + app-role scripts: written under `prisma/rls`,
+  **not** auto-applied (not under migrations).
 - `withOrgContext` helper: implemented + unit-tested (param-safe, tx-scoped).
-- DB-level enforcement: **not yet activated** — requires Docker/Postgres to
-  verify the staged rollout before enabling in any real environment.
+- SQL-layer isolation: **verified** on live Postgres via `docvault_app`.
+- Runtime activation: **not yet wired** — requires (1) the app to connect as
+  `docvault_app` and (2) org-scoped queries routed through `withOrgContext`.
+
