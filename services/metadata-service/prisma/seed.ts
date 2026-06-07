@@ -15,11 +15,6 @@ import {
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
-// Keycloak user sub UUIDs (from Keycloak Admin API)
-const EDITOR1 = '0e23e8e2-8f9d-4381-a7d6-9f181550de7f';
-const ADMIN1 = '8c5c10f1-187f-4f21-9430-76c6a852f9e1';
-const APPROVER1 = '181882a9-1394-4f5c-93e8-0dd5105620ae';
-
 const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
@@ -27,8 +22,63 @@ const prisma = new PrismaClient({ adapter });
 // Default seed organization — all sample documents belong to this org.
 const ORG1 = '00000000-0000-0000-0000-000000000001';
 
+// Demo user subs are resolved from Keycloak at seed time (not hardcoded) so
+// they always match the running realm — otherwise users get lazily
+// provisioned into separate orgs and lose access to seeded documents.
+const KC_BASE = process.env.KEYCLOAK_BASE_URL ?? 'http://localhost:8080';
+const KC_REALM = process.env.KEYCLOAK_REALM ?? 'docvault';
+const KC_CLIENT = process.env.KEYCLOAK_CLIENT_ID ?? 'docvault-gateway';
+const KC_SECRET = process.env.KEYCLOAK_CLIENT_SECRET ?? 'dev-gateway-secret';
+const DEMO_PASSWORD = process.env.SEED_DEMO_PASSWORD ?? 'Passw0rd!';
+
+/** Resolve a Keycloak user's `sub` by logging in via password grant. */
+async function resolveSub(username: string): Promise<string> {
+  const res = await fetch(
+    `${KC_BASE}/realms/${KC_REALM}/protocol/openid-connect/token`,
+    {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'password',
+        client_id: KC_CLIENT,
+        client_secret: KC_SECRET,
+        username,
+        password: DEMO_PASSWORD,
+      }),
+    },
+  );
+  if (!res.ok) {
+    throw new Error(`Cannot resolve sub for ${username}: HTTP ${res.status}`);
+  }
+  const { access_token } = (await res.json()) as { access_token: string };
+  const payload = JSON.parse(
+    Buffer.from(access_token.split('.')[1], 'base64').toString('utf8'),
+  ) as { sub: string };
+  return payload.sub;
+}
+
+// Populated by resolveDemoUsers() before any seeding.
+let EDITOR1 = '';
+let ADMIN1 = '';
+let APPROVER1 = '';
+let VIEWER1 = '';
+let CO1 = '';
+
+async function resolveDemoUsers(): Promise<void> {
+  [EDITOR1, ADMIN1, APPROVER1, VIEWER1, CO1] = await Promise.all([
+    resolveSub('editor1'),
+    resolveSub('admin1'),
+    resolveSub('approver1'),
+    resolveSub('viewer1'),
+    resolveSub('co1'),
+  ]);
+}
+
 async function main() {
   console.log('🌱 Seeding database...');
+
+  // Resolve real Keycloak subs first so memberships match the running realm.
+  await resolveDemoUsers();
 
   // Clean up
   await prisma.documentWorkflowHistory.deleteMany();
@@ -40,6 +90,7 @@ async function main() {
   await prisma.organization.deleteMany();
 
   // ── Organization + memberships ─────────────────────────────
+  // All demo users belong to one org (internal-company model).
   await prisma.organization.create({
     data: {
       id: ORG1,
@@ -51,6 +102,8 @@ async function main() {
           { userId: ADMIN1, role: 'ADMIN' },
           { userId: EDITOR1, role: 'MEMBER' },
           { userId: APPROVER1, role: 'MEMBER' },
+          { userId: VIEWER1, role: 'MEMBER' },
+          { userId: CO1, role: 'MEMBER' },
         ],
       },
     },
