@@ -787,13 +787,32 @@ async function main() {
   );
 
   const futureAsOf = '2030-01-01T00:00:00.000Z';
+  // run-retention is a sensitive action: obtain a step-up proof first.
+  const retentionProof = await expectStatus(
+    'admin issue run-retention proof',
+    '/api/metadata/sensitive-actions/proof',
+    200,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(adminToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'run-retention',
+        challengePhrase: 'RUN RETENTION',
+      }),
+    },
+  );
   const retentionRun = await expectStatus(
     'admin run retention future clock',
     `/api/metadata/retention/run?asOf=${encodeURIComponent(futureAsOf)}`,
     200,
     {
       method: 'POST',
-      headers: authHeaders(adminToken),
+      headers: authHeaders(adminToken, {
+        'x-docvault-step-up-proof': retentionProof.proof,
+      }),
     },
   );
   assert(
@@ -861,12 +880,30 @@ async function main() {
   );
   log(`PASS audit verify-chain valid=${chainStatus.valid}`);
 
+  const evidenceProof = await expectStatus(
+    'compliance officer issue evidence-packet proof',
+    '/api/metadata/sensitive-actions/proof',
+    200,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(complianceToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        action: 'export-evidence-packet',
+        challengePhrase: 'EXPORT EVIDENCE',
+      }),
+    },
+  );
   const evidencePacket = await expectStatus(
     'compliance officer evidence packet',
     `/api/metadata/documents/${docId}/evidence-packet`,
     200,
     {
-      headers: authHeaders(complianceToken),
+      headers: authHeaders(complianceToken, {
+        'x-docvault-step-up-proof': evidenceProof.proof,
+      }),
     },
   );
   assert(
