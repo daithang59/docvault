@@ -36,20 +36,26 @@ async function main() {
     tx.document.count(),
   );
 
-  console.log(JSON.stringify({ noContext: noCtx, correctOrg: correct, wrongOrg: wrong }));
+  console.log(
+    JSON.stringify({ noContext: noCtx, correctOrg: correct, wrongOrg: wrong }),
+  );
 
   await prisma.$disconnect();
 
   // Assertions: correct org must see rows; wrong org must see zero.
   if (wrong !== 0) {
-    console.error(`FAIL: wrong-org query returned ${wrong}, expected 0 (RLS not enforced)`);
+    console.error(
+      `FAIL: wrong-org query returned ${wrong}, expected 0 (RLS not enforced)`,
+    );
     process.exit(1);
   }
   if (correct <= 0) {
     console.error(`FAIL: correct-org query returned ${correct}, expected > 0`);
     process.exit(1);
   }
-  console.log('PASS: RLS isolation enforced via withOrgContext through real Prisma + docvault_app');
+  console.log(
+    'PASS: RLS isolation enforced via withOrgContext through real Prisma + docvault_app',
+  );
 }
 
 main().catch((e) => {
