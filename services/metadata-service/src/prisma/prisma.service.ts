@@ -6,7 +6,13 @@ import { PrismaPg } from '@prisma/adapter-pg';
 @Injectable()
 export class PrismaService extends PrismaClient implements OnModuleInit {
   constructor() {
-    const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+    // Runtime connects as the restricted app role (RLS-enforced) when
+    // DATABASE_URL_RUNTIME is set; otherwise falls back to DATABASE_URL so
+    // existing setups keep working. Migrations/seed always use DATABASE_URL
+    // (owner role) for DDL.
+    const connectionString =
+      process.env.DATABASE_URL_RUNTIME ?? process.env.DATABASE_URL!;
+    const pool = new Pool({ connectionString });
     const adapter = new PrismaPg(pool as any);
     super({ adapter });
   }
