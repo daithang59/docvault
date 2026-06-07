@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import {
@@ -8,7 +7,6 @@ import {
   fetchOrgMembers,
   updateMemberRole,
   removeMember,
-  type OrganizationInfo,
 } from './org.api';
 
 /**
@@ -17,32 +15,14 @@ import {
  */
 export function useMyOrg() {
   const { session } = useAuth();
-  const [org, setOrg] = useState<OrganizationInfo | null>(null);
-  const [loading, setLoading] = useState(false);
+  const query = useQuery({
+    queryKey: ['org', 'me'] as const,
+    queryFn: fetchMyOrg,
+    enabled: Boolean(session),
+    staleTime: 5 * 60 * 1000,
+  });
 
-  useEffect(() => {
-    if (!session) {
-      setOrg(null);
-      return;
-    }
-    let cancelled = false;
-    setLoading(true);
-    fetchMyOrg()
-      .then((data) => {
-        if (!cancelled) setOrg(data);
-      })
-      .catch(() => {
-        if (!cancelled) setOrg(null);
-      })
-      .finally(() => {
-        if (!cancelled) setLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [session]);
-
-  return { org, loading };
+  return { org: query.data ?? null, loading: query.isLoading };
 }
 
 /** Loads the member list of the current user's organization (admin only). */

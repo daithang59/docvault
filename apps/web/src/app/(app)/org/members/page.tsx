@@ -1,8 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
-import { Building2, RefreshCw, Shield, Users, Trash2, ShieldCheck, UserMinus } from 'lucide-react';
+import { Building2, RefreshCw, Shield, Users, ShieldCheck, UserMinus } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
@@ -58,7 +57,7 @@ export default function OrgMembersPage() {
     });
   }
 
-  const members = membersQuery.data ?? [];
+  const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
   const memberIds = useMemo(() => members.map((m) => m.userId), [members]);
   const { data: displayNames } = useOwnerDisplayNames(memberIds);
 
