@@ -26,7 +26,17 @@ export class PrismaService extends PrismaClient implements OnModuleInit {
    */
   async withOrgContext<T>(
     organizationId: string,
-    fn: (tx: Omit<PrismaClient, '$connect' | '$disconnect' | '$on' | '$transaction' | '$use' | '$extends'>) => Promise<T>,
+    fn: (
+      tx: Omit<
+        PrismaClient,
+        | '$connect'
+        | '$disconnect'
+        | '$on'
+        | '$transaction'
+        | '$use'
+        | '$extends'
+      >,
+    ) => Promise<T>,
   ): Promise<T> {
     return this.$transaction(async (tx) => {
       // Parameterized to prevent injection via organizationId.
