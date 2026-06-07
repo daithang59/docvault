@@ -242,7 +242,10 @@ describe('NotificationService', () => {
     const service = new NotificationService(
       model as any,
       { isEnabled: () => true, send } as any,
-      { isEnabled: () => true, resolveEmail: jest.fn().mockResolvedValue('x@y.z') } as any,
+      {
+        isEnabled: () => true,
+        resolveEmail: jest.fn().mockResolvedValue('x@y.z'),
+      } as any,
     );
 
     await service.notify({

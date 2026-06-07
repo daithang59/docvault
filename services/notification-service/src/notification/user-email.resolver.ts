@@ -15,7 +15,10 @@ interface KeycloakUser {
 @Injectable()
 export class UserEmailResolver {
   private readonly logger = new Logger(UserEmailResolver.name);
-  private readonly cache = new Map<string, { email?: string; expiresAt: number }>();
+  private readonly cache = new Map<
+    string,
+    { email?: string; expiresAt: number }
+  >();
   private static readonly TTL_MS = 5 * 60_000;
 
   private get baseUrl(): string | undefined {
@@ -47,7 +50,10 @@ export class UserEmailResolver {
     }
 
     const email = await this.fetchEmail(sub);
-    this.cache.set(sub, { email, expiresAt: Date.now() + UserEmailResolver.TTL_MS });
+    this.cache.set(sub, {
+      email,
+      expiresAt: Date.now() + UserEmailResolver.TTL_MS,
+    });
     return email;
   }
 
