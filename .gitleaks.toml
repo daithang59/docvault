@@ -1,0 +1,45 @@
+# Gitleaks configuration for DocVault
+# Extends the default ruleset and allowlists known demo/dev fixtures so CI
+# stays green on intentional non-secrets while still catching real leaks.
+#
+# Docs: https://github.com/gitleaks/gitleaks
+
+# Inherit all default detection rules.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "DocVault demo/dev fixtures — intentional non-production credentials"
+
+# Paths that hold demo-only credentials by design. These are documented as
+# non-production and must be replaced before any real deployment.
+paths = [
+  # Local infra compose + Keycloak realm seed (demo passwords only)
+  '''infra/keycloak/realm-docvault\.json''',
+  '''infra/docker-compose\.dev\.yml''',
+  # Kubernetes demo secret (explicitly labeled demo-only, replace with SOPS/SealedSecrets)
+  '''infra/k8s/infra-deps/app-secrets\.yaml''',
+  # Env templates (placeholder keys, no real values)
+  '''\.env\.example''',
+  # Terraform plan binaries (can contain rendered values; should not be committed long-term)
+  '''.*\.tfplan$''',
+  # Lockfiles and generated artifacts
+  '''pnpm-lock\.yaml''',
+  '''.*/generated/.*''',
+]
+
+# Known demo secret literals used across the dev stack. Allowlisting the exact
+# strings means a NEW/different secret value still trips the scanner.
+regexes = [
+  '''dev-gateway-secret''',
+  '''docvault-download-grant-secret''',
+  '''Passw0rd!''',
+  '''minioadmin''',
+  '''minioadminpw''',
+  '''adminpw''',
+  '''docvaultpw''',
+  '''rootpw''',
+]
+
+# Frontend "*.keys.ts" are React Query key factories, NOT credentials.
+regexTarget = "match"

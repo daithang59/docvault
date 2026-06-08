@@ -14,6 +14,7 @@ import { DocumentsProxyController } from './proxy/documents.proxy.controller';
 import { WorkflowProxyController } from './proxy/workflow.proxy.controller';
 import { AuditProxyController } from './proxy/audit.proxy.controller';
 import { NotifyProxyController } from './proxy/notify.proxy.controller';
+import { OrgProxyController } from './proxy/org.proxy.controller';
 import { SensitiveActionProofService } from './proxy/sensitive-action-proof.service';
 import { GatewayAuditClient } from './audit/audit.client';
 
@@ -38,6 +39,7 @@ import { GatewayAuditClient } from './audit/audit.client';
     WorkflowProxyController,
     AuditProxyController,
     NotifyProxyController,
+    OrgProxyController,
   ],
   providers: [
     ProxyService,

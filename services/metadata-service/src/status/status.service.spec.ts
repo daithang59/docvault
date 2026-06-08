@@ -18,7 +18,11 @@ const mockTransaction = jest.fn((fn) =>
 const mockFindUnique = jest.fn();
 
 const mockPrisma = {
-  document: { findUnique: mockFindUnique, update: mockDocumentUpdate },
+  document: {
+    findUnique: mockFindUnique,
+    findFirst: mockFindUnique,
+    update: mockDocumentUpdate,
+  },
   documentWorkflowHistory: { create: mockWorkflowHistoryCreate },
   $transaction: mockTransaction,
 };
@@ -26,6 +30,9 @@ const mockPrisma = {
 // --- Mock AuditClient ---
 const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
 const mockAuditClient = { emitEvent: mockEmitEvent };
+
+// --- Mock OrgService ---
+const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
 
 // --- Test helpers ---
 function makeDocument(overrides: Partial<Record<string, any>> = {}) {
@@ -56,7 +63,11 @@ describe('StatusService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new StatusService(mockPrisma as any, mockAuditClient as any);
+    service = new StatusService(
+      mockPrisma as any,
+      mockAuditClient as any,
+      mockOrgService as any,
+    );
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockWorkflowHistoryCreate.mockResolvedValue({});
   });
@@ -232,5 +243,19 @@ describe('StatusService', () => {
         context,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('scopes the document lookup to the resolved organization', async () => {
+    mockFindUnique.mockResolvedValue(makeDocument({ status: 'DRAFT' }));
+
+    await service.update(
+      'doc-1',
+      { status: 'PENDING', action: 'SUBMIT' },
+      adminUser,
+      context,
+    );
+
+    const lookupArg = JSON.stringify(mockFindUnique.mock.calls[0][0]);
+    expect(lookupArg).toContain('"organizationId":"org-1"');
   });
 });

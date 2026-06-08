@@ -5,6 +5,23 @@
   "loginWithEmailAllowed": false,
   "registrationAllowed": false,
 
+  "bruteForceProtected": true,
+  "permanentLockout": false,
+  "failureFactor": 5,
+  "maxFailureWaitSeconds": 900,
+  "waitIncrementSeconds": 60,
+  "minimumQuickLoginWaitSeconds": 60,
+  "quickLoginCheckMilliSeconds": 1000,
+  "maxDeltaTimeSeconds": 43200,
+
+  "passwordPolicy": "length(8) and upperCase(1) and lowerCase(1) and digits(1) and specialChars(1) and notUsername",
+
+  "otpPolicyType": "totp",
+  "otpPolicyAlgorithm": "HmacSHA1",
+  "otpPolicyDigits": 6,
+  "otpPolicyPeriod": 30,
+  "otpPolicyLookAheadWindow": 1,
+
   "roles": {
     "realm": [
       { "name": "viewer" },
@@ -150,7 +167,7 @@
       "firstName": "CO",
       "lastName": "One",
       "email": "co1@docvault.local",
-      "requiredActions": [],
+      "requiredActions": ["CONFIGURE_TOTP"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["co", "compliance_officer"]
     },
@@ -161,7 +178,7 @@
       "firstName": "Admin",
       "lastName": "One",
       "email": "admin1@docvault.local",
-      "requiredActions": [],
+      "requiredActions": ["CONFIGURE_TOTP"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["admin"]
     },

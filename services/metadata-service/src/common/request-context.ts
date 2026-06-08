@@ -12,6 +12,8 @@ export type RequestContext = {
   roles: string[];
   groups?: string[];
   ip?: string;
+  /** Resolved organization the actor belongs to. Populated by OrgService. */
+  organizationId?: string;
 };
 
 export function buildActorId(user: ServiceUser): string {

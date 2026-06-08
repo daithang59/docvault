@@ -1,7 +1,7 @@
 import { BadRequestException, Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
-import { createHash, randomUUID } from 'crypto';
+import { createHash, createHmac, randomUUID } from 'crypto';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
@@ -173,6 +173,12 @@ export class AuditService {
 
     const hash = this.computeHash(prevHash, canonicalPayload);
 
+    // Sign the hash with the server-side secret (if configured) so the chain
+    // cannot be silently recomputed by anyone with raw DB write access.
+    const signing = this.getSigningSecret();
+    const signature = signing ? this.signHash(hash, signing.secret) : undefined;
+    const signatureKid = signing?.kid;
+
     // 3. Insert the event
     const saved = await this.auditEvent.create({
       eventId,
@@ -189,6 +195,7 @@ export class AuditService {
       metadata: dto.metadata,
       prevHash,
       hash,
+      ...(signature ? { signature, signatureKid } : {}),
     });
 
     return saved.toObject();
@@ -453,6 +460,36 @@ export class AuditService {
   ): string {
     const input = `${prevHash ?? ''}|${canonicalPayload}`;
     return createHash('sha256').update(input, 'utf8').digest('hex');
+  }
+
+  /**
+   * Resolve the current signing secret + key id, if configured.
+   * AUDIT_SIGNING_KID selects which AUDIT_SIGNING_SECRET_<kid> to use;
+   * falling back to a single AUDIT_SIGNING_SECRET for simple setups.
+   */
+  private getSigningSecret(): { kid?: string; secret: string } | null {
+    const kid = process.env.AUDIT_SIGNING_KID?.trim();
+    if (kid) {
+      const secret = process.env[`AUDIT_SIGNING_SECRET_${kid}`];
+      return secret && secret.trim().length > 0 ? { kid, secret } : null;
+    }
+    const secret = process.env.AUDIT_SIGNING_SECRET;
+    return secret && secret.trim().length > 0 ? { secret } : null;
+  }
+
+  /** Resolve a verification secret for a given kid (supports rotation). */
+  private getVerifySecret(kid?: string): string | null {
+    if (kid) {
+      const secret = process.env[`AUDIT_SIGNING_SECRET_${kid}`];
+      return secret && secret.trim().length > 0 ? secret : null;
+    }
+    const secret = process.env.AUDIT_SIGNING_SECRET;
+    return secret && secret.trim().length > 0 ? secret : null;
+  }
+
+  /** HMAC-SHA256 over the event hash, keyed by the signing secret. */
+  private signHash(hash: string, secret: string): string {
+    return createHmac('sha256', secret).update(hash, 'utf8').digest('hex');
   }
 
   private async getRepeatedDenyActors(): Promise<
@@ -1201,6 +1238,9 @@ export class AuditService {
     checked: number;
     firstBrokenIndex?: number;
     message?: string;
+    signedCount?: number;
+    unsignedCount?: number;
+    signatureValid?: boolean;
   }> {
     const events = await this.auditEvent
       .find({}, { _id: 0 })
@@ -1209,8 +1249,11 @@ export class AuditService {
       .lean();
 
     if (events.length === 0) {
-      return { valid: true, checked: 0 };
+      return { valid: true, checked: 0, signedCount: 0, unsignedCount: 0 };
     }
+
+    let signedCount = 0;
+    let unsignedCount = 0;
 
     for (let i = 0; i < events.length; i++) {
       const event = events[i] as any;
@@ -1254,8 +1297,35 @@ export class AuditService {
           message: `prevHash mismatch at event index ${i} (eventId=${event.eventId}). Expected=${i === 0 ? null : (events[i - 1] as any).hash}, got=${event.prevHash}`,
         };
       }
+
+      // Signature check: a signed event must carry a valid HMAC over its hash.
+      // Unsigned legacy events are counted but do not fail the chain.
+      if (event.signature) {
+        const secret = this.getVerifySecret(event.signatureKid);
+        if (!secret) {
+          unsignedCount += 1;
+        } else if (this.signHash(event.hash, secret) !== event.signature) {
+          return {
+            valid: false,
+            checked: i + 1,
+            firstBrokenIndex: i,
+            signatureValid: false,
+            message: `Signature mismatch at event index ${i} (eventId=${event.eventId}).`,
+          };
+        } else {
+          signedCount += 1;
+        }
+      } else {
+        unsignedCount += 1;
+      }
     }
 
-    return { valid: true, checked: events.length };
+    return {
+      valid: true,
+      checked: events.length,
+      signedCount,
+      unsignedCount,
+      signatureValid: unsignedCount === 0 ? true : undefined,
+    };
   }
 }

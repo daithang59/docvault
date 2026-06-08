@@ -46,10 +46,16 @@ describe('VersionsService DLP state', () => {
         document: { update: mockDocumentUpdate },
       }),
     );
-    service = new VersionsService({
-      document: { findUnique: mockDocumentFindUnique },
-      $transaction: mockTransaction,
-    } as any);
+    service = new VersionsService(
+      {
+        document: {
+          findUnique: mockDocumentFindUnique,
+          findFirst: mockDocumentFindUnique,
+        },
+        $transaction: mockTransaction,
+      } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+    );
   });
 
   it('persists DLP findings and escalates the document classification', async () => {
@@ -75,7 +81,6 @@ describe('VersionsService DLP state', () => {
     });
   });
 });
-
 
 describe('VersionsService restore', () => {
   const actor = { sub: 'editor-1', roles: ['editor'] };
@@ -116,11 +121,17 @@ describe('VersionsService restore', () => {
         document: { update: mockDocumentUpdate },
       }),
     );
-    service = new VersionsService({
-      document: { findUnique: mockDocumentFindUnique },
-      documentVersion: { findUnique: mockVersionFindUnique },
-      $transaction: mockTransaction,
-    } as any);
+    service = new VersionsService(
+      {
+        document: {
+          findUnique: mockDocumentFindUnique,
+          findFirst: mockDocumentFindUnique,
+        },
+        documentVersion: { findUnique: mockVersionFindUnique },
+        $transaction: mockTransaction,
+      } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+    );
   });
 
   it('creates a new version that copies the source version file pointer', async () => {
@@ -168,8 +179,19 @@ describe('VersionsService restore', () => {
 
   it('forbids non-owner non-admin from restoring', async () => {
     await expect(
-      service.restore('doc-1', 1, { sub: 'intruder', roles: ['viewer'] } as any),
+      service.restore('doc-1', 1, {
+        sub: 'intruder',
+        roles: ['viewer'],
+      } as any),
     ).rejects.toThrow();
+    expect(mockVersionCreate).not.toHaveBeenCalled();
+  });
+
+  it('treats a document from another organization as not found', async () => {
+    mockDocumentFindUnique.mockResolvedValueOnce(null); // org-scoped findFirst → null
+    await expect(
+      service.restore('doc-other-org', 1, actor as any),
+    ).rejects.toThrow('Document not found');
     expect(mockVersionCreate).not.toHaveBeenCalled();
   });
 });

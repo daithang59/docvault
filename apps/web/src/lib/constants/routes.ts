@@ -16,4 +16,5 @@ export const ROUTES = {
   RETENTION: '/retention',
   TRASH: '/trash',
   PROFILE: '/profile',
+  ORG_MEMBERS: '/org/members',
 } as const;

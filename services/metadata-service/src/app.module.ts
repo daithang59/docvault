@@ -7,6 +7,7 @@ import { ScheduleModule as NestScheduleModule } from '@nestjs/schedule';
 import { AppController } from './app.controller';
 import { AuthModule } from './auth/auth.module';
 import { PrismaModule } from './prisma/prisma.module';
+import { OrgModule } from './org/org.module';
 import { DocumentsModule } from './documents/documents.module';
 import { AclModule } from './acl/acl.module';
 import { VersionsModule } from './versions/versions.module';
@@ -29,6 +30,7 @@ import { DocumentShareLinksModule } from './document-share-links/document-share-
     NestScheduleModule.forRoot(),
     AuthModule,
     PrismaModule,
+    OrgModule,
     AuditModule,
     AclModule,
     VersionsModule,

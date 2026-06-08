@@ -21,12 +21,18 @@ function contextWithToken(token?: string): ExecutionContext {
 
 describe('ServiceTokenGuard', () => {
   const previousToken = process.env.AUDIT_INGEST_TOKEN;
+  const previousRotationToken = process.env.AUDIT_INGEST_TOKEN_PREVIOUS;
 
   afterEach(() => {
     if (previousToken === undefined) {
       delete process.env.AUDIT_INGEST_TOKEN;
     } else {
       process.env.AUDIT_INGEST_TOKEN = previousToken;
+    }
+    if (previousRotationToken === undefined) {
+      delete process.env.AUDIT_INGEST_TOKEN_PREVIOUS;
+    } else {
+      process.env.AUDIT_INGEST_TOKEN_PREVIOUS = previousRotationToken;
     }
   });
 
@@ -60,6 +66,29 @@ describe('ServiceTokenGuard', () => {
     expect(
       new ServiceTokenGuard().canActivate(contextWithToken('expected-token')),
     ).toBe(true);
+  });
+
+  it('accepts the previous token during a rotation window', () => {
+    process.env.AUDIT_INGEST_TOKEN = 'new-token';
+    process.env.AUDIT_INGEST_TOKEN_PREVIOUS = 'old-token';
+
+    // Caller still using the old token is accepted while rotation completes.
+    expect(
+      new ServiceTokenGuard().canActivate(contextWithToken('old-token')),
+    ).toBe(true);
+    // The new token is accepted too.
+    expect(
+      new ServiceTokenGuard().canActivate(contextWithToken('new-token')),
+    ).toBe(true);
+  });
+
+  it('rejects a token that matches neither current nor previous', () => {
+    process.env.AUDIT_INGEST_TOKEN = 'new-token';
+    process.env.AUDIT_INGEST_TOKEN_PREVIOUS = 'old-token';
+
+    expect(() =>
+      new ServiceTokenGuard().canActivate(contextWithToken('retired-token')),
+    ).toThrow(ForbiddenException);
   });
 
   it('guards audit event ingestion without replacing query role guards', () => {

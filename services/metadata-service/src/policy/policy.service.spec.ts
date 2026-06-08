@@ -16,6 +16,7 @@ const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
 const mockPrisma = {
   document: {
     findUnique: mockDocumentFindUnique,
+    findFirst: mockDocumentFindUnique,
   },
   documentVersion: {
     findUnique: mockVersionFindUnique,
@@ -28,6 +29,8 @@ const mockPrisma = {
 const auditClient = {
   emitEvent: mockEmitEvent,
 };
+
+const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
 
 const baseContext = {
   traceId: 'trace-1',
@@ -69,7 +72,11 @@ describe('PolicyService', () => {
     jest.clearAllMocks();
     process.env.DOWNLOAD_GRANT_SECRET = 'test-download-secret';
     process.env.PREVIEW_GRANT_SECRET = 'test-preview-secret';
-    service = new PolicyService(mockPrisma as any, auditClient as any);
+    service = new PolicyService(
+      mockPrisma as any,
+      auditClient as any,
+      mockOrgService as any,
+    );
     mockDocumentFindUnique.mockResolvedValue(makeDocument());
     mockVersionFindUnique.mockResolvedValue(makeVersion());
     mockShareLinkFindUnique.mockResolvedValue(null);
@@ -170,6 +177,19 @@ describe('PolicyService', () => {
         baseContext,
       ),
     ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('treats a document from another organization as not found', async () => {
+    // Org-scoped findFirst returns null → cross-org document is invisible.
+    mockDocumentFindUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-other-org',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow('Document not found');
   });
 
   it('denies guessed confidential metadata detail without owner or ACL access', async () => {
@@ -602,5 +622,4 @@ describe('PolicyService', () => {
       ).rejects.toThrow(ForbiddenException);
     });
   });
-
 });

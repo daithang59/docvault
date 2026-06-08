@@ -9,8 +9,15 @@ import { createHash, timingSafeEqual } from 'crypto';
 @Injectable()
 export class ServiceTokenGuard implements CanActivate {
   canActivate(context: ExecutionContext): boolean {
-    const expectedToken = process.env.AUDIT_INGEST_TOKEN;
-    if (!expectedToken || expectedToken.trim().length === 0) {
+    // Accept the current token and, during rotation, the previous one too.
+    // This lets the audit-service be redeployed with a new token before every
+    // caller has switched over — a zero-downtime rotation window.
+    const acceptedTokens = [
+      process.env.AUDIT_INGEST_TOKEN,
+      process.env.AUDIT_INGEST_TOKEN_PREVIOUS,
+    ].filter((value): value is string => Boolean(value && value.trim().length));
+
+    if (acceptedTokens.length === 0) {
       throw new ForbiddenException('Audit ingest token is not configured');
     }
 
@@ -23,7 +30,10 @@ export class ServiceTokenGuard implements CanActivate {
       throw new ForbiddenException('Invalid audit service token');
     }
 
-    if (!this.matches(providedToken, expectedToken)) {
+    const isAccepted = acceptedTokens.some((expected) =>
+      this.matches(providedToken, expected),
+    );
+    if (!isAccepted) {
       throw new ForbiddenException('Invalid audit service token');
     }
 

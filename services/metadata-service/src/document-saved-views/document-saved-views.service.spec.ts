@@ -44,14 +44,18 @@ describe('DocumentSavedViewsService', () => {
     mockFindUnique.mockResolvedValue(privateView);
     mockDelete.mockResolvedValue(privateView);
 
-    service = new DocumentSavedViewsService({
-      documentSavedView: {
-        create: mockCreate,
-        findMany: mockFindMany,
-        findUnique: mockFindUnique,
-        delete: mockDelete,
-      },
-    } as any);
+    service = new DocumentSavedViewsService(
+      {
+        documentSavedView: {
+          create: mockCreate,
+          findMany: mockFindMany,
+          findUnique: mockFindUnique,
+          findFirst: mockFindUnique,
+          delete: mockDelete,
+        },
+      } as any,
+      { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+    );
   });
 
   it('creates a private saved view owned by the current actor', async () => {
@@ -68,6 +72,7 @@ describe('DocumentSavedViewsService', () => {
     expect(result).toBe(privateView);
     expect(mockCreate).toHaveBeenCalledWith({
       data: {
+        organizationId: 'org-1',
         name: 'My pending',
         description: 'Pending work',
         filters: { status: ['PENDING'] },
@@ -107,6 +112,7 @@ describe('DocumentSavedViewsService', () => {
     expect(result).toBe(teamView);
     expect(mockCreate).toHaveBeenCalledWith({
       data: {
+        organizationId: 'org-1',
         name: 'Team confidential',
         description: undefined,
         filters: { classification: ['CONFIDENTIAL'] },
@@ -122,6 +128,7 @@ describe('DocumentSavedViewsService', () => {
     expect(result).toEqual([teamView, privateView]);
     expect(mockFindMany).toHaveBeenCalledWith({
       where: {
+        organizationId: 'org-1',
         OR: [{ scope: 'PRIVATE', ownerId: 'user-1' }, { scope: 'TEAM' }],
       },
       orderBy: [{ scope: 'asc' }, { createdAt: 'desc' }],

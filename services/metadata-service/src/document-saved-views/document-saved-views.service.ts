@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { RequestContext } from '../common/request-context';
 import { PrismaService } from '../prisma/prisma.service';
+import { OrgService } from '../org/org.service';
 import {
   CreateDocumentSavedViewDto,
   DocumentSavedViewScope,
@@ -12,7 +13,10 @@ import {
 
 @Injectable()
 export class DocumentSavedViewsService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly orgService: OrgService,
+  ) {}
 
   async create(dto: CreateDocumentSavedViewDto, context: RequestContext) {
     const scope = dto.scope ?? DocumentSavedViewScope.PRIVATE;
@@ -21,8 +25,11 @@ export class DocumentSavedViewsService {
       throw new ForbiddenException('Only admins can create team saved views');
     }
 
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+
     return this.savedViews.create({
       data: {
+        organizationId,
         name: dto.name,
         description: dto.description,
         filters: dto.filters,
@@ -32,9 +39,11 @@ export class DocumentSavedViewsService {
     });
   }
 
-  findAll(context: RequestContext) {
+  async findAll(context: RequestContext) {
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
     return this.savedViews.findMany({
       where: {
+        organizationId,
         OR: [
           { scope: DocumentSavedViewScope.PRIVATE, ownerId: context.actorId },
           { scope: DocumentSavedViewScope.TEAM },
@@ -45,7 +54,10 @@ export class DocumentSavedViewsService {
   }
 
   async delete(id: string, context: RequestContext) {
-    const savedView = await this.savedViews.findUnique({ where: { id } });
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const savedView = await this.savedViews.findFirst({
+      where: { id, organizationId },
+    });
 
     if (!savedView) {
       throw new NotFoundException('Document saved view not found');

@@ -1,5 +1,6 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
+import { MongooseModule } from '@nestjs/mongoose';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { THROTTLE_TTL, BACKEND_LIMIT } from '@docvault/throttler';
 import { InternalAwareThrottlerGuard } from './common/internal-aware-throttler.guard';
@@ -16,6 +17,8 @@ import { NotificationModule } from './notification/notification.module';
         limit: BACKEND_LIMIT,
       },
     ]),
+    // MongoDB connection — reads MONGODB_URI from env
+    MongooseModule.forRoot(process.env.MONGODB_URI!),
     AuthModule,
     NotificationModule,
   ],

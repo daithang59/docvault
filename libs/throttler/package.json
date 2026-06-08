@@ -13,5 +13,8 @@
   "scripts": {
     "build": "tsc --build tsconfig.json --force"
   },
+  "devDependencies": {
+    "@types/node": "^20"
+  },
   "files": ["dist"]
 }

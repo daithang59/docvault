@@ -137,9 +137,11 @@ export class RetentionService {
 
   async listRetentionEvidence(
     now = new Date(),
+    organizationId?: string,
   ): Promise<RetentionEvidenceResult> {
     const documents = await this.prisma.document.findMany({
       where: {
+        ...(organizationId ? { organizationId } : {}),
         status: { in: ['PUBLISHED', 'ARCHIVED'] },
         publishedAt: { not: null },
       },
