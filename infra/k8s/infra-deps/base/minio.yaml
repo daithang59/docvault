@@ -1,7 +1,7 @@
 apiVersion: external-secrets.io/v1
 kind: ExternalSecret
 metadata:
-  name: mongodb-secret
+  name: minio-secret
   namespace: docvault
   annotations:
     argocd.argoproj.io/sync-wave: "-1"
@@ -11,72 +11,74 @@ spec:
     name: aws-secrets-manager
     kind: SecretStore
   target:
-    name: mongodb-secret
+    name: minio-secret
     creationPolicy: Owner
     deletionPolicy: Retain
   dataFrom:
     - extract:
-        key: /docvault/testing/mongodb
+        key: /docvault/__SECRETS_ENVIRONMENT__/minio
 ---
 apiVersion: apps/v1
 kind: StatefulSet
 metadata:
-  name: mongo
+  name: minio
   namespace: docvault
   annotations:
     argocd.argoproj.io/sync-wave: "0"
   labels:
-    app: mongo
-    component: mongodb
+    app: minio
+    component: minio
 spec:
-  serviceName: mongo
+  serviceName: minio
   replicas: 1
   selector:
     matchLabels:
-      app: mongo
-      component: mongodb
+      app: minio
+      component: minio
   template:
     metadata:
       labels:
-        app: mongo
-        component: mongodb
+        app: minio
+        component: minio
     spec:
       securityContext:
         runAsNonRoot: true
-        runAsUser: 999
-        runAsGroup: 999
-        fsGroup: 999
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
         seccompProfile:
           type: RuntimeDefault
       containers:
-        - name: mongodb
-          image: mongo:7
+        - name: minio
+          image: minio/minio:RELEASE.2025-01-20T14-49-07Z
+          args: ["server", "/data", "--address", ":9000", "--console-address", ":9001"]
           securityContext:
             runAsNonRoot: true
-            runAsUser: 999
-            runAsGroup: 999
+            runAsUser: 1000
+            runAsGroup: 1000
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
               drop:
                 - ALL
           ports:
-            - containerPort: 27017
+            - containerPort: 9000
+            - containerPort: 9001
           env:
-            - name: MONGO_INITDB_ROOT_USERNAME
+            - name: MINIO_ROOT_USER
               valueFrom:
                 secretKeyRef:
-                  name: mongodb-secret
-                  key: MONGO_INITDB_ROOT_USERNAME
-            - name: MONGO_INITDB_ROOT_PASSWORD
+                  name: minio-secret
+                  key: MINIO_ROOT_USER
+            - name: MINIO_ROOT_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: mongodb-secret
-                  key: MONGO_INITDB_ROOT_PASSWORD
+                  name: minio-secret
+                  key: MINIO_ROOT_PASSWORD
           volumeMounts:
-            - name: mongo-data
-              mountPath: /data/db
-            - name: mongo-tmp
+            - name: minio-data
+              mountPath: /data
+            - name: tmp
               mountPath: /tmp
           resources:
             limits:
@@ -86,29 +88,34 @@ spec:
               cpu: 100m
               memory: 256Mi
       volumes:
-        - name: mongo-tmp
+        - name: tmp
           emptyDir: {}
   volumeClaimTemplates:
     - metadata:
-        name: mongo-data
+        name: minio-data
       spec:
         accessModes:
           - ReadWriteOnce
         storageClassName: docvault-gp3
         resources:
           requests:
-            storage: 10Gi
+            storage: 20Gi
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: mongo
+  name: minio
   namespace: docvault
 spec:
   selector:
-    app: mongo
-    component: mongodb
+    app: minio
+    component: minio
   ports:
-    - protocol: TCP
-      port: 27017
-      targetPort: 27017
+    - name: api
+      protocol: TCP
+      port: 9000
+      targetPort: 9000
+    - name: console
+      protocol: TCP
+      port: 9001
+      targetPort: 9001

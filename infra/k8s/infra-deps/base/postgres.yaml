@@ -16,7 +16,7 @@ spec:
     deletionPolicy: Retain
   dataFrom:
     - extract:
-        key: /docvault/testing/postgres
+        key: /docvault/__SECRETS_ENVIRONMENT__/postgres
 ---
 apiVersion: v1
 kind: ConfigMap

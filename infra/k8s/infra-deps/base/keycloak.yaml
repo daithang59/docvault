@@ -16,7 +16,7 @@ spec:
     deletionPolicy: Retain
   dataFrom:
     - extract:
-        key: /docvault/testing/keycloak
+        key: /docvault/__SECRETS_ENVIRONMENT__/keycloak
 ---
 apiVersion: apps/v1
 kind: Deployment
