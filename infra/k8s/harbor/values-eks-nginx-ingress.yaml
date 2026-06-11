@@ -7,7 +7,7 @@ expose:
       secretName: harbor-tls
   ingress:
     hosts:
-      core: harbor.example.com
+      core: harbor.docvault.id.vn
     controller: default
     className: nginx
     annotations:
@@ -18,7 +18,7 @@ expose:
       nginx.ingress.kubernetes.io/proxy-read-timeout: "900"
       nginx.ingress.kubernetes.io/proxy-send-timeout: "900"
 
-externalURL: https://harbor.example.com
+externalURL: https://harbor.docvault.id.vn
 
 persistence:
   enabled: true
