@@ -30,54 +30,66 @@ def call(cfg = [:]) {
         }
     }
 
-    def runScan = { apiKey ->
-        def nvdFlag = apiKey ? "--nvdApiKey \"${apiKey}\"" : ""
+    def runScan = { useApiKey ->
         def updateFlag = noUpdate ? "--noupdate" : ""
-        sh """
+        withEnv([
+            "DEPENDENCY_CHECK_DATA_DIR_RESOLVED=${dataDir}",
+            "DEPENDENCY_CHECK_UPDATE_FLAG=${updateFlag}",
+            "DEPENDENCY_CHECK_USE_NVD_KEY=${useApiKey ? 'true' : 'false'}"
+        ]) {
+            sh '''
             set -eu
 
-            docker run --rm \\
-                -v "\$WORKSPACE:/src" \\
-                -v "\$WORKSPACE/dependency-check-report:/report" \\
-                -v "${dataDir}:/usr/share/dependency-check/data" \\
-                owasp/dependency-check:latest \\
-                --project "DocVault" \\
-                --scan /src \\
-                --exclude "**/.agent/**" \\
-                --exclude "**/.agents/**" \\
-                --exclude "**/generated/**" \\
-                --exclude "**/prisma/generated/**" \\
-                --exclude "**/node_modules/**" \\
-                --exclude "**/.pnpm-store/**" \\
-                --exclude "**/.turbo/**" \\
-                --exclude "**/.next/**" \\
-                --exclude "**/dist/**" \\
-                --exclude "**/coverage/**" \\
-                --exclude "**/.scannerwork/**" \\
-                --exclude "**/dependency-check-report/**" \\
-                --exclude "**/checkov-report/**" \\
-                --exclude "**/zap-report/**" \\
-                --format "HTML" \\
-                --format "JSON" \\
-                --out /report \\
-                --failOnCVSS 7 \\
-                --disableKnownExploited \\
-                ${nvdFlag} \\
-                ${updateFlag}
-        """
+            nvd_args=""
+            if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
+                nvd_args="--nvdApiKey $NVD_API_KEY"
+            fi
+
+            echo "Dependency Check is starting. The first NVD database update can be quiet and take several minutes."
+
+            docker run --rm \
+                -v "$WORKSPACE:/src" \
+                -v "$WORKSPACE/dependency-check-report:/report" \
+                -v "$DEPENDENCY_CHECK_DATA_DIR_RESOLVED:/usr/share/dependency-check/data" \
+                owasp/dependency-check:latest \
+                --project "DocVault" \
+                --scan /src \
+                --exclude "**/.agent/**" \
+                --exclude "**/.agents/**" \
+                --exclude "**/generated/**" \
+                --exclude "**/prisma/generated/**" \
+                --exclude "**/node_modules/**" \
+                --exclude "**/.pnpm-store/**" \
+                --exclude "**/.turbo/**" \
+                --exclude "**/.next/**" \
+                --exclude "**/dist/**" \
+                --exclude "**/coverage/**" \
+                --exclude "**/.scannerwork/**" \
+                --exclude "**/dependency-check-report/**" \
+                --exclude "**/checkov-report/**" \
+                --exclude "**/zap-report/**" \
+                --format "HTML" \
+                --format "JSON" \
+                --out /report \
+                --failOnCVSS 7 \
+                --disableKnownExploited \
+                $nvd_args \
+                $DEPENDENCY_CHECK_UPDATE_FLAG
+            '''
+        }
     }
 
     if (useNvdKey) {
         try {
             withCredentials([string(credentialsId: nvdKeyId, variable: 'NVD_API_KEY')]) {
-                runScan(NVD_API_KEY)
+                runScan(true)
             }
         } catch (Exception e) {
             echo "WARNING: Credential '${nvdKeyId}' not found or error accessing it. Running scan without API key (rate limits may apply)."
-            runScan(null)
+            runScan(false)
         }
     } else {
         echo ">>> Running scan without NVD API Key..."
-        runScan(null)
+        runScan(false)
     }
 }
