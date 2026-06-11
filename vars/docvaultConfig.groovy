@@ -22,6 +22,7 @@ def call() {
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : false
+    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -32,6 +33,7 @@ def call() {
         registryUsername: registryUsername,
         pushLatest: pushLatest,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
+        dependencyCheckDataDir: dependencyCheckDataDir,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
         kyvernoImage: 'ghcr.io/kyverno/kyverno-cli:v1.12.0',

@@ -106,6 +106,11 @@ pipeline {
             defaultValue: false,
             description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
         )
+        string(
+            name: 'DEPENDENCY_CHECK_DATA_DIR',
+            defaultValue: '',
+            description: 'Host cache directory for Dependency Check data. Leave blank to use $HOME/jenkins_cache/dependency-check-data on the agent.'
+        )
     }
 
     environment {
@@ -178,6 +183,7 @@ pipeline {
 
                     cfg.useNvdKey = params.USE_NVD_KEY
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
+                    cfg.dependencyCheckDataDir = params.DEPENDENCY_CHECK_DATA_DIR?.trim()
 
                     echo ">>> Effective GitOps branch: ${cfg.gitOpsBranch}"
                     echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
@@ -196,6 +202,7 @@ pipeline {
                     echo ">>> RUN_ZAP=${params.RUN_ZAP}"
                     echo ">>> ZAP_TARGET=${cfg.zapTarget ?: '(not set)'}"
                     echo ">>> DEPENDENCY_CHECK_NO_UPDATE=${cfg.dependencyCheckNoUpdate}"
+                    echo ">>> DEPENDENCY_CHECK_DATA_DIR=${cfg.dependencyCheckDataDir ?: '(default)'}"
                 }
             }
         }

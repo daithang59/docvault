@@ -2,25 +2,30 @@ def call(cfg = [:]) {
     echo '>>> Running SCA Scan...'
     echo '>>> Security gate policy: Dependency Check fails on CVSS >= 7 unless a written exception is created.'
 
-    sh '''
-        mkdir -p dependency-check-report
-        mkdir -p /var/jenkins_home/dependency-check-data
-    '''
-
     // Determine if we should attempt to use a credential
     def useNvdKey = cfg.useNvdKey ?: false
     def nvdKeyId = cfg.nvdApiKeyId ?: 'nvd-api-key'
     def noUpdate = (cfg.dependencyCheckNoUpdate != null) ? cfg.dependencyCheckNoUpdate : (cfg.noUpdate ?: false)
-    def dataDir = '/var/jenkins_home/dependency-check-data'
+    def defaultCacheRoot = env.HOME?.trim() ?: "${env.WORKSPACE}/.."
+    def dataDir = cfg.dependencyCheckDataDir?.trim()
+        ?: env.DEPENDENCY_CHECK_DATA_DIR?.trim()
+        ?: "${defaultCacheRoot}/jenkins_cache/dependency-check-data"
+
+    echo ">>> Dependency Check data cache: ${dataDir}"
+
+    sh """
+        mkdir -p dependency-check-report
+        mkdir -p "${dataDir}"
+    """
 
     if (noUpdate) {
         def hasCachedDb = sh(
-            script: 'test -s "/var/jenkins_home/dependency-check-data/odc.mv.db"',
+            script: """test -s "${dataDir}/odc.mv.db" """,
             returnStatus: true
         ) == 0
 
         if (!hasCachedDb) {
-            echo 'WARNING: DEPENDENCY_CHECK_NO_UPDATE=true but the workspace Dependency Check DB does not exist. Allowing update so the cache can be initialized.'
+            echo "WARNING: DEPENDENCY_CHECK_NO_UPDATE=true but the Dependency Check DB does not exist at ${dataDir}. Allowing update so the cache can be initialized."
             noUpdate = false
         }
     }
