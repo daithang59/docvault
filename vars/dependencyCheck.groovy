@@ -16,6 +16,12 @@ def call(cfg = [:]) {
     sh """
         mkdir -p dependency-check-report
         mkdir -p "${dataDir}"
+        if [ -s "${dataDir}/odc.mv.db" ]; then
+            echo "Dependency Check cache is warm: ${dataDir}/odc.mv.db exists."
+        else
+            echo "Dependency Check cache is empty or cold: ${dataDir}/odc.mv.db is missing."
+            echo "First update can take a long time. Set DEPENDENCY_CHECK_DATA_DIR to an existing cache if one is available."
+        fi
     """
 
     if (noUpdate) {
@@ -46,6 +52,37 @@ def call(cfg = [:]) {
             fi
 
             echo "Dependency Check is starting. The first NVD database update can be quiet and take several minutes."
+            echo "Using Dependency Check data cache: $DEPENDENCY_CHECK_DATA_DIR_RESOLVED"
+            echo "Checking NVD API connectivity from inside the Dependency Check container..."
+
+            docker run --rm \
+                -e DEPENDENCY_CHECK_USE_NVD_KEY \
+                -e NVD_API_KEY \
+                --entrypoint /bin/sh \
+                owasp/dependency-check:latest \
+                -c '
+                    set -eu
+                    url="https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1"
+
+                    if command -v curl >/dev/null 2>&1; then
+                        if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
+                            curl -fsS --connect-timeout 15 --max-time 60 -H "apiKey: $NVD_API_KEY" "$url" >/dev/null
+                        else
+                            curl -fsS --connect-timeout 15 --max-time 60 "$url" >/dev/null
+                        fi
+                    elif command -v wget >/dev/null 2>&1; then
+                        if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
+                            wget -q -T 60 --spider --header "apiKey: $NVD_API_KEY" "$url"
+                        else
+                            wget -q -T 60 --spider "$url"
+                        fi
+                    else
+                        echo "No curl/wget in the Dependency Check image; skipping explicit NVD connectivity probe."
+                        exit 0
+                    fi
+
+                    echo "NVD API connectivity check passed."
+                '
 
             docker run --rm \
                 -v "$WORKSPACE:/src" \
@@ -71,6 +108,7 @@ def call(cfg = [:]) {
                 --format "HTML" \
                 --format "JSON" \
                 --out /report \
+                --log /report/dependency-check.log \
                 --failOnCVSS 7 \
                 --disableKnownExploited \
                 $nvd_args \
