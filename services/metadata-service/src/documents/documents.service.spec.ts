@@ -184,7 +184,7 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('"effect":"DENY"');
   });
 
-  it('includes archived readable classifications in baseline list visibility', async () => {
+  it('limits viewer baseline list visibility to PUBLIC records', async () => {
     await service.findAll({
       traceId: 'trace-1',
       actorId: 'viewer-1',
@@ -195,6 +195,21 @@ describe('DocumentsService access-controlled list visibility', () => {
     const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
 
     expect(queryText).toContain('"status":{"in":["PUBLISHED","ARCHIVED"]}');
+    expect(queryText).toContain('"classification":"PUBLIC"');
+    // Viewers no longer see INTERNAL records in the baseline list.
+    expect(queryText).not.toContain('"classification":"INTERNAL"');
+  });
+
+  it('includes INTERNAL records in baseline list visibility for editor+', async () => {
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'editor-1',
+      roles: ['editor'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
     expect(queryText).toContain('"classification":"PUBLIC"');
     expect(queryText).toContain('"classification":"INTERNAL"');
   });

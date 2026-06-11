@@ -1,5 +1,6 @@
 import {
   BadRequestException,
+  ForbiddenException,
   Injectable,
   Logger,
   NotFoundException,
@@ -17,8 +18,8 @@ interface CacheEntry {
  * Resolves the organization a user belongs to (single org per user model).
  *
  * Source of truth is the app database (OrganizationMembership), NOT the JWT.
- * On first access for an unknown user, an organization is lazily provisioned
- * and the user becomes its ADMIN — this is the "self-service signup" flow.
+ * Membership is granted explicitly by an admin via addMember(); users are NOT
+ * auto-provisioned. A user with no membership is denied access until assigned.
  *
  * Results are cached briefly to avoid a DB hit on every request.
  */
@@ -34,16 +35,16 @@ export class OrgService {
   ) {}
 
   /**
-   * Return the orgId for a user, provisioning a new org if the user has none.
-   * `displayName` is used to name a freshly-created org.
+   * Return the orgId for a user. Throws if the user has not been assigned to
+   * an organization (membership is granted explicitly by an admin).
    */
-  async requireOrgId(actorId: string, displayName?: string): Promise<string> {
+  async requireOrgId(actorId: string): Promise<string> {
     const cached = this.cache.get(actorId);
     if (cached && cached.expiresAt > Date.now()) {
       return cached.orgId;
     }
 
-    const orgId = await this.resolveOrProvision(actorId, displayName);
+    const orgId = await this.resolveOrgId(actorId);
     this.cache.set(actorId, {
       orgId,
       expiresAt: Date.now() + OrgService.CACHE_TTL_MS,
@@ -52,8 +53,8 @@ export class OrgService {
   }
 
   /** Return the current user's organization with their membership role. */
-  async getMyOrg(actorId: string, displayName?: string) {
-    const orgId = await this.requireOrgId(actorId, displayName);
+  async getMyOrg(actorId: string) {
+    const orgId = await this.requireOrgId(actorId);
     const [org, membership] = await Promise.all([
       this.prisma.organization.findUnique({ where: { id: orgId } }),
       this.prisma.organizationMembership.findUnique({
@@ -82,6 +83,122 @@ export class OrgService {
       role: m.role,
       joinedAt: m.createdAt,
     }));
+  }
+
+  /**
+   * Add a user (resolved to their stable Keycloak `sub`) to the caller's
+   * organization. If the target is already a member, their role is updated.
+   *
+   * Handles the legacy "self-service" leftover: a user who logged in before
+   * this flow existed may own an empty solo organization. That orphan org is
+   * cleaned up so the user is cleanly reassigned to the caller's org.
+   */
+  async addMember(
+    context: RequestContext,
+    targetUserId: string,
+    role: 'MEMBER' | 'ADMIN' = 'MEMBER',
+  ) {
+    const adminActorId = context.actorId;
+    const organizationId = await this.requireOrgId(adminActorId);
+
+    const normalizedTarget = targetUserId.trim();
+    if (!normalizedTarget) {
+      throw new BadRequestException('targetUserId is required');
+    }
+
+    const existingMemberships =
+      await this.prisma.organizationMembership.findMany({
+        where: { userId: normalizedTarget },
+        include: { organization: true },
+      });
+
+    const alreadyHere = existingMemberships.find(
+      (m) => m.organizationId === organizationId,
+    );
+    if (alreadyHere) {
+      if (alreadyHere.role === role) {
+        return {
+          userId: alreadyHere.userId,
+          role: alreadyHere.role,
+          joinedAt: alreadyHere.createdAt,
+        };
+      }
+      const updated = await this.prisma.organizationMembership.update({
+        where: {
+          organizationId_userId: {
+            organizationId,
+            userId: normalizedTarget,
+          },
+        },
+        data: { role },
+      });
+      this.invalidate(normalizedTarget);
+      await this.auditClient.emitEvent(context, {
+        action: 'ORG_MEMBER_ROLE_CHANGED',
+        resourceType: 'ORGANIZATION_MEMBER',
+        resourceId: normalizedTarget,
+        result: 'SUCCESS',
+        metadata: {
+          organizationId,
+          targetUserId: normalizedTarget,
+          fromRole: alreadyHere.role,
+          toRole: updated.role,
+        },
+      });
+      return {
+        userId: updated.userId,
+        role: updated.role,
+        joinedAt: updated.createdAt,
+      };
+    }
+
+    const otherMemberships = existingMemberships.filter(
+      (m) => m.organizationId !== organizationId,
+    );
+
+    for (const membership of otherMemberships) {
+      const memberCount = await this.prisma.organizationMembership.count({
+        where: { organizationId: membership.organizationId },
+      });
+      const isOrphanSoloOrg =
+        memberCount === 1 &&
+        membership.organization?.ownerId === normalizedTarget;
+      if (!isOrphanSoloOrg) {
+        throw new BadRequestException(
+          'User already belongs to another organization. Remove them there first.',
+        );
+      }
+      // Drop the orphan solo org (cascade removes its membership).
+      await this.prisma.organization.delete({
+        where: { id: membership.organizationId },
+      });
+      this.logger.log(
+        `Removed orphan org ${membership.organizationId} while reassigning user ${normalizedTarget}`,
+      );
+    }
+
+    const created = await this.prisma.organizationMembership.create({
+      data: { organizationId, userId: normalizedTarget, role },
+    });
+    this.invalidate(normalizedTarget);
+
+    await this.auditClient.emitEvent(context, {
+      action: 'ORG_MEMBER_ADDED',
+      resourceType: 'ORGANIZATION_MEMBER',
+      resourceId: normalizedTarget,
+      result: 'SUCCESS',
+      metadata: {
+        organizationId,
+        targetUserId: normalizedTarget,
+        role: created.role,
+      },
+    });
+
+    return {
+      userId: created.userId,
+      role: created.role,
+      joinedAt: created.createdAt,
+    };
   }
 
   /**
@@ -198,50 +315,16 @@ export class OrgService {
     }
   }
 
-  private async resolveOrProvision(
-    actorId: string,
-    displayName?: string,
-  ): Promise<string> {
+  private async resolveOrgId(actorId: string): Promise<string> {
     const existing = await this.prisma.organizationMembership.findFirst({
       where: { userId: actorId },
       orderBy: { createdAt: 'asc' },
     });
-    if (existing) {
-      return existing.organizationId;
+    if (!existing) {
+      throw new ForbiddenException(
+        'You are not assigned to any organization. Ask an administrator to add you.',
+      );
     }
-
-    // Lazy provision: create a new organization owned by this user.
-    const baseName = displayName?.trim() || actorId;
-    const slug = await this.uniqueSlug(baseName);
-    const org = await this.prisma.organization.create({
-      data: {
-        name: `${baseName}'s Organization`,
-        slug,
-        ownerId: actorId,
-        memberships: {
-          create: { userId: actorId, role: 'ADMIN' },
-        },
-      },
-    });
-    this.logger.log(
-      `Provisioned organization ${org.id} (${slug}) for user ${actorId}`,
-    );
-    return org.id;
-  }
-
-  private async uniqueSlug(base: string): Promise<string> {
-    const root =
-      base
-        .toLowerCase()
-        .replace(/[^a-z0-9]+/g, '-')
-        .replace(/^-+|-+$/g, '')
-        .slice(0, 40) || 'org';
-    let slug = root;
-    let suffix = 1;
-    // Collisions are rare; bounded retry keeps it simple.
-    while (await this.prisma.organization.findUnique({ where: { slug } })) {
-      slug = `${root}-${suffix++}`;
-    }
-    return slug;
+    return existing.organizationId;
   }
 }

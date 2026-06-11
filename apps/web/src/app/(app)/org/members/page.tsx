@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { Building2, RefreshCw, Shield, Users, ShieldCheck, UserMinus } from 'lucide-react';
+import { Building2, RefreshCw, Shield, Users, ShieldCheck, UserMinus, UserPlus } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
@@ -12,6 +12,7 @@ import {
   useOrgMembers,
   useUpdateMemberRole,
   useRemoveMember,
+  useAddMember,
 } from '@/features/org/org.hooks';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { formatDateTime } from '@/lib/utils/date';
@@ -30,7 +31,10 @@ export default function OrgMembersPage() {
   const membersQuery = useOrgMembers(isAdmin);
   const updateRole = useUpdateMemberRole();
   const removeMemberMut = useRemoveMember();
+  const addMemberMut = useAddMember();
   const [actionError, setActionError] = useState<string | null>(null);
+  const [newMember, setNewMember] = useState('');
+  const [newRole, setNewRole] = useState<'MEMBER' | 'ADMIN'>('MEMBER');
 
   function readError(err: unknown): string {
     const anyErr = err as { response?: { data?: { message?: unknown } } };
@@ -55,6 +59,23 @@ export default function OrgMembersPage() {
     removeMemberMut.mutate(userId, {
       onError: (err) => setActionError(readError(err)),
     });
+  }
+
+  function handleAddMember(e: React.FormEvent) {
+    e.preventDefault();
+    setActionError(null);
+    const identifier = newMember.trim();
+    if (!identifier) return;
+    addMemberMut.mutate(
+      { identifier, role: newRole },
+      {
+        onSuccess: () => {
+          setNewMember('');
+          setNewRole('MEMBER');
+        },
+        onError: (err) => setActionError(readError(err)),
+      },
+    );
   }
 
   const members = useMemo(() => membersQuery.data ?? [], [membersQuery.data]);
@@ -142,6 +163,40 @@ export default function OrgMembersPage() {
         ))}
       </section>
 
+      <section
+        className="mb-5 rounded-lg border p-4"
+        style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
+      >
+        <h3 className="mb-1 text-sm font-semibold text-[var(--text-strong)]">Add member</h3>
+        <p className="mb-3 text-xs text-[var(--text-muted)]">
+          Enter a username, email, or user id from Keycloak to add them to this organization.
+        </p>
+        <form onSubmit={handleAddMember} className="flex flex-col gap-2 sm:flex-row sm:items-center">
+          <input
+            type="text"
+            value={newMember}
+            onChange={(e) => setNewMember(e.target.value)}
+            placeholder="username, email, or user id"
+            className="flex-1 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2 text-sm text-[var(--text-main)] outline-none focus:border-[var(--color-primary)]"
+          />
+          <select
+            value={newRole}
+            onChange={(e) => setNewRole(e.target.value as 'MEMBER' | 'ADMIN')}
+            className="rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2 text-sm text-[var(--text-main)] outline-none focus:border-[var(--color-primary)]"
+          >
+            <option value="MEMBER">Member</option>
+            <option value="ADMIN">Admin</option>
+          </select>
+          <button
+            type="submit"
+            disabled={!newMember.trim() || addMemberMut.isPending}
+            className="inline-flex items-center justify-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 py-2 text-sm font-medium text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <UserPlus className="h-4 w-4" />
+            {addMemberMut.isPending ? 'Adding...' : 'Add member'}
+          </button>
+        </form>
+      </section>
       {actionError && (
         <div
           className="mb-4 rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-900 dark:bg-red-950/40 dark:text-red-300"

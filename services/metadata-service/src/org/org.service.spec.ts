@@ -1,4 +1,8 @@
-import { BadRequestException, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  ForbiddenException,
+  NotFoundException,
+} from '@nestjs/common';
 import { OrgService } from './org.service';
 
 describe('OrgService member mutations', () => {
@@ -13,9 +17,12 @@ describe('OrgService member mutations', () => {
 
   let findFirst: jest.Mock;
   let findUnique: jest.Mock;
+  let findMany: jest.Mock;
+  let create: jest.Mock;
   let update: jest.Mock;
   let del: jest.Mock;
   let count: jest.Mock;
+  let orgDelete: jest.Mock;
   let emitEvent: jest.Mock;
   let service: OrgService;
 
@@ -24,18 +31,26 @@ describe('OrgService member mutations', () => {
     // Membership lookup used by requireOrgId() to resolve the caller's org.
     findFirst = jest.fn().mockResolvedValue({ organizationId: ORG });
     findUnique = jest.fn();
+    findMany = jest.fn().mockResolvedValue([]);
+    create = jest.fn();
     update = jest.fn();
     del = jest.fn();
     count = jest.fn();
+    orgDelete = jest.fn();
     emitEvent = jest.fn().mockResolvedValue(undefined);
 
     const prisma = {
       organizationMembership: {
         findFirst,
         findUnique,
+        findMany,
+        create,
         update,
         delete: del,
         count,
+      },
+      organization: {
+        delete: orgDelete,
       },
     } as any;
 
@@ -201,6 +216,107 @@ describe('OrgService member mutations', () => {
 
       expect(result.removed).toBe(true);
       expect(emitEvent).toHaveBeenCalled();
+    });
+  });
+
+  describe('addMember', () => {
+    it('adds a brand-new user to the caller org and audits it', async () => {
+      // target has no memberships anywhere
+      findMany.mockResolvedValue([]);
+      create.mockResolvedValue({
+        userId: 'user-9',
+        role: 'MEMBER',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+
+      const result = await service.addMember(adminCtx, 'user-9', 'MEMBER');
+
+      expect(result).toMatchObject({ userId: 'user-9', role: 'MEMBER' });
+      expect(create).toHaveBeenCalledWith({
+        data: { organizationId: ORG, userId: 'user-9', role: 'MEMBER' },
+      });
+      expect(emitEvent).toHaveBeenCalledWith(
+        adminCtx,
+        expect.objectContaining({ action: 'ORG_MEMBER_ADDED' }),
+      );
+    });
+
+    it('updates role when target is already a member of this org', async () => {
+      findMany.mockResolvedValue([
+        { organizationId: ORG, userId: 'user-2', role: 'MEMBER', createdAt: new Date() },
+      ]);
+      update.mockResolvedValue({
+        userId: 'user-2',
+        role: 'ADMIN',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+
+      const result = await service.addMember(adminCtx, 'user-2', 'ADMIN');
+
+      expect(result.role).toBe('ADMIN');
+      expect(create).not.toHaveBeenCalled();
+      expect(update).toHaveBeenCalled();
+    });
+
+    it('reassigns a user out of their orphan solo org', async () => {
+      findMany.mockResolvedValue([
+        {
+          organizationId: 'orphan-org',
+          userId: 'editor2',
+          role: 'ADMIN',
+          createdAt: new Date(),
+          organization: { id: 'orphan-org', ownerId: 'editor2' },
+        },
+      ]);
+      count.mockResolvedValue(1); // solo org
+      create.mockResolvedValue({
+        userId: 'editor2',
+        role: 'MEMBER',
+        createdAt: new Date('2026-06-01T00:00:00.000Z'),
+      });
+
+      const result = await service.addMember(adminCtx, 'editor2', 'MEMBER');
+
+      expect(orgDelete).toHaveBeenCalledWith({ where: { id: 'orphan-org' } });
+      expect(create).toHaveBeenCalledWith({
+        data: { organizationId: ORG, userId: 'editor2', role: 'MEMBER' },
+      });
+      expect(result.userId).toBe('editor2');
+    });
+
+    it('refuses to steal a user from a populated foreign org', async () => {
+      findMany.mockResolvedValue([
+        {
+          organizationId: 'other-org',
+          userId: 'user-2',
+          role: 'MEMBER',
+          createdAt: new Date(),
+          organization: { id: 'other-org', ownerId: 'someone-else' },
+        },
+      ]);
+      count.mockResolvedValue(5); // not a solo org
+
+      await expect(
+        service.addMember(adminCtx, 'user-2', 'MEMBER'),
+      ).rejects.toThrow(BadRequestException);
+      expect(orgDelete).not.toHaveBeenCalled();
+      expect(create).not.toHaveBeenCalled();
+    });
+
+    it('rejects an empty identifier', async () => {
+      await expect(service.addMember(adminCtx, '   ', 'MEMBER')).rejects.toThrow(
+        BadRequestException,
+      );
+    });
+  });
+
+  describe('requireOrgId', () => {
+    it('throws Forbidden when the user has no membership', async () => {
+      findFirst.mockResolvedValue(null);
+
+      await expect(service.requireOrgId('nobody')).rejects.toThrow(
+        ForbiddenException,
+      );
     });
   });
 });

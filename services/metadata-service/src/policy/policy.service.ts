@@ -425,7 +425,21 @@ export class PolicyService {
       AclEffect.ALLOW,
     );
 
-    if (actorId === document.ownerId || hasExplicitReadAllow) {
+    // A DOWNLOAD allow is strictly stronger than READ: anyone who may download
+    // the file may also read its metadata. Treat it as a metadata-read grant.
+    const hasExplicitDownloadAllow = this.matchesAcl(
+      document.aclEntries,
+      actorId,
+      roles,
+      groups,
+      AclEffect.ALLOW,
+    );
+
+    if (
+      actorId === document.ownerId ||
+      hasExplicitReadAllow ||
+      hasExplicitDownloadAllow
+    ) {
       return document;
     }
 
@@ -448,7 +462,9 @@ export class PolicyService {
     }
 
     if (!['PUBLISHED', 'ARCHIVED'].includes(document.status)) {
-      return deny('Only published or archived documents are readable by this user');
+      return deny(
+        'Only published or archived documents are readable by this user',
+      );
     }
 
     const classification = document.classification as ClassificationLevel;
@@ -459,7 +475,7 @@ export class PolicyService {
 
     if (
       classification === 'INTERNAL' &&
-      roles.some((role) => ['viewer', 'editor'].includes(role))
+      roles.some((role) => ['editor'].includes(role))
     ) {
       return document;
     }
@@ -770,7 +786,7 @@ export class PolicyService {
       return true;
     }
     if (classification === 'INTERNAL') {
-      return role === 'viewer' || role === 'editor';
+      return role === 'editor';
     }
     return false;
   }
@@ -961,23 +977,21 @@ export class PolicyService {
         return null;
 
       case 'INTERNAL':
-        if (
-          !roles.some((r) =>
-            ['viewer', 'editor', 'approver', 'admin'].includes(r),
-          )
-        ) {
-          return 'INTERNAL documents require at least the viewer role';
+        if (!roles.some((r) => ['editor', 'approver', 'admin'].includes(r))) {
+          return 'INTERNAL documents require at least the editor role';
         }
         return null;
 
       case 'CONFIDENTIAL':
+        // Option A: an explicit ACL ALLOW (or ownership) grants access regardless
+        // of role tier. DENY is evaluated earlier by the caller and still wins.
+        if (hasExplicitAllow || actorId === ownerId) {
+          return null;
+        }
         if (!roles.some((r) => ['editor', 'approver', 'admin'].includes(r))) {
           return 'CONFIDENTIAL documents require at least the editor role';
         }
-        if (actorId !== ownerId && !hasExplicitAllow) {
-          return 'CONFIDENTIAL documents require explicit ACL grant or document ownership';
-        }
-        return null;
+        return 'CONFIDENTIAL documents require explicit ACL grant or document ownership';
 
       case 'SECRET':
         if (!roles.some((r) => ['approver', 'admin'].includes(r))) {

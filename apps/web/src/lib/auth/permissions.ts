@@ -146,16 +146,19 @@ function getClassificationContentDecision(
     case 'PUBLIC':
       return allow();
     case 'INTERNAL':
-      return hasAnyUserRole(session, ['viewer', 'editor', 'approver', 'admin'])
+      return hasAnyUserRole(session, ['editor', 'approver', 'admin'])
         ? allow()
-        : deny('INTERNAL documents require at least the viewer role.');
+        : deny('INTERNAL documents require at least the editor role.');
     case 'CONFIDENTIAL':
+      // Option A: an explicit ACL ALLOW (or ownership) grants access regardless
+      // of role tier. DENY is evaluated by the caller and still wins.
+      if (isOwner(session, doc.ownerId) || explicitAllow) {
+        return allow();
+      }
       if (!hasAnyUserRole(session, ['editor', 'approver', 'admin'])) {
         return deny('CONFIDENTIAL documents require at least the editor role.');
       }
-      return isOwner(session, doc.ownerId) || explicitAllow
-        ? allow()
-        : deny(`CONFIDENTIAL documents require ownership or explicit ${permission} ACL allow.`);
+      return deny(`CONFIDENTIAL documents require ownership or explicit ${permission} ACL allow.`);
     case 'SECRET':
       if (!hasAnyUserRole(session, ['approver', 'admin'])) {
         return deny('SECRET documents require at least the approver role.');
@@ -178,7 +181,12 @@ function getMetadataAccessDecision(
   if (hasRole(session, 'admin')) return allow();
 
   const explicitReadAllow = matchesAcl(session, doc, 'READ', 'ALLOW');
-  if (isOwner(session, doc.ownerId) || explicitReadAllow) return allow();
+  // A DOWNLOAD allow is strictly stronger than READ: whoever may download may
+  // also read metadata. Treat it as a metadata-read grant too.
+  const explicitDownloadAllow = matchesAcl(session, doc, 'DOWNLOAD', 'ALLOW');
+  if (isOwner(session, doc.ownerId) || explicitReadAllow || explicitDownloadAllow) {
+    return allow();
+  }
 
   if (hasRole(session, 'compliance_officer')) {
     return ['PUBLISHED', 'ARCHIVED'].includes(doc.status)
@@ -197,7 +205,7 @@ function getMetadataAccessDecision(
   }
 
   if (!doc.classification || doc.classification === 'PUBLIC') return allow();
-  if (doc.classification === 'INTERNAL' && hasAnyUserRole(session, ['viewer', 'editor'])) {
+  if (doc.classification === 'INTERNAL' && hasAnyUserRole(session, ['editor'])) {
     return allow();
   }
   if (doc.classification === 'CONFIDENTIAL' && hasRole(session, 'editor') && explicitReadAllow) {

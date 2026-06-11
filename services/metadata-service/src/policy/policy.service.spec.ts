@@ -237,7 +237,24 @@ describe('PolicyService', () => {
     ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
   });
 
-  it('allows baseline readers to read archived metadata when classification permits it', async () => {
+  it('allows viewer to read archived PUBLIC metadata', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.PUBLIC,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('denies viewer from reading archived INTERNAL metadata', async () => {
     mockDocumentFindUnique.mockResolvedValue(
       makeDocument({
         status: 'ARCHIVED',
@@ -250,6 +267,27 @@ describe('PolicyService', () => {
         'doc-1',
         { sub: 'viewer-1', roles: ['viewer'] },
         baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows editor to read archived INTERNAL metadata', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.INTERNAL,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
       ),
     ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
   });
@@ -384,6 +422,102 @@ describe('PolicyService', () => {
     );
 
     expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('lets a viewer with an explicit USER DOWNLOAD allow download a confidential document (Option A)', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('denies a viewer without any matching ACL on a confidential download', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [],
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('keeps SECRET downloads gated on role tier even with an explicit USER ALLOW', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.SECRET,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('lets a viewer with an explicit USER DOWNLOAD allow read confidential metadata (Option A)', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
   });
 
   it('blocks AI content operations for compliance officers while allowing metadata-only AI context', async () => {

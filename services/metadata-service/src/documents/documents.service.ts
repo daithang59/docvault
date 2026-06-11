@@ -203,8 +203,8 @@ export class DocumentsService {
                       },
                     ]
                   : []),
-                // INTERNAL: viewer+ sees published/archived internal records.
-                ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
+                // INTERNAL: editor+ sees published/archived internal records.
+                ...(['editor', 'approver', 'admin'].some((r) =>
                   roles.includes(r),
                 )
                   ? [
@@ -289,10 +289,7 @@ export class DocumentsService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const organizationId = await this.orgService.requireOrgId(
-      context.actorId,
-      user?.username,
-    );
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
     const created = await this.prisma.document.create({
       data: {
         organizationId,

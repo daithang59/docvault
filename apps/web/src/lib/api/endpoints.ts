@@ -5,6 +5,7 @@ export const apiEndpoints = {
   orgs: {
     me: '/orgs/me',
     members: '/orgs/members',
+    groups: '/orgs/groups',
     member: (userId: string) => `/orgs/members/${userId}`,
   },
   users: {
