@@ -184,6 +184,21 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('"effect":"DENY"');
   });
 
+  it('includes archived readable classifications in baseline list visibility', async () => {
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'viewer-1',
+      roles: ['viewer'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"status":{"in":["PUBLISHED","ARCHIVED"]}');
+    expect(queryText).toContain('"classification":"PUBLIC"');
+    expect(queryText).toContain('"classification":"INTERNAL"');
+  });
+
   it('returns latest version file metadata in document list summaries', async () => {
     mockDocumentFindMany.mockResolvedValue([
       {

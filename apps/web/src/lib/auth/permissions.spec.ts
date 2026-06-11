@@ -157,6 +157,32 @@ describe('document access decisions', () => {
     expect(canPreviewDocument(session(['approver']), doc({ classification: 'SECRET' }))).toBe(true);
   });
 
+  it('lets owner preview their own SECRET document regardless of role', () => {
+    const secretDoc = doc({ classification: 'SECRET', ownerId: 'user-1' });
+    expect(canPreviewDocument(session(['editor'], { sub: 'user-1' }), secretDoc)).toBe(true);
+  });
+
+  it('denies non-owner editor from previewing SECRET documents', () => {
+    const secretDoc = doc({ classification: 'SECRET', ownerId: 'other-user' });
+    expect(canPreviewDocument(session(['editor']), secretDoc)).toBe(false);
+  });
+
+  it('denies owner editor from downloading their own SECRET document', () => {
+    const secretDoc = doc({ classification: 'SECRET', ownerId: 'user-1' });
+    expect(canDownloadDocument(session(['editor'], { sub: 'user-1' }), secretDoc)).toBe(false);
+  });
+
+  it('lets baseline readers view and preview archived readable documents', () => {
+    const archivedPublic = doc({ status: 'ARCHIVED', classification: 'PUBLIC' });
+    const archivedInternal = doc({ status: 'ARCHIVED', classification: 'INTERNAL' });
+
+    expect(canViewDocumentDetail(session(['viewer']), archivedPublic)).toBe(true);
+    expect(canPreviewDocument(session(['viewer']), archivedPublic)).toBe(true);
+    expect(canViewDocumentDetail(session(['viewer']), archivedInternal)).toBe(true);
+    expect(canPreviewDocument(session(['viewer']), archivedInternal)).toBe(true);
+    expect(canDownloadDocument(session(['viewer']), archivedPublic)).toBe(false);
+  });
+
   it('models metadata detail access for owner, compliance, classification, and ACL deny cases', () => {
     expect(canViewDocumentDetail(session(['viewer'], { sub: 'owner-1' }), doc({ status: 'DRAFT' }))).toBe(true);
     expect(canViewDocumentDetail(session(['compliance_officer']), doc({ status: 'PENDING' }))).toBe(false);

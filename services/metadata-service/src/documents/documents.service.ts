@@ -168,17 +168,23 @@ export class DocumentsService {
                       },
                     ]
                   : []),
-                // PENDING: approver sees all pending documents to review
+                // Approvers can review pending records and read published/archived metadata.
                 ...(['approver', 'admin'].some((r) => roles.includes(r))
                   ? [
                       {
-                        status: 'PENDING' as const,
+                        status: {
+                          in: [
+                            'PENDING' as const,
+                            'PUBLISHED' as const,
+                            'ARCHIVED' as const,
+                          ],
+                        },
                       },
                     ]
                   : []),
                 // DRAFT: viewer sees their own drafts to preview/download
                 { ownerId: actorId, status: 'DRAFT' as const },
-                // PUBLIC: any authenticated user sees PUBLISHED + PUBLIC
+                // PUBLIC: any authenticated user sees published/archived public records.
                 ...(roles.some((r) =>
                   [
                     'viewer',
@@ -190,36 +196,44 @@ export class DocumentsService {
                 )
                   ? [
                       {
-                        status: 'PUBLISHED' as const,
+                        status: {
+                          in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                        },
                         classification: 'PUBLIC' as const,
                       },
                     ]
                   : []),
-                // INTERNAL: viewer+ sees PUBLISHED + INTERNAL (consistent with getClassificationDeniedReason)
+                // INTERNAL: viewer+ sees published/archived internal records.
                 ...(['viewer', 'editor', 'approver', 'admin'].some((r) =>
                   roles.includes(r),
                 )
                   ? [
                       {
-                        status: 'PUBLISHED' as const,
+                        status: {
+                          in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                        },
                         classification: 'INTERNAL' as const,
                       },
                     ]
                   : []),
-                // CONFIDENTIAL: approver+ sees PUBLISHED + CONFIDENTIAL
+                // CONFIDENTIAL: approver+ sees published/archived confidential records.
                 ...(['approver', 'admin'].some((r) => roles.includes(r))
                   ? [
                       {
-                        status: 'PUBLISHED' as const,
+                        status: {
+                          in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                        },
                         classification: 'CONFIDENTIAL' as const,
                       },
                     ]
                   : []),
-                // SECRET: approver+ sees PUBLISHED + SECRET
+                // SECRET: approver+ sees published/archived secret records.
                 ...(['approver', 'admin'].some((r) => roles.includes(r))
                   ? [
                       {
-                        status: 'PUBLISHED' as const,
+                        status: {
+                          in: ['PUBLISHED' as const, 'ARCHIVED' as const],
+                        },
                         classification: 'SECRET' as const,
                       },
                     ]

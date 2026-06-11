@@ -46,6 +46,13 @@ const SIMULATED_ROLES: SimulatedRole[] = [
   'admin',
 ];
 
+const SHARE_LINK_RECIPIENT_ROLES = new Set([
+  'viewer',
+  'editor',
+  'approver',
+  'admin',
+]);
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -348,6 +355,7 @@ export class PolicyService {
     docId: string,
     user: ServiceUser,
     context: RequestContext,
+    options: { shareToken?: string } = {},
   ) {
     const organizationId = await this.orgService.requireOrgId(context.actorId);
     const document = await this.prisma.document.findFirst({
@@ -365,6 +373,10 @@ export class PolicyService {
     const actorId = buildActorId(user);
     const roles = user.roles ?? context.roles ?? [];
     const groups = this.getActorGroups(user, context);
+    const shareGrant = await this.resolveShareGrant(docId, options.shareToken);
+    const shareAllowsMetadata =
+      (shareGrant === 'VIEW' || shareGrant === 'DOWNLOAD') &&
+      roles.some((role) => SHARE_LINK_RECIPIENT_ROLES.has(role));
 
     const deny = async (reason: string) => {
       await this.auditClient.emitEvent(context, {
@@ -384,6 +396,10 @@ export class PolicyService {
       });
       throw new ForbiddenException(reason);
     };
+
+    if (shareAllowsMetadata) {
+      return document;
+    }
 
     if (
       this.matchesPreviewAcl(
@@ -431,8 +447,8 @@ export class PolicyService {
       );
     }
 
-    if (document.status !== 'PUBLISHED') {
-      return deny('Only published documents are readable by this user');
+    if (!['PUBLISHED', 'ARCHIVED'].includes(document.status)) {
+      return deny('Only published or archived documents are readable by this user');
     }
 
     const classification = document.classification as ClassificationLevel;
@@ -747,7 +763,7 @@ export class PolicyService {
     if (role === 'approver') {
       return ['PENDING', 'PUBLISHED', 'ARCHIVED'].includes(status);
     }
-    if (status !== 'PUBLISHED') {
+    if (!['PUBLISHED', 'ARCHIVED'].includes(status)) {
       return false;
     }
     if (classification === 'PUBLIC') {
@@ -910,6 +926,12 @@ export class PolicyService {
 
     // Approver can preview ALL classifications (highest non-admin authority)
     if (roles.includes('approver')) {
+      return null;
+    }
+
+    // Owner can preview their own documents regardless of classification
+    // (Practical Security model: allows owner to verify uploaded content)
+    if (actorId === ownerId) {
       return null;
     }
 

@@ -4,7 +4,7 @@ import type { ReactNode } from 'react';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react';
+import { X, ShieldAlert } from 'lucide-react';
 import { ClassificationLevel } from '@/types/document';
 import { cn } from '@/lib/utils/cn';
 
@@ -30,11 +30,11 @@ interface DocumentFormProps {
   children?: React.ReactNode;
 }
 
-const CLASSIFICATIONS: { value: ClassificationLevel; label: string }[] = [
-  { value: 'PUBLIC', label: 'Public' },
-  { value: 'INTERNAL', label: 'Internal' },
-  { value: 'CONFIDENTIAL', label: 'Confidential' },
-  { value: 'SECRET', label: 'Secret' },
+const CLASSIFICATIONS: { value: ClassificationLevel; label: string; description: string }[] = [
+  { value: 'PUBLIC', label: 'Public', description: 'No sensitivity. Safe to share with anyone.' },
+  { value: 'INTERNAL', label: 'Internal', description: 'For organization members only. Do not share externally.' },
+  { value: 'CONFIDENTIAL', label: 'Confidential', description: 'Sensitive data. Restricted to authorized personnel.' },
+  { value: 'SECRET', label: 'Secret', description: 'Highly sensitive. Only approvers and admins can access.' },
 ];
 
 export function DocumentForm({
@@ -124,24 +124,41 @@ export function DocumentForm({
           name="classification"
           render={({ field }) => (
             <div className="grid grid-cols-2 gap-2">
-              {CLASSIFICATIONS.map(({ value, label }) => (
+              {CLASSIFICATIONS.map(({ value, label, description }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => field.onChange(value)}
                   className={cn(
-                    'rounded-xl border px-3 py-2 text-sm font-medium transition-all',
+                    'rounded-xl border px-3 py-2.5 text-left transition-all',
                     field.value === value
                       ? 'text-white border-[var(--color-primary)] bg-[var(--color-primary)]'
                       : 'bg-[var(--input-bg)] text-[var(--text-muted)] border-[var(--input-border)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]',
                   )}
                 >
-                  {label}
+                  <span className="block text-sm font-medium">{label}</span>
+                  <span className={cn(
+                    'block text-[11px] leading-tight mt-0.5',
+                    field.value === value ? 'text-white/70' : 'text-[var(--text-muted)]',
+                  )}>
+                    {description}
+                  </span>
                 </button>
               ))}
             </div>
           )}
         />
+
+        {classification === 'SECRET' && (
+          <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              <strong>Secret classification:</strong> Only admins can download this document.
+              As the owner, you can preview the content but cannot download it.
+              Approvers need explicit ACL grants to access.
+            </p>
+          </div>
+        )}
       </div>
 
       {classificationSlot?.(classification)}

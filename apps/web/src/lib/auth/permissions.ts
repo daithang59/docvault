@@ -131,13 +131,14 @@ function getClassificationContentDecision(
   session: Session | null,
   doc: DocumentContext,
   permission: Extract<AclPermission, 'READ' | 'DOWNLOAD'>,
-  options?: { approverBypassesClassification?: boolean },
+  options?: { approverBypassesClassification?: boolean; ownerBypassesClassification?: boolean },
 ): DocumentAccessDecision {
   const classification = doc.classification;
   if (!classification) return allow();
 
   if (hasRole(session, 'admin')) return allow();
   if (options?.approverBypassesClassification && hasRole(session, 'approver')) return allow();
+  if (options?.ownerBypassesClassification && isOwner(session, doc.ownerId)) return allow();
 
   const explicitAllow = matchesAcl(session, doc, permission, 'ALLOW');
 
@@ -191,8 +192,8 @@ function getMetadataAccessDecision(
       : deny('Approvers can only read pending, published, or archived metadata.');
   }
 
-  if (doc.status !== 'PUBLISHED') {
-    return deny('Only published documents are readable by this user.');
+  if (!['PUBLISHED', 'ARCHIVED'].includes(doc.status)) {
+    return deny('Only published or archived documents are readable by this user.');
   }
 
   if (!doc.classification || doc.classification === 'PUBLIC') return allow();
@@ -235,6 +236,7 @@ function getPreviewAccessDecision(
 
   return getClassificationContentDecision(session, doc, 'READ', {
     approverBypassesClassification: true,
+    ownerBypassesClassification: true,
   });
 }
 

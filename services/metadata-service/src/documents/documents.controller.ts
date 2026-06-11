@@ -81,11 +81,16 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Get a document metadata record by id' })
-  findOne(@Param('docId') docId: string, @Req() req: any) {
+  findOne(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Query('shareToken') shareToken?: string,
+  ) {
     return this.policyService.assertCanReadMetadata(
       docId,
       req.user,
       buildRequestContext(req),
+      { shareToken },
     );
   }
 

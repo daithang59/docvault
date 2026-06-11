@@ -730,7 +730,7 @@ pnpm --filter web build
   - `PUBLIC_730D`
   - `INTERNAL_365D`
   - `CONFIDENTIAL_180D`
-  - `SECRET_30D`
+  - `SECRET_90D`
 - Endpoint:
   - `GET /metadata/retention/documents`
   - `POST /metadata/retention/run`

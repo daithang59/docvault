@@ -13,6 +13,7 @@ import {
   canDeleteDocument,
   canViewComplianceEvidencePacket,
   getDocumentAccessDecision,
+  type DocumentAccessDecision,
 } from '@/lib/auth/permissions';
 import {
   useSubmitDocument,
@@ -41,6 +42,8 @@ interface DocumentActionPanelProps {
   doc: DocumentDetail;
   onActionComplete?: () => void;
   onPreview?: () => void;
+  previewDecision?: DocumentAccessDecision;
+  downloadDecision?: DocumentAccessDecision;
   previewUnavailableReason?: string;
 }
 
@@ -48,6 +51,8 @@ export function DocumentActionPanel({
   doc,
   onActionComplete,
   onPreview,
+  previewDecision: previewDecisionOverride,
+  downloadDecision: downloadDecisionOverride,
   previewUnavailableReason,
 }: DocumentActionPanelProps) {
   const { session } = useAuth();
@@ -68,8 +73,10 @@ export function DocumentActionPanel({
   const { download, isDownloading } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
-  const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
-  const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
+  const previewDecision =
+    previewDecisionOverride ?? getDocumentAccessDecision(session, doc, 'preview');
+  const downloadDecision =
+    downloadDecisionOverride ?? getDocumentAccessDecision(session, doc, 'download');
   const previewBlockedReason = !previewDecision.allowed
     ? previewDecision.reason
     : previewUnavailableReason;

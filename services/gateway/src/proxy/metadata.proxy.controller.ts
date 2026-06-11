@@ -298,9 +298,12 @@ export class MetadataProxyController {
       'Returns full document metadata including versions, ACL entries, and workflow history.',
   })
   async findOne(@Param('docId') docId: string, @Req() req: any) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
-      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}${queryString}`,
     });
     return response.data;
   }

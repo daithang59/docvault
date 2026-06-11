@@ -237,6 +237,23 @@ describe('PolicyService', () => {
     ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
   });
 
+  it('allows baseline readers to read archived metadata when classification permits it', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.INTERNAL,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
   it('allows confidential metadata read through a matching GROUP READ allow', async () => {
     mockDocumentFindUnique.mockResolvedValue(
       makeDocument({
@@ -433,6 +450,72 @@ describe('PolicyService', () => {
     expect(guardrails.deniedOperations).toEqual([]);
   });
 
+  it('allows owner editor to preview their own SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    const result = await service.authorizePreview(
+      'doc-1',
+      { version: 1 },
+      { sub: 'editor-1', roles: ['editor'] },
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+      },
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('denies non-owner editor from previewing a SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'other-editor',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    await expect(
+      service.authorizePreview(
+        'doc-1',
+        { version: 1 },
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies owner editor from downloading their own SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
   it('simulates classification impact without exposing file grants or object keys', async () => {
     mockDocumentFindUnique.mockResolvedValue(
       makeDocument({
@@ -563,6 +646,24 @@ describe('PolicyService', () => {
       );
 
       expect(result.grantToken).toEqual(expect.any(String));
+    });
+
+    it('lets a VIEW share token bypass classification denial for metadata detail', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      await expect(
+        service.assertCanReadMetadata(
+          'doc-1',
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
     });
 
     it('does not let a VIEW share token authorize a download', async () => {

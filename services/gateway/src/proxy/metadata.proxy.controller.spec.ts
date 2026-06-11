@@ -719,6 +719,33 @@ describe('MetadataProxyController AI guardrails', () => {
   });
 });
 
+describe('MetadataProxyController document detail', () => {
+  const metadataUrl = 'http://metadata-service:3002';
+
+  beforeEach(() => {
+    process.env.METADATA_SERVICE_URL = metadataUrl;
+  });
+
+  it('forwards share token query params to metadata detail', async () => {
+    const document = { id: 'doc-1', title: 'Shared document' };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: document }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = makeReq({
+      url: '/metadata/documents/doc-1?shareToken=raw%20token',
+    });
+
+    const result = await (controller as any).findOne('doc-1', req);
+
+    expect(result).toBe(document);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'GET',
+      url: `${metadataUrl}/documents/doc-1?shareToken=raw%20token`,
+    });
+  });
+});
+
 describe('MetadataProxyController access impact preview', () => {
   const metadataUrl = 'http://metadata-service:3002';
 

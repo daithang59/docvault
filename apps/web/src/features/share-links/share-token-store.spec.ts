@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import {
   clearShareToken,
+  getSharePermission,
   getShareToken,
   rememberShareToken,
 } from './share-token-store';
@@ -44,6 +45,12 @@ describe('share token store', () => {
     rememberShareToken('doc-1', 'token-abc');
     expect(getShareToken('doc-1')).toBe('token-abc');
     expect(getShareToken('doc-2')).toBeUndefined();
+  });
+
+  it('remembers the redeemed share permission with the token', () => {
+    rememberShareToken('doc-1', 'token-abc', 'VIEW');
+    expect(getShareToken('doc-1')).toBe('token-abc');
+    expect(getSharePermission('doc-1')).toBe('VIEW');
   });
 
   it('ignores empty doc id or token', () => {
