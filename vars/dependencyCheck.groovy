@@ -74,7 +74,7 @@ def call(cfg = [:]) {
                 --failOnCVSS 7 \
                 --disableKnownExploited \
                 $nvd_args \
-                $DEPENDENCY_CHECK_UPDATE_FLAG
+                ${DEPENDENCY_CHECK_UPDATE_FLAG:-}
             '''
         }
     }
