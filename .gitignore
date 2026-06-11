@@ -166,9 +166,12 @@ Desktop.ini
 .omx/notepad.md
 .omx/project-memory.json
 
-# Test runner artifacts
+# Test and generated reports
 **/playwright-report/
 **/test-results/
+*_out.txt
+*-output.txt
+error.txt
 
 # Claude
 .claude/
@@ -184,18 +187,16 @@ tfplan
 crash.log
 crash.*.log
 
-# Generated kubeconfigs / cluster credentials
+# Kubernetes secrets / generated cluster credentials
+*-secrets.yaml
+!*-secrets.example.yaml
 *.kubeconfig
 *.pem
 *.key
 *.p12
 *.pfx
 
-# Local scratch and manual test artifacts
-/downloaded_file.md
-/downloaded_file.pdf
-/lint_out.txt
-/test-output.txt
-/test_out.txt
-/test_big_file.pdf
+# Local downloaded/test files
+downloaded_file.*
+test_big_file.pdf
 /text.txt
