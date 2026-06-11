@@ -227,13 +227,17 @@ infra/
           service.yaml
     infra-deps/
       README.md
-      app-secrets.yaml
-      keycloak.yaml
-      keycloak-cm.yaml
-      minio.yaml
-      mongodb.yaml
-      monitoring-ns.yaml
-      postgres.yaml
+      base/
+        app-secrets.yaml
+        keycloak.yaml
+        minio.yaml
+        mongodb.yaml
+        monitoring-ns.yaml
+        postgres.yaml
+      overlays/
+        testing/
+          kustomization.yaml
+          realm-docvault.json
     values/
       audit-service.yaml
       document-service.yaml
