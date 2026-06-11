@@ -101,6 +101,11 @@ pipeline {
             defaultValue: false,
             description: 'Use NVD API key for Dependency Check to bypass rate limits (requires "nvd-api-key" credential).'
         )
+        booleanParam(
+            name: 'DEPENDENCY_CHECK_NO_UPDATE',
+            defaultValue: false,
+            description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
+        )
     }
 
     environment {
@@ -172,6 +177,7 @@ pipeline {
                         : cfg.kubeconfigCredentialId
 
                     cfg.useNvdKey = params.USE_NVD_KEY
+                    cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
 
                     echo ">>> Effective GitOps branch: ${cfg.gitOpsBranch}"
                     echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
@@ -189,6 +195,7 @@ pipeline {
                     echo ">>> KUBECONFIG_CREDENTIAL_ID=${cfg.kubeconfigCredentialId ?: '(not set)'}"
                     echo ">>> RUN_ZAP=${params.RUN_ZAP}"
                     echo ">>> ZAP_TARGET=${cfg.zapTarget ?: '(not set)'}"
+                    echo ">>> DEPENDENCY_CHECK_NO_UPDATE=${cfg.dependencyCheckNoUpdate}"
                 }
             }
         }
