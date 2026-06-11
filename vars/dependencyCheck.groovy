@@ -6,14 +6,22 @@ def call(cfg = [:]) {
     def useNvdKey = cfg.useNvdKey ?: false
     def nvdKeyId = cfg.nvdApiKeyId ?: 'nvd-api-key'
     def noUpdate = (cfg.dependencyCheckNoUpdate != null) ? cfg.dependencyCheckNoUpdate : (cfg.noUpdate ?: false)
-    def defaultCacheRoot = env.HOME?.trim() ?: "${env.WORKSPACE}/.."
-    def dataDir = cfg.dependencyCheckDataDir?.trim()
-        ?: env.DEPENDENCY_CHECK_DATA_DIR?.trim()
-        ?: "${defaultCacheRoot}/jenkins_cache/dependency-check-data"
+    def dataDir = cfg.dependencyCheckDataDir?.trim() ?: env.DEPENDENCY_CHECK_DATA_DIR?.trim()
+    def dataVolume = cfg.dependencyCheckDataVolume?.trim()
+        ?: env.DEPENDENCY_CHECK_DATA_VOLUME?.trim()
+        ?: 'docvault-dependency-check-data'
+    def dataMount = dataDir
+        ? "${dataDir}:/usr/share/dependency-check/data"
+        : "${dataVolume}:/usr/share/dependency-check/data"
+    def cacheLabel = dataDir ? dataDir : "Docker volume ${dataVolume}"
+    def cacheCheckScript = dataDir
+        ? """test -s "${dataDir}/odc.mv.db" """
+        : """docker run --rm -v "${dataVolume}:/data" --entrypoint /bin/sh owasp/dependency-check:latest -c 'test -s /data/odc.mv.db'"""
 
-    echo ">>> Dependency Check data cache: ${dataDir}"
+    echo ">>> Dependency Check data cache: ${cacheLabel}"
 
-    sh """
+    if (dataDir) {
+        sh """
         mkdir -p dependency-check-report
         mkdir -p "${dataDir}"
         if [ -s "${dataDir}/odc.mv.db" ]; then
@@ -22,16 +30,28 @@ def call(cfg = [:]) {
             echo "Dependency Check cache is empty or cold: ${dataDir}/odc.mv.db is missing."
             echo "First update can take a long time. Set DEPENDENCY_CHECK_DATA_DIR to an existing cache if one is available."
         fi
-    """
+        """
+    } else {
+        sh """
+        mkdir -p dependency-check-report
+        docker volume create "${dataVolume}" >/dev/null
+        if docker run --rm -v "${dataVolume}:/data" --entrypoint /bin/sh owasp/dependency-check:latest -c 'test -s /data/odc.mv.db'; then
+            echo "Dependency Check cache is warm: Docker volume ${dataVolume} contains odc.mv.db."
+        else
+            echo "Dependency Check cache is empty or cold: Docker volume ${dataVolume} does not contain odc.mv.db."
+            echo "First update can take a long time. The populated DB will persist in this Docker volume."
+        fi
+        """
+    }
 
     if (noUpdate) {
         def hasCachedDb = sh(
-            script: """test -s "${dataDir}/odc.mv.db" """,
+            script: cacheCheckScript,
             returnStatus: true
         ) == 0
 
         if (!hasCachedDb) {
-            echo "WARNING: DEPENDENCY_CHECK_NO_UPDATE=true but the Dependency Check DB does not exist at ${dataDir}. Allowing update so the cache can be initialized."
+            echo "WARNING: DEPENDENCY_CHECK_NO_UPDATE=true but the Dependency Check DB does not exist in ${cacheLabel}. Allowing update so the cache can be initialized."
             noUpdate = false
         }
     }
@@ -39,7 +59,7 @@ def call(cfg = [:]) {
     def runScan = { useApiKey ->
         def updateFlag = noUpdate ? "--noupdate" : ""
         withEnv([
-            "DEPENDENCY_CHECK_DATA_DIR_RESOLVED=${dataDir}",
+            "DEPENDENCY_CHECK_DATA_MOUNT=${dataMount}",
             "DEPENDENCY_CHECK_UPDATE_FLAG=${updateFlag}",
             "DEPENDENCY_CHECK_USE_NVD_KEY=${useApiKey ? 'true' : 'false'}"
         ]) {
@@ -52,7 +72,7 @@ def call(cfg = [:]) {
             fi
 
             echo "Dependency Check is starting. The first NVD database update can be quiet and take several minutes."
-            echo "Using Dependency Check data cache: $DEPENDENCY_CHECK_DATA_DIR_RESOLVED"
+            echo "Using Dependency Check data mount: $DEPENDENCY_CHECK_DATA_MOUNT"
             echo "Checking NVD API connectivity from inside the Dependency Check container..."
 
             docker run --rm \
@@ -87,7 +107,7 @@ def call(cfg = [:]) {
             docker run --rm \
                 -v "$WORKSPACE:/src" \
                 -v "$WORKSPACE/dependency-check-report:/report" \
-                -v "$DEPENDENCY_CHECK_DATA_DIR_RESOLVED:/usr/share/dependency-check/data" \
+                -v "$DEPENDENCY_CHECK_DATA_MOUNT" \
                 owasp/dependency-check:latest \
                 --project "DocVault" \
                 --scan /src \

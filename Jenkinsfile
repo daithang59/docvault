@@ -109,7 +109,7 @@ pipeline {
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
             defaultValue: '',
-            description: 'Host cache directory for Dependency Check data. Leave blank to use $HOME/jenkins_cache/dependency-check-data on the agent.'
+            description: 'Optional host cache directory for Dependency Check data. Leave blank to use Docker volume docvault-dependency-check-data.'
         )
     }
 
