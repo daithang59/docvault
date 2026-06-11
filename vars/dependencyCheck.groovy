@@ -10,16 +10,18 @@ def call(cfg = [:]) {
     // Determine if we should attempt to use a credential
     def useNvdKey = cfg.useNvdKey ?: false
     def nvdKeyId = cfg.nvdApiKeyId ?: 'nvd-api-key'
+    def noUpdate = (cfg.dependencyCheckNoUpdate != null) ? cfg.dependencyCheckNoUpdate : (cfg.noUpdate ?: false)
 
     def runScan = { apiKey ->
         def nvdFlag = apiKey ? "--nvdApiKey \"${apiKey}\"" : ""
+        def updateFlag = noUpdate ? "--noupdate" : ""
         sh """
             set -eu
 
             docker run --rm \\
                 -v "\$WORKSPACE:/src" \\
                 -v "\$WORKSPACE/dependency-check-report:/report" \\
-                -v /var/jenkins_home/dependency-check-data:/usr/share/dependency-check/data \\
+                -v "\$WORKSPACE/var/jenkins_home/dependency-check-data:/usr/share/dependency-check/data" \\
                 owasp/dependency-check:latest \\
                 --project "DocVault" \\
                 --scan /src \\
@@ -42,8 +44,8 @@ def call(cfg = [:]) {
                 --out /report \\
                 --failOnCVSS 7 \\
                 --disableKnownExploited \\
-		--noupdate \\
-                ${nvdFlag}
+                ${nvdFlag} \\
+                ${updateFlag}
         """
     }
 

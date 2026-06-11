@@ -19,6 +19,9 @@ def call() {
     def pushLatest = env.PUSH_LATEST?.trim()
         ? env.PUSH_LATEST.equalsIgnoreCase('true')
         : false
+    def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
+        ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
+        : false
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -28,6 +31,7 @@ def call() {
         registryCredentialType: registryCredentialType,
         registryUsername: registryUsername,
         pushLatest: pushLatest,
+        dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
         kyvernoImage: 'ghcr.io/kyverno/kyverno-cli:v1.12.0',
