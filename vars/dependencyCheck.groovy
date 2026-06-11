@@ -4,13 +4,26 @@ def call(cfg = [:]) {
 
     sh '''
         mkdir -p dependency-check-report
-        mkdir -p ${WORKSPACE}/var/jenkins_home/dependency-check-data
+        mkdir -p /var/jenkins_home/dependency-check-data
     '''
 
     // Determine if we should attempt to use a credential
     def useNvdKey = cfg.useNvdKey ?: false
     def nvdKeyId = cfg.nvdApiKeyId ?: 'nvd-api-key'
     def noUpdate = (cfg.dependencyCheckNoUpdate != null) ? cfg.dependencyCheckNoUpdate : (cfg.noUpdate ?: false)
+    def dataDir = '/var/jenkins_home/dependency-check-data'
+
+    if (noUpdate) {
+        def hasCachedDb = sh(
+            script: 'test -s "/var/jenkins_home/dependency-check-data/odc.mv.db"',
+            returnStatus: true
+        ) == 0
+
+        if (!hasCachedDb) {
+            echo 'WARNING: DEPENDENCY_CHECK_NO_UPDATE=true but the workspace Dependency Check DB does not exist. Allowing update so the cache can be initialized.'
+            noUpdate = false
+        }
+    }
 
     def runScan = { apiKey ->
         def nvdFlag = apiKey ? "--nvdApiKey \"${apiKey}\"" : ""
@@ -21,7 +34,7 @@ def call(cfg = [:]) {
             docker run --rm \\
                 -v "\$WORKSPACE:/src" \\
                 -v "\$WORKSPACE/dependency-check-report:/report" \\
-                -v "\$WORKSPACE/var/jenkins_home/dependency-check-data:/usr/share/dependency-check/data" \\
+                -v "${dataDir}:/usr/share/dependency-check/data" \\
                 owasp/dependency-check:latest \\
                 --project "DocVault" \\
                 --scan /src \\
