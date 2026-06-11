@@ -64,7 +64,7 @@ resource "aws_rolesanywhere_trust_anchor" "jenkins" {
     source_type = "CERTIFICATE_BUNDLE"
 
     source_data {
-      x509_certificate_data = file(var.jenkins_rolesanywhere_ca_certificate_path)
+      x509_certificate_data = replace(trimspace(file(var.jenkins_rolesanywhere_ca_certificate_path)), "\r\n", "\n")
     }
   }
 
