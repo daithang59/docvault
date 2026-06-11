@@ -28,12 +28,13 @@ AWS Secrets Manager
 The repo uses:
 
 ```text
-infra/k8s/infra-deps/secretstore.yaml
-infra/k8s/infra-deps/app-secrets.yaml
-infra/k8s/infra-deps/postgres.yaml
-infra/k8s/infra-deps/mongodb.yaml
-infra/k8s/infra-deps/minio.yaml
-infra/k8s/infra-deps/keycloak.yaml
+infra/k8s/infra-deps/base/secretstore.yaml
+infra/k8s/infra-deps/base/app-secrets.yaml
+infra/k8s/infra-deps/base/postgres.yaml
+infra/k8s/infra-deps/base/mongodb.yaml
+infra/k8s/infra-deps/base/minio.yaml
+infra/k8s/infra-deps/base/keycloak.yaml
+infra/k8s/infra-deps/overlays/testing/kustomization.yaml
 infra/terraform/aws-eks/external-secrets-irsa.tf
 ```
 
@@ -181,16 +182,10 @@ kubectl delete deployment keycloak -n default --ignore-not-found
 kubectl delete job minio-init -n default --ignore-not-found
 ```
 
-Apply infra deps:
+Apply infra deps through the testing Kustomize overlay:
 
 ```powershell
-kubectl apply -f infra/k8s/infra-deps/docvault-ns.yaml
-kubectl apply -f infra/k8s/infra-deps/secretstore.yaml
-kubectl apply -f infra/k8s/infra-deps/app-secrets.yaml
-kubectl apply -f infra/k8s/infra-deps/postgres.yaml
-kubectl apply -f infra/k8s/infra-deps/mongodb.yaml
-kubectl apply -f infra/k8s/infra-deps/minio.yaml
-kubectl apply -f infra/k8s/infra-deps/keycloak.yaml
+kubectl apply -k infra/k8s/infra-deps/overlays/testing
 ```
 
 Or sync through Argo CD after External Secrets Operator is installed.

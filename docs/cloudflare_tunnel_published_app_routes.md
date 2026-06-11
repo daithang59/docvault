@@ -15,20 +15,12 @@ User browser
 
 This avoids a public AWS Load Balancer for web/admin UIs. `cloudflared` creates outbound connections from EKS to Cloudflare, and Cloudflare publishes selected hostnames.
 
-Use this plan for:
+- Harbor UI (read-only/browsing).
 
-- DocVault web UI.
-- Argo CD UI.
-- Grafana UI.
-- Harbor UI.
+> [!WARNING]
+> **Deprecated/Limited Approach for Registry Push**: Do not use the Cloudflare Tunnel/Proxy path for Jenkins `docker push` or Docker registry operations. Cloudflare's free plan limits uploads to 100MB, causing registry pushes of heavy services to fail with a `413 Payload Too Large` error.
+> Use the **Cloudflare Gray-Cloud DNS-only** path (routing via AWS LoadBalancer -> ingress-nginx) for all Docker registry activities. See [harbor_cloudflare_dns_tls_guide.md](file:///D:/projects/docvaultNewest/docvault/docs/harbor_cloudflare_dns_tls_guide.md) for the active production architecture.
 
-Do not use this as the primary path for:
-
-- Jenkins `docker push`.
-- Kubernetes image pulls from Harbor.
-- Large Harbor registry blobs.
-
-Cloudflare published application routes are browser/application-friendly. Harbor registry traffic is a Docker registry data path and still deserves separate push/pull testing before trusting it.
 
 ## 1. What Cloudflare Means by Published Application Route
 
@@ -359,26 +351,14 @@ kubectl logs -n harbor deploy/harbor-jobservice --tail=100
 
 If Harbor is still starting or failing, fix pods before debugging Cloudflare.
 
-## 11. Harbor Position in the New Plan
+## 11. Harbor Position in the New Plan (Deprecated/Limited for Registry Push)
 
-New recommendation:
+> [!WARNING]
+> This section describes the previous Cloudflare Tunnel Harbor approach. It is retained for historical context but is NOT recommended for active use due to Cloudflare's 100MB upload limit on the free plan (causing `413 Payload Too Large` errors when pushing larger Docker images).
+> Active deployment uses the Cloudflare Gray-cloud DNS-only path with NGINX Ingress documented in [harbor_cloudflare_dns_tls_guide.md](file:///D:/projects/docvaultNewest/docvault/docs/harbor_cloudflare_dns_tls_guide.md).
 
-```text
-Harbor UI: OK through Cloudflare published application route.
-Harbor registry push/pull: test carefully; keep direct DNS/LB as fallback.
-```
+For registry push/pull traffic, use the NGINX Ingress + DNS-only setup to avoid proxy limits.
 
-If you want to try Harbor registry through the published route anyway, prove it with:
-
-```powershell
-docker login harbor.example.com
-docker pull alpine:3.20
-docker tag alpine:3.20 harbor.example.com/docvault-dev/alpine-test:tunnel
-docker push harbor.example.com/docvault-dev/alpine-test:tunnel
-docker pull harbor.example.com/docvault-dev/alpine-test:tunnel
-```
-
-Then test a real DocVault image. If push fails with upload/body/timeout errors, do not burn time debugging Harbor. Use NGINX Ingress or a direct LoadBalancer for registry traffic.
 
 ## 11.1. Deploy Harbor for Cloudflare Tunnel Testing
 
@@ -414,7 +394,7 @@ externalURL: https://harbor.<your-domain>
 Then deploy:
 
 ```powershell
-kubectl apply -f infra/k8s/infra-deps/storageclass.yaml
+kubectl apply -f infra/k8s/infra-deps/base/storageclass.yaml
 kubectl create namespace harbor --dry-run=client -o yaml | kubectl apply -f -
 
 kubectl create secret generic harbor-bootstrap-secrets `

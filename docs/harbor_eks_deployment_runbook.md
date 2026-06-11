@@ -18,33 +18,27 @@ Official context checked while writing this:
 
 ## 1. Decision Before Apply
 
-Do not deploy Harbor as plain HTTP on EKS if EKS nodes must pull images from it. Docker/Jenkins and EKS node containerd both need a trusted registry endpoint. The clean path is:
+Do not deploy Harbor as plain HTTP on EKS. Docker/Jenkins and EKS node containerd both need a trusted registry endpoint.
+Also, do not proxy Harbor registry traffic through a Cloudflare Tunnel or Cloudflare proxied (orange cloud) DNS, as this will fail with a `413 Payload Too Large` error for images larger than 100MB.
+
+The recommended production architecture for DocVault is:
 
 ```text
-harbor.<your-domain> over HTTPS with a trusted certificate
+harbor.docvault.id.vn
+  -> Cloudflare DNS-only (gray cloud)
+  -> AWS LoadBalancer (NLB)
+  -> ingress-nginx
+  -> Harbor Ingress
+  -> Harbor services
 ```
 
-For MVP, use one of these:
-
-| Option | When to use | Notes |
-|---|---|---|
-| Real DNS + trusted TLS | Best EKS demo path | Use `harbor.<domain>` and create `harbor-tls` in namespace `harbor`. |
-| Temporary self-signed TLS | Short lab only | Jenkins and every EKS node must trust the CA. More moving parts. |
-| HTTP NodePort | Local kind/minikube only | Avoid on EKS unless you intentionally configure insecure registries on all nodes. |
-
-The committed values file is:
+The primary manifest for this is:
 
 ```text
-infra/k8s/harbor/values-eks.yaml
+infra/k8s/harbor/values-eks-nginx-ingress.yaml
 ```
 
-Replace:
-
-```yaml
-externalURL: https://harbor.example.com
-```
-
-with the real Harbor URL before installing Harbor.
+The domain is pre-configured to `harbor.docvault.id.vn`.
 
 ## 2. EKS First
 
@@ -67,63 +61,116 @@ Expected storage class for this repo:
 docvault-gp3
 ```
 
-## 3. Create Harbor Namespace and Secrets
+## 3. Install cert-manager and ClusterIssuer
 
-Create namespace:
+cert-manager requests and auto-renews Let's Encrypt certificates.
 
 ```powershell
-kubectl create namespace harbor
+# Add Helm repo and install cert-manager
+helm repo add jetstack https://charts.jetstack.io
+helm repo update
+helm upgrade --install cert-manager jetstack/cert-manager `
+  --namespace cert-manager `
+  --create-namespace `
+  --set crds.enabled=true
+
+# Create the Cloudflare API token secret (do not commit the token itself)
+kubectl create secret generic cloudflare-api-token-secret `
+  -n cert-manager `
+  --from-literal=api-token="<YOUR_CLOUDFLARE_API_TOKEN>"
+
+# Apply ClusterIssuer
+kubectl apply -f infra/k8s/cert-manager/clusterissuer-letsencrypt-cloudflare.yaml
+kubectl get clusterissuer
 ```
 
-Create bootstrap secret. Do not commit these values:
+## 4. Install NGINX Ingress Controller (ingress-nginx)
+
+The controller handles routing from the external AWS Load Balancer to the Kubernetes Services.
 
 ```powershell
+# Add Helm repo and install ingress-nginx
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm repo update
+helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx `
+  --namespace ingress-nginx `
+  --create-namespace `
+  -f infra/k8s/ingress-nginx/values-eks.yaml
+
+# Wait for the external AWS Load Balancer to be provisioned
+kubectl get svc ingress-nginx-controller -n ingress-nginx -w
+```
+
+Note down the **EXTERNAL-IP** of the load balancer. It will look like:
+`xxxxxx.elb.ap-southeast-1.amazonaws.com`
+
+## 5. Configure Cloudflare DNS-only Record
+
+In your Cloudflare dashboard under your active zone (`docvault.id.vn`):
+
+1. Go to **DNS** -> **Records**.
+2. Click **Add record**.
+3. Set **Type** to `CNAME`.
+4. Set **Name** to `harbor`.
+5. Set **Target** to the AWS LoadBalancer DNS name retrieved in Step 4.
+6. Set **Proxy status** to **DNS only** (gray cloud).
+7. Save the record.
+
+> [!IMPORTANT]
+> The **DNS-only** (gray cloud) setting is critical. If proxied (orange cloud), the 100MB upload limit applies, causing Docker pushes to fail with `413 Payload Too Large`.
+
+## 6. Create Harbor Namespace and Bootstrap Secrets
+
+Create the namespace and bootstrap credentials before installing Harbor:
+
+```powershell
+# Create namespace
+kubectl create namespace harbor
+
+# Create bootstrap secret
 kubectl create secret generic harbor-bootstrap-secrets `
   -n harbor `
   --from-literal=HARBOR_ADMIN_PASSWORD="<strong-admin-password>" `
-  --from-literal=secretKey="<16-char-secret-key>"
+  --from-literal=secretKey="<16-char-random-key>"
 ```
 
-Create TLS secret:
+*Note: The `harbor-tls` secret will be created automatically by cert-manager through ingress-shim once the Harbor chart is installed.*
 
-```powershell
-kubectl create secret tls harbor-tls `
-  -n harbor `
-  --cert .\harbor.crt `
-  --key .\harbor.key
-```
+## 7. Install Harbor with Helm and Ingress-NGINX
 
-The certificate common name/SAN must match `externalURL`, for example `harbor.example.com`.
-
-## 4. Install Harbor With Helm
+Deploy Harbor and expose it via NGINX Ingress:
 
 ```powershell
 helm repo add harbor https://helm.goharbor.io
 helm repo update
 helm upgrade --install harbor harbor/harbor `
   -n harbor `
-  -f infra/k8s/harbor/values-eks.yaml
+  -f infra/k8s/harbor/values-eks-nginx-ingress.yaml
 ```
 
-Check status:
+Wait for all Harbor pods to be healthy and running:
 
 ```powershell
 kubectl get pods -n harbor
-kubectl get pvc -n harbor
-kubectl get svc -n harbor
+kubectl get ingress -n harbor
+kubectl get certificate -n harbor
 ```
 
-If using `type: loadBalancer`, wait for the external endpoint:
+## 8. Verify TLS and Docker Push
+
+Once deployment succeeds and DNS propagates, test the endpoint:
 
 ```powershell
-kubectl get svc harbor -n harbor -w
-```
+# 1. Verify HTTPS connection
+curl -I https://harbor.docvault.id.vn
 
-Point DNS for `harbor.<domain>` to the load balancer endpoint, then verify:
+# 2. Log in using your configured HARBOR_ADMIN_PASSWORD
+docker login harbor.docvault.id.vn
 
-```powershell
-curl -I https://harbor.<domain>
-docker login harbor.<domain>
+# 3. Pull a test image, tag it, and push it to verify upload capacity
+docker pull alpine:3.20
+docker tag alpine:3.20 harbor.docvault.id.vn/docvault-dev/alpine-test:dns-only
+docker push harbor.docvault.id.vn/docvault-dev/alpine-test:dns-only
 ```
 
 ## 5. Harbor Project Setup
@@ -159,7 +206,7 @@ Harbor does not show robot secrets again after creation, so store it immediately
 Run the DocVault pipeline with:
 
 ```text
-REGISTRY_HOST=harbor.<domain>
+REGISTRY_HOST=harbor.docvault.id.vn
 REGISTRY_NAMESPACE=docvault-dev
 REGISTRY_CREDENTIAL_ID=harbor-docvault-dev-robot
 PUSH_LATEST=false
@@ -173,7 +220,7 @@ After the first successful push, the pipeline updates each values file like:
 
 ```yaml
 image:
-  repository: "harbor.<domain>/docvault-dev/gateway"
+  repository: "harbor.docvault.id.vn/docvault-dev/gateway"
   tag: "v<jenkins-build-number>"
   digest: "sha256:..."
 ```
@@ -188,7 +235,7 @@ Create an image pull secret in `docvault`:
 kubectl create namespace docvault --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret docker-registry harbor-docvault-dev-pull `
   -n docvault `
-  --docker-server=harbor.<domain> `
+  --docker-server=harbor.docvault.id.vn `
   --docker-username="<harbor-robot-username>" `
   --docker-password="<harbor-robot-secret>"
 ```
@@ -219,6 +266,6 @@ Do not rebuild for prod. Promotion means the artifact already scanned and valida
 - Harbor UI projects `docvault-dev` and `docvault-prod`.
 - Harbor robot account permissions.
 - Harbor scan report for one DocVault image.
-- Jenkins log showing `docker login harbor.<domain>`, push to `docvault-dev`, and GitOps digest update.
+- Jenkins log showing `docker login harbor.docvault.id.vn`, push to `docvault-dev`, and GitOps digest update.
 - Argo CD app health after pulling from Harbor.
 - A failed attempt to overwrite an immutable prod tag.

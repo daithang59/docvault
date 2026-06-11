@@ -1,21 +1,20 @@
 # Harbor DNS + Trusted TLS With Cloudflare
 
-Updated: 2026-05-25
+Updated: 2026-06-10
 
-This document originally explained the DNS/load balancer method. The current DocVault plan has changed:
-
-```text
-Primary app/admin UI exposure: Cloudflare Tunnel published application routes
-Harbor registry push/pull: keep direct DNS/LB or NGINX Ingress as fallback if tunnel push/pull is unstable
-```
-
-Use this newer guide first:
+This document explains the recommended production path for Harbor deployment and exposure:
 
 ```text
-docs/cloudflare_tunnel_published_app_routes.md
+harbor.docvault.id.vn
+  -> Cloudflare DNS-only
+  -> AWS LoadBalancer
+  -> ingress-nginx
+  -> Harbor Ingress
+  -> Harbor services
 ```
 
-The older DNS/TLS method below is still useful if Docker registry push/pull through Tunnel is unreliable.
+By routing Harbor registry traffic directly through the NGINX Ingress Controller rather than the Cloudflare Tunnel, we avoid Cloudflare's 100MB upload limit (which otherwise triggers `413 Payload Too Large` errors during heavy Docker image pushes).
+
 
 This document explains the DNS/TLS method:
 
@@ -72,19 +71,25 @@ You can later test proxied mode for the Harbor UI, but do the first working regi
 ## 3. Recommended Architecture for DocVault
 
 ```text
-Jenkins
+Jenkins / Docker Client
   |
   | docker login / push
   v
-harbor.docvault-demo.example.com
+harbor.docvault.id.vn
   |
-  | Cloudflare DNS-only CNAME
+  | Cloudflare DNS-only CNAME (Gray Cloud)
   v
-AWS Load Balancer created by EKS Service
+AWS Load Balancer (NLB) created by ingress-nginx
   |
-  | HTTPS
   v
-Harbor pods in namespace harbor
+NGINX Ingress Controller (ingress-nginx)
+  |
+  | (Routes via Ingress rule)
+  v
+Harbor Ingress (harbor-tls terminated at Ingress)
+  |
+  v
+Harbor services (core, registry, etc.)
   |
   v
 EBS-backed PVCs using docvault-gp3
@@ -93,7 +98,8 @@ EBS-backed PVCs using docvault-gp3
 For DocVault, this matches:
 
 - Terraform EKS in `infra/terraform/aws-eks`.
-- Harbor values in `infra/k8s/harbor/values-eks.yaml`.
+- NGINX Ingress values in `infra/k8s/ingress-nginx/values-eks.yaml`.
+- Harbor values in `infra/k8s/harbor/values-eks-nginx-ingress.yaml`.
 - Jenkins Harbor parameters in `Jenkinsfile`.
 - GitOps image values in `infra/k8s/values/*.yaml`.
 
@@ -101,7 +107,7 @@ For DocVault, this matches:
 
 You need:
 
-- A domain you control, for example `example.com`.
+- A domain you control: `docvault.id.vn`.
 - The domain added to Cloudflare.
 - Cloudflare nameservers configured at your domain registrar.
 - AWS account ready for EKS.
@@ -111,15 +117,15 @@ You need:
 Example names used below:
 
 ```text
-Domain: example.com
-Harbor hostname: harbor.example.com
+Domain: docvault.id.vn
+Harbor hostname: harbor.docvault.id.vn
 AWS region: ap-southeast-1
 EKS cluster: docvault-eks
 Harbor namespace: harbor
 TLS secret: harbor-tls
 ```
 
-Replace those with your real values.
+Replace those with your real values if executing manually.
 
 ## 4.1. If You Do Not Have a Domain Yet
 
@@ -151,23 +157,23 @@ docvault-lab.com
 The exact name does not matter. What matters is that Cloudflare shows it as an active zone in the Cloudflare dashboard. If Cloudflare lists:
 
 ```text
-example.com
+docvault.id.vn
 ```
 
 then:
 
 ```yaml
 dnsZones:
-  - example.com
+  - docvault.id.vn
 ```
 
 and Harbor can use:
 
 ```text
-harbor.example.com
+harbor.docvault.id.vn
 ```
 
-Do not use `harbor.example.com` as `dnsZones` unless it is separately delegated as its own Cloudflare zone.
+Do not use `harbor.docvault.id.vn` as `dnsZones` unless it is separately delegated as its own Cloudflare zone.
 
 ## 4.2. If You Want a `.vn` Domain With Google Cloud DNS
 
@@ -441,7 +447,7 @@ Zone - Zone - Read
 Restrict the token to your zone if possible, for example:
 
 ```text
-Include -> Specific zone -> example.com
+Include -> Specific zone -> docvault.id.vn
 ```
 
 Do not commit this token.
@@ -456,7 +462,7 @@ kubectl create secret generic cloudflare-api-token-secret `
 
 ## 8. Step 4 - Create a Let's Encrypt ClusterIssuer
 
-Create `infra/k8s/harbor/clusterissuer-letsencrypt-cloudflare.yaml` locally or apply this directly after replacing the email and zone:
+Create `infra/k8s/cert-manager/clusterissuer-letsencrypt-cloudflare.yaml` locally or apply this directly after replacing the email:
 
 ```yaml
 apiVersion: cert-manager.io/v1
@@ -465,7 +471,7 @@ metadata:
   name: letsencrypt-cloudflare
 spec:
   acme:
-    email: your-email@example.com
+    email: admin@docvault.id.vn
     server: https://acme-v02.api.letsencrypt.org/directory
     privateKeySecretRef:
       name: letsencrypt-cloudflare-account-key
@@ -477,13 +483,13 @@ spec:
               key: api-token
         selector:
           dnsZones:
-            - example.com
+            - docvault.id.vn
 ```
 
 Apply it:
 
 ```powershell
-kubectl apply -f infra/k8s/harbor/clusterissuer-letsencrypt-cloudflare.yaml
+kubectl apply -f infra/k8s/cert-manager/clusterissuer-letsencrypt-cloudflare.yaml
 kubectl get clusterissuer
 ```
 
@@ -509,7 +515,7 @@ spec:
     name: letsencrypt-cloudflare
     kind: ClusterIssuer
   dnsNames:
-    - harbor.example.com
+    - harbor.docvault.id.vn
 ```
 
 Create namespace and request the cert:
@@ -534,7 +540,7 @@ infra/k8s/harbor/values-eks.yaml
 Set:
 
 ```yaml
-externalURL: https://harbor.example.com
+externalURL: https://harbor.docvault.id.vn
 
 expose:
   type: loadBalancer
@@ -615,14 +621,14 @@ Use gray cloud / DNS only for the first working Harbor registry setup.
 Wait for DNS:
 
 ```powershell
-nslookup harbor.example.com
-curl -I https://harbor.example.com
+nslookup harbor.docvault.id.vn
+curl -I https://harbor.docvault.id.vn
 ```
 
 Then test Docker:
 
 ```powershell
-docker login harbor.example.com
+docker login harbor.docvault.id.vn
 ```
 
 If `docker login` succeeds without `x509` errors, your DNS + trusted TLS path works.
@@ -632,7 +638,7 @@ If `docker login` succeeds without `x509` errors, your DNS + trusted TLS path wo
 In Harbor UI:
 
 ```text
-https://harbor.example.com
+https://harbor.docvault.id.vn
 ```
 
 Create projects:
@@ -672,7 +678,7 @@ Use the exact robot username Harbor shows.
 Use these Jenkins parameters:
 
 ```text
-REGISTRY_HOST=harbor.example.com
+REGISTRY_HOST=harbor.docvault.id.vn
 REGISTRY_NAMESPACE=docvault-dev
 REGISTRY_CREDENTIAL_ID=harbor-docvault-dev-robot
 PUSH_LATEST=false
@@ -686,7 +692,7 @@ Expected image references after Jenkins updates GitOps:
 
 ```yaml
 image:
-  repository: "harbor.example.com/docvault-dev/gateway"
+  repository: "harbor.docvault.id.vn/docvault-dev/gateway"
   tag: "v<build-number>"
   digest: "sha256:..."
 ```
@@ -699,7 +705,7 @@ If Harbor projects are private, create a pull secret in `docvault`:
 kubectl create namespace docvault --dry-run=client -o yaml | kubectl apply -f -
 kubectl create secret docker-registry harbor-docvault-dev-pull `
   -n docvault `
-  --docker-server=harbor.example.com `
+  --docker-server=harbor.docvault.id.vn `
   --docker-username="robot$docvault-dev+jenkins-push" `
   --docker-password="<robot-secret-from-harbor>"
 ```
@@ -737,7 +743,7 @@ For Harbor registry traffic, be careful:
 - Long uploads may hit proxy timeouts.
 - Troubleshooting registry push failures becomes harder.
 
-For this project, keep `harbor.example.com` DNS-only until the final demo is stable.
+For this project, keep `harbor.docvault.id.vn` DNS-only until the final demo is stable.
 
 ## 17. What If You Use NGINX Ingress?
 
@@ -823,14 +829,14 @@ expose:
       secretName: harbor-tls
   ingress:
     hosts:
-      core: harbor.example.com
+      core: harbor.docvault.id.vn
     className: nginx
     annotations:
       cert-manager.io/cluster-issuer: letsencrypt-cloudflare
       nginx.ingress.kubernetes.io/proxy-body-size: "0"
       nginx.ingress.kubernetes.io/proxy-request-buffering: "off"
 
-externalURL: https://harbor.example.com
+externalURL: https://harbor.docvault.id.vn
 ```
 
 Why these annotations matter:
@@ -874,14 +880,14 @@ kubectl get ingress -n harbor
 kubectl describe ingress -n harbor
 kubectl get certificate -n harbor
 kubectl get pods -n harbor
-curl -I https://harbor.example.com
-docker login harbor.example.com
+curl -I https://harbor.docvault.id.vn
+docker login harbor.docvault.id.vn
 ```
 
 If Docker login works, Jenkins can use:
 
 ```text
-REGISTRY_HOST=harbor.example.com
+REGISTRY_HOST=harbor.docvault.id.vn
 REGISTRY_NAMESPACE=docvault-dev
 REGISTRY_CREDENTIAL_ID=harbor-docvault-dev-robot
 PUSH_LATEST=false
@@ -908,7 +914,7 @@ Cloudflare Tunnel can work well for **web UIs**, but it is not the recommended p
 It can expose:
 
 ```text
-https://harbor.example.com -> cloudflared -> Harbor/NGINX inside the cluster
+https://harbor.docvault.id.vn -> cloudflared -> Harbor/NGINX inside the cluster
 ```
 
 But Harbor is not only a normal website. Docker push/pull sends registry API calls plus large image layer uploads/downloads. Those large request bodies and long-lived upload streams are exactly where Cloudflare proxy/tunnel setups can become painful.
@@ -996,19 +1002,19 @@ This creates a bad demo failure mode because the registry appears reachable but 
 Only test it as a temporary experiment:
 
 ```text
-Tunnel hostname: harbor.example.com
+Tunnel hostname: harbor.docvault.id.vn
 Tunnel service: http://harbor-core-or-nginx-service:80
-Harbor externalURL: https://harbor.example.com
+Harbor externalURL: https://harbor.docvault.id.vn
 ```
 
 Then verify all of these, not just the UI:
 
 ```powershell
-docker login harbor.example.com
+docker login harbor.docvault.id.vn
 docker pull alpine:3.20
-docker tag alpine:3.20 harbor.example.com/docvault-dev/alpine-test:tunnel
-docker push harbor.example.com/docvault-dev/alpine-test:tunnel
-docker pull harbor.example.com/docvault-dev/alpine-test:tunnel
+docker tag alpine:3.20 harbor.docvault.id.vn/docvault-dev/alpine-test:tunnel
+docker push harbor.docvault.id.vn/docvault-dev/alpine-test:tunnel
+docker pull harbor.docvault.id.vn/docvault-dev/alpine-test:tunnel
 ```
 
 If the test image is tiny but DocVault images fail, the tunnel/proxy path is probably the problem. Switch back to DNS-only plus AWS Load Balancer or NGINX Ingress.
@@ -1025,7 +1031,7 @@ Fix:
 
 - Use Let's Encrypt via cert-manager DNS-01, or use orange cloud Full (strict) where Docker sees Cloudflare's edge cert.
 
-### `certificate is valid for X, not harbor.example.com`
+### `certificate is valid for X, not harbor.docvault.id.vn`
 
 Cause:
 
@@ -1072,13 +1078,13 @@ Fix:
 
 Capture:
 
-- Cloudflare DNS record for `harbor.example.com` set to DNS-only.
+- Cloudflare DNS record for `harbor.docvault.id.vn` set to DNS-only.
 - `kubectl get certificate -n harbor`.
 - `kubectl get secret harbor-tls -n harbor`.
 - `kubectl get svc -n harbor` showing LoadBalancer.
 - Browser screenshot of Harbor UI over HTTPS.
-- `docker login harbor.example.com` success.
-- Jenkins log showing push to `harbor.example.com/docvault-dev/...`.
+- `docker login harbor.docvault.id.vn` success.
+- Jenkins log showing push to `harbor.docvault.id.vn/docvault-dev/...`.
 - Harbor scan report for one pushed image.
 - Argo CD app pulling images from Harbor successfully.
 
