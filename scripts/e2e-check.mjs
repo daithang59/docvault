@@ -684,10 +684,37 @@ async function main() {
     },
   );
 
-  const viewerDownload = await expectStatus(
-    'viewer download published document',
+  const editorDownload = await expectStatus(
+    'editor download published INTERNAL document',
     `/api/documents/${docId}/presign-download`,
     200,
+    {
+      method: 'POST',
+      headers: {
+        ...authHeaders(editorToken),
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({ version: uploadResult.version }),
+    },
+  );
+  assert(typeof editorDownload.url === 'string', 'editor presign should return URL');
+  log('PASS editor presign-download returns URL');
+
+  await expectStatus(
+    'editor stream published INTERNAL document',
+    `/api/documents/${docId}/versions/${uploadResult.version}/stream`,
+    200,
+    {
+      headers: authHeaders(editorToken),
+    },
+  );
+
+  // INTERNAL documents require at least the editor role: a plain viewer is denied
+  // both the presign and the direct stream even after the document is published.
+  await expectStatus(
+    'viewer download published INTERNAL denied',
+    `/api/documents/${docId}/presign-download`,
+    403,
     {
       method: 'POST',
       headers: {
@@ -697,13 +724,11 @@ async function main() {
       body: JSON.stringify({ version: uploadResult.version }),
     },
   );
-  assert(typeof viewerDownload.url === 'string', 'viewer presign should return URL');
-  log('PASS viewer presign-download returns URL');
 
   await expectStatus(
-    'viewer stream published document',
+    'viewer stream published INTERNAL denied',
     `/api/documents/${docId}/versions/${uploadResult.version}/stream`,
-    200,
+    403,
     {
       headers: authHeaders(viewerToken),
     },

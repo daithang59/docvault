@@ -254,8 +254,8 @@
   --state-info-bg: rgba(30, 41, 59, 0.8);
   --state-info-border: rgba(51, 65, 85, 0.7);
   --state-info-text: #94A3B8;
-  --state-error-bg: rgba(127, 29, 29, 0.5);
-  --state-error-border: rgba(185, 28, 28, 0.6);
+  --state-error-bg: rgba(239, 68, 68, 0.12);
+  --state-error-border: rgba(239, 68, 68, 0.32);
   --state-error-text: #FCA5A5;
   --destructive-hover-bg: rgba(127, 29, 29, 0.35);
 
