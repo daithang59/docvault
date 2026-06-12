@@ -16,6 +16,7 @@ import {
   buildDocumentMetadataSummary,
   type DocumentMetadataKind,
 } from '@/features/documents/document-detail-presentation';
+import { useOwnerDisplayName } from '@/features/approvals/approvals.hooks';
 
 interface DocumentMetadataSummaryCardProps {
   document: DocumentDetail;
@@ -35,7 +36,12 @@ const ICONS: Record<DocumentMetadataKind, LucideIcon> = {
 export function DocumentMetadataSummaryCard({
   document,
 }: DocumentMetadataSummaryCardProps) {
-  const items = buildDocumentMetadataSummary(document);
+  const { data: ownerDisplay } = useOwnerDisplayName(document.ownerId);
+  const items = buildDocumentMetadataSummary(document).map((item) =>
+    item.kind === 'identity' && ownerDisplay
+      ? { ...item, value: ownerDisplay }
+      : item,
+  );
 
   return (
     <section
