@@ -11,6 +11,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/gateway.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -35,6 +36,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/metadata-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -59,6 +61,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/audit-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -83,6 +86,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/notification-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -107,6 +111,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/workflow-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -131,6 +136,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/document-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -155,6 +161,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/web.yaml
   destination:
     server: 'https://kubernetes.default.svc'
