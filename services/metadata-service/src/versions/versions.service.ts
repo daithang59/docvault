@@ -64,15 +64,23 @@ export class VersionsService {
         currentVersion: dto.version,
       };
 
+      // The document-level DLP aggregate reflects the CURRENT version's scan
+      // result, so it must follow the new version up (DETECTED) and down
+      // (CLEAR/NOT_SCANNED). Historical detections are preserved on the version
+      // record and in the immutable audit log, not by pinning this field.
       if (dlpDetected) {
         documentUpdateData.dlpStatus = 'DETECTED';
         documentUpdateData.dlpFindings = dlpFindings;
         documentUpdateData.dlpDetectedAt = new Date();
+        // Classification only escalates on detection; de-escalation is left to a
+        // human so an earlier CONFIDENTIAL label is never silently downgraded.
         if (shouldEscalateClassification) {
           documentUpdateData.classification = 'CONFIDENTIAL';
         }
-      } else if ((document as any).dlpStatus !== 'DETECTED') {
+      } else {
         documentUpdateData.dlpStatus = dlpStatus;
+        documentUpdateData.dlpFindings = dlpFindings;
+        documentUpdateData.dlpDetectedAt = null;
       }
 
       await tx.document.update({

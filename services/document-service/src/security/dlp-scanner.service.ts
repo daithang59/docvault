@@ -66,6 +66,10 @@ const RULES: Rule[] = [
 
 const MAX_SCAN_CHARS = 1_000_000;
 const PDF_MAGIC = '%PDF-';
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+// DOCX is a zip container; its files start with the "PK" local-file-header magic.
+const ZIP_MAGIC = 'PK';
 
 // pdfjs-dist 4.x ships ESM only. This service compiles with `module: commonjs`,
 // which would down-level a normal dynamic import() to require() and break on the
@@ -74,6 +78,36 @@ const PDF_MAGIC = '%PDF-';
 const importEsm = new Function('specifier', 'return import(specifier)') as (
   specifier: string,
 ) => Promise<unknown>;
+
+// Pull the visible text out of a DOCX word/document.xml: paragraph and break
+// tags become whitespace, <w:t> run contents are kept, all other tags dropped,
+// then XML entities are decoded. This keeps phone/email patterns intact while
+// discarding markup that would otherwise split or hide them.
+function extractDocxXmlText(xml: string): string {
+  const withBreaks = xml
+    .replace(/<\/w:p>/g, '\n')
+    .replace(/<w:(?:br|tab|cr)\b[^>]*\/?>/g, ' ');
+
+  const runs = withBreaks.match(/<w:t\b[^>]*>([\s\S]*?)<\/w:t>/g) ?? [];
+  const text = runs
+    .map((run) => run.replace(/<w:t\b[^>]*>/, '').replace(/<\/w:t>/, ''))
+    .join(' ');
+
+  return decodeXmlEntities(text);
+}
+
+function decodeXmlEntities(value: string): string {
+  return value
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>')
+    .replace(/&quot;/g, '"')
+    .replace(/&apos;/g, "'")
+    .replace(/&#(\d+);/g, (_, code) => String.fromCodePoint(Number(code)))
+    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) =>
+      String.fromCodePoint(parseInt(code, 16)),
+    )
+    .replace(/&amp;/g, '&');
+}
 
 @Injectable()
 export class DlpScannerService {
@@ -121,8 +155,16 @@ export class DlpScannerService {
       return this.extractPdfText(buffer);
     }
 
+    if (this.isDocx(buffer, mimeType)) {
+      return this.extractDocxText(buffer);
+    }
+
     if (this.isTextLike(mimeType)) {
-      return buffer.toString('utf8', 0, Math.min(buffer.length, MAX_SCAN_CHARS));
+      return buffer.toString(
+        'utf8',
+        0,
+        Math.min(buffer.length, MAX_SCAN_CHARS),
+      );
     }
 
     return null;
@@ -132,7 +174,9 @@ export class DlpScannerService {
     if (mimeType === 'application/pdf') {
       return true;
     }
-    return buffer.subarray(0, PDF_MAGIC.length).toString('latin1') === PDF_MAGIC;
+    return (
+      buffer.subarray(0, PDF_MAGIC.length).toString('latin1') === PDF_MAGIC
+    );
   }
 
   private isTextLike(mimeType?: string): boolean {
@@ -182,6 +226,45 @@ export class DlpScannerService {
       // Extraction must never break uploads — treat a failed parse as empty text.
       const message = error instanceof Error ? error.message : String(error);
       this.logger.warn(`PDF text extraction failed for DLP scan: ${message}`);
+      return '';
+    }
+  }
+
+  private isDocx(buffer: Buffer, mimeType?: string): boolean {
+    if (mimeType === DOCX_MIME) {
+      return true;
+    }
+    // A bare ZIP magic is not enough to claim DOCX, so only trust the mimetype
+    // here; PDFs and plain text are already handled before this check.
+    return false;
+  }
+
+  private async extractDocxText(buffer: Buffer): Promise<string> {
+    try {
+      if (
+        buffer.subarray(0, ZIP_MAGIC.length).toString('latin1') !== ZIP_MAGIC
+      ) {
+        // Mimetype claimed DOCX but the bytes are not a zip container.
+        return '';
+      }
+
+      // A DOCX is a zip; the body text lives in word/document.xml inside <w:t>
+      // runs. We read that entry and strip tags directly rather than going
+      // through mammoth, whose DOMParser call is incompatible with the
+      // @xmldom/xmldom version pinned in this workspace.
+      const JSZip = ((await importEsm('jszip')) as { default: any }).default;
+      const zip = await JSZip.loadAsync(buffer);
+      const documentEntry = zip.file('word/document.xml');
+      if (!documentEntry) {
+        return '';
+      }
+
+      const xml: string = await documentEntry.async('string');
+      return extractDocxXmlText(xml).slice(0, MAX_SCAN_CHARS);
+    } catch (error) {
+      // Extraction must never break uploads — treat a failed parse as empty text.
+      const message = error instanceof Error ? error.message : String(error);
+      this.logger.warn(`DOCX text extraction failed for DLP scan: ${message}`);
       return '';
     }
   }

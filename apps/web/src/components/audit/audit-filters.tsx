@@ -2,6 +2,7 @@
 
 import { AuditQueryFilters, AuditResult } from '@/types/audit';
 import { X } from 'lucide-react';
+import { UserCombobox } from '@/components/common/user-combobox';
 
 interface AuditFiltersProps {
   filters: AuditQueryFilters;
@@ -30,12 +31,16 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
         )}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        <FilterInput
-          label="Actor ID"
-          value={filters.actorId ?? ''}
-          onChange={(v) => setField('actorId', v)}
-          placeholder="User ID..."
-        />
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">Actor</label>
+          <UserCombobox
+            value={filters.actorId ?? ''}
+            onChange={(v) => setField('actorId', v)}
+            placeholder="Any user…"
+            allowClear
+            fallbackPlaceholder="User ID..."
+          />
+        </div>
         <FilterInput
           label="Action"
           value={filters.action ?? ''}

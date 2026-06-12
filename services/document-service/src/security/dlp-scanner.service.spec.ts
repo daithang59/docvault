@@ -12,6 +12,50 @@ async function buildPdf(lines: string[]): Promise<Buffer> {
   return Buffer.from(bytes);
 }
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+async function buildDocx(paragraphs: string[]): Promise<Buffer> {
+  const body = paragraphs
+    .map(
+      (text) =>
+        `<w:p><w:r><w:t xml:space="preserve">${escapeXml(text)}</w:t></w:r></w:p>`,
+    )
+    .join('');
+  const documentXml =
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
+    `<w:body>${body}</w:body></w:document>`;
+
+  const JSZip = require('jszip');
+  const zip = new JSZip();
+  zip.file(
+    '[Content_Types].xml',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/>' +
+      '</Types>',
+  );
+  zip.file(
+    '_rels/.rels',
+    '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/>' +
+      '</Relationships>',
+  );
+  zip.file('word/document.xml', documentXml);
+
+  return zip.generateAsync({ type: 'nodebuffer' });
+}
+
+const DOCX_MIME =
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+
 describe('DlpScannerService', () => {
   let service: DlpScannerService;
 
@@ -40,7 +84,9 @@ describe('DlpScannerService', () => {
   });
 
   it('returns CLEAR when no DLP pattern is present', async () => {
-    expect(await service.scan(Buffer.from('normal project document'), 'text/plain')).toEqual({
+    expect(
+      await service.scan(Buffer.from('normal project document'), 'text/plain'),
+    ).toEqual({
       status: 'CLEAR',
       findings: [],
     });
@@ -61,16 +107,47 @@ describe('DlpScannerService', () => {
   });
 
   it('does not raise findings for a clean PDF (no binary false positives)', async () => {
-    const pdf = await buildPdf(['Quarterly planning notes with no sensitive data.']);
+    const pdf = await buildPdf([
+      'Quarterly planning notes with no sensitive data.',
+    ]);
 
     const result = await service.scan(pdf, 'application/pdf');
 
     expect(result.status).toBe('CLEAR');
   });
 
+  it('extracts real text from a DOCX and detects a genuine phone number', async () => {
+    const docx = await buildDocx([
+      'Project notes.',
+      'Call me at 0901234567 about the deal.',
+    ]);
+
+    const result = await service.scan(docx, DOCX_MIME);
+
+    expect(result.status).toBe('DETECTED');
+    if (result.status !== 'DETECTED') {
+      throw new Error('Expected DLP detection');
+    }
+    const phone = result.findings.find((finding) => finding.type === 'PHONE');
+    expect(phone).toBeDefined();
+    expect(phone?.count).toBe(1);
+  });
+
+  it('does not raise findings for a clean DOCX', async () => {
+    const docx = await buildDocx([
+      'Quarterly planning notes with no sensitive data.',
+    ]);
+
+    const result = await service.scan(docx, DOCX_MIME);
+
+    expect(result.status).toBe('CLEAR');
+  });
+
   it('skips unsupported binary types instead of scanning raw bytes', async () => {
     // Random bytes that would trip the phone regex if decoded as UTF-8.
-    const binary = Buffer.from([0x00, 0x30, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0xff]);
+    const binary = Buffer.from([
+      0x00, 0x30, 0x39, 0x30, 0x31, 0x32, 0x33, 0x34, 0x35, 0x36, 0x37, 0xff,
+    ]);
 
     const result = await service.scan(binary, 'application/octet-stream');
 

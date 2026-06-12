@@ -80,6 +80,39 @@ describe('VersionsService DLP state', () => {
       }),
     });
   });
+
+  it('downgrades the document aggregate when a new clean version replaces a detected one', async () => {
+    mockDocumentFindUnique.mockResolvedValue({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      currentVersion: 1,
+      classification: 'CONFIDENTIAL',
+      dlpStatus: 'DETECTED',
+    });
+    const cleanDto = {
+      version: 2,
+      objectKey: 'doc/doc-1/v2/clean.docx',
+      checksum: 'def456',
+      size: 128,
+      filename: 'clean.docx',
+      contentType:
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      dlpStatus: 'CLEAR',
+      dlpFindings: [],
+    };
+
+    await service.create('doc-1', cleanDto as any, actor as any);
+
+    const updateData = mockDocumentUpdate.mock.calls[0][0].data;
+    expect(updateData).toMatchObject({
+      currentVersion: 2,
+      dlpStatus: 'CLEAR',
+      dlpFindings: [],
+      dlpDetectedAt: null,
+    });
+    // An earlier CONFIDENTIAL label is never silently downgraded by a clean scan.
+    expect(updateData).not.toHaveProperty('classification');
+  });
 });
 
 describe('VersionsService restore', () => {

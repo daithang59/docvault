@@ -186,7 +186,6 @@ describe('DocumentsService upload security controls', () => {
   });
 });
 
-
 describe('DocumentsService preview watermark', () => {
   const PREVIEW_SECRET = 'test-preview-secret';
 
@@ -258,7 +257,10 @@ describe('DocumentsService preview watermark', () => {
       getObjectStream,
     });
 
-    const result = await service.preview({ docId: 'doc-1', context: baseContext as any });
+    const result = await service.preview({
+      docId: 'doc-1',
+      context: baseContext as any,
+    });
 
     expect(applyWatermark).toHaveBeenCalledTimes(1);
     expect(result.watermarked).toBe(true);
@@ -277,7 +279,10 @@ describe('DocumentsService preview watermark', () => {
       getObjectStream,
     });
 
-    const result = await service.preview({ docId: 'doc-1', context: baseContext as any });
+    const result = await service.preview({
+      docId: 'doc-1',
+      context: baseContext as any,
+    });
 
     expect(applyWatermark).not.toHaveBeenCalled();
     expect(result.watermarked).toBeFalsy();
