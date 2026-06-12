@@ -121,9 +121,11 @@ def call(cfg = [:]) {
                 --exclude "**/.next/**" \
                 --exclude "**/dist/**" \
                 --exclude "**/coverage/**" \
+                --exclude "**/.sonar-cache/**" \
                 --exclude "**/.scannerwork/**" \
                 --exclude "**/dependency-check-report/**" \
                 --exclude "**/checkov-report/**" \
+                --exclude "**/trivy-fs-report/**" \
                 --exclude "**/zap-report/**" \
                 --format "HTML" \
                 --format "JSON" \

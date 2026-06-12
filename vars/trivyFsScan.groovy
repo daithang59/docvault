@@ -28,7 +28,14 @@ def call(cfg) {
             --exclude='*/dist' \\
             --exclude='coverage' \\
             --exclude='*/coverage' \\
+            --exclude='.sonar-cache' \\
+            --exclude='*/.sonar-cache' \\
+            --exclude='*/.sonar-cache/*' \\
+            --exclude='.scannerwork' \\
+            --exclude='*/.scannerwork' \\
+            --exclude='*/.scannerwork/*' \\
             --exclude='dependency-check-report' \\
+            --exclude='trivy-fs-report' \\
             --exclude='checkov-report' \\
             --exclude='zap-report' \\
             --exclude='*/.terraform' \\
