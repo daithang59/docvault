@@ -43,6 +43,7 @@ export interface DocumentLifecycleStage {
   state: DocumentLifecycleStageState;
   timestamp?: string;
   actorLabel?: string;
+  actorId?: string;
 }
 
 export interface DocumentLifecycleNextAction {
@@ -221,6 +222,7 @@ export function buildDocumentLifecycleTimeline(
               : 'upcoming',
         timestamp: evidence?.timestamp,
         actorLabel: evidence?.actorLabel,
+        actorId: evidence?.actorId,
       };
     }),
   };
@@ -323,7 +325,7 @@ function formatEnum(value: string): string {
 }
 
 const LIFECYCLE_STAGES: Array<
-  Omit<DocumentLifecycleStage, 'state' | 'timestamp' | 'actorLabel'>
+  Omit<DocumentLifecycleStage, 'state' | 'timestamp' | 'actorLabel' | 'actorId'>
 > = [
   {
     id: 'DRAFT',
@@ -409,7 +411,7 @@ function findLifecycleEvidence(
   document: DocumentDetail,
   history: WorkflowHistoryEntry[],
   stage: DocumentLifecycleStage['id'],
-): { timestamp: string; actorLabel?: string } | null {
+): { timestamp: string; actorLabel?: string; actorId?: string } | null {
   const matchingHistory = [...history]
     .filter((entry) => normalizeLifecycleStage(entry.toStatus) === stage)
     .sort(
@@ -422,6 +424,7 @@ function findLifecycleEvidence(
       timestamp: matchingHistory.createdAt,
       actorLabel:
         matchingHistory.actorDisplay ?? matchingHistory.actorId ?? undefined,
+      actorId: matchingHistory.actorId ?? undefined,
     };
   }
 
@@ -429,6 +432,7 @@ function findLifecycleEvidence(
     return {
       timestamp: document.createdAt,
       actorLabel: document.ownerDisplay ?? document.ownerId,
+      actorId: document.ownerId ?? undefined,
     };
   }
   if (stage === 'PUBLISHED' && document.publishedAt) {

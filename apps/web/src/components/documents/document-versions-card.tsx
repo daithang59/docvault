@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { DocumentVersion } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
 import { formatBytes } from '@/lib/utils/file';
@@ -11,6 +11,8 @@ import { getVersionPreviewPosture } from '@/features/documents/document-detail-p
 import { buildVersionDiff } from '@/features/documents/version-diff';
 import { useRestoreDocumentVersion } from '@/features/documents/documents.hooks';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { useAuth } from '@/lib/auth/auth-context';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 
 interface DocumentVersionsCardProps {
   docId: string;
@@ -38,8 +40,23 @@ export function DocumentVersionsCard({
   currentVersion,
 }: DocumentVersionsCardProps) {
   const restore = useRestoreDocumentVersion(docId);
+  const { session } = useAuth();
+  const currentSub = session?.user.sub;
   const [selected, setSelected] = useState<number[]>([]);
   const [restoreTarget, setRestoreTarget] = useState<number | null>(null);
+
+  const creatorIds = useMemo(
+    () =>
+      [
+        ...new Set(
+          versions
+            .map((v) => v.createdBy ?? v.uploadedById)
+            .filter((id): id is string => Boolean(id)),
+        ),
+      ],
+    [versions],
+  );
+  const { data: displayNames } = useOwnerDisplayNames(creatorIds);
 
   const latestVersion =
     currentVersion ??
@@ -128,9 +145,17 @@ export function DocumentVersionsCard({
                     {v.checksum && (
                       <span title={v.checksum}>SHA: {truncateMiddle(v.checksum, 12)}</span>
                     )}
-                    {(v.createdBy ?? v.uploadedById) && (
-                      <span>By {v.createdBy ?? v.uploadedById}</span>
-                    )}
+                    {(() => {
+                      const creatorId = v.createdBy ?? v.uploadedById;
+                      if (!creatorId) return null;
+                      const resolved =
+                        (creatorId === currentSub && session?.user.displayName) ||
+                        displayNames?.[creatorId]?.displayName ||
+                        creatorId;
+                      return (
+                        <span title={creatorId}>By {resolved}</span>
+                      );
+                    })()}
                     <span>{formatDateTime(v.uploadedAt ?? v.createdAt ?? '')}</span>
                   </div>
                   <div

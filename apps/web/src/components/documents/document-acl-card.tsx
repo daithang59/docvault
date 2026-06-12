@@ -38,7 +38,7 @@ export function DocumentAclCard({ docId, entries, canManage }: DocumentAclCardPr
   const { data: displayNames } = useOwnerDisplayNames(userSubjectIds);
 
   return (
-    <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+    <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
       <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
         <div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>Access Control</h3>
@@ -149,18 +149,18 @@ function AclAddForm({
 
   return (
     <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)', background: 'var(--bg-subtle)' }}>
-      <div className="grid grid-cols-2 gap-3 mb-3">
+      <div className="grid grid-cols-1 gap-3 mb-3 sm:grid-cols-3">
         <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'GROUP', 'ALL']} onChange={(v) => setSubjectType(v as SubjectType)} />
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Subject</label>
-          <SubjectPicker
-            subjectType={form.subjectType}
-            value={form.subjectId ?? ''}
-            onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
-          />
-        </div>
         <Select label="Permission" value={form.permission} options={['READ', 'DOWNLOAD', 'WRITE', 'APPROVE']} onChange={(v) => setForm({ ...form, permission: v as Permission })} />
         <Select label="Effect" value={form.effect} options={['ALLOW', 'DENY']} onChange={(v) => setForm({ ...form, effect: v as Effect })} />
+      </div>
+      <div className="mb-3">
+        <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Subject</label>
+        <SubjectPicker
+          subjectType={form.subjectType}
+          value={form.subjectId ?? ''}
+          onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+        />
       </div>
       {error && (
         <p className="mb-3 text-xs" style={{ color: 'var(--state-error-text)' }}>{error}</p>
@@ -294,7 +294,7 @@ function UserCombobox({ value, onChange }: { value: string; onChange: (v: string
       </button>
       {open && (
         <div
-          className="absolute z-20 mt-1 w-full rounded-lg border shadow-lg overflow-hidden"
+          className="relative z-20 mt-1 w-full rounded-lg border shadow-lg overflow-hidden"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
         >
           <div className="flex items-center gap-2 px-2.5 py-2 border-b" style={{ borderColor: 'var(--border-soft)' }}>
@@ -382,7 +382,7 @@ function GroupCombobox({ value, onChange }: { value: string; onChange: (v: strin
       </button>
       {open && (
         <div
-          className="absolute z-20 mt-1 w-full rounded-lg border shadow-lg overflow-hidden"
+          className="relative z-20 mt-1 w-full rounded-lg border shadow-lg overflow-hidden"
           style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
         >
           <div className="flex items-center gap-2 px-2.5 py-2 border-b" style={{ borderColor: 'var(--border-soft)' }}>

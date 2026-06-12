@@ -68,7 +68,7 @@ export class DocumentsService {
       throw new BadRequestException('Malware detected in upload');
     }
 
-    const dlpResult = this.dlpScanner.scan(file.buffer);
+    const dlpResult = await this.dlpScanner.scan(file.buffer, file.mimetype);
     if (dlpResult.status === 'DETECTED') {
       await this.auditClient.emitEvent(context, {
         action: 'DLP_PATTERN_DETECTED',

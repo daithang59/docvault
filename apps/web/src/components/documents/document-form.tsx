@@ -1,6 +1,6 @@
 'use client';
 
-import type { ReactNode } from 'react';
+import { useRef, type ReactNode } from 'react';
 import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
@@ -59,21 +59,36 @@ export function DocumentForm({
     },
   });
 
+  const tagInputRef = useRef<HTMLInputElement>(null);
   const tags = useWatch({ control, name: 'tags' }) ?? [];
   const classification =
     useWatch({ control, name: 'classification' }) ?? 'INTERNAL';
   const showClassificationOverrideReason =
     isAdmin && dlpStatus === 'DETECTED' && (classification === 'PUBLIC' || classification === 'INTERNAL');
 
+  // Read the tag input's pending text and, if it's a usable new tag, return
+  // the tag list with it appended. Used to flush a tag the user typed but
+  // didn't confirm with Enter/comma before submitting.
+  function tagsWithPending(): string[] {
+    const pending = tagInputRef.current?.value.trim().replace(/,$/, '');
+    if (pending && !tags.includes(pending) && tags.length < 50) {
+      return [...tags, pending];
+    }
+    return tags;
+  }
+
+  function commitPendingTag() {
+    const next = tagsWithPending();
+    if (next !== tags) {
+      setValue('tags', next);
+      if (tagInputRef.current) tagInputRef.current.value = '';
+    }
+  }
+
   function addTag(e: React.KeyboardEvent<HTMLInputElement>) {
-    const input = e.currentTarget;
-    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
+    if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      const newTag = input.value.trim().replace(/,$/, '');
-      if (newTag && !tags.includes(newTag) && tags.length < 50) {
-        setValue('tags', [...tags, newTag]);
-        input.value = '';
-      }
+      commitPendingTag();
     }
   }
 
@@ -81,8 +96,16 @@ export function DocumentForm({
     setValue('tags', tags.filter((t) => t !== tag));
   }
 
+  // Flush any unconfirmed tag text into form state before validating, so a tag
+  // the user typed but didn't press Enter on is still saved. setValue updates
+  // RHF synchronously, so handleSubmit sees the committed tag.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    commitPendingTag();
+    void handleSubmit(onSubmit)(e);
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={submit} className="space-y-5">
       {/* Title */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
@@ -197,9 +220,11 @@ export function DocumentForm({
             </span>
           ))}
           <input
+            ref={tagInputRef}
             type="text"
             placeholder={tags.length === 0 ? 'Type and press Enter to add tags...' : ''}
             onKeyDown={addTag}
+            onBlur={commitPendingTag}
             className="min-w-[120px] flex-1 bg-transparent text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none"
           />
         </div>

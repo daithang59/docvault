@@ -111,7 +111,7 @@ describe('DocumentsService upload security controls', () => {
       scan: jest.fn().mockResolvedValue({ clean: true, engine: 'local-eicar' }),
     };
     dlpScanner = {
-      scan: jest.fn().mockReturnValue({ status: 'CLEAR', findings: [] }),
+      scan: jest.fn().mockResolvedValue({ status: 'CLEAR', findings: [] }),
     };
     service = new (DocumentsService as any)(
       metadataClient,
@@ -155,7 +155,7 @@ describe('DocumentsService upload security controls', () => {
         count: 1,
       },
     ];
-    dlpScanner.scan.mockReturnValue({
+    dlpScanner.scan.mockResolvedValue({
       status: 'DETECTED',
       findings,
       suggestedClassification: 'CONFIDENTIAL',
