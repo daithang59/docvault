@@ -2,9 +2,9 @@
 namespace: docvault
 
 image:
-  repository: daithang59/docvault
-  tag: "v7"
-  digest: "sha256:2a59529e07924de310811cfcaff382d3bb99598d208dc3378c0a0449b15d3e63"
+  repository: "harbor.docvault.id.vn/docvault-dev/docvault"
+  tag: "v145"
+  digest: "sha256:72074849d58144b35452678e7fd042df617fca778e9a2293d79fba71a65072e8"
 
 healthPath: /api/health
 

@@ -1,0 +1,43 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - ../../base
+
+configMapGenerator:
+  - name: docvault-external-secrets-settings
+    namespace: docvault
+    literals:
+      - awsRegion=ap-southeast-1
+      - secretsEnvironment=testing
+  - name: keycloak-realm-config
+    namespace: docvault
+    files:
+      - realm-docvault.json
+
+generatorOptions:
+  disableNameSuffixHash: true
+
+replacements:
+  - source:
+      kind: ConfigMap
+      name: docvault-external-secrets-settings
+      fieldPath: data.awsRegion
+    targets:
+      - select:
+          kind: SecretStore
+          name: aws-secrets-manager
+        fieldPaths:
+          - spec.provider.aws.region
+  - source:
+      kind: ConfigMap
+      name: docvault-external-secrets-settings
+      fieldPath: data.secretsEnvironment
+    targets:
+      - select:
+          kind: ExternalSecret
+        fieldPaths:
+          - spec.dataFrom.0.extract.key
+        options:
+          delimiter: /
+          index: 2
