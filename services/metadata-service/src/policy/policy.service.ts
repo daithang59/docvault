@@ -548,23 +548,35 @@ export class PolicyService {
       ],
     };
 
-    await this.auditClient.emitEvent(context, {
-      action: 'AI_GUARDRAILS_EVALUATED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
-      metadata: {
-        docId,
-        actorId,
-        roles,
-        groups,
-        classification: document.classification,
-        status: document.status,
-        canUseContent: result.canUseContent,
-        allowedOperations,
-        deniedOperations,
-      },
-    });
+    // Only audit when the guardrail actually restricts something. A plain page
+    // view where every AI operation is allowed produces no security signal, and
+    // emitting it on every render floods the activity timeline (this endpoint
+    // runs once per document-detail load). Denials are the auditable decision —
+    // matching how metadata-read only logs DENY, never routine allows.
+    //
+    // result stays SUCCESS: the evaluation succeeded and merely reports which
+    // operations are unavailable. Marking it DENY would feed deny-burst and
+    // repeated-deny detection, turning normal browsing by a restricted role
+    // (e.g. compliance officer) into false anomaly signals.
+    if (deniedOperations.length > 0) {
+      await this.auditClient.emitEvent(context, {
+        action: 'AI_GUARDRAILS_EVALUATED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'SUCCESS',
+        metadata: {
+          docId,
+          actorId,
+          roles,
+          groups,
+          classification: document.classification,
+          status: document.status,
+          canUseContent: result.canUseContent,
+          allowedOperations,
+          deniedOperations,
+        },
+      });
+    }
 
     return result;
   }

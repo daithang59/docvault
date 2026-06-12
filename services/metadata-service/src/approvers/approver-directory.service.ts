@@ -71,9 +71,12 @@ export class ApproverDirectoryService {
 
       // 2. Fetch users by role in the docvault realm — parallel requests
       const [approverRes, adminRes] = await Promise.all([
-        fetch(`${baseUrl}/admin/realms/${realm}/roles/approver/users?max=1000`, {
-          headers: { Authorization: `Bearer ${access_token}` },
-        }),
+        fetch(
+          `${baseUrl}/admin/realms/${realm}/roles/approver/users?max=1000`,
+          {
+            headers: { Authorization: `Bearer ${access_token}` },
+          },
+        ),
         fetch(`${baseUrl}/admin/realms/${realm}/roles/admin/users?max=1000`, {
           headers: { Authorization: `Bearer ${access_token}` },
         }),

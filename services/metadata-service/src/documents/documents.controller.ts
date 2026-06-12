@@ -71,10 +71,14 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
   @ApiOperation({
-    summary: 'Restore a soft-deleted document back to DRAFT within the recovery window',
+    summary:
+      'Restore a soft-deleted document back to DRAFT within the recovery window',
   })
   restoreFromTrash(@Param('docId') docId: string, @Req() req: any) {
-    return this.documentsService.restoreFromTrash(docId, buildRequestContext(req));
+    return this.documentsService.restoreFromTrash(
+      docId,
+      buildRequestContext(req),
+    );
   }
 
   @Get(':docId')
@@ -172,17 +176,25 @@ export class DocumentsController {
     @Body() body: ApprovalChainDto,
     @Req() req: any,
   ) {
-    return this.documentsService.setApprovalChain(docId, body, buildRequestContext(req));
+    return this.documentsService.setApprovalChain(
+      docId,
+      body,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/approval-step/advance')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('approver', 'admin')
   @ApiOperation({
-    summary: 'Advance the approval chain to the next step (internal, used by workflow)',
+    summary:
+      'Advance the approval chain to the next step (internal, used by workflow)',
   })
   advanceApprovalStep(@Param('docId') docId: string, @Req() req: any) {
-    return this.documentsService.advanceApprovalStep(docId, buildRequestContext(req));
+    return this.documentsService.advanceApprovalStep(
+      docId,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/legal-hold')
