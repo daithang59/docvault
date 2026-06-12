@@ -111,6 +111,42 @@ export function computeAuditHash(
   return createHash('sha256').update(input, 'utf8').digest('hex');
 }
 
+// Mirror AuditService.sortMetadataValue: deterministically sort object keys
+// (recursively) so JSON.stringify yields the same string the service hashed.
+function sortMetadataValue(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map((item) => sortMetadataValue(item));
+  }
+
+  if (value !== null && typeof value === 'object' && !(value instanceof Date)) {
+    return Object.keys(value as Record<string, unknown>)
+      .sort()
+      .reduce<Record<string, unknown>>((sorted, key) => {
+        sorted[key] = sortMetadataValue(
+          (value as Record<string, unknown>)[key],
+        );
+        return sorted;
+      }, {});
+  }
+
+  return value;
+}
+
+// Mirror AuditService.canonicalMetadata: undefined/null/empty object all map to
+// undefined (omitted from the canonical payload), otherwise sort then stringify.
+export function canonicalMetadata(
+  metadata: Record<string, unknown> | undefined,
+): string | undefined {
+  if (
+    metadata === undefined ||
+    metadata === null ||
+    Object.keys(metadata).length === 0
+  ) {
+    return undefined;
+  }
+  return JSON.stringify(sortMetadataValue(metadata));
+}
+
 export function verifyAuditChain(
   events: AuditEventRecord[],
 ): ChainVerificationResult {
@@ -121,7 +157,11 @@ export function verifyAuditChain(
   for (let i = 0; i < events.length; i += 1) {
     const event = events[i];
     const expectedPrevHash = i === 0 ? null : events[i - 1].hash;
-    const canonicalPayload = buildCanonicalPayload({
+    // Mirror AuditService.create: the `metadata` key is only added to the
+    // canonical payload when canonicalMetadata returns a value. Always passing
+    // it (even as undefined) would emit "metadata=" for metadata-less events
+    // and diverge from the hash the service actually computed.
+    const canonicalFields: Record<string, any> = {
       eventId: event.eventId,
       timestamp: canonicalTimestamp(event.timestamp),
       actorId: event.actorId,
@@ -133,9 +173,12 @@ export function verifyAuditChain(
       reason: event.reason,
       ip: event.ip,
       traceId: event.traceId,
-      metadata:
-        event.metadata !== undefined ? JSON.stringify(event.metadata) : undefined,
-    });
+    };
+    const metadataStr = canonicalMetadata(event.metadata);
+    if (metadataStr !== undefined) {
+      canonicalFields.metadata = metadataStr;
+    }
+    const canonicalPayload = buildCanonicalPayload(canonicalFields);
     const expectedHash = computeAuditHash(
       i === 0 ? null : (events[i - 1].hash ?? null),
       canonicalPayload,
@@ -244,7 +287,10 @@ function parseArgs(argv: string[]): DemoOptions {
     if (arg === '--limit') {
       const rawLimit = argv[i + 1];
       const parsedLimit = Number(rawLimit);
-      if (!Number.isInteger(parsedLimit) || parsedLimit < MIN_EVENTS_FOR_TAMPER) {
+      if (
+        !Number.isInteger(parsedLimit) ||
+        parsedLimit < MIN_EVENTS_FOR_TAMPER
+      ) {
         throw new Error(
           `--limit must be an integer >= ${MIN_EVENTS_FOR_TAMPER}. Received: ${rawLimit}`,
         );
