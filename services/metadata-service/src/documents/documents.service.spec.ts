@@ -36,6 +36,7 @@ describe('DocumentsService DLP downgrade guard', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -145,6 +146,7 @@ describe('DocumentsService access-controlled list visibility', () => {
       } as any,
       { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -371,6 +373,7 @@ describe('DocumentsService legal hold', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -496,6 +499,7 @@ describe('DocumentsService trash', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -635,6 +639,7 @@ describe('DocumentsService approval chain', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -751,6 +756,7 @@ describe('DocumentsService purge expired trash', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -826,6 +832,7 @@ describe('DocumentsService tenant isolation', () => {
       } as any,
       { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-acme') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 

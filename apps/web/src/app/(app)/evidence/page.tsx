@@ -32,12 +32,14 @@ import {
   buildEvidenceCenterManifest,
   buildEvidenceCenterModel,
   buildEvidenceCenterDocumentPacket,
+  resolveActorIdsInText,
   type EvidenceBundleManifest,
   type EvidenceCaseNarrative,
   type EvidenceCenterModel,
   type EvidenceDocumentPacketTarget,
   type EvidenceRecommendationTarget,
   type EvidenceSourceState,
+  type UserDisplayNameMap,
 } from '@/features/evidence/evidence-center';
 import { buildEvidenceReportHtml } from '@/features/evidence/evidence-report';
 import { getRetentionEvidence } from '@/features/retention/retention.api';
@@ -48,6 +50,7 @@ import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
+import { getErrorMessage } from '@/lib/api/errors';
 import { formatDateTime } from '@/lib/utils/date';
 
 const sourceStateTone: Record<EvidenceSourceState, string> = {
@@ -170,7 +173,7 @@ export default function EvidenceCenterPage() {
     });
     const narrative = buildEvidenceCaseNarrative(bundle);
     downloadHtml(
-      buildEvidenceReportHtml(bundle, narrative),
+      buildEvidenceReportHtml(bundle, narrative, actorDisplayNames),
       `${bundle.bundleId}-report.html`,
     );
   }
@@ -238,8 +241,8 @@ export default function EvidenceCenterPage() {
         generatedAt: new Date().toISOString(),
       });
       downloadJson(packet, target.packetFilename);
-    } catch {
-      setDownloadError('Failed to export recommendation packet.');
+    } catch (error) {
+      setDownloadError(`Failed to export recommendation packet: ${getErrorMessage(error)}`);
     } finally {
       setPendingRecommendationId(null);
     }
@@ -266,8 +269,8 @@ export default function EvidenceCenterPage() {
         }),
       );
       downloadJson(packet, target.packetFilename);
-    } catch {
-      setDownloadError('Failed to export document packet.');
+    } catch (error) {
+      setDownloadError(`Failed to export document packet: ${getErrorMessage(error)}`);
     } finally {
       setPendingDocumentId(null);
       setStepUpDocumentTarget(null);
@@ -429,6 +432,7 @@ export default function EvidenceCenterPage() {
           <EvidenceCasePresentation
             bundle={bundlePreview}
             narrative={caseNarrative}
+            actorDisplayNames={actorDisplayNames}
             onCopy={copyEvidenceText}
             onExportBundle={() => downloadBundle(model)}
             onExportReport={() => downloadReport(model)}
@@ -599,12 +603,14 @@ function EvidenceBundlePanel({
 function EvidenceCasePresentation({
   bundle,
   narrative,
+  actorDisplayNames,
   onCopy,
   onExportBundle,
   onExportReport,
 }: {
   bundle: EvidenceBundleManifest | null;
   narrative: EvidenceCaseNarrative | null;
+  actorDisplayNames?: UserDisplayNameMap;
   onCopy: (value: string) => void | Promise<void>;
   onExportBundle: () => void;
   onExportReport: () => void;
@@ -813,7 +819,7 @@ function EvidenceCasePresentation({
                       </span>
                     </div>
                     <p className="mt-2 text-sm font-semibold text-[var(--text-main)]">
-                      {item.title}
+                      {resolveActorIdsInText(item.title, item.affectedActorIds, actorDisplayNames)}
                     </p>
                     <p className="mt-1 font-mono text-xs text-[var(--text-faint)]">
                       {item.packetFilename}
@@ -989,7 +995,7 @@ function RecommendationPacketQueue({
   items: EvidenceRecommendationTarget[];
   pendingId: string | null;
   selectedIds: Set<string>;
-  actorDisplayNames?: Record<string, { displayName: string; username: string }>;
+  actorDisplayNames?: UserDisplayNameMap;
   onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceRecommendationTarget) => Promise<void>;
 }) {
@@ -1241,25 +1247,6 @@ function badgeClass(severity: EvidenceRecommendationTarget['severity']): string 
     return 'rounded bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold text-[var(--status-pending-text)]';
   }
   return 'rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]';
-}
-
-function resolveActorIdsInText(
-  text: string,
-  actorIds: string[],
-  displayNames?: Record<string, { displayName: string; username: string }>,
-): string {
-  if (!displayNames || actorIds.length === 0) {
-    return text;
-  }
-
-  let resolved = text;
-  for (const actorId of actorIds) {
-    const name = displayNames[actorId]?.displayName;
-    if (name && resolved.includes(actorId)) {
-      resolved = resolved.split(actorId).join(name);
-    }
-  }
-  return resolved;
 }
 
 function downloadJson(value: unknown, filename: string) {

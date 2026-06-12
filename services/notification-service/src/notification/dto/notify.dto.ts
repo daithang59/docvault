@@ -14,6 +14,8 @@ export enum NotifyType {
   DELETED = 'DELETED',
   MENTIONED = 'MENTIONED',
   COMMENTED = 'COMMENTED',
+  VERSION_UPLOADED = 'VERSION_UPLOADED',
+  DLP_DETECTED = 'DLP_DETECTED',
 }
 
 export class NotifyDto {

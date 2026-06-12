@@ -261,7 +261,12 @@ export class DocumentsController {
     @Body() body: CreateVersionDto,
     @Req() req: any,
   ) {
-    return this.versionsService.create(docId, body, req.user);
+    return this.versionsService.create(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/versions/:version/restore')
@@ -277,7 +282,12 @@ export class DocumentsController {
     @Param('version') version: string,
     @Req() req: any,
   ) {
-    return this.versionsService.restore(docId, Number(version), req.user);
+    return this.versionsService.restore(
+      docId,
+      Number(version),
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/status')

@@ -17,6 +17,35 @@ import type { ClassificationLevel, DocumentStatus } from '@/types/enums';
 
 export type EvidenceSourceState = 'ready' | 'attention' | 'empty';
 
+export type UserDisplayNameMap = Record<
+  string,
+  { displayName: string; username: string }
+>;
+
+/**
+ * Replace raw actor ids embedded in a server-built label with their resolved
+ * display names. Used for display surfaces only — JSON packets keep raw ids so
+ * evidence stays machine-verifiable.
+ */
+export function resolveActorIdsInText(
+  text: string,
+  actorIds: string[],
+  displayNames?: UserDisplayNameMap,
+): string {
+  if (!displayNames || actorIds.length === 0) {
+    return text;
+  }
+
+  let resolved = text;
+  for (const actorId of actorIds) {
+    const name = displayNames[actorId]?.displayName;
+    if (name && resolved.includes(actorId)) {
+      resolved = resolved.split(actorId).join(name);
+    }
+  }
+  return resolved;
+}
+
 export const EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS = [
   'fileContent',
   'objectKey',
@@ -106,6 +135,7 @@ export interface EvidenceBundleRecommendationReference
   severity: SecurityRecommendationRow['severity'];
   workflowStatus: SecurityRecommendationRow['workflow']['status'];
   ownerLabel: string;
+  affectedActorIds: string[];
 }
 
 export interface EvidenceBundleDocumentReference
@@ -328,6 +358,7 @@ export function buildEvidenceBundle(
       severity: item.severity,
       workflowStatus: item.workflowStatus,
       ownerLabel: item.ownerLabel,
+      affectedActorIds: item.affectedActorIds,
       packetFilename: item.packetFilename,
     }));
   const documents = model.documentPacketTargets

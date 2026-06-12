@@ -37,6 +37,17 @@ const BEHAVIOR_SIGNAL_ACTIONS = [
   'DOCUMENT_UPLOADED',
 ] as const;
 
+// Sliding window for behavior-signal detection. Burst thresholds (>= N denies,
+// mass-access counts) only mean "burst" if scoped to recent activity; without
+// this, 3 denies spread across months would trip DENY_BURST. Overridable via
+// env so retention-heavy deployments can widen or narrow the window.
+const BEHAVIOR_SIGNAL_WINDOW_DAYS = (() => {
+  const parsed = Number(process.env.AUDIT_BEHAVIOR_WINDOW_DAYS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+})();
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
 export interface RiskyDocumentSummary {
   documentId: string;
   classification: string;
@@ -671,10 +682,14 @@ export class AuditService {
   }
 
   private async getBehaviorSignals(): Promise<BehaviorSignalSummary[]> {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const events = await this.auditEvent
       .find(
         {
           action: { $in: [...BEHAVIOR_SIGNAL_ACTIONS] },
+          timestamp: { $gte: windowStart },
         },
         {
           _id: 0,

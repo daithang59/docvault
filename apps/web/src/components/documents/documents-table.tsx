@@ -31,10 +31,13 @@ import {
 } from '@/lib/auth/permissions';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
+import { cn } from '@/lib/utils/cn';
 
 interface DocumentsTableProps {
   data: DocumentListItem[];
   enableSelection?: boolean;
+  onRowClick?: (doc: DocumentListItem) => void;
+  activeRowId?: string | null;
   onSubmit?: (doc: DocumentListItem) => void;
   onApprove?: (doc: DocumentListItem) => void;
   onReject?: (doc: DocumentListItem) => void;
@@ -50,6 +53,8 @@ interface DocumentsTableProps {
 export function DocumentsTable({
   data,
   enableSelection = false,
+  onRowClick,
+  activeRowId = null,
   onSubmit,
   onApprove,
   onReject,
@@ -431,28 +436,44 @@ export function DocumentsTable({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row, rowIndex) => (
-              <tr
-                key={row.id}
-                className={`group border-b last:border-0 transition-all duration-150 ${row.getIsSelected() ? 'ring-1 ring-inset ring-[var(--color-primary)]/20' : ''}`}
-                style={{
-                  borderColor: 'var(--table-row-border)',
-                  background: row.getIsSelected()
-                    ? 'var(--color-primary-bg)'
-                    : rowIndex % 2 === 0
-                      ? 'transparent'
-                      : 'var(--table-row-alt-bg)',
-                }}
-                onMouseEnter={() => handleRowEnter(row.original.id)}
-                onMouseLeave={handleRowLeave}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3 transition-colors group-hover:bg-[var(--bg-muted)]/30">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map((row, rowIndex) => {
+              const isActive = activeRowId === row.original.id;
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    'group border-b last:border-0 transition-all duration-150',
+                    row.getIsSelected() && 'ring-1 ring-inset ring-[var(--color-primary)]/20',
+                    isActive && 'ring-1 ring-inset ring-[var(--color-primary)]/40',
+                    onRowClick && 'cursor-pointer',
+                  )}
+                  style={{
+                    borderColor: 'var(--table-row-border)',
+                    background: row.getIsSelected() || isActive
+                      ? 'var(--color-primary-bg)'
+                      : rowIndex % 2 === 0
+                        ? 'transparent'
+                        : 'var(--table-row-alt-bg)',
+                  }}
+                  onMouseEnter={() => handleRowEnter(row.original.id)}
+                  onMouseLeave={handleRowLeave}
+                  onClick={(event) => {
+                    if (!onRowClick) return;
+                    // Ignore clicks on interactive elements (links, buttons, checkboxes, selects).
+                    if ((event.target as HTMLElement).closest('a,button,input,select,[role="menu"]')) {
+                      return;
+                    }
+                    onRowClick(row.original);
+                  }}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-2.5 transition-colors group-hover:bg-[var(--bg-muted)]/30">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>

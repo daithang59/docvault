@@ -345,6 +345,7 @@ describe('AuditService security summary', () => {
             'DOCUMENT_UPLOADED',
           ],
         },
+        timestamp: { $gte: expect.any(Date) },
       },
       {
         _id: 0,

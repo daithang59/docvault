@@ -1,12 +1,13 @@
 'use client';
 
 import type { ComponentType } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import {
   Bookmark,
   ChevronDown,
   Clock,
   FileText,
-  FolderOpen,
   RotateCcw,
   Save,
   Search,
@@ -30,7 +31,6 @@ import {
 } from '@/features/documents/document-filter-model';
 import type { DocumentSavedViewOption } from '@/features/documents/document-saved-views';
 import { cn } from '@/lib/utils/cn';
-import { useState } from 'react';
 
 interface DocumentFiltersProps {
   filters: DocumentFiltersState;
@@ -76,6 +76,8 @@ export function DocumentFilters({
   onDeleteSavedView,
 }: DocumentFiltersProps) {
   const [savedViewName, setSavedViewName] = useState('');
+  const [filterPanelOpen, setFilterPanelOpen] = useState(false);
+  const [savePanelOpen, setSavePanelOpen] = useState(false);
 
   function setField<K extends keyof DocumentFiltersState>(key: K, value: DocumentFiltersState[K]) {
     onChange({ ...filters, [key]: value });
@@ -91,59 +93,328 @@ export function DocumentFilters({
 
   function appendSearchToken(token: string) {
     const currentSearch = filters.search.trim();
-    const nextSearch = currentSearch
-      ? `${currentSearch} ${token}`
-      : token;
-
-    if (currentSearch.toLowerCase().includes(token.toLowerCase())) {
-      return;
-    }
-
-    setField('search', nextSearch);
+    if (currentSearch.toLowerCase().includes(token.toLowerCase())) return;
+    setField('search', currentSearch ? `${currentSearch} ${token}` : token);
   }
 
   const activeChips = getActiveDocumentFilterChips(filters, options);
   const hasActiveFilters = activeChips.length > 0;
+  // Chips minus the quick-view chip — the view is already represented by the tab strip.
+  const detailChips = activeChips.filter((chip) => chip.key !== 'view');
+  // Count of advanced filters living inside the popover (status/class/owner/tag).
+  const popoverFilterCount = [
+    filters.status,
+    filters.classification,
+    filters.ownerId,
+    filters.tag,
+  ].filter(Boolean).length;
   const canSaveView = Boolean(savedViewName.trim() && onSaveCurrentView);
-  const hasFolders = options.folders.length > 0;
+  const isSortDirty =
+    filters.sort !== DEFAULT_DOCUMENT_FILTERS.sort ||
+    filters.sortDir !== DEFAULT_DOCUMENT_FILTERS.sortDir;
 
   return (
     <div
-      className="mb-4 rounded-lg border p-3"
-      style={{
-        background: 'var(--bg-card)',
-        borderColor: 'var(--border-soft)',
-      }}
+      className="mb-4 rounded-xl border p-3"
+      style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
     >
-      <div className="mb-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-        <div className="flex items-center gap-2">
-          <SlidersHorizontal className="h-4 w-4 text-[var(--text-faint)]" />
-          <p className="text-sm font-semibold text-[var(--text-strong)]">
-            Document filters
-          </p>
+      {/* ── Row 1: View tabs + saved views ─────────────────────────── */}
+      <div className="flex items-center gap-2">
+        <div
+          className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto pb-0.5"
+          role="tablist"
+          aria-label="Document views"
+        >
+          {quickViews.map((view) => {
+            const active = activeSavedViewId === null && filters.view === view.value;
+            return (
+              <button
+                key={view.value}
+                type="button"
+                role="tab"
+                aria-selected={active}
+                title={view.description}
+                onClick={() => setField('view', view.value)}
+                className={cn(
+                  'inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg px-2.5 text-xs font-semibold transition',
+                  active
+                    ? 'bg-[var(--color-primary)] text-white'
+                    : 'text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)]',
+                )}
+              >
+                <span>{view.label}</span>
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 text-[10px] tabular-nums',
+                    active ? 'bg-white/20 text-white' : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
+                  )}
+                >
+                  {view.count}
+                </span>
+              </button>
+            );
+          })}
+
+          {savedViews.length > 0 ? (
+            <>
+              <span className="mx-1 h-5 w-px shrink-0 bg-[var(--border-soft)]" aria-hidden="true" />
+              {savedViews.map((view) => {
+                const active = activeSavedViewId === view.id;
+                return (
+                  <span
+                    key={view.id}
+                    className={cn(
+                      'inline-flex h-8 shrink-0 items-center overflow-hidden rounded-lg border transition',
+                      active
+                        ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
+                        : 'border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-muted)]',
+                    )}
+                  >
+                    <button
+                      type="button"
+                      title={view.description}
+                      onClick={() => onApplySavedView?.(view)}
+                      className="inline-flex h-full items-center gap-1.5 px-2.5 text-xs font-semibold"
+                    >
+                      <Bookmark className="h-3 w-3 shrink-0" />
+                      <span className="max-w-[10rem] truncate">{view.label}</span>
+                      <span
+                        className={cn(
+                          'rounded-full px-1.5 text-[10px] tabular-nums',
+                          active ? 'bg-white/20 text-white' : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
+                        )}
+                      >
+                        {view.count}
+                      </span>
+                    </button>
+                    {view.source === 'custom' && onDeleteSavedView ? (
+                      <button
+                        type="button"
+                        aria-label={`Delete saved view ${view.label}`}
+                        onClick={() => onDeleteSavedView(view.id)}
+                        className={cn(
+                          'flex h-full w-7 items-center justify-center border-l transition',
+                          active
+                            ? 'border-white/20 text-white hover:bg-white/10'
+                            : 'border-[var(--border-soft)] text-[var(--text-faint)] hover:bg-[var(--bg-muted)] hover:text-[var(--state-error-text)]',
+                        )}
+                      >
+                        <Trash2 className="h-3 w-3" />
+                      </button>
+                    ) : null}
+                  </span>
+                );
+              })}
+            </>
+          ) : null}
         </div>
-        <p className="text-xs text-[var(--text-muted)]">
-          Showing {resultCount} of {totalCount} documents
+
+        <p className="hidden shrink-0 text-xs text-[var(--text-muted)] tabular-nums sm:block">
+          {resultCount} / {totalCount}
         </p>
       </div>
 
-      {savedViews.length > 0 || onSaveCurrentView ? (
-        <div className="mb-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
-          <div className="mb-2 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
-            <div className="flex items-center gap-2">
-              <Bookmark className="h-4 w-4 text-[var(--text-faint)]" />
+      {/* ── Row 2: Search + Filter popover + Sort + Save ───────────── */}
+      <div className="mt-3 flex flex-wrap items-center gap-2">
+        <div className="relative min-w-0 flex-1">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
+          <input
+            value={filters.search}
+            onChange={(event) => setField('search', event.target.value)}
+            placeholder="Search documents…"
+            aria-label="Search documents"
+            title="Search syntax: status:pending, class:confidential, tag:finance, owner:editor, file:report.pdf"
+            className="h-9 w-full rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] py-2 pl-9 pr-8 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)]"
+          />
+          {filters.search ? (
+            <button
+              type="button"
+              aria-label="Clear search"
+              onClick={() => setField('search', '')}
+              className="absolute right-2.5 top-1/2 -translate-y-1/2 text-[var(--text-faint)] transition hover:text-[var(--text-main)]"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          ) : null}
+        </div>
+
+        {/* Filter popover */}
+        <Popover
+          open={filterPanelOpen}
+          onOpenChange={setFilterPanelOpen}
+          align="end"
+          trigger={
+            <button
+              type="button"
+              className={cn(
+                'inline-flex h-9 items-center gap-2 rounded-lg border px-3 text-sm font-medium transition',
+                popoverFilterCount > 0
+                  ? 'border-[var(--border-focus)] bg-[var(--color-primary-light)] text-[var(--color-primary)]'
+                  : 'border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-muted)] hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)]',
+              )}
+            >
+              <SlidersHorizontal className="h-4 w-4" />
+              <span className="hidden sm:inline">Filter</span>
+              {popoverFilterCount > 0 ? (
+                <span className="rounded-full bg-[var(--color-primary)] px-1.5 text-[10px] font-bold text-white tabular-nums">
+                  {popoverFilterCount}
+                </span>
+              ) : null}
+            </button>
+          }
+        >
+          <div className="w-72 p-3">
+            <div className="mb-2 flex items-center justify-between">
               <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-                Saved views
+                Filters
               </p>
+              {popoverFilterCount > 0 ? (
+                <button
+                  type="button"
+                  onClick={() =>
+                    onChange({
+                      ...filters,
+                      status: '',
+                      classification: '',
+                      ownerId: '',
+                      tag: '',
+                    })
+                  }
+                  className="text-xs font-medium text-[var(--text-faint)] transition hover:text-[var(--state-error-text)]"
+                >
+                  Clear all
+                </button>
+              ) : null}
             </div>
-            {onSaveCurrentView ? (
-              <div className="flex w-full gap-2 lg:w-auto">
+
+            <div className="space-y-2.5">
+              <FilterField label="Status">
+                <SelectFilter
+                  value={filters.status}
+                  onChange={(value) => setField('status', value as DocumentStatus | '')}
+                  options={STATUSES.map((status) => ({ value: status, label: formatEnum(status) }))}
+                  placeholder="All Status"
+                  ariaLabel="Filter by status"
+                />
+              </FilterField>
+
+              <FilterField label="Classification">
+                <SelectFilter
+                  value={filters.classification}
+                  onChange={(value) => setField('classification', value as ClassificationLevel | '')}
+                  options={CLASSIFICATIONS.map((classification) => ({
+                    value: classification,
+                    label: formatEnum(classification),
+                  }))}
+                  placeholder="All Classifications"
+                  ariaLabel="Filter by classification"
+                />
+              </FilterField>
+
+              <FilterField label="Owner">
+                <SelectFilter
+                  value={filters.ownerId}
+                  onChange={(value) => setField('ownerId', value)}
+                  options={options.owners}
+                  placeholder="All Owners"
+                  icon={User}
+                  ariaLabel="Filter by owner"
+                />
+              </FilterField>
+
+              <FilterField label="Tag">
+                <SelectFilter
+                  value={filters.tag}
+                  onChange={(value) => setField('tag', value)}
+                  options={options.tags.map((tag) => ({ value: tag, label: tag }))}
+                  placeholder="All Tags"
+                  icon={Tag}
+                  ariaLabel="Filter by tag"
+                />
+              </FilterField>
+            </div>
+
+            {searchSuggestions.length > 0 ? (
+              <div className="mt-3 border-t border-[var(--border-soft)] pt-3">
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                  Quick queries
+                </p>
+                <div className="flex flex-wrap gap-1.5">
+                  {searchSuggestions.map((suggestion) => {
+                    const Icon = suggestionIcon(suggestion.kind);
+                    return (
+                      <button
+                        key={suggestion.token}
+                        type="button"
+                        title={suggestion.description}
+                        onClick={() => appendSearchToken(suggestion.token)}
+                        className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border-soft)] bg-[var(--bg-muted)] px-2 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-main)]"
+                      >
+                        <Icon className="h-3 w-3" />
+                        <span>{suggestion.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            ) : null}
+          </div>
+        </Popover>
+
+        {/* Sort */}
+        <div className="w-44 shrink-0">
+          <SelectFilter
+            value={`${filters.sort}:${filters.sortDir}`}
+            onChange={(value) => {
+              const [sort, sortDir] = value.split(':');
+              onChange({
+                ...filters,
+                sort: sort as DocumentFiltersState['sort'],
+                sortDir: sortDir as DocumentFiltersState['sortDir'],
+              });
+            }}
+            options={SORT_OPTIONS}
+            placeholder="Sort by"
+            ariaLabel="Sort documents"
+          />
+        </div>
+
+        {/* Save view */}
+        {onSaveCurrentView ? (
+          <Popover
+            open={savePanelOpen}
+            onOpenChange={setSavePanelOpen}
+            align="end"
+            trigger={
+              <button
+                type="button"
+                title="Save current filters as a view"
+                className="inline-flex h-9 items-center gap-2 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)]"
+              >
+                <Bookmark className="h-4 w-4" />
+                <span className="hidden lg:inline">Save view</span>
+              </button>
+            }
+          >
+            <div className="w-64 p-3">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
+                Save current view
+              </p>
+              <div className="flex gap-2">
                 <input
                   value={savedViewName}
                   onChange={(event) => setSavedViewName(event.target.value)}
-                  placeholder="Name current view..."
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter' && canSaveView) {
+                      onSaveCurrentView(savedViewName.trim());
+                      setSavedViewName('');
+                      setSavePanelOpen(false);
+                    }
+                  }}
+                  placeholder="View name…"
                   aria-label="Saved view name"
-                  className="h-9 min-w-0 flex-1 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)] lg:w-52"
+                  autoFocus
+                  className="h-9 min-w-0 flex-1 rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)]"
                 />
                 <button
                   type="button"
@@ -151,262 +422,36 @@ export function DocumentFilters({
                   onClick={() => {
                     const label = savedViewName.trim();
                     if (!label) return;
-                    onSaveCurrentView?.(label);
+                    onSaveCurrentView(label);
                     setSavedViewName('');
+                    setSavePanelOpen(false);
                   }}
-                  className="inline-flex h-9 items-center justify-center gap-2 rounded-xl bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                  className="inline-flex h-9 items-center justify-center gap-1.5 rounded-lg bg-[var(--color-primary)] px-3 text-xs font-semibold text-white transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
                 >
                   <Save className="h-3.5 w-3.5" />
                   Save
                 </button>
               </div>
-            ) : null}
-          </div>
+            </div>
+          </Popover>
+        ) : null}
 
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {savedViews.map((view) => {
-              const active = activeSavedViewId === view.id;
-
-              return (
-                <div
-                  key={view.id}
-                  className={cn(
-                    'inline-flex h-10 shrink-0 items-center overflow-hidden rounded-xl border transition',
-                    active
-                      ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
-                      : 'border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-muted)]',
-                  )}
-                >
-                  <button
-                    type="button"
-                    title={view.description}
-                    onClick={() => onApplySavedView?.(view)}
-                    className="inline-flex h-full items-center gap-2 px-3 text-xs font-semibold"
-                  >
-                    <span>{view.label}</span>
-                    <span
-                      className={cn(
-                        'rounded-full px-1.5 py-0.5 text-[10px]',
-                        active
-                          ? 'bg-white/20 text-white'
-                          : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
-                      )}
-                    >
-                      {view.count}
-                    </span>
-                  </button>
-                  {view.source === 'custom' && onDeleteSavedView ? (
-                    <button
-                      type="button"
-                      aria-label={`Delete saved view ${view.label}`}
-                      onClick={() => onDeleteSavedView(view.id)}
-                      className={cn(
-                        'flex h-full w-8 items-center justify-center border-l transition',
-                        active
-                          ? 'border-white/20 text-white hover:bg-white/10'
-                          : 'border-[var(--border-soft)] text-[var(--text-faint)] hover:bg-[var(--bg-muted)] hover:text-[var(--state-error-text)]',
-                      )}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      <div className="mb-3 flex gap-2 overflow-x-auto pb-1" role="tablist" aria-label="Document quick views">
-        {quickViews.map((view) => {
-          const active = filters.view === view.value;
-
-          return (
-            <button
-              key={view.value}
-              type="button"
-              role="tab"
-              aria-selected={active}
-              title={view.description}
-              onClick={() => setField('view', view.value)}
-              className={cn(
-                'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition',
-                active
-                  ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
-                  : 'border-[var(--border-soft)] bg-[var(--bg-muted)] text-[var(--text-muted)] hover:text-[var(--text-main)]',
-              )}
-            >
-              <span>{view.label}</span>
-              <span
-                className={cn(
-                  'rounded-full px-1.5 py-0.5 text-[10px]',
-                  active
-                    ? 'bg-white/20 text-white'
-                    : 'bg-[var(--bg-card)] text-[var(--text-faint)]',
-                )}
-              >
-                {view.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="grid gap-2 md:grid-cols-2 xl:grid-cols-4 2xl:grid-cols-[minmax(240px,1fr)_repeat(5,minmax(140px,auto))_auto]">
-        <div className="relative min-w-0">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--text-muted)]" />
-          <input
-            value={filters.search}
-            onChange={(event) => setField('search', event.target.value)}
-            placeholder="Search documents..."
-            aria-label="Search documents"
-            title="Search syntax: status:pending, class:confidential, tag:finance, owner:editor, file:report.pdf"
-            className="h-10 w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] py-2 pl-9 pr-3 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none transition focus:border-[var(--border-focus)] focus:ring-2 focus:ring-[var(--focus-ring)]"
-          />
-          <span className="sr-only">Search syntax</span>
-        </div>
-
-        <SelectFilter
-          value={filters.status}
-          onChange={(value) => setField('status', value as DocumentStatus | '')}
-        options={STATUSES.map((status) => ({ value: status, label: formatEnum(status) }))}
-        placeholder="All Status"
-        ariaLabel="Filter by status"
-      />
-
-        <SelectFilter
-          value={filters.classification}
-          onChange={(value) =>
-            setField('classification', value as ClassificationLevel | '')
-          }
-          options={CLASSIFICATIONS.map((classification) => ({
-            value: classification,
-            label: formatEnum(classification),
-          }))}
-          placeholder="All Classifications"
-          ariaLabel="Filter by classification"
-        />
-
-        <SelectFilter
-          value={filters.ownerId}
-          onChange={(value) => setField('ownerId', value)}
-          options={options.owners}
-          placeholder="All Owners"
-          icon={User}
-          ariaLabel="Filter by owner"
-        />
-
-        <SelectFilter
-          value={filters.tag}
-          onChange={(value) => setField('tag', value)}
-          options={options.tags.map((tag) => ({ value: tag, label: tag }))}
-          placeholder="All Tags"
-          icon={Tag}
-          ariaLabel="Filter by tag"
-        />
-
-        <SelectFilter
-          value={`${filters.sort}:${filters.sortDir}`}
-          onChange={(value) => {
-            const [sort, sortDir] = value.split(':');
-            onChange({
-              ...filters,
-              sort: sort as DocumentFiltersState['sort'],
-              sortDir: sortDir as DocumentFiltersState['sortDir'],
-            });
-          }}
-          options={SORT_OPTIONS}
-          placeholder="Sort by"
-          ariaLabel="Sort documents"
-        />
-
+        {/* Reset */}
         <button
           type="button"
           onClick={resetFilters}
-          disabled={!hasActiveFilters && filters.sort === DEFAULT_DOCUMENT_FILTERS.sort && filters.sortDir === DEFAULT_DOCUMENT_FILTERS.sortDir}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 text-sm font-medium text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)] disabled:cursor-not-allowed disabled:opacity-50"
+          disabled={!hasActiveFilters && !isSortDirty}
+          title="Reset all filters"
+          className="inline-flex h-9 w-9 items-center justify-center rounded-lg border border-[var(--input-border)] bg-[var(--input-bg)] text-[var(--text-muted)] transition hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)] disabled:cursor-not-allowed disabled:opacity-40"
         >
-          <RotateCcw className="h-3.5 w-3.5" />
-          Reset
+          <RotateCcw className="h-4 w-4" />
         </button>
       </div>
 
-      {searchSuggestions.length > 0 ? (
-        <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-          <div className="flex shrink-0 items-center gap-2">
-            <Search className="h-3.5 w-3.5 text-[var(--text-faint)]" />
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Query chips
-            </p>
-          </div>
-          <div className="flex min-w-0 gap-2 overflow-x-auto pb-1 sm:pb-0">
-            {searchSuggestions.map((suggestion) => {
-              const Icon = suggestionIcon(suggestion.kind);
-
-              return (
-                <button
-                  key={suggestion.token}
-                  type="button"
-                  title={suggestion.description}
-                  onClick={() => appendSearchToken(suggestion.token)}
-                  className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-muted)] px-2.5 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-main)]"
-                >
-                  <Icon className="h-3.5 w-3.5" />
-                  <span>{suggestion.label}</span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {hasFolders ? (
-        <div className="mt-3 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-3">
-          <div className="mb-2 flex items-center gap-2">
-            <FolderOpen className="h-4 w-4 text-[var(--text-faint)]" />
-            <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-              Smart folders
-            </p>
-          </div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {options.folders.map((folder) => {
-              const active = filters.folder === folder.value;
-
-              return (
-                <button
-                  key={folder.value}
-                  type="button"
-                  onClick={() =>
-                    setField('folder', active ? '' : folder.value)
-                  }
-                  className={cn(
-                    'inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-xs font-semibold transition',
-                    active
-                      ? 'border-[var(--border-focus)] bg-[var(--color-primary)] text-white'
-                      : 'border-[var(--border-soft)] bg-[var(--bg-card)] text-[var(--text-muted)] hover:text-[var(--text-main)]',
-                  )}
-                >
-                  <span>Folder: {folder.value}</span>
-                  <span
-                    className={cn(
-                      'rounded-full px-1.5 py-0.5 text-[10px]',
-                      active
-                        ? 'bg-white/20 text-white'
-                        : 'bg-[var(--bg-muted)] text-[var(--text-faint)]',
-                    )}
-                  >
-                    {folder.count}
-                  </span>
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
-      {activeChips.length > 0 ? (
-        <div className="mt-3 flex flex-wrap gap-2">
-          {activeChips.map((chip) => (
+      {/* ── Row 3: Active filter chips (detail only) ───────────────── */}
+      {detailChips.length > 0 ? (
+        <div className="mt-2.5 flex flex-wrap items-center gap-1.5">
+          {detailChips.map((chip) => (
             <button
               key={chip.key}
               type="button"
@@ -419,6 +464,107 @@ export function DocumentFilters({
           ))}
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function FilterField({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="block">
+      <span className="mb-1 block text-[11px] font-medium uppercase tracking-wide text-[var(--text-faint)]">
+        {label}
+      </span>
+      {children}
+    </label>
+  );
+}
+
+function Popover({
+  open,
+  onOpenChange,
+  trigger,
+  children,
+  align = 'start',
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  trigger: React.ReactNode;
+  children: React.ReactNode;
+  align?: 'start' | 'end';
+}) {
+  const triggerRef = useRef<HTMLDivElement>(null);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const [position, setPosition] = useState<{ top: number; left: number } | null>(null);
+
+  // Anchor the floating panel to the trigger via fixed positioning so it
+  // escapes the filter card's stacking context (the card uses `animate-in`,
+  // which would otherwise let the table render above an absolute popover).
+  useEffect(() => {
+    if (!open) {
+      setPosition(null);
+      return;
+    }
+
+    function updatePosition() {
+      const rect = triggerRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const width = panelRef.current?.offsetWidth ?? 288;
+      const rawLeft = align === 'end' ? rect.right - width : rect.left;
+      const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8));
+      setPosition({ top: rect.bottom + 8, left });
+    }
+
+    updatePosition();
+
+    function handlePointerDown(event: MouseEvent) {
+      const target = event.target as Node;
+      if (
+        !triggerRef.current?.contains(target) &&
+        !panelRef.current?.contains(target)
+      ) {
+        onOpenChange(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') onOpenChange(false);
+    }
+
+    document.addEventListener('mousedown', handlePointerDown);
+    document.addEventListener('keydown', handleKeyDown);
+    window.addEventListener('resize', updatePosition);
+    window.addEventListener('scroll', updatePosition, true);
+    return () => {
+      document.removeEventListener('mousedown', handlePointerDown);
+      document.removeEventListener('keydown', handleKeyDown);
+      window.removeEventListener('resize', updatePosition);
+      window.removeEventListener('scroll', updatePosition, true);
+    };
+  }, [open, onOpenChange, align]);
+
+  return (
+    <div ref={triggerRef} className="shrink-0">
+      <span onClick={() => onOpenChange(!open)}>{trigger}</span>
+      {open && typeof document !== 'undefined'
+        ? createPortal(
+            <div
+              ref={panelRef}
+              className="fixed z-50 overflow-hidden rounded-xl border"
+              style={{
+                top: position?.top ?? -9999,
+                left: position?.left ?? -9999,
+                visibility: position ? 'visible' : 'hidden',
+                background: 'var(--surface-overlay-strong)',
+                borderColor: 'var(--surface-border)',
+                backdropFilter: 'blur(16px)',
+                WebkitBackdropFilter: 'blur(16px)',
+                boxShadow: 'var(--surface-shadow-lg)',
+              }}
+            >
+              {children}
+            </div>,
+            document.body,
+          )
+        : null}
     </div>
   );
 }
@@ -448,7 +594,7 @@ function SelectFilter({
         onChange={(e) => onChange(e.target.value)}
         aria-label={ariaLabel}
         className={cn(
-          'h-10 w-full cursor-pointer appearance-none rounded-xl border bg-[var(--input-bg)] py-2 pr-8 text-sm outline-none transition',
+          'h-9 w-full cursor-pointer appearance-none rounded-lg border bg-[var(--input-bg)] py-2 pr-8 text-sm outline-none transition',
           'focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]',
           value ? 'border-[var(--border-focus)] text-[var(--color-primary)]' : 'border-[var(--input-border)] text-[var(--text-muted)]',
           Icon ? 'pl-8' : 'pl-3',

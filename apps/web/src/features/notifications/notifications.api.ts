@@ -11,7 +11,8 @@ export type NotifyType =
   | 'SECURITY_RECOMMENDATION_OVERDUE'
   | 'MALWARE_BLOCKED'
   | 'DLP_DETECTED'
-  | 'AUDIT_CHAIN_INVALID';
+  | 'AUDIT_CHAIN_INVALID'
+  | 'VERSION_UPLOADED';
 
 export interface NotificationRecord {
   id:          string;
