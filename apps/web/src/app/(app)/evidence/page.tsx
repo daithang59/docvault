@@ -44,6 +44,7 @@ import { getRetentionEvidence } from '@/features/retention/retention.api';
 import { retentionKeys } from '@/features/retention/retention.keys';
 import { requestSensitiveActionProof } from '@/features/security/sensitive-action.api';
 import { getSensitiveActionStepUp } from '@/features/security/sensitive-action';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -104,6 +105,18 @@ export default function EvidenceCenterPage() {
         : null,
     [generatedAt, retentionQuery.data, securityQuery.data],
   );
+  const recommendationActorIds = useMemo(
+    () =>
+      model
+        ? [
+            ...new Set(
+              model.recommendationTargets.flatMap((item) => item.affectedActorIds),
+            ),
+          ]
+        : [],
+    [model],
+  );
+  const { data: actorDisplayNames } = useOwnerDisplayNames(recommendationActorIds);
   const selectedRecommendationIdSet = useMemo(
     () => new Set(selectedRecommendationIds),
     [selectedRecommendationIds],
@@ -386,6 +399,7 @@ export default function EvidenceCenterPage() {
               items={model.recommendationTargets}
               pendingId={pendingRecommendationId}
               selectedIds={selectedRecommendationIdSet}
+              actorDisplayNames={actorDisplayNames}
               onToggleSelection={toggleRecommendationSelection}
               onDownload={downloadRecommendationPacket}
             />
@@ -968,12 +982,14 @@ function RecommendationPacketQueue({
   items,
   pendingId,
   selectedIds,
+  actorDisplayNames,
   onToggleSelection,
   onDownload,
 }: {
   items: EvidenceRecommendationTarget[];
   pendingId: string | null;
   selectedIds: Set<string>;
+  actorDisplayNames?: Record<string, { displayName: string; username: string }>;
   onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceRecommendationTarget) => Promise<void>;
 }) {
@@ -1023,7 +1039,7 @@ function RecommendationPacketQueue({
                     </span>
                   </div>
                   <h3 className="mt-2 text-sm font-semibold text-[var(--text-main)]">
-                    {item.title}
+                    {resolveActorIdsInText(item.title, item.affectedActorIds, actorDisplayNames)}
                   </h3>
                   <p className="mt-1 font-mono text-xs text-[var(--text-faint)]">
                     {item.id}
@@ -1225,6 +1241,25 @@ function badgeClass(severity: EvidenceRecommendationTarget['severity']): string 
     return 'rounded bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold text-[var(--status-pending-text)]';
   }
   return 'rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]';
+}
+
+function resolveActorIdsInText(
+  text: string,
+  actorIds: string[],
+  displayNames?: Record<string, { displayName: string; username: string }>,
+): string {
+  if (!displayNames || actorIds.length === 0) {
+    return text;
+  }
+
+  let resolved = text;
+  for (const actorId of actorIds) {
+    const name = displayNames[actorId]?.displayName;
+    if (name && resolved.includes(actorId)) {
+      resolved = resolved.split(actorId).join(name);
+    }
+  }
+  return resolved;
 }
 
 function downloadJson(value: unknown, filename: string) {

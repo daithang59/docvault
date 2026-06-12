@@ -43,6 +43,7 @@ export interface EvidenceRecommendationTarget {
   slaState: SecurityRecommendationSlaState;
   auditQuery: string;
   affectedDocumentId: string | null;
+  affectedActorIds: string[];
   packetFilename: string;
 }
 
@@ -644,6 +645,7 @@ function buildRecommendationTarget(
     slaState: recommendation.playbook.slaState,
     auditQuery: buildAuditFilterQuery(recommendation.auditFilters),
     affectedDocumentId: recommendation.affectedDocumentIds[0] ?? null,
+    affectedActorIds: recommendation.affectedActorIds,
     packetFilename: `${slugify(recommendation.id)}-recommendation-evidence.json`,
   };
 }
