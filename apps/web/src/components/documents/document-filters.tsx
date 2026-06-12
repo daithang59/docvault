@@ -1,8 +1,9 @@
 'use client';
 
 import type { ComponentType } from 'react';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import {
   Bookmark,
   ChevronDown,
@@ -97,7 +98,40 @@ export function DocumentFilters({
     setField('search', currentSearch ? `${currentSearch} ${token}` : token);
   }
 
-  const activeChips = getActiveDocumentFilterChips(filters, options);
+  // Owner options arrive as raw ids when the list payload lacks display names.
+  // Resolve them through the org directory so the dropdown and owner chips show
+  // human names instead of opaque keycloak subs.
+  const ownerIds = useMemo(
+    () => options.owners.map((owner) => owner.value),
+    [options.owners],
+  );
+  const { data: ownerDisplayNames } = useOwnerDisplayNames(ownerIds);
+  const ownerOptions = useMemo(
+    () =>
+      options.owners.map((owner) => ({
+        value: owner.value,
+        label:
+          ownerDisplayNames?.[owner.value]?.displayName ?? owner.label,
+      })),
+    [options.owners, ownerDisplayNames],
+  );
+
+  function resolveSuggestionLabel(suggestion: DocumentSearchSuggestion): string {
+    if (suggestion.kind !== 'owner') return suggestion.label;
+    // The token is `owner:<id>` (or quoted) — swap the id for a display name.
+    const match = suggestion.token.match(/^owner:"?([^"]+)"?$/i);
+    const ownerId = match?.[1];
+    const displayName = ownerId
+      ? ownerDisplayNames?.[ownerId]?.displayName
+      : undefined;
+    return displayName ? `owner:${displayName}` : suggestion.label;
+  }
+
+  const resolvedOptions = useMemo(
+    () => ({ ...options, owners: ownerOptions }),
+    [options, ownerOptions],
+  );
+  const activeChips = getActiveDocumentFilterChips(filters, resolvedOptions);
   const hasActiveFilters = activeChips.length > 0;
   // Chips minus the quick-view chip — the view is already represented by the tab strip.
   const detailChips = activeChips.filter((chip) => chip.key !== 'view');
@@ -315,7 +349,7 @@ export function DocumentFilters({
                 <SelectFilter
                   value={filters.ownerId}
                   onChange={(value) => setField('ownerId', value)}
-                  options={options.owners}
+                  options={ownerOptions}
                   placeholder="All Owners"
                   icon={User}
                   ariaLabel="Filter by owner"
@@ -351,7 +385,7 @@ export function DocumentFilters({
                         className="inline-flex h-7 items-center gap-1.5 rounded-md border border-[var(--border-soft)] bg-[var(--bg-muted)] px-2 text-xs font-semibold text-[var(--text-muted)] transition hover:border-[var(--border-focus)] hover:text-[var(--text-main)]"
                       >
                         <Icon className="h-3 w-3" />
-                        <span>{suggestion.label}</span>
+                        <span>{resolveSuggestionLabel(suggestion)}</span>
                       </button>
                     );
                   })}
@@ -500,10 +534,7 @@ function Popover({
   // escapes the filter card's stacking context (the card uses `animate-in`,
   // which would otherwise let the table render above an absolute popover).
   useEffect(() => {
-    if (!open) {
-      setPosition(null);
-      return;
-    }
+    if (!open) return;
 
     function updatePosition() {
       const rect = triggerRef.current?.getBoundingClientRect();

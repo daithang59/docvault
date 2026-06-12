@@ -594,8 +594,17 @@ export class AuditService {
   private async getRepeatedDenyActors(): Promise<
     Array<{ actorId: string; denyCount: number }>
   > {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const query = this.auditEvent.aggregate([
-      { $match: { result: 'DENY', actorId: { $ne: null } } },
+      {
+        $match: {
+          result: 'DENY',
+          actorId: { $ne: null },
+          timestamp: { $gte: windowStart },
+        },
+      },
       { $group: { _id: '$actorId', denyCount: { $sum: 1 } } },
       { $match: { denyCount: { $gte: 3 } } },
       { $sort: { denyCount: -1 } },
@@ -611,11 +620,15 @@ export class AuditService {
   }
 
   private async getRiskyDocuments(): Promise<RiskyDocumentSummary[]> {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const events = await this.auditEvent
       .find(
         {
           action: { $in: [...AUTHORIZED_CONTENT_ACTIONS] },
           result: 'SUCCESS',
+          timestamp: { $gte: windowStart },
         },
         {
           _id: 0,
