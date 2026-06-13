@@ -276,24 +276,8 @@ pipeline {
             }
         }
 
-        stage('Pre-build Security') {
+        stage('Pre-build Quality') {
             parallel {
-                stage('SCA - Dependency Check') {
-                    steps {
-                        script {
-                            dependencyCheck(cfg)
-                        }
-                    }
-                }
-
-                stage('Trivy FS Scan') {
-                    steps {
-                        script {
-                            trivyFsScan(cfg)
-                        }
-                    }
-                }
-
                 stage('Unit Tests') {
                     steps {
                         script {
@@ -317,6 +301,26 @@ pipeline {
                         }
                     }
                 }
+            }
+        }
+
+        stage('Pre-build Security') {
+            parallel {
+                stage('SCA - Dependency Check') {
+                    steps {
+                        script {
+                            dependencyCheck(cfg)
+                        }
+                    }
+                }
+
+                stage('Trivy FS Scan') {
+                    steps {
+                        script {
+                            trivyFsScan(cfg)
+                        }
+                    }
+                }
 
                 stage('SAST - SonarQube') {
                     steps {
@@ -325,29 +329,15 @@ pipeline {
                         }
                     }
                 }
+            }
+        }
 
-                stage('Policy as Code') {
-                    steps {
-                        script {
-                            policyAsCode(cfg)
-                        }
-                    }
-                }
-
-                stage('IaC - Checkov Scan') {
-                    steps {
-                        script {
-                            iacCheckov(cfg)
-                        }
-                    }
-                }
-
-                stage('IaC - Terraform Validate') {
-                    steps {
-                        script {
-                            terraformValidate(cfg)
-                        }
-                    }
+        stage('Pre-build Security - IaC') {
+            steps {
+                script {
+                    policyAsCode(cfg)
+                    iacCheckov(cfg)
+                    terraformValidate(cfg)
                 }
             }
         }
