@@ -161,3 +161,4 @@ crash.*.log
 # Generated kubeconfigs / cluster credentials
 *.kubeconfig
 jenkins-argocd-reader.kubeconfig
+infra/terraform/aws-eks/nocommit/
