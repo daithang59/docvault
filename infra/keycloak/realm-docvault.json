@@ -64,9 +64,15 @@
       "redirectUris": [
         "http://localhost:3000/*",
         "http://localhost:3006/*",
-        "http://localhost:3006/api/auth/callback"
+        "http://localhost:3006/api/auth/callback",
+        "https://app.docvault.id.vn/*",
+        "https://app.docvault.id.vn/api/auth/callback"
       ],
-      "webOrigins": ["http://localhost:3000", "http://localhost:3006"],
+      "webOrigins": [
+        "http://localhost:3000",
+        "http://localhost:3006",
+        "https://app.docvault.id.vn"
+      ],
 
       "attributes": {
         "access.token.lifespan": "900",

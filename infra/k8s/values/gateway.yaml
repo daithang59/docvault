@@ -15,9 +15,7 @@ env:
   NODE_ENV: production
   PORT: "3000"
   KEYCLOAK_BASE_URL: "http://keycloak:8080"
-  # Patched at runtime by scripts/setup-eks-access.ps1 to the public
-  # Keycloak NodePort issuer while JWKS stays on KEYCLOAK_BASE_URL.
-  KEYCLOAK_ISSUER: "http://keycloak:8080/realms/docvault"
+  KEYCLOAK_ISSUER: "https://auth.docvault.id.vn/realms/docvault"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_AUDIENCE: "docvault-gateway"
   KEYCLOAK_CLIENT_ID: "docvault-gateway"
@@ -27,10 +25,8 @@ env:
   WORKFLOW_SERVICE_URL: "http://docvault-workflow-service:3003"
   AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
   NOTIFICATION_SERVICE_URL: "http://docvault-notification-service:3005"
-  # FRONTEND_URL and ALLOWED_ORIGINS are patched at runtime
-  # by scripts/setup-eks-access.ps1 with the current node external IP.
-  FRONTEND_URL: "http://localhost:3006"
-  ALLOWED_ORIGINS: "http://localhost:3006"
+  FRONTEND_URL: "https://app.docvault.id.vn"
+  ALLOWED_ORIGINS: "https://app.docvault.id.vn"
 
 envFrom:
   - secretRef:

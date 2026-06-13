@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-client-public-url
+  namespace: docvault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: keycloak-client-public-url
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        fsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: configure
+          image: quay.io/keycloak/keycloak:26.0
+          imagePullPolicy: IfNotPresent
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              /opt/keycloak/bin/kcadm.sh config credentials \
+                --server http://keycloak:8080 \
+                --realm master \
+                --user "$KEYCLOAK_ADMIN" \
+                --password "$KEYCLOAK_ADMIN_PASSWORD"
+
+              client_uuid="$(/opt/keycloak/bin/kcadm.sh get clients \
+                -r docvault \
+                -q clientId=docvault-gateway \
+                --fields id \
+                --format csv \
+                --noquotes | tail -n 1)"
+
+              if [ -z "$client_uuid" ]; then
+                echo "Keycloak client docvault-gateway was not found"
+                exit 1
+              fi
+
+              /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
+                -r docvault \
+                -s 'redirectUris=["http://localhost:3000/*","http://localhost:3006/*","http://localhost:3006/api/auth/callback","https://app.docvault.id.vn/*","https://app.docvault.id.vn/api/auth/callback"]' \
+                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]'
+          env:
+            - name: HOME
+              value: /tmp
+            - name: KEYCLOAK_ADMIN
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: KEYCLOAK_ADMIN
+            - name: KEYCLOAK_ADMIN_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-secret
+                  key: KEYCLOAK_ADMIN_PASSWORD
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            limits:
+              cpu: 300m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 256Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
