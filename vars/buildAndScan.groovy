@@ -1,10 +1,14 @@
 def call(cfg) {
     def tag = resolveImageTag(cfg)
-    def forceBuildAll = shouldForceBuildAll()
-    def diffRange = resolveDiffRange()
+    def forceBuildAll = shouldForceBuildAll(cfg)
+    def diffRange = cfg.changeDiffRange?.trim() ? cfg.changeDiffRange.trim() : resolveDiffRange()
     def changedFiles = []
 
-    if (!forceBuildAll && diffRange) {
+    if (!forceBuildAll && cfg.changeDetectionReady) {
+        changedFiles = cfg.changedFiles ?: []
+        echo ">>> Reusing early change detection diff range: ${diffRange ?: '(none)'}"
+        echo ">>> Changed paths available for image selection: ${changedFiles.size()}"
+    } else if (!forceBuildAll && diffRange) {
         changedFiles = getChangedFiles(diffRange)
         echo ">>> Change detection diff range: ${diffRange}"
         echo ">>> Changed paths detected: ${changedFiles.size()}"
@@ -70,7 +74,11 @@ String resolveImageTag(cfg) {
     return "v${env.BUILD_NUMBER}"
 }
 
-def shouldForceBuildAll() {
+def shouldForceBuildAll(cfg = [:]) {
+    if (cfg.forceBuildAll != null) {
+        return cfg.forceBuildAll.toString().equalsIgnoreCase('true')
+    }
+
     if (env.FORCE_BUILD_ALL?.trim()) {
         return env.FORCE_BUILD_ALL.equalsIgnoreCase('true')
     }

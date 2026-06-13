@@ -1,6 +1,7 @@
 @Library('docvault@feat/devsecops-main-intergation') _
 
 def cfg = [:]
+def changeSet = [:]
 def builtServicesCsv = ''
 
 pipeline {
@@ -250,6 +251,32 @@ pipeline {
             }
         }
 
+        stage('Detect Changes') {
+            steps {
+                script {
+                    changeSet = detectChanges(cfg)
+
+                    cfg.changeDetectionReady = true
+                    cfg.changeDiffRange = changeSet.diffRange ?: ''
+                    cfg.changedFiles = changeSet.changedFiles ?: []
+                    cfg.forceBuildAll = changeSet.forceBuildAll
+
+                    env.FORCE_BUILD_ALL_EFFECTIVE = changeSet.forceBuildAll ? 'true' : 'false'
+                    env.DOCS_ONLY = changeSet.docsOnly ? 'true' : 'false'
+                    env.APP_CHANGED = changeSet.appChanged ? 'true' : 'false'
+                    env.IAC_CHANGED = changeSet.infraChanged ? 'true' : 'false'
+                    env.INFRA_CHANGED = changeSet.gitOpsInfraChanged ? 'true' : 'false'
+                    env.PIPELINE_CHANGED = changeSet.pipelineChanged ? 'true' : 'false'
+                    env.UNKNOWN_CHANGED = changeSet.unknownChanged ? 'true' : 'false'
+                    env.RUN_APP_CI = changeSet.runAppCi ? 'true' : 'false'
+                    env.RUN_SECURITY_CI = changeSet.runSecurityCi ? 'true' : 'false'
+                    env.RUN_IAC_CI = changeSet.runIacCi ? 'true' : 'false'
+                    env.RUN_IMAGE_BUILD = changeSet.runImageBuild ? 'true' : 'false'
+                    env.CHANGED_FILES_COUNT = "${changeSet.changedFiles?.size() ?: 0}"
+                }
+            }
+        }
+
         stage('System Check') {
             steps {
                 script {
@@ -259,6 +286,11 @@ pipeline {
         }
 
         stage('Install') {
+            when {
+                expression {
+                    return env.RUN_APP_CI == 'true'
+                }
+            }
             steps {
                 script {
                     installStep(cfg)
@@ -277,7 +309,12 @@ pipeline {
         }
 
         stage('Pre-build Quality') {
-            parallel {
+            when {
+                expression {
+                    return env.RUN_APP_CI == 'true'
+                }
+            }
+            stages {
                 stage('Unit Tests') {
                     steps {
                         script {
@@ -305,8 +342,18 @@ pipeline {
         }
 
         stage('Pre-build Security') {
+            when {
+                expression {
+                    return env.RUN_SECURITY_CI == 'true'
+                }
+            }
             parallel {
                 stage('SCA - Dependency Check') {
+                    when {
+                        expression {
+                            return env.RUN_APP_CI == 'true'
+                        }
+                    }
                     steps {
                         script {
                             dependencyCheck(cfg)
@@ -323,6 +370,11 @@ pipeline {
                 }
 
                 stage('SAST - SonarQube') {
+                    when {
+                        expression {
+                            return env.RUN_APP_CI == 'true'
+                        }
+                    }
                     steps {
                         script {
                             sonarSast(cfg + [enforceQualityGate: params.ENFORCE_SONAR_QG])
@@ -333,6 +385,11 @@ pipeline {
         }
 
         stage('Pre-build Security - IaC') {
+            when {
+                expression {
+                    return env.RUN_IAC_CI == 'true'
+                }
+            }
             steps {
                 script {
                     policyAsCode(cfg)
@@ -343,6 +400,11 @@ pipeline {
         }
 
         stage('Build & Scan Services') {
+            when {
+                expression {
+                    return env.RUN_IMAGE_BUILD == 'true'
+                }
+            }
             steps {
                 script {
                     def built = buildAndScan(cfg)
