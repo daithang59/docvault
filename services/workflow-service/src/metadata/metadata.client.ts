@@ -40,9 +40,12 @@ export class MetadataClient {
     try {
       return await this.request(() =>
         firstValueFrom(
-          this.http.get(`${this.baseUrl}/documents/00000000-0000-0000-0000-000000000000/approvers`, {
-            headers: this.buildHeaders(context),
-          }),
+          this.http.get(
+            `${this.baseUrl}/documents/00000000-0000-0000-0000-000000000000/approvers`,
+            {
+              headers: this.buildHeaders(context),
+            },
+          ),
         ),
       );
     } catch {
@@ -66,6 +69,18 @@ export class MetadataClient {
           {
             headers: this.buildHeaders(context),
           },
+        ),
+      ),
+    );
+  }
+
+  async advanceApprovalStep(docId: string, context: RequestContext) {
+    return this.request(() =>
+      firstValueFrom(
+        this.http.post(
+          `${this.baseUrl}/documents/${docId}/approval-step/advance`,
+          {},
+          { headers: this.buildHeaders(context) },
         ),
       ),
     );

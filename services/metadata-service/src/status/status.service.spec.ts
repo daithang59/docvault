@@ -18,7 +18,11 @@ const mockTransaction = jest.fn((fn) =>
 const mockFindUnique = jest.fn();
 
 const mockPrisma = {
-  document: { findUnique: mockFindUnique, update: mockDocumentUpdate },
+  document: {
+    findUnique: mockFindUnique,
+    findFirst: mockFindUnique,
+    update: mockDocumentUpdate,
+  },
   documentWorkflowHistory: { create: mockWorkflowHistoryCreate },
   $transaction: mockTransaction,
 };
@@ -27,6 +31,9 @@ const mockPrisma = {
 const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
 const mockAuditClient = { emitEvent: mockEmitEvent };
 
+// --- Mock OrgService ---
+const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
+
 // --- Test helpers ---
 function makeDocument(overrides: Partial<Record<string, any>> = {}) {
   return {
@@ -34,6 +41,7 @@ function makeDocument(overrides: Partial<Record<string, any>> = {}) {
     title: 'Test',
     ownerId: 'user-1',
     status: 'DRAFT',
+    classification: 'SECRET',
     currentVersion: 0,
     createdAt: new Date(),
     updatedAt: new Date(),
@@ -55,7 +63,11 @@ describe('StatusService', () => {
 
   beforeEach(() => {
     jest.clearAllMocks();
-    service = new StatusService(mockPrisma as any, mockAuditClient as any);
+    service = new StatusService(
+      mockPrisma as any,
+      mockAuditClient as any,
+      mockOrgService as any,
+    );
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockWorkflowHistoryCreate.mockResolvedValue({});
   });
@@ -84,7 +96,7 @@ describe('StatusService', () => {
     );
   });
 
-  it('APPROVE: PENDING -> PUBLISHED (sets publishedAt)', async () => {
+  it('APPROVE: PENDING -> PUBLISHED (sets publishedAt and retention evidence)', async () => {
     mockFindUnique.mockResolvedValue(makeDocument({ status: 'PENDING' }));
     mockDocumentUpdate.mockResolvedValue(makeDocument({ status: 'PUBLISHED' }));
 
@@ -100,6 +112,10 @@ describe('StatusService', () => {
         data: expect.objectContaining({
           status: 'PUBLISHED',
           publishedAt: expect.any(Date),
+          retentionClass: 'SECRET_90D',
+          retentionUntil: expect.any(Date),
+          retentionReason:
+            'SECRET records are retained for 90 days after publication',
         }),
       }),
     );
@@ -227,5 +243,19 @@ describe('StatusService', () => {
         context,
       ),
     ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('scopes the document lookup to the resolved organization', async () => {
+    mockFindUnique.mockResolvedValue(makeDocument({ status: 'DRAFT' }));
+
+    await service.update(
+      'doc-1',
+      { status: 'PENDING', action: 'SUBMIT' },
+      adminUser,
+      context,
+    );
+
+    const lookupArg = JSON.stringify(mockFindUnique.mock.calls[0][0]);
+    expect(lookupArg).toContain('"organizationId":"org-1"');
   });
 });

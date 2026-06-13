@@ -11,14 +11,17 @@ import {
   Archive,
   Inbox,
   User,
+  ExternalLink,
 } from 'lucide-react';
 import { useAuth } from '@/lib/auth/auth-context';
+import { useMyOrg } from '@/features/org/org.hooks';
 import { useRouter } from 'next/navigation';
 import { RoleBadge } from '@/components/badges/role-badge';
 import { ThemeToggle } from '@/components/common/theme-toggle';
 import { UserRole } from '@/types/auth';
 import { useState, useEffect, useRef, startTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
+import { ROUTES } from '@/lib/constants/routes';
 import { formatRelative } from '@/lib/utils/date';
 import {
   fetchNotifications,
@@ -28,6 +31,7 @@ import {
   NotificationRecord,
   NotificationPage,
 } from '@/features/notifications/notifications.api';
+import { toNotificationCenterItem } from '@/features/notifications/notifications-center';
 
 // ── Constants ────────────────────────────────────────────────────────────────
 const POLL_INTERVAL_MS = 30_000; // refresh badge every 30 seconds
@@ -68,24 +72,29 @@ const NOTIF_META: Record<
 function NotificationItem({
   notif,
   onMarkRead,
+  onOpenTarget,
 }: {
   notif: NotificationRecord;
   onMarkRead: (id: string) => void;
+  onOpenTarget: (href: string) => void;
 }) {
   const meta   = NOTIF_META[notif.type] ?? NOTIF_META.SUBMITTED;
   const { Icon } = meta;
+  const item = toNotificationCenterItem(notif);
   // Prefer docTitle; fall back to truncated docId for older records
   const docLabel = notif.docTitle ?? `${notif.docId.slice(0, 8)}…`;
 
   return (
-    <div
+    <button
+      type="button"
       className={cn(
-        'group flex items-start gap-3 px-4 py-3 transition-colors cursor-pointer',
+        'group flex w-full items-start gap-3 px-4 py-3 text-left transition-colors',
         'hover:bg-[var(--bg-muted)]/60',
         !notif.read && 'bg-[var(--color-primary-light)]/40',
       )}
       onClick={() => {
         if (!notif.read) onMarkRead(notif.id);
+        onOpenTarget(item.targetHref);
       }}
     >
       <div
@@ -116,13 +125,14 @@ function NotificationItem({
           style={{ boxShadow: '0 0 6px var(--color-primary-glow)' }}
         />
       )}
-    </div>
+    </button>
   );
 }
 
 // ── AppTopbar ────────────────────────────────────────────────────────────────
 export function AppTopbar() {
   const { session, logout } = useAuth();
+  const { org } = useMyOrg();
   const router = useRouter();
 
   // ── Notification state ─────────────────────────────────────────────────
@@ -209,6 +219,11 @@ export function AppTopbar() {
     setNotifOpen((prev) => !prev);
   }
 
+  function handleOpenNotificationTarget(href: string) {
+    setNotifOpen(false);
+    router.push(href);
+  }
+
   const notifications = notifPage?.records ?? [];
 
   function handleLogout() {
@@ -231,7 +246,7 @@ export function AppTopbar() {
 
   return (
     <header
-      className="sticky top-0 z-30 flex h-14 items-center justify-between border-b px-6"
+      className="sticky top-0 z-30 flex h-14 items-center justify-between border-b pl-16 pr-4 lg:px-6"
       style={{
         background: 'var(--surface-overlay)',
         backdropFilter: 'blur(16px)',
@@ -242,6 +257,15 @@ export function AppTopbar() {
     >
       <div className="flex items-center gap-3">
         <RoleBadge role={session?.user.roles[0] as UserRole ?? null} />
+        {org?.name && (
+          <span
+            className="hidden items-center rounded-lg border px-2.5 py-1 text-xs font-medium text-[var(--text-main)] sm:inline-flex"
+            style={{ borderColor: 'var(--surface-border)', background: 'var(--bg-subtle)' }}
+            title={`Organization: ${org.name}`}
+          >
+            {org.name}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2">
@@ -326,9 +350,24 @@ export function AppTopbar() {
                       key={notif.id}
                       notif={notif}
                       onMarkRead={handleMarkRead}
+                      onOpenTarget={handleOpenNotificationTarget}
                     />
                   ))
                 )}
+              </div>
+
+              <div
+                className="border-t px-3 py-2"
+                style={{ borderColor: 'var(--border-soft)' }}
+              >
+                <button
+                  type="button"
+                  onClick={() => handleOpenNotificationTarget(ROUTES.NOTIFICATIONS)}
+                  className="flex w-full items-center justify-between rounded-lg px-2 py-2 text-sm font-medium text-[var(--color-primary)] transition-colors hover:bg-[var(--bg-muted)]"
+                >
+                  Open notification center
+                  <ExternalLink className="h-3.5 w-3.5" />
+                </button>
               </div>
             </div>
           )}
@@ -380,6 +419,9 @@ export function AppTopbar() {
                 style={{ borderColor: 'var(--border-soft)' }}
               >
                 <p className="text-sm font-semibold text-[var(--text-strong)]">{displayName}</p>
+                {org?.name && (
+                  <p className="mt-0.5 text-xs font-medium text-[var(--text-main)]">{org.name}</p>
+                )}
                 {session?.user.email && (
                   <p className="mt-0.5 text-xs text-[var(--text-muted)]">{session.user.email}</p>
                 )}

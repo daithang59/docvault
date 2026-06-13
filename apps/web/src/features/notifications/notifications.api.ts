@@ -1,6 +1,18 @@
 import apiClient from '@/lib/api/client';
 
-export type NotifyType = 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'ARCHIVED' | 'DELETED';
+export type NotifyType =
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ARCHIVED'
+  | 'DELETED'
+  | 'RETENTION_DUE_SOON'
+  | 'RETENTION_OVERDUE'
+  | 'SECURITY_RECOMMENDATION_OVERDUE'
+  | 'MALWARE_BLOCKED'
+  | 'DLP_DETECTED'
+  | 'AUDIT_CHAIN_INVALID'
+  | 'VERSION_UPLOADED';
 
 export interface NotificationRecord {
   id:          string;
@@ -10,6 +22,7 @@ export interface NotificationRecord {
   docTitle?:   string;
   reason?:     string;
   traceId?:    string;
+  metadata?:   Record<string, unknown>;
   createdAt:   string;
   read:        boolean;
 }

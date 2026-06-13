@@ -4,6 +4,7 @@ import { useState } from 'react';
 import apiClient from '@/lib/api/client';
 import { apiEndpoints } from '@/lib/api/endpoints';
 import { getErrorMessage } from '@/lib/api/errors';
+import { getShareToken } from '@/features/share-links/share-token-store';
 
 interface UseDocumentPreviewOptions {
   onError?: (message: string) => void;
@@ -11,7 +12,12 @@ interface UseDocumentPreviewOptions {
 
 function buildPreviewPath(docId: string, version?: number): string {
   const endpoint = apiEndpoints.documents.preview(docId);
-  return `${endpoint}${version !== undefined ? `?version=${version}` : ''}`;
+  const params = new URLSearchParams();
+  if (version !== undefined) params.set('version', String(version));
+  const shareToken = getShareToken(docId);
+  if (shareToken) params.set('shareToken', shareToken);
+  const query = params.toString();
+  return query ? `${endpoint}?${query}` : endpoint;
 }
 
 export function useDocumentPreview(options?: UseDocumentPreviewOptions) {
@@ -61,16 +67,6 @@ export function useDocumentPreview(options?: UseDocumentPreviewOptions) {
     try {
       const response = await apiClient.get(buildPreviewPath(docId, version), {
         responseType: 'arraybuffer',
-      }).catch((err: unknown) => {
-        let bodyStr = '';
-        const e = err as { details?: { data?: Uint8Array }; statusCode?: number; message?: string };
-        if (e.details?.data) {
-          try {
-            bodyStr = new TextDecoder().decode(e.details.data);
-          } catch { bodyStr = 'cannot decode'; }
-        }
-        console.error('[Preview] API error:', e.statusCode, e.message, 'BODY:', bodyStr);
-        throw err;
       });
 
       // Extract filename from Content-Disposition header if present

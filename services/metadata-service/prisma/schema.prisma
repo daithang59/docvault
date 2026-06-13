@@ -51,12 +51,66 @@ enum WorkflowAction {
   RETENTION
 }
 
+enum DocumentSharePermission {
+  VIEW
+  DOWNLOAD
+}
+
+enum DocumentSavedViewScope {
+  PRIVATE
+  TEAM
+}
+
+enum OrganizationRole {
+  MEMBER
+  ADMIN
+}
+
+model Organization {
+  id          String                   @id @default(uuid())
+  name        String
+  slug        String                   @unique
+  ownerId     String
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  memberships OrganizationMembership[]
+
+  @@index([ownerId])
+  @@map("organizations")
+}
+
+model OrganizationMembership {
+  id             String           @id @default(uuid())
+  organizationId String
+  userId         String
+  role           OrganizationRole @default(MEMBER)
+  createdAt      DateTime         @default(now())
+  organization   Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+  @@map("organization_memberships")
+}
+
 model Document {
   id              String            @id @default(uuid())
+  organizationId  String
   title           String
   description     String?
   ownerId         String
   classification  ClassificationLevel @default(INTERNAL)
+  dlpStatus       String            @default("NOT_SCANNED")
+  dlpFindings     Json?
+  dlpDetectedAt   DateTime?
+  retentionClass  String?
+  retentionUntil  DateTime?
+  retentionReason String?
+  legalHold       Boolean           @default(false)
+  legalHoldReason String?
+  legalHoldBy     String?
+  legalHoldAt     DateTime?
+  approvalChain   String[]          @default([])
+  approvalStep    Int               @default(0)
   tags            String[]          @default([])
   status          DocumentStatus    @default(DRAFT)
   currentVersion  Int               @default(0)
@@ -69,9 +123,15 @@ model Document {
   aclEntries      DocumentAcl[]
   workflowHistory DocumentWorkflowHistory[]
   comments        DocumentComment[]
+  shareLinks      DocumentShareLink[]
 
+  @@index([organizationId])
+  @@index([organizationId, status])
   @@index([ownerId])
   @@index([status])
+  @@index([retentionUntil])
+  @@index([status, retentionUntil])
+  @@index([legalHold])
   @@index([tags], type: Gin)
   @@map("documents")
 }
@@ -85,6 +145,8 @@ model DocumentVersion {
   size        Int
   filename    String
   contentType String?
+  dlpStatus   String   @default("NOT_SCANNED")
+  dlpFindings Json?
   createdAt   DateTime @default(now())
   createdBy   String
   document    Document @relation(fields: [docId], references: [id], onDelete: Cascade)
@@ -136,4 +198,41 @@ model DocumentComment {
 
   @@index([docId, createdAt])
   @@map("document_comments")
+}
+
+model DocumentSavedView {
+  id          String                 @id @default(uuid())
+  organizationId String
+  name        String
+  description String?
+  filters     Json
+  scope       DocumentSavedViewScope @default(PRIVATE)
+  ownerId     String
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+
+  @@index([organizationId, scope])
+  @@index([ownerId, scope])
+  @@index([scope, createdAt])
+  @@map("document_saved_views")
+}
+
+model DocumentShareLink {
+  id            String                 @id @default(uuid())
+  docId         String
+  tokenHash     String                 @unique
+  permission    DocumentSharePermission @default(VIEW)
+  createdBy     String
+  expiresAt     DateTime
+  maxAccessCount Int?
+  accessCount   Int                    @default(0)
+  lastAccessedAt DateTime?
+  revokedAt     DateTime?
+  revokedBy     String?
+  createdAt     DateTime               @default(now())
+  document      Document               @relation(fields: [docId], references: [id], onDelete: Cascade)
+
+  @@index([docId, createdAt])
+  @@index([expiresAt])
+  @@map("document_share_links")
 }

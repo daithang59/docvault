@@ -114,7 +114,7 @@ Hệ thống đã có sẵn 5 tài khoản mẫu với các vai trò khác nhau.
 
 | Tài khoản | Vai trò | Họ làm được gì |
 |---|---|---|
-| `viewer1` | Viewer | Xem danh sách, xem trước và tải xuống tài liệu đã xuất bản |
+| `viewer1` | Viewer | Xem danh sách/xem trước tài liệu đã xuất bản hoặc lưu trữ nếu policy cho phép; tải xuống tài liệu đã xuất bản |
 | `editor1` | Editor | Tạo tài liệu, tải file lên, gửi duyệt, lưu trữ |
 | `approver1` | Approver | Phê duyệt hoặc từ chối tài liệu |
 | `co1` | Compliance Officer | Xem audit log, kiểm tra tuân thủ (không được tải file) |
@@ -252,7 +252,7 @@ Sử dụng các bộ lọc phía trên bảng để thu hẹp kết quả:
 #### Quy tắc đặc biệt cho Compliance Officer
 
 - **Được xem** metadata (chi tiết) của tất cả tài liệu PUBLISHED và ARCHIVED.
-- **Được xem trước** (preview) tài liệu phân loại **PUBLIC** — không xem được INTERNAL, CONFIDENTIAL, SECRET.
+- **Không được xem trước** (preview) nội dung file. Compliance Officer chỉ xem metadata/audit/retention evidence.
 - **Không được tải xuống** bất kỳ file nào, dù ACL cho phép. Đây là quy tắc cứng trong hệ thống.
 
 ---
@@ -308,6 +308,7 @@ ACL cho phép kiểm soát quyền truy cập chi tiết trên từng tài liệ
 2. Ở cột phải, phần **Access Control** hiển thị các rule hiện tại.
 3. Nhấn thêm rule mới:
    - **Subject**: Chọn USER / ROLE / GROUP / ALL
+     - Với GROUP, nhập tên group Keycloak đã chuẩn hóa, ví dụ `/finance-team` trong token sẽ dùng `finance-team` trong ACL.
    - **Permission**: READ / DOWNLOAD / WRITE / APPROVE
    - **Effect**: ALLOW hoặc DENY
 
@@ -332,7 +333,7 @@ Hệ thống hỗ trợ giao diện tối. Vào **Settings** (menu thanh bên) �
 | **DRAFT** | Mới tạo hoặc bị từ chối | Editor: sửa, upload, gửi duyệt |
 | **PENDING** | Đang chờ duyệt | Approver: phê duyệt hoặc từ chối |
 | **PUBLISHED** | Đã duyệt, cho phép tải | Viewer/Editor: xem, tải; Editor: lưu trữ |
-| **ARCHIVED** | Đã lưu trữ | Chỉ cho xem trước, không tải |
+| **ARCHIVED** | Đã lưu trữ | Cho xem metadata/xem trước theo quyền đọc, không tải |
 
 ---
 
@@ -383,7 +384,7 @@ Sau khi tất cả service đang chạy:
 pnpm test:e2e
 ```
 
-Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log...
+Script tự động kiểm tra các luồng chính: xác thực, tạo tài liệu, upload, submit, approve, download, audit log, GROUP ACL, confidential stream-only posture, malware block, DLP escalation, retention evidence và audit security summary.
 
 ### Mở Swagger UI (tài liệu API)
 

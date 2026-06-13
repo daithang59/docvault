@@ -1,15 +1,18 @@
 import {
   Body,
   Controller,
+  Delete,
   Get,
   HttpCode,
   Param,
   Patch,
   Post,
+  Query,
   Req,
   UseGuards,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
+import { Throttle } from '@nestjs/throttler';
 import {
   ApiBearerAuth,
   ApiOperation,
@@ -18,14 +21,39 @@ import {
 } from '@nestjs/swagger';
 import { Roles } from '../auth/roles.decorator';
 import { RolesGuard } from '../auth/roles.guard';
+import { GatewayAuditClient } from '../audit/audit.client';
 import { ProxyService } from './proxy.service';
+import {
+  SensitiveActionProofService,
+  type SensitiveMetadataAction,
+} from './sensitive-action-proof.service';
+
+const EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES = [
+  'fileContent',
+  'objectKey',
+  'storagePath',
+  'presignedUrl',
+  'grantToken',
+  'downloadToken',
+] as const;
+
+const EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS = [
+  'file-payload',
+  'storage-reference',
+  'direct-download-link',
+  'temporary-access-grant',
+] as const;
 
 @ApiTags('metadata-proxy')
 @ApiBearerAuth()
 @ApiSecurity('cookie')
 @Controller('metadata')
 export class MetadataProxyController {
-  constructor(private readonly proxyService: ProxyService) {}
+  constructor(
+    private readonly proxyService: ProxyService,
+    private readonly sensitiveActionProofService: SensitiveActionProofService,
+    private readonly auditClient: GatewayAuditClient,
+  ) {}
 
   @Get('documents')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
@@ -48,6 +76,219 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Get('documents/trash')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'List soft-deleted documents (trash)',
+    description:
+      'Returns the current user\'s deleted documents (admins see all) with recovery deadlines.',
+  })
+  async listTrash(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/trash`,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a soft-deleted document back to DRAFT',
+  })
+  async restoreFromTrash(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/restore`,
+    });
+    return response.data;
+  }
+
+  @Get('retention/documents')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'List retention evidence',
+    description:
+      'Returns records-management evidence for published and archived documents, including retention class, retention deadline, and computed status.',
+  })
+  async listRetention(@Req() req: any) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/retention/documents${queryString}`,
+    });
+    return response.data;
+  }
+
+  @Get('access-review/documents')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'List access review documents',
+    description:
+      'Returns a gateway-batched access review dataset. Sensitive documents include ACL detail; non-sensitive rows are returned from the list response without extra detail fan-out.',
+  })
+  async listAccessReviewDocuments(@Req() req: any) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const listResponse = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents${queryString}`,
+    });
+    const documents = normalizeDocumentArray(listResponse.data);
+    const sensitiveDocuments = documents.filter((document: any) =>
+      isAccessReviewSensitiveClassification(document.classification),
+    );
+    const details = await Promise.all(
+      sensitiveDocuments.map(async (document: any) => {
+        const detailResponse = await this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/documents/${document.id}`,
+        });
+        return [document.id, detailResponse.data] as const;
+      }),
+    );
+    const detailsById = new Map(details);
+
+    return documents.map((document: any) =>
+      normalizeAccessReviewDocument(detailsById.get(document.id) ?? document),
+    );
+  }
+
+  @Post('retention/run')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Run retention auto-archive',
+    description:
+      'Admin-only demo endpoint that runs the retention job. Optional `asOf` query parameter can be used as a deterministic demo clock.',
+  })
+  async runRetention(@Req() req: any) {
+    await this.assertSensitiveActionUse(req, 'run-retention');
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/retention/run${queryString}`,
+    });
+    return response.data;
+  }
+
+  @Post('sensitive-actions/proof')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Issue sensitive action proof',
+    description:
+      'Issues a short-lived HMAC proof after typed confirmation for metadata sensitive actions.',
+  })
+  async issueSensitiveActionProof(@Req() req: any, @Body() body: any) {
+    const sensitiveAction = readSensitiveActionResourceId(body?.action);
+    try {
+      const issued = this.sensitiveActionProofService.issueProof(req, body);
+      await this.emitSensitiveActionProofAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_ISSUED',
+        resourceId: sensitiveAction,
+        result: 'SUCCESS',
+        metadata: {
+          sensitiveAction,
+          reauthChecked: issued.reauth.checked,
+          reauthMaxAgeSeconds: issued.reauth.maxAgeSeconds,
+          ...(issued.reauth.ageSeconds !== undefined && {
+            reauthAgeSeconds: issued.reauth.ageSeconds,
+          }),
+        },
+      });
+      return issued;
+    } catch (error) {
+      await this.emitSensitiveActionProofAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_DENIED',
+        resourceId: sensitiveAction,
+        result: 'DENY',
+        reason: getAuditReason(error),
+        metadata: {
+          sensitiveAction,
+        },
+      });
+      throw error;
+    }
+  }
+
+  private async emitSensitiveActionProofAudit(
+    req: any,
+    event: {
+      action: 'SENSITIVE_ACTION_PROOF_ISSUED' | 'SENSITIVE_ACTION_PROOF_DENIED';
+      resourceId?: string;
+      result: 'SUCCESS' | 'DENY';
+      reason?: string;
+      metadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.auditClient.emitEvent(req, {
+        ...event,
+        resourceType: 'SENSITIVE_ACTION',
+      });
+    } catch {
+      // Sensitive actions should not fail solely because audit transport is down.
+    }
+  }
+
+  private async assertSensitiveActionUse(
+    req: any,
+    action: SensitiveMetadataAction,
+  ): Promise<void> {
+    try {
+      this.sensitiveActionProofService.assertProof(req, action);
+    } catch (error) {
+      await this.emitSensitiveActionUseAudit(req, {
+        action: 'SENSITIVE_ACTION_PROOF_USE_DENIED',
+        resourceId: action,
+        result: 'DENY',
+        reason: getAuditReason(error),
+        metadata: { sensitiveAction: action },
+      });
+      throw error;
+    }
+
+    await this.emitSensitiveActionUseAudit(req, {
+      action: 'SENSITIVE_ACTION_PROOF_USED',
+      resourceId: action,
+      result: 'SUCCESS',
+      metadata: { sensitiveAction: action },
+    });
+  }
+
+  private async emitSensitiveActionUseAudit(
+    req: any,
+    event: {
+      action: 'SENSITIVE_ACTION_PROOF_USED' | 'SENSITIVE_ACTION_PROOF_USE_DENIED';
+      resourceId?: string;
+      result: 'SUCCESS' | 'DENY';
+      reason?: string;
+      metadata: Record<string, unknown>;
+    },
+  ): Promise<void> {
+    try {
+      await this.auditClient.emitEvent(req, {
+        ...event,
+        resourceType: 'SENSITIVE_ACTION',
+      });
+    } catch {
+      // Sensitive actions should not fail solely because audit transport is down.
+    }
+  }
+
   @Get('documents/:docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
@@ -57,9 +298,150 @@ export class MetadataProxyController {
       'Returns full document metadata including versions, ACL entries, and workflow history.',
   })
   async findOne(@Param('docId') docId: string, @Req() req: any) {
+    const queryString = req.url.includes('?')
+      ? req.url.substring(req.url.indexOf('?'))
+      : '';
     const response = await this.proxyService.forward(req, {
       method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}${queryString}`,
+    });
+    return response.data;
+  }
+
+  @Get('documents/:docId/evidence-packet')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Export document compliance evidence packet',
+    description:
+      'Builds a document-scoped JSON packet with metadata, versions, ACL, workflow history, retention evidence, audit hash-chain status, and related audit events.',
+  })
+  async getEvidencePacket(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Query('asOf') asOf?: string,
+  ) {
+    await this.assertSensitiveActionUse(req, 'export-evidence-packet');
+    const documentResponse = await this.proxyService.forward(req, {
+      method: 'GET',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}`,
+    });
+    const document = documentResponse.data ?? {};
+
+    const [workflowResponse, retentionResponse, chainResponse, auditResponse] =
+      await Promise.all([
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/workflow-history`,
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.METADATA_SERVICE_URL}/retention/documents`,
+          ...(asOf ? { params: { asOf } } : {}),
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.AUDIT_SERVICE_URL}/audit/verify-chain`,
+          params: { limit: 5000 },
+        }),
+        this.proxyService.forward(req, {
+          method: 'GET',
+          url: `${process.env.AUDIT_SERVICE_URL}/audit/query`,
+          params: { documentId: docId, pageSize: 200 },
+        }),
+      ]);
+
+    const { versions = [], aclEntries, acl } = document;
+    const documentMetadata = { ...document };
+    delete documentMetadata.versions;
+    delete documentMetadata.aclEntries;
+    delete documentMetadata.acl;
+    delete documentMetadata.workflowHistory;
+    const retentionRecords = Array.isArray(retentionResponse.data?.records)
+      ? retentionResponse.data.records
+      : [];
+    const auditEvents = Array.isArray(auditResponse.data?.data)
+      ? auditResponse.data.data
+      : [];
+
+    const packet = {
+      generatedAt: new Date().toISOString(),
+      metadataOnly: true,
+      excludedSensitiveFields: [...EVIDENCE_PACKET_EXCLUDED_SENSITIVE_FIELDS],
+      generatedBy: {
+        id: req.user?.sub ?? req.user?.username ?? null,
+        username: req.user?.username ?? null,
+        roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      },
+      scope: {
+        type: 'DOCUMENT',
+        documentId: docId,
+        asOf: asOf ?? null,
+      },
+      document: documentMetadata,
+      versions,
+      aclEntries: aclEntries ?? acl ?? [],
+      workflowHistory: Array.isArray(workflowResponse.data)
+        ? workflowResponse.data
+        : [],
+      retention: {
+        checkedAt: retentionResponse.data?.checkedAt ?? null,
+        summary: retentionResponse.data?.summary ?? null,
+        record:
+          retentionRecords.find((record: any) => record.docId === docId) ??
+          null,
+        fields: {
+          retentionClass: document.retentionClass ?? null,
+          retentionUntil: document.retentionUntil ?? null,
+          retentionReason: document.retentionReason ?? null,
+        },
+      },
+      audit: {
+        chain: chainResponse.data,
+        events: auditEvents,
+        total: auditResponse.data?.total ?? auditEvents.length,
+        page: auditResponse.data?.page ?? 1,
+        pageSize: auditResponse.data?.pageSize ?? auditEvents.length,
+      },
+    };
+
+    return sanitizeEvidencePacket(packet);
+  }
+
+  @Get('documents/:docId/ai-guardrails')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Get AI-ready access guardrails for a document',
+    description:
+      'Returns policy decisions for future AI classification, tagging, summarization, and QA without exposing file content, object keys, presigned URLs, or grant tokens.',
+  })
+  async getAiGuardrails(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/ai-guardrails`,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/access-impact')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Preview access impact for a proposed metadata policy change',
+    description:
+      'Proxies metadata-service policy simulation without exposing file content, object keys, presigned URLs, or grant tokens.',
+  })
+  async getAccessImpactPreview(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/access-impact`,
+      data: body,
     });
     return response.data;
   }
@@ -79,6 +461,43 @@ export class MetadataProxyController {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents`,
       data: body,
+    });
+    return response.data;
+  }
+
+  @Get('document-saved-views')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'List document saved views' })
+  async listDocumentSavedViews(@Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views`,
+    });
+    return response.data;
+  }
+
+  @Post('document-saved-views')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Create a document saved view' })
+  async createDocumentSavedView(@Req() req: any, @Body() body: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Delete('document-saved-views/:id')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @ApiOperation({ summary: 'Delete a document saved view' })
+  async deleteDocumentSavedView(@Param('id') id: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'DELETE',
+      url: `${process.env.METADATA_SERVICE_URL}/document-saved-views/${id}`,
     });
     return response.data;
   }
@@ -137,6 +556,115 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Post('documents/:docId/share-links')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Create a time-limited share link for a document',
+    description:
+      'Owner editor or admin only. Returns a one-time raw token; the gateway stores only its hash downstream.',
+  })
+  async createShareLink(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Get('documents/:docId/share-links')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'List share links for a document' })
+  async listShareLinks(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links`,
+    });
+    return response.data;
+  }
+
+  @Delete('documents/:docId/share-links/:linkId')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({ summary: 'Revoke a share link' })
+  async revokeShareLink(
+    @Param('docId') docId: string,
+    @Param('linkId') linkId: string,
+    @Req() req: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'DELETE',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/share-links/${linkId}`,
+    });
+    return response.data;
+  }
+
+  @Post('share-links/redeem')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('viewer', 'editor', 'approver', 'admin')
+  @HttpCode(200)
+  @ApiOperation({
+    summary: 'Redeem a share link token',
+    description:
+      'Authenticated recipient redeems a share token to gain scoped access to the linked document.',
+  })
+  async redeemShareLink(@Req() req: any, @Body() body: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/share-links/redeem`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/approval-chain')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Set an ordered approval chain for a document',
+    description:
+      'Owner editor or admin only. Each listed approver must approve in order before the document is published.',
+  })
+  async setApprovalChain(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/approval-chain`,
+      data: body,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/legal-hold')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Place or release a legal hold on a document',
+    description:
+      'Admin-only. While a legal hold is active, retention auto-archive is suspended for the document.',
+  })
+  async setLegalHold(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/legal-hold`,
+      data: body,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/versions')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
@@ -155,6 +683,26 @@ export class MetadataProxyController {
       method: 'POST',
       url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/versions`,
       data: body,
+    });
+    return response.data;
+  }
+
+  @Post('documents/:docId/versions/:version/restore')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Restore a previous version as a new current version',
+    description:
+      'Owner editor or admin only. Creates a new version pointing to the chosen older version file.',
+  })
+  async restoreVersion(
+    @Param('docId') docId: string,
+    @Param('version') version: string,
+    @Req() req: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/versions/${version}/restore`,
     });
     return response.data;
   }
@@ -206,12 +754,12 @@ export class MetadataProxyController {
 
   @Post('documents/:docId/preview-authorize')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Authorize document preview',
     description:
-      'Issues a preview grant token. Unlike download-authorize, this allows compliance_officer ' +
-      'and only requires READ permission (not DOWNLOAD).',
+      'Issues a preview grant token for file content access. ' +
+      'Compliance officers may inspect metadata and audit events, but cannot preview, stream, presign, or download file content.',
   })
   @HttpCode(200)
   async authorizePreview(
@@ -267,4 +815,90 @@ export class MetadataProxyController {
     });
     return response.data;
   }
+}
+
+function sanitizeEvidencePacket(value: unknown): unknown {
+  if (Array.isArray(value)) {
+    return value.map(sanitizeEvidencePacket);
+  }
+
+  if (!value || typeof value !== 'object') {
+    return value;
+  }
+
+  return Object.entries(value as Record<string, unknown>).reduce<
+    Record<string, unknown>
+  >((acc, [key, nestedValue]) => {
+    if (isExcludedEvidenceField(key)) {
+      return acc;
+    }
+
+    acc[key] = sanitizeEvidencePacket(nestedValue);
+    return acc;
+  }, {});
+}
+
+function isExcludedEvidenceField(key: string): boolean {
+  return (EVIDENCE_PACKET_SENSITIVE_FIELD_NAMES as readonly string[]).includes(
+    key,
+  );
+}
+
+function normalizeDocumentArray(value: any): any[] {
+  if (Array.isArray(value)) {
+    return value;
+  }
+
+  if (Array.isArray(value?.data)) {
+    return value.data;
+  }
+
+  return [];
+}
+
+function normalizeAccessReviewDocument(document: any): any {
+  return {
+    ...document,
+    versions: Array.isArray(document?.versions) ? document.versions : [],
+    aclEntries: Array.isArray(document?.aclEntries)
+      ? document.aclEntries
+      : Array.isArray(document?.acl)
+        ? document.acl
+        : [],
+  };
+}
+
+function isAccessReviewSensitiveClassification(
+  classification: unknown,
+): boolean {
+  return classification === 'CONFIDENTIAL' || classification === 'SECRET';
+}
+
+function readSensitiveActionResourceId(value: unknown): string | undefined {
+  if (typeof value !== 'string') {
+    return undefined;
+  }
+
+  const trimmed = value.trim();
+  return trimmed.length > 0 ? trimmed.slice(0, 120) : undefined;
+}
+
+function getAuditReason(error: unknown): string | undefined {
+  if (!error || typeof error !== 'object') {
+    return undefined;
+  }
+
+  const response = (error as { response?: unknown }).response;
+  if (response && typeof response === 'object') {
+    const message = (response as { message?: unknown }).message;
+    if (typeof message === 'string') {
+      return message;
+    }
+    if (Array.isArray(message)) {
+      return message.filter((item) => typeof item === 'string').join('; ');
+    }
+  }
+
+  const message = (error as { message?: unknown }).message;
+  return typeof message === 'string' ? message : undefined;
 }

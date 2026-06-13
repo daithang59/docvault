@@ -1,0 +1,860 @@
+import { createHmac } from 'crypto';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
+import {
+  AclEffect,
+  AclSubjectType,
+  ClassificationLevel,
+  DocumentPermission,
+} from '../../generated/prisma';
+import { PolicyService } from './policy.service';
+
+const mockDocumentFindUnique = jest.fn();
+const mockVersionFindUnique = jest.fn();
+const mockShareLinkFindUnique = jest.fn();
+const mockEmitEvent = jest.fn().mockResolvedValue(undefined);
+
+const mockPrisma = {
+  document: {
+    findUnique: mockDocumentFindUnique,
+    findFirst: mockDocumentFindUnique,
+  },
+  documentVersion: {
+    findUnique: mockVersionFindUnique,
+  },
+  documentShareLink: {
+    findUnique: mockShareLinkFindUnique,
+  },
+};
+
+const auditClient = {
+  emitEvent: mockEmitEvent,
+};
+
+const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
+
+const baseContext = {
+  traceId: 'trace-1',
+  actorId: 'viewer-1',
+  roles: ['viewer'],
+  authorization: 'Bearer token',
+  ip: '127.0.0.1',
+};
+
+function makeDocument(overrides: Record<string, unknown> = {}) {
+  return {
+    id: 'doc-1',
+    ownerId: 'editor-1',
+    status: 'PUBLISHED',
+    classification: ClassificationLevel.PUBLIC,
+    currentVersion: 1,
+    aclEntries: [],
+    ...overrides,
+  };
+}
+
+function makeVersion(overrides: Record<string, unknown> = {}) {
+  return {
+    docId: 'doc-1',
+    version: 1,
+    objectKey: 'doc/doc-1/v1/file.pdf',
+    filename: 'file.pdf',
+    contentType: 'application/pdf',
+    size: 1024,
+    checksum: 'sha256:abc',
+    ...overrides,
+  };
+}
+
+describe('PolicyService', () => {
+  let service: PolicyService;
+
+  beforeEach(() => {
+    jest.clearAllMocks();
+    process.env.DOWNLOAD_GRANT_SECRET = 'test-download-secret';
+    process.env.PREVIEW_GRANT_SECRET = 'test-preview-secret';
+    service = new PolicyService(
+      mockPrisma as any,
+      auditClient as any,
+      mockOrgService as any,
+    );
+    mockDocumentFindUnique.mockResolvedValue(makeDocument());
+    mockVersionFindUnique.mockResolvedValue(makeVersion());
+    mockShareLinkFindUnique.mockResolvedValue(null);
+  });
+
+  afterEach(() => {
+    delete process.env.DOWNLOAD_GRANT_SECRET;
+    delete process.env.PREVIEW_GRANT_SECRET;
+    delete process.env.GRANT_TOKEN_CURRENT_KID;
+    delete process.env.GRANT_TOKEN_PREVIOUS_KID;
+    delete process.env.DOWNLOAD_GRANT_SECRET_2026_05;
+    delete process.env.PREVIEW_GRANT_SECRET_2026_05;
+  });
+
+  it('denies compliance officers from previewing file content', async () => {
+    await expect(
+      service.authorizePreview(
+        'doc-1',
+        { version: 1 },
+        { sub: 'co-1', roles: ['compliance_officer'] },
+        {
+          ...baseContext,
+          actorId: 'co-1',
+          roles: ['compliance_officer'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies compliance officers from downloading file content', async () => {
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'co-1', roles: ['compliance_officer'] },
+        {
+          ...baseContext,
+          actorId: 'co-1',
+          roles: ['compliance_officer'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('signs download grants with the current kid when rotation env is configured', async () => {
+    delete process.env.DOWNLOAD_GRANT_SECRET;
+    process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
+    process.env.DOWNLOAD_GRANT_SECRET_2026_05 = 'current-download-secret';
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    const [encodedPayload, signature] = result.grantToken.split('.');
+    const tokenPayload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+    );
+    const expectedSignature = createHmac('sha256', 'current-download-secret')
+      .update(encodedPayload)
+      .digest('base64url');
+
+    expect(tokenPayload.kid).toBe('2026_05');
+    expect(signature).toBe(expectedSignature);
+  });
+
+  it('signs preview grants with the current kid when rotation env is configured', async () => {
+    delete process.env.PREVIEW_GRANT_SECRET;
+    process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
+    process.env.PREVIEW_GRANT_SECRET_2026_05 = 'current-preview-secret';
+
+    const result = await service.authorizePreview(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    const [encodedPayload, signature] = result.grantToken.split('.');
+    const tokenPayload = JSON.parse(
+      Buffer.from(encodedPayload, 'base64url').toString('utf8'),
+    );
+    const expectedSignature = createHmac('sha256', 'current-preview-secret')
+      .update(encodedPayload)
+      .digest('base64url');
+
+    expect(tokenPayload.kid).toBe('2026_05');
+    expect(signature).toBe(expectedSignature);
+  });
+
+  it('allows viewer metadata read for a published public document', async () => {
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('treats a document from another organization as not found', async () => {
+    // Org-scoped findFirst returns null → cross-org document is invisible.
+    mockDocumentFindUnique.mockResolvedValueOnce(null);
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-other-org',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow('Document not found');
+  });
+
+  it('denies guessed confidential metadata detail without owner or ACL access', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        aclEntries: [
+          {
+            subjectType: 'USER',
+            subjectId: 'other-user',
+            permission: 'READ',
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows approver metadata read for pending documents', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'PENDING',
+        classification: ClassificationLevel.CONFIDENTIAL,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'approver-1', roles: ['approver'] },
+        {
+          ...baseContext,
+          actorId: 'approver-1',
+          roles: ['approver'],
+        },
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('allows viewer to read archived PUBLIC metadata', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.PUBLIC,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('denies viewer from reading archived INTERNAL metadata', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.INTERNAL,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('allows editor to read archived INTERNAL metadata', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        status: 'ARCHIVED',
+        classification: ClassificationLevel.INTERNAL,
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('allows confidential metadata read through a matching GROUP READ allow', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'finance-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['finance-team'] } as any,
+        { ...baseContext, groups: ['finance-team'] } as any,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('denies metadata read through a matching GROUP READ deny', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.INTERNAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'blocked-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.DENY,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['blocked-team'] } as any,
+        { ...baseContext, groups: ['blocked-team'] } as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies admin metadata read through a matching GROUP READ deny', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.INTERNAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'blocked-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.DENY,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'admin-1', roles: ['admin'], groups: ['blocked-team'] } as any,
+        {
+          ...baseContext,
+          actorId: 'admin-1',
+          roles: ['admin'],
+          groups: ['blocked-team'],
+        } as any,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('matches slash-prefixed GROUP READ allow ACL subject ids', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: '/finance-team',
+            permission: DocumentPermission.READ,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'], groups: ['finance-team'] } as any,
+        { ...baseContext, groups: ['finance-team'] } as any,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('allows confidential download through a matching GROUP DOWNLOAD allow when role policy also matches', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.GROUP,
+            subjectId: 'finance-team',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'editor-1', roles: ['editor'], groups: ['finance-team'] } as any,
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+        groups: ['finance-team'],
+      } as any,
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('lets a viewer with an explicit USER DOWNLOAD allow download a confidential document (Option A)', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    const result = await service.authorizeDownload(
+      'doc-1',
+      { version: 1 },
+      { sub: 'viewer-1', roles: ['viewer'] },
+      baseContext,
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('denies a viewer without any matching ACL on a confidential download', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [],
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('keeps SECRET downloads gated on role tier even with an explicit USER ALLOW', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.SECRET,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('lets a viewer with an explicit USER DOWNLOAD allow read confidential metadata (Option A)', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        classification: ClassificationLevel.CONFIDENTIAL,
+        ownerId: 'other-editor',
+        aclEntries: [
+          {
+            subjectType: AclSubjectType.USER,
+            subjectId: 'viewer-1',
+            permission: DocumentPermission.DOWNLOAD,
+            effect: AclEffect.ALLOW,
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      (service as any).assertCanReadMetadata(
+        'doc-1',
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+      ),
+    ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+  });
+
+  it('blocks AI content operations for compliance officers while allowing metadata-only AI context', async () => {
+    const guardrails = await service.getAiGuardrails(
+      'doc-1',
+      { sub: 'co-1', roles: ['compliance_officer'] },
+      {
+        ...baseContext,
+        actorId: 'co-1',
+        roles: ['compliance_officer'],
+      },
+    );
+
+    expect(guardrails).toMatchObject({
+      documentId: 'doc-1',
+      actorId: 'co-1',
+      canUseMetadata: true,
+      canUseContent: false,
+      allowedOperations: ['METADATA_CLASSIFICATION', 'METADATA_TAGGING'],
+    });
+    expect(guardrails.deniedOperations).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          operation: 'CONTENT_SUMMARIZATION',
+          reason:
+            'Compliance officers cannot use file content for AI operations',
+        }),
+        expect.objectContaining({
+          operation: 'CONTENT_QA',
+          reason:
+            'Compliance officers cannot use file content for AI operations',
+        }),
+      ]),
+    );
+    expect(JSON.stringify(guardrails)).not.toContain('grantToken');
+    expect(JSON.stringify(guardrails)).not.toContain('objectKey');
+  });
+
+  it('allows AI content operations for an owner who can preview the document content', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.CONFIDENTIAL,
+      }),
+    );
+
+    const guardrails = await service.getAiGuardrails(
+      'doc-1',
+      { sub: 'editor-1', roles: ['editor'] },
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+      },
+    );
+
+    expect(guardrails.canUseContent).toBe(true);
+    expect(guardrails.allowedOperations).toEqual([
+      'METADATA_CLASSIFICATION',
+      'METADATA_TAGGING',
+      'CONTENT_SUMMARIZATION',
+      'CONTENT_QA',
+    ]);
+    expect(guardrails.deniedOperations).toEqual([]);
+  });
+
+  it('allows owner editor to preview their own SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    const result = await service.authorizePreview(
+      'doc-1',
+      { version: 1 },
+      { sub: 'editor-1', roles: ['editor'] },
+      {
+        ...baseContext,
+        actorId: 'editor-1',
+        roles: ['editor'],
+      },
+    );
+
+    expect(result.grantToken).toEqual(expect.any(String));
+  });
+
+  it('denies non-owner editor from previewing a SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'other-editor',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    await expect(
+      service.authorizePreview(
+        'doc-1',
+        { version: 1 },
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('denies owner editor from downloading their own SECRET document', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'editor-1',
+        classification: ClassificationLevel.SECRET,
+      }),
+    );
+
+    await expect(
+      service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'editor-1', roles: ['editor'] },
+        {
+          ...baseContext,
+          actorId: 'editor-1',
+          roles: ['editor'],
+        },
+      ),
+    ).rejects.toThrow(ForbiddenException);
+  });
+
+  it('simulates classification impact without exposing file grants or object keys', async () => {
+    mockDocumentFindUnique.mockResolvedValue(
+      makeDocument({
+        ownerId: 'admin-1',
+        classification: ClassificationLevel.CONFIDENTIAL,
+        dlpStatus: 'DETECTED',
+      }),
+    );
+
+    const impact = await service.getAccessImpactPreview(
+      'doc-1',
+      { classification: ClassificationLevel.PUBLIC },
+      { sub: 'admin-1', roles: ['admin'] },
+      {
+        ...baseContext,
+        actorId: 'admin-1',
+        roles: ['admin'],
+      },
+    );
+
+    expect(impact).toMatchObject({
+      documentId: 'doc-1',
+      current: {
+        classification: ClassificationLevel.CONFIDENTIAL,
+        watermarkRequired: true,
+      },
+      proposed: {
+        classification: ClassificationLevel.PUBLIC,
+        watermarkRequired: false,
+      },
+      changes: {
+        accessExpanded: true,
+        watermarkReduced: true,
+        dlpOverrideRequired: true,
+      },
+    });
+    expect(impact.roleImpacts).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          role: 'viewer',
+          download: { current: false, proposed: true },
+        }),
+      ]),
+    );
+    expect(JSON.stringify(impact)).not.toContain('grantToken');
+    expect(JSON.stringify(impact)).not.toContain('objectKey');
+    expect(mockEmitEvent).toHaveBeenCalledWith(
+      expect.objectContaining({ actorId: 'admin-1' }),
+      expect.objectContaining({
+        action: 'DOCUMENT_ACCESS_IMPACT_SIMULATED',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-1',
+        result: 'SUCCESS',
+      }),
+    );
+  });
+
+  it('requires a proposed classification before simulating access impact', async () => {
+    await expect(
+      service.getAccessImpactPreview(
+        'doc-1',
+        {} as any,
+        { sub: 'admin-1', roles: ['admin'] },
+        {
+          ...baseContext,
+          actorId: 'admin-1',
+          roles: ['admin'],
+        },
+      ),
+    ).rejects.toThrow(BadRequestException);
+
+    expect(mockEmitEvent).not.toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({
+        action: 'DOCUMENT_ACCESS_IMPACT_SIMULATED',
+      }),
+    );
+  });
+
+  describe('share link grants', () => {
+    const { createHash } = require('crypto');
+
+    function activeShareLink(overrides = {}) {
+      return {
+        id: 'link-1',
+        docId: 'doc-1',
+        tokenHash: createHash('sha256').update('rawtoken').digest('hex'),
+        permission: 'DOWNLOAD',
+        expiresAt: new Date(Date.now() + 3600_000),
+        maxAccessCount: null,
+        accessCount: 0,
+        revokedAt: null,
+        ...overrides,
+      };
+    }
+
+    it('lets a DOWNLOAD share token bypass classification denial for download', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(activeShareLink());
+
+      const result = await service.authorizeDownload(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+        { shareToken: 'rawtoken' },
+      );
+
+      expect(result.grantToken).toEqual(expect.any(String));
+    });
+
+    it('lets a VIEW share token bypass classification denial for preview', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      const result = await service.authorizePreview(
+        'doc-1',
+        { version: 1 },
+        { sub: 'viewer-1', roles: ['viewer'] },
+        baseContext,
+        { shareToken: 'rawtoken' },
+      );
+
+      expect(result.grantToken).toEqual(expect.any(String));
+    });
+
+    it('lets a VIEW share token bypass classification denial for metadata detail', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      await expect(
+        service.assertCanReadMetadata(
+          'doc-1',
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).resolves.toEqual(expect.objectContaining({ id: 'doc-1' }));
+    });
+
+    it('does not let a VIEW share token authorize a download', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ permission: 'VIEW' }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ignores a share token issued for a different document', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ docId: 'other-doc' }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+
+    it('ignores an expired share token', async () => {
+      mockDocumentFindUnique.mockResolvedValue(
+        makeDocument({ classification: ClassificationLevel.SECRET }),
+      );
+      mockShareLinkFindUnique.mockResolvedValue(
+        activeShareLink({ expiresAt: new Date(Date.now() - 1000) }),
+      );
+
+      await expect(
+        service.authorizeDownload(
+          'doc-1',
+          { version: 1 },
+          { sub: 'viewer-1', roles: ['viewer'] },
+          baseContext,
+          { shareToken: 'rawtoken' },
+        ),
+      ).rejects.toThrow(ForbiddenException);
+    });
+  });
+});

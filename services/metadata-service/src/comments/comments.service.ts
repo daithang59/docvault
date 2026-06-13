@@ -5,6 +5,8 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { NotificationClient } from '../notification/notification.client';
+import { parseMentions } from './mentions.util';
 import {
   RequestContext,
   ServiceUser,
@@ -16,6 +18,7 @@ export class CommentsService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly notificationClient?: NotificationClient,
   ) {}
 
   async create(
@@ -50,26 +53,30 @@ export class CommentsService {
       },
     });
 
+    const mentioned = parseMentions(content).filter(
+      (username) => username !== authorId,
+    );
+    if (mentioned.length > 0 && this.notificationClient) {
+      await this.notificationClient.notify(context, {
+        type: 'MENTIONED',
+        docId,
+        recipientIds: mentioned,
+        metadata: { commentId: comment.id, mentionedBy: authorId },
+      });
+    }
+
     return comment;
   }
 
   async update(
+    docId: string,
     commentId: string,
     content: string,
     user: ServiceUser,
     context: RequestContext,
   ) {
     const actorId = buildActorId(user);
-    const authorRoles = user.roles ?? [];
-    const isAdmin = authorRoles.includes('admin');
-
-    const comment = await this.prisma.documentComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
+    const comment = await this.findCommentForDocument(docId, commentId);
 
     if (comment.authorId !== actorId) {
       await this.auditClient.emitEvent(context, {
@@ -85,7 +92,9 @@ export class CommentsService {
           actualAuthor: comment.authorId,
         },
       });
-      throw new ForbiddenException('Only the author can edit their own comment');
+      throw new ForbiddenException(
+        'Only the author can edit their own comment',
+      );
     }
 
     const updated = await this.prisma.documentComment.update({
@@ -112,6 +121,7 @@ export class CommentsService {
   }
 
   async delete(
+    docId: string,
     commentId: string,
     user: ServiceUser,
     context: RequestContext,
@@ -120,13 +130,7 @@ export class CommentsService {
     const authorRoles = user.roles ?? [];
     const isAdmin = authorRoles.includes('admin');
 
-    const comment = await this.prisma.documentComment.findUnique({
-      where: { id: commentId },
-    });
-
-    if (!comment) {
-      throw new NotFoundException('Comment not found');
-    }
+    const comment = await this.findCommentForDocument(docId, commentId);
 
     if (comment.authorId !== actorId && !isAdmin) {
       await this.auditClient.emitEvent(context, {
@@ -169,5 +173,17 @@ export class CommentsService {
       where: { docId },
       orderBy: { createdAt: 'desc' },
     });
+  }
+
+  private async findCommentForDocument(docId: string, commentId: string) {
+    const comment = await this.prisma.documentComment.findFirst({
+      where: { id: commentId, docId },
+    });
+
+    if (!comment) {
+      throw new NotFoundException('Comment not found');
+    }
+
+    return comment;
   }
 }

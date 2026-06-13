@@ -28,12 +28,12 @@ export function TablePagination({
   const end = Math.min(page * pageSize, total);
 
   return (
-    <div className={cn('flex items-center justify-between px-1 py-3 text-sm', className)}>
+    <div className={cn('flex flex-col gap-3 px-1 py-3 text-sm sm:flex-row sm:items-center sm:justify-between', className)}>
       <span className="text-[var(--text-muted)]">
         {total === 0 ? 'No results' : `Showing ${start}–${end} of ${total}`}
       </span>
 
-      <div className="flex items-center gap-4">
+      <div className="flex flex-wrap items-center gap-4">
         {onPageSizeChange && (
           <div className="flex items-center gap-2">
             <span className="text-xs font-medium text-[var(--text-muted)]">Rows:</span>

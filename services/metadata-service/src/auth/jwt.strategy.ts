@@ -8,12 +8,24 @@ type KeycloakAccessToken = {
   exp?: number;
   preferred_username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   resource_access?: Record<string, { roles?: string[] }>;
   aud?: string | string[];
   azp?: string;
   iss?: string;
 };
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
+}
 
 function normalizeUrl(value: string): string {
   return value.replace(/\/$/, '');
@@ -75,12 +87,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: KeycloakAccessToken) {
     // Manually validate expiry with generous clock tolerance (5 min) to handle
     // Keycloak Docker clock drift that causes valid tokens to appear expired.
-    if (payload.exp) {
-      const now = Math.floor(Date.now() / 1000);
-      const CLOCK_DRIFT_TOLERANCE_SECONDS = 300;
-      if (payload.exp + CLOCK_DRIFT_TOLERANCE_SECONDS < now) {
-        throw new UnauthorizedException('Token expired');
-      }
+    // Fail-closed: a token without a numeric exp claim is rejected outright.
+    if (typeof payload.exp !== 'number') {
+      throw new UnauthorizedException('Token missing expiry');
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const toleranceSeconds = Number(
+      process.env.JWT_CLOCK_TOLERANCE_SECONDS ?? 300,
+    );
+    if (payload.exp + toleranceSeconds < now) {
+      throw new UnauthorizedException('Token expired');
     }
 
     if (this.audience) {
@@ -105,6 +121,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
       username: payload.preferred_username,
       email: payload.email,
       roles: Array.from(roles),
+      groups: normalizeGroups(payload.groups),
       raw: payload,
     };
   }

@@ -1,0 +1,8 @@
+ALTER TABLE "documents"
+ADD COLUMN "dlpStatus" TEXT NOT NULL DEFAULT 'NOT_SCANNED',
+ADD COLUMN "dlpFindings" JSONB,
+ADD COLUMN "dlpDetectedAt" TIMESTAMP(3);
+
+ALTER TABLE "document_versions"
+ADD COLUMN "dlpStatus" TEXT NOT NULL DEFAULT 'NOT_SCANNED',
+ADD COLUMN "dlpFindings" JSONB;

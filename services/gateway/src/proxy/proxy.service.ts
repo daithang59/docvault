@@ -50,6 +50,7 @@ export class ProxyService {
             'x-request-id': req.traceId ?? req.headers['x-request-id'],
             'x-user-id': req.user?.sub ?? req.user?.username ?? '',
             'x-roles': (req.user?.roles ?? []).join(','),
+            'x-groups': (req.user?.groups ?? []).join(','),
           },
           maxBodyLength: Infinity,
         }),

@@ -1,9 +1,10 @@
 'use client';
 
-import { useForm, Controller } from 'react-hook-form';
+import { useRef, type ReactNode } from 'react';
+import { useForm, Controller, useWatch } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { X } from 'lucide-react';
+import { X, ShieldAlert } from 'lucide-react';
 import { ClassificationLevel } from '@/types/document';
 import { cn } from '@/lib/utils/cn';
 
@@ -11,24 +12,29 @@ const documentFormSchema = z.object({
   title: z.string().trim().min(1, 'Title is required').max(255),
   description: z.string().trim().max(5000).optional().or(z.literal('')),
   classification: z.enum(['PUBLIC', 'INTERNAL', 'CONFIDENTIAL', 'SECRET']),
+  classificationOverrideReason: z.string().trim().max(500).optional().or(z.literal('')),
   tags: z.array(z.string().trim().min(1).max(50)).max(50),
 });
 
 export type DocumentFormValues = z.infer<typeof documentFormSchema>;
+type DlpStatus = 'NOT_SCANNED' | 'CLEAR' | 'DETECTED';
 
 interface DocumentFormProps {
   defaultValues?: Partial<DocumentFormValues>;
   onSubmit: (values: DocumentFormValues) => void | Promise<void>;
   submitLabel?: string;
   isLoading?: boolean;
+  dlpStatus?: DlpStatus;
+  isAdmin?: boolean;
+  classificationSlot?: (classification: ClassificationLevel) => ReactNode;
   children?: React.ReactNode;
 }
 
-const CLASSIFICATIONS: { value: ClassificationLevel; label: string }[] = [
-  { value: 'PUBLIC', label: 'Public' },
-  { value: 'INTERNAL', label: 'Internal' },
-  { value: 'CONFIDENTIAL', label: 'Confidential' },
-  { value: 'SECRET', label: 'Secret' },
+const CLASSIFICATIONS: { value: ClassificationLevel; label: string; description: string }[] = [
+  { value: 'PUBLIC', label: 'Public', description: 'No sensitivity. Safe to share with anyone.' },
+  { value: 'INTERNAL', label: 'Internal', description: 'For organization members only. Do not share externally.' },
+  { value: 'CONFIDENTIAL', label: 'Confidential', description: 'Sensitive data. Restricted to authorized personnel.' },
+  { value: 'SECRET', label: 'Secret', description: 'Highly sensitive. Only approvers and admins can access.' },
 ];
 
 export function DocumentForm({
@@ -36,30 +42,53 @@ export function DocumentForm({
   onSubmit,
   submitLabel = 'Save',
   isLoading,
+  dlpStatus,
+  isAdmin = false,
+  classificationSlot,
   children,
 }: DocumentFormProps) {
-  const { register, control, handleSubmit, watch, setValue, formState: { errors } } = useForm<DocumentFormValues>({
+  const { register, control, handleSubmit, setValue, formState: { errors } } = useForm<DocumentFormValues>({
     resolver: zodResolver(documentFormSchema),
     defaultValues: {
       title: '',
       description: '',
       classification: 'INTERNAL',
+      classificationOverrideReason: '',
       tags: [],
       ...defaultValues,
     },
   });
 
-  const tags = watch('tags');
+  const tagInputRef = useRef<HTMLInputElement>(null);
+  const tags = useWatch({ control, name: 'tags' }) ?? [];
+  const classification =
+    useWatch({ control, name: 'classification' }) ?? 'INTERNAL';
+  const showClassificationOverrideReason =
+    isAdmin && dlpStatus === 'DETECTED' && (classification === 'PUBLIC' || classification === 'INTERNAL');
+
+  // Read the tag input's pending text and, if it's a usable new tag, return
+  // the tag list with it appended. Used to flush a tag the user typed but
+  // didn't confirm with Enter/comma before submitting.
+  function tagsWithPending(): string[] {
+    const pending = tagInputRef.current?.value.trim().replace(/,$/, '');
+    if (pending && !tags.includes(pending) && tags.length < 50) {
+      return [...tags, pending];
+    }
+    return tags;
+  }
+
+  function commitPendingTag() {
+    const next = tagsWithPending();
+    if (next !== tags) {
+      setValue('tags', next);
+      if (tagInputRef.current) tagInputRef.current.value = '';
+    }
+  }
 
   function addTag(e: React.KeyboardEvent<HTMLInputElement>) {
-    const input = e.currentTarget;
-    if ((e.key === 'Enter' || e.key === ',') && input.value.trim()) {
+    if (e.key === 'Enter' || e.key === ',') {
       e.preventDefault();
-      const newTag = input.value.trim().replace(/,$/, '');
-      if (newTag && !tags.includes(newTag) && tags.length < 50) {
-        setValue('tags', [...tags, newTag]);
-        input.value = '';
-      }
+      commitPendingTag();
     }
   }
 
@@ -67,8 +96,16 @@ export function DocumentForm({
     setValue('tags', tags.filter((t) => t !== tag));
   }
 
+  // Flush any unconfirmed tag text into form state before validating, so a tag
+  // the user typed but didn't press Enter on is still saved. setValue updates
+  // RHF synchronously, so handleSubmit sees the committed tag.
+  function submit(e: React.FormEvent<HTMLFormElement>) {
+    commitPendingTag();
+    void handleSubmit(onSubmit)(e);
+  }
+
   return (
-    <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+    <form onSubmit={submit} className="space-y-5">
       {/* Title */}
       <div>
         <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
@@ -110,25 +147,62 @@ export function DocumentForm({
           name="classification"
           render={({ field }) => (
             <div className="grid grid-cols-2 gap-2">
-              {CLASSIFICATIONS.map(({ value, label }) => (
+              {CLASSIFICATIONS.map(({ value, label, description }) => (
                 <button
                   key={value}
                   type="button"
                   onClick={() => field.onChange(value)}
                   className={cn(
-                    'rounded-xl border px-3 py-2 text-sm font-medium transition-all',
+                    'rounded-xl border px-3 py-2.5 text-left transition-all',
                     field.value === value
                       ? 'text-white border-[var(--color-primary)] bg-[var(--color-primary)]'
                       : 'bg-[var(--input-bg)] text-[var(--text-muted)] border-[var(--input-border)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]',
                   )}
                 >
-                  {label}
+                  <span className="block text-sm font-medium">{label}</span>
+                  <span className={cn(
+                    'block text-[11px] leading-tight mt-0.5',
+                    field.value === value ? 'text-white/70' : 'text-[var(--text-muted)]',
+                  )}>
+                    {description}
+                  </span>
                 </button>
               ))}
             </div>
           )}
         />
+
+        {classification === 'SECRET' && (
+          <div className="mt-2 flex items-start gap-2 rounded-xl border border-amber-500/30 bg-amber-500/5 px-3 py-2.5">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" />
+            <p className="text-xs text-amber-600 dark:text-amber-400">
+              <strong>Secret classification:</strong> Only admins can download this document.
+              As the owner, you can preview the content but cannot download it.
+              Approvers need explicit ACL grants to access.
+            </p>
+          </div>
+        )}
       </div>
+
+      {classificationSlot?.(classification)}
+
+      {showClassificationOverrideReason && (
+        <div>
+          <label className="mb-1.5 block text-sm font-medium text-[var(--text-main)]">
+            Classification override reason <span className="text-[var(--color-destructive)]">*</span>
+          </label>
+          <textarea
+            {...register('classificationOverrideReason')}
+            rows={3}
+            required
+            placeholder="Explain why this DLP-detected document can use this classification..."
+            className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3.5 py-2.5 text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)] transition resize-none"
+          />
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Required for admin DLP downgrade override.
+          </p>
+        </div>
+      )}
 
       {/* Tags */}
       <div>
@@ -146,9 +220,11 @@ export function DocumentForm({
             </span>
           ))}
           <input
+            ref={tagInputRef}
             type="text"
             placeholder={tags.length === 0 ? 'Type and press Enter to add tags...' : ''}
             onKeyDown={addTag}
+            onBlur={commitPendingTag}
             className="min-w-[120px] flex-1 bg-transparent text-sm text-[var(--input-text)] placeholder:text-[var(--input-placeholder)] outline-none"
           />
         </div>

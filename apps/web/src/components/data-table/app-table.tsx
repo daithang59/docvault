@@ -41,6 +41,7 @@ export function AppTable<TData>({
   onRowClick,
   className,
 }: AppTableProps<TData>) {
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table is a known React Compiler incompatible API.
   const table = useReactTable({
     data,
     columns,

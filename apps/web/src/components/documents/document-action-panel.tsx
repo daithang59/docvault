@@ -9,12 +9,12 @@ import {
   canApproveDocument,
   canRejectDocument,
   canArchiveDocument,
-  canDownloadDocument,
-  canPreviewDocument,
-  canUploadVersion,
   canManageAcl,
   canDeleteDocument,
-} from '@/lib/auth/guards';
+  canViewComplianceEvidencePacket,
+  getDocumentAccessDecision,
+  type DocumentAccessDecision,
+} from '@/lib/auth/permissions';
 import {
   useSubmitDocument,
   useApproveDocument,
@@ -24,30 +24,44 @@ import {
   useDeleteDocument,
 } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
+import { useExportComplianceEvidencePacket } from '@/features/documents/documents.hooks';
 import { ConfirmDialog } from '@/components/common/confirm-dialog';
+import { StepUpConfirmDialog } from '@/components/common/step-up-confirm-dialog';
 import { UploadDropzone } from './upload-dropzone';
 import {
-  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2
+  Pencil, Send, CheckCircle, XCircle, Archive, Download, Upload, Eye, Trash2, FileJson
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
+import { getSensitiveActionStepUp } from '@/features/security/sensitive-action';
 
 interface DocumentActionPanelProps {
   doc: DocumentDetail;
   onActionComplete?: () => void;
   onPreview?: () => void;
+  previewDecision?: DocumentAccessDecision;
+  downloadDecision?: DocumentAccessDecision;
+  previewUnavailableReason?: string;
 }
 
-export function DocumentActionPanel({ doc, onActionComplete, onPreview }: DocumentActionPanelProps) {
+export function DocumentActionPanel({
+  doc,
+  onActionComplete,
+  onPreview,
+  previewDecision: previewDecisionOverride,
+  downloadDecision: downloadDecisionOverride,
+  previewUnavailableReason,
+}: DocumentActionPanelProps) {
   const { session } = useAuth();
 
   const [confirmType, setConfirmType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [showUpload, setShowUpload] = useState(false);
   const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [isEvidenceStepUpOpen, setIsEvidenceStepUpOpen] = useState(false);
 
   const submit = useSubmitDocument(doc.id);
   const approve = useApproveDocument(doc.id);
@@ -55,9 +69,17 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
   const archive = useArchiveDocument(doc.id);
   const upload = useUploadDocument(doc.id);
   const deleteDoc = useDeleteDocument(doc.id);
+  const exportEvidencePacket = useExportComplianceEvidencePacket(doc.id);
   const { download, isDownloading } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
+  const previewDecision =
+    previewDecisionOverride ?? getDocumentAccessDecision(session, doc, 'preview');
+  const downloadDecision =
+    downloadDecisionOverride ?? getDocumentAccessDecision(session, doc, 'download');
+  const previewBlockedReason = !previewDecision.allowed
+    ? previewDecision.reason
+    : previewUnavailableReason;
 
   async function handleSubmit() {
     try {
@@ -151,9 +173,11 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
     canApproveDocument(session, doc) ||
     canRejectDocument(session, doc) ||
     canArchiveDocument(session, doc) ||
-    canDownloadDocument(session, doc) ||
-    canPreviewDocument(session, doc) ||
-    canDeleteDocument(session, doc);
+    Boolean(onPreview) ||
+    Boolean(previewBlockedReason) ||
+    canViewComplianceEvidencePacket(session) ||
+    canDeleteDocument(session, doc) ||
+    Boolean(downloadDecision.reason);
 
   if (!hasAnyAction) return null;
 
@@ -174,7 +198,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </Link>
         )}
 
-        {canUploadVersion(session, doc) && (
+        {canEditDocument(session, doc) && (
           <>
             <button
               onClick={() => setShowUpload(!showUpload)}
@@ -253,7 +277,7 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           </button>
         )}
 
-        {canPreviewDocument(session, doc) && onPreview && (
+        {onPreview && previewDecision.allowed && !previewBlockedReason && (
           <button
             onClick={onPreview}
             className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition-colors hover:bg-[var(--bg-muted)]"
@@ -262,8 +286,15 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
             Preview
           </button>
         )}
+        {previewBlockedReason && (
+          <DisabledActionButton
+            icon={Eye}
+            label="Preview"
+            reason={previewBlockedReason}
+          />
+        )}
 
-        {canDownloadDocument(session, doc) && (
+        {downloadDecision.allowed && (
           <button
             onClick={() => download(doc.id)}
             disabled={isDownloading}
@@ -271,6 +302,24 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           >
             <Download className="h-4 w-4 text-[var(--text-muted)]" />
             {isDownloading ? 'Preparing download...' : 'Download'}
+          </button>
+        )}
+        {!downloadDecision.allowed && downloadDecision.reason && (
+          <DisabledActionButton
+            icon={Download}
+            label="Download"
+            reason={downloadDecision.reason}
+          />
+        )}
+
+        {canViewComplianceEvidencePacket(session) && (
+          <button
+            onClick={() => setIsEvidenceStepUpOpen(true)}
+            disabled={exportEvidencePacket.isPending}
+            className="flex w-full items-center gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-4 py-2.5 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-muted)] disabled:opacity-50"
+          >
+            <FileJson className="h-4 w-4 text-[var(--text-muted)]" />
+            {exportEvidencePacket.isPending ? 'Preparing evidence...' : 'Export Evidence Packet'}
           </button>
         )}
 
@@ -339,6 +388,43 @@ export function DocumentActionPanel({ doc, onActionComplete, onPreview }: Docume
           }
         }}
       />
+      <StepUpConfirmDialog
+        open={isEvidenceStepUpOpen}
+        onOpenChange={setIsEvidenceStepUpOpen}
+        stepUp={getSensitiveActionStepUp('export-evidence-packet')}
+        loading={exportEvidencePacket.isPending}
+        onConfirm={async (challengePhrase) => {
+          await exportEvidencePacket.mutateAsync(challengePhrase);
+        }}
+      />
     </div>
+  );
+}
+
+function DisabledActionButton({
+  icon: Icon,
+  label,
+  reason,
+}: {
+  icon: React.ComponentType<{ className?: string }>;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      title={reason}
+      aria-label={`${label} unavailable: ${reason}`}
+      className="flex w-full items-start gap-2.5 rounded-xl border border-[var(--input-border)] bg-[var(--bg-muted)]/45 px-4 py-2.5 text-left text-sm font-medium text-[var(--text-muted)] opacity-80"
+    >
+      <Icon className="mt-0.5 h-4 w-4 shrink-0 text-[var(--text-faint)]" />
+      <span className="min-w-0">
+        <span className="block text-[var(--text-muted)]">{label}</span>
+        <span className="mt-0.5 block break-words text-xs font-normal leading-relaxed text-[var(--text-faint)]">
+          {reason}
+        </span>
+      </span>
+    </button>
   );
 }

@@ -8,9 +8,11 @@ export function useAuditQuery(
   filters: AuditQueryFilters,
   page: number = 1,
   pageSize: number = DEFAULT_PAGE_SIZE,
+  enabled: boolean = true,
 ) {
   return useQuery({
     queryKey: auditKeys.query({ ...filters, page, pageSize }),
     queryFn: () => queryAudit(filters, page, pageSize),
+    enabled,
   });
 }

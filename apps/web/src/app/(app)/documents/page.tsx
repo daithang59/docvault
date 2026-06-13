@@ -1,15 +1,43 @@
 'use client';
 
-import { useState, useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
 import { deleteDocument } from '@/lib/api/workflow';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { submitDocument, approveDocument, archiveDocument } from '@/lib/api/workflow';
-import { useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { documentsKeys } from '@/features/documents/documents.keys';
 import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
-import { DocumentFilters, DocumentFiltersState } from '@/components/documents/document-filters';
+import { DocumentFilters } from '@/components/documents/document-filters';
+import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
+import { DocumentPreviewPanel } from '@/components/documents/document-preview-panel';
+import {
+  DEFAULT_DOCUMENT_FILTERS,
+  buildDocumentFilterOptions,
+  buildDocumentQuickViewOptions,
+  buildDocumentSearchSuggestions,
+  countActiveDocumentFilters,
+  describeActiveDocumentFilters,
+  filterAndSortDocuments,
+  parseDocumentFiltersFromSearchParams,
+  serializeDocumentFiltersToSearchParams,
+  type DocumentFiltersState,
+} from '@/features/documents/document-filter-model';
+import {
+  DOCUMENT_SAVED_VIEWS_STORAGE_KEY,
+  buildDocumentSavedViewOptions,
+  createCustomDocumentSavedView,
+  findMatchingDocumentSavedViewId,
+  parseCustomDocumentSavedViews,
+  serializeCustomDocumentSavedViews,
+  type DocumentSavedView,
+} from '@/features/documents/document-saved-views';
+import {
+  createPersistedDocumentSavedView,
+  deletePersistedDocumentSavedView,
+  listPersistedDocumentSavedViews,
+} from '@/features/documents/document-saved-views.api';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -23,23 +51,21 @@ import Link from 'next/link';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
 import { ApiError } from '@/types/api';
-import { parseApiError } from '@/lib/api/errors';
+import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
-
-const DEFAULT_FILTERS: DocumentFiltersState = {
-  search: '',
-  status: '',
-  classification: '',
-  sort: 'updatedAt',
-  sortDir: 'desc',
-};
+import { scheduleDeferredAction } from '@/features/documents/deferred-action';
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
-  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_FILTERS);
+  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
+  const [localSavedViews, setLocalSavedViews] = useState<DocumentSavedView[]>(
+    () => loadCustomDocumentSavedViews(),
+  );
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [page, setPage] = useState(1);
@@ -53,28 +79,74 @@ export default function DocumentsPage() {
   const { download } = useDownloadDocument({
     onError: (msg) => toast.error(msg),
   });
+  const persistedSavedViewsQuery = useQuery({
+    queryKey: documentsKeys.savedViews(),
+    queryFn: listPersistedDocumentSavedViews,
+    retry: false,
+  });
 
-  const filtered = useMemo(() => {
-    if (!docs) return [];
-    let result = [...docs.data];
-    if (filters.search) {
-      const q = filters.search.toLowerCase();
-      result = result.filter(
-        (d) => d.title.toLowerCase().includes(q) || d.tags.some((t) => t.toLowerCase().includes(q))
-      );
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    setFilters(parseDocumentFiltersFromSearchParams(params));
+    setFiltersHydrated(true);
+  }, []);
+
+  useEffect(() => {
+    if (!filtersHydrated) return;
+
+    const params = serializeDocumentFiltersToSearchParams(filters);
+    const query = params.toString();
+    const nextUrl = query
+      ? `${window.location.pathname}?${query}`
+      : window.location.pathname;
+    const currentUrl = `${window.location.pathname}${window.location.search}`;
+
+    if (currentUrl !== nextUrl) {
+      window.history.replaceState(null, '', nextUrl);
     }
-    if (filters.status) result = result.filter((d) => d.status === filters.status);
-    if (filters.classification) result = result.filter(
-      (d) => (d.classificationLevel ?? d.classification) === filters.classification
-    );
-    result.sort((a, b) => {
-      const valA: string | number = a[filters.sort as keyof DocumentListItem] as string ?? '';
-      const valB: string | number = b[filters.sort as keyof DocumentListItem] as string ?? '';
-      const cmp = String(valA).localeCompare(String(valB));
-      return filters.sortDir === 'asc' ? cmp : -cmp;
-    });
-    return result;
-  }, [docs, filters]);
+  }, [filters, filtersHydrated]);
+
+  const documents = useMemo(() => docs?.data ?? [], [docs?.data]);
+  const filterOptions = useMemo(
+    () => buildDocumentFilterOptions(documents),
+    [documents],
+  );
+  const quickViews = useMemo(
+    () => buildDocumentQuickViewOptions(documents),
+    [documents],
+  );
+  const searchSuggestions = useMemo(
+    () => buildDocumentSearchSuggestions(documents),
+    [documents],
+  );
+  const savedViews = useMemo(
+    () =>
+      buildDocumentSavedViewOptions(
+        documents,
+        persistedSavedViewsQuery.isError
+          ? localSavedViews
+          : (persistedSavedViewsQuery.data ?? []),
+      ),
+    [
+      documents,
+      localSavedViews,
+      persistedSavedViewsQuery.data,
+      persistedSavedViewsQuery.isError,
+    ],
+  );
+  const activeSavedViewId = useMemo(
+    () => findMatchingDocumentSavedViewId(savedViews, filters),
+    [savedViews, filters],
+  );
+  const filtered = useMemo(
+    () => filterAndSortDocuments(documents, filters),
+    [documents, filters],
+  );
+  const activeFilterCount = countActiveDocumentFilters(filters);
+  const emptyDescription =
+    documents.length === 0 && activeFilterCount === 0
+      ? 'Create your first document to get started.'
+      : describeActiveDocumentFilters(filters, filterOptions);
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = useMemo(() => {
@@ -129,7 +201,7 @@ export default function DocumentsPage() {
     }
   }
 
-  async function handleBulkAction(
+  async function runBulkAction(
     docs: DocumentListItem[],
     action: (id: string) => Promise<unknown>,
     label: string,
@@ -150,21 +222,85 @@ export default function DocumentsPage() {
     setPage(1);
   }
 
-  async function handleBulkDelete(docs: DocumentListItem[]) {
-    let ok = 0;
-    let fail = 0;
-    for (const doc of docs) {
-      try {
-        await deleteDocument(doc.id);
-        ok++;
-      } catch {
-        fail++;
-      }
+  function scheduleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    if (docs.length === 0) return;
+    const toastId = `bulk-${label}-${Date.now()}`;
+    const deferred = scheduleDeferredAction(
+      () => runBulkAction(docs, action, label),
+      { delayMs: 5000 },
+    );
+    toast(`${label}: ${docs.length} document${docs.length === 1 ? '' : 's'}`, {
+      id: toastId,
+      description: 'Applying in 5s',
+      duration: 5000,
+      action: {
+        label: 'Undo',
+        onClick: () => {
+          if (deferred.cancel()) {
+            toast.dismiss(toastId);
+            toast.info(`${label} cancelled`);
+          }
+        },
+      },
+    });
+  }
+
+  function handleBulkAction(
+    docs: DocumentListItem[],
+    action: (id: string) => Promise<unknown>,
+    label: string,
+  ) {
+    scheduleBulkAction(docs, action, label);
+  }
+
+  function handleBulkDelete(docs: DocumentListItem[]) {
+    scheduleBulkAction(docs, (id) => deleteDocument(id), 'Delete');
+  }
+
+  function persistCustomSavedViews(nextViews: DocumentSavedView[]) {
+    setLocalSavedViews(nextViews);
+    window.localStorage.setItem(
+      DOCUMENT_SAVED_VIEWS_STORAGE_KEY,
+      serializeCustomDocumentSavedViews(nextViews),
+    );
+  }
+
+  async function handleSaveCurrentView(label: string) {
+    try {
+      const nextView = await createPersistedDocumentSavedView({
+        label,
+        filters,
+        scope: 'PRIVATE',
+      });
+      await qc.invalidateQueries({ queryKey: documentsKeys.savedViews() });
+      toast.success(`Saved view "${nextView.label}".`);
+    } catch {
+      const nextView = createCustomDocumentSavedView(label, filters);
+      const nextViews = [...localSavedViews, nextView].slice(-8);
+      persistCustomSavedViews(nextViews);
+      toast.success(`Saved view "${nextView.label}" locally.`);
     }
-    if (ok > 0) toast.success(`Deleted: ${ok} succeeded${fail > 0 ? `, ${fail} failed` : ''}`);
-    else toast.error(`Delete failed for all ${fail} documents`);
-    qc.invalidateQueries({ queryKey: documentsKeys.lists() });
-    setPage(1);
+  }
+
+  async function handleDeleteSavedView(id: string) {
+    if (id.startsWith('custom-') || persistedSavedViewsQuery.isError) {
+      const nextViews = localSavedViews.filter((view) => view.id !== id);
+      persistCustomSavedViews(nextViews);
+      toast.success('Saved view removed.');
+      return;
+    }
+
+    try {
+      await deletePersistedDocumentSavedView(id);
+      await qc.invalidateQueries({ queryKey: documentsKeys.savedViews() });
+      toast.success('Saved view removed.');
+    } catch (error) {
+      toast.error(getErrorMessage(error));
+    }
   }
 
   return (
@@ -173,6 +309,13 @@ export default function DocumentsPage() {
         <PageHeader
           title="Documents"
           subtitle="Manage and review secure documents across their lifecycle."
+          badge={
+            activeFilterCount > 0 ? (
+              <span className="rounded-full px-2 py-0.5 text-xs font-bold text-white bg-[var(--color-primary)]">
+                {activeFilterCount} filter{activeFilterCount === 1 ? '' : 's'}
+              </span>
+            ) : null
+          }
           actions={
             <ProtectedAction roles={['editor', 'admin']}>
               <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary flex items-center gap-2 rounded-xl px-4 py-2.5 text-sm font-medium text-white transition">
@@ -185,55 +328,98 @@ export default function DocumentsPage() {
       </div>
 
       <div className="animate-in delay-2">
-        <DocumentFilters filters={filters} onChange={(f) => { setFilters(f); setPage(1); }} />
+        <DocumentFilters
+          filters={filters}
+          options={filterOptions}
+          quickViews={quickViews}
+          searchSuggestions={searchSuggestions}
+          savedViews={savedViews}
+          activeSavedViewId={activeSavedViewId}
+          resultCount={filtered.length}
+          totalCount={documents.length}
+          onApplySavedView={(view) => {
+            setFilters(view.filters);
+            setPage(1);
+          }}
+          onSaveCurrentView={handleSaveCurrentView}
+          onDeleteSavedView={handleDeleteSavedView}
+          onChange={(nextFilters) => {
+            setFilters(nextFilters);
+            setPage(1);
+          }}
+        />
       </div>
 
-      {filtered.length === 0 ? (
-        <div className="animate-in delay-3">
-          <EmptyState
-            title="No documents found"
-          description={filters.search || filters.status || filters.classification
-            ? 'Try adjusting your filters.'
-            : 'Create your first document to get started.'
-          }
-          icon="document"
-          action={
-            <ProtectedAction roles={['editor', 'admin']}>
-              <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
-                Create Document
-              </Link>
-            </ProtectedAction>
-          }
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="lg:w-64 lg:shrink-0">
+          <DocumentFolderTree
+            documents={documents}
+            selectedFolder={filters.folder}
+            onSelect={(folder) => {
+              setFilters({ ...filters, folder });
+              setPage(1);
+            }}
           />
         </div>
-      ) : (
-        <>
-          <div className="animate-in delay-3">
-            <DocumentsTable
-              data={paginated}
-              enableSelection
-              onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
-              onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
-              onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
-              onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
-              onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
-              onDownload={(doc) => download(doc.id)}
-              onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
-              onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
-              onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
-              onBulkDelete={handleBulkDelete}
-            />
-            <TablePagination
-              page={page}
-              pageSize={pageSize}
-              total={filtered.length}
-              totalPages={totalPages}
-              onPageChange={(p) => setPage(p)}
-              onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
-            />
-          </div>
-        </>
-      )}
+        <div className="min-w-0 flex-1">
+          {filtered.length === 0 ? (
+            <div className="animate-in delay-3">
+              <EmptyState
+            title="No documents found"
+          description={emptyDescription}
+          icon="document"
+          action={
+                <ProtectedAction roles={['editor', 'admin']}>
+                  <Link href={ROUTES.DOCUMENTS_NEW} className="btn-primary rounded-xl px-4 py-2 text-sm font-medium text-white transition">
+                    Create Document
+                  </Link>
+                </ProtectedAction>
+              }
+              />
+            </div>
+          ) : (
+            <>
+              <div className="animate-in delay-3">
+                <DocumentsTable
+                  data={paginated}
+                  enableSelection
+                  onRowClick={(doc) => setPreviewDoc(doc)}
+                  activeRowId={previewDoc?.id ?? null}
+                  onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+                  onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+                  onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+                  onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+                  onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
+                  onDownload={(doc) => download(doc.id)}
+                  onBulkSubmit={(docs) => handleBulkAction(docs, submitDocument, 'Bulk Submit')}
+                  onBulkApprove={(docs) => handleBulkAction(docs, approveDocument, 'Bulk Approve')}
+                  onBulkArchive={(docs) => handleBulkAction(docs, archiveDocument, 'Bulk Archive')}
+                  onBulkDelete={handleBulkDelete}
+                />
+                <TablePagination
+                  page={page}
+                  pageSize={pageSize}
+                  total={filtered.length}
+                  totalPages={totalPages}
+                  onPageChange={(p) => setPage(p)}
+                  onPageSizeChange={(s) => { setPageSize(s); setPage(1); }}
+                />
+              </div>
+            </>
+          )}
+        </div>
+      </div>
+
+      <DocumentPreviewPanel
+        doc={previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+        onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+        onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+        onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+        onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
+        onDownload={(doc) => download(doc.id)}
+      />
 
       <ConfirmDialog
         open={actionType === 'submit'}
@@ -287,5 +473,12 @@ export default function DocumentsPage() {
         onConfirm={() => handleAction('delete')}
       />
     </div>
+  );
+}
+
+function loadCustomDocumentSavedViews(): DocumentSavedView[] {
+  if (typeof window === 'undefined') return [];
+  return parseCustomDocumentSavedViews(
+    window.localStorage.getItem(DOCUMENT_SAVED_VIEWS_STORAGE_KEY),
   );
 }

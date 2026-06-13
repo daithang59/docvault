@@ -5,7 +5,7 @@ import { StatusBadge } from '@/components/badges/status-badge';
 import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { useOwnerDisplayName } from '@/features/approvals/approvals.hooks';
-import { User, Calendar, Tag } from 'lucide-react';
+import { User, Calendar, Tag, Archive } from 'lucide-react';
 
 interface DocumentHeaderProps {
   doc: DocumentDetail;
@@ -54,6 +54,12 @@ export function DocumentHeader({ doc }: DocumentHeaderProps) {
         )}
         {doc.archivedAt && (
           <MetaItem label="Archived" icon={Calendar} value={formatDateTime(doc.archivedAt)} />
+        )}
+        {doc.retentionClass && (
+          <MetaItem label="Retention Class" icon={Archive} value={doc.retentionClass} />
+        )}
+        {doc.retentionUntil && (
+          <MetaItem label="Retention Until" icon={Calendar} value={formatDateTime(doc.retentionUntil)} />
         )}
       </div>
     </div>
