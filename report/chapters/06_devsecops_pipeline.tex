@@ -103,7 +103,7 @@ Artifacts quan trọng gồm:
 
 \section{Observability}
 
-DocVault có cấu hình observability thông qua Argo CD applications cho Prometheus/Grafana và Loki/promtail. Prometheus/Grafana phục vụ metric và dashboard; Loki/promtail phục vụ log tập trung từ Kubernetes namespace \code{docvault}. Các bằng chứng nên chụp gồm pod health, CPU/RAM, workload status và Grafana Explore với query \code{\{namespace="docvault"\}}.
+DocVault có cấu hình observability qua các Argo CD application cho Prometheus, Grafana, Loki và promtail. Prometheus/Grafana phục vụ metric và dashboard; Loki/promtail phục vụ log tập trung từ Kubernetes namespace \code{docvault}. Các bằng chứng nên chụp gồm pod health, CPU/RAM, workload status và Grafana Explore với query \code{\{namespace="docvault"\}}.
 
 \section{Mapping stage, công cụ và bằng chứng}
 

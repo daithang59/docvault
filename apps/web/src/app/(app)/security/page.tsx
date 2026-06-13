@@ -646,6 +646,9 @@ function RecommendationsPanel({
     ? filteredItems
     : filteredItems.slice(0, SECURITY_RECOMMENDATION_PREVIEW_LIMIT);
   const actorNames = useActorNames();
+  const selectedItem = selectedRecommendationId
+    ? filteredItems.find((item) => item.id === selectedRecommendationId) ?? null
+    : null;
 
   return (
     <div
@@ -709,7 +712,8 @@ function RecommendationsPanel({
         </p>
       ) : (
         <>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(380px,1.18fr)]">
+            <div className="space-y-2">
             {items.map((item) => {
               const tone = getRecommendationTone(item.severity);
               const isSelected = selectedRecommendationId === item.id;
@@ -725,13 +729,18 @@ function RecommendationsPanel({
               return (
                 <div
                   key={item.id}
-                  className="rounded-lg border px-4 py-3"
+                  className="rounded-lg border border-l-4 px-4 py-3 transition"
                   style={{
-                    borderColor: tone.border,
-                    background: tone.bg,
+                    borderColor: isSelected
+                      ? 'var(--color-primary)'
+                      : 'var(--border-soft)',
+                    borderLeftColor: tone.border,
+                    background: isSelected
+                      ? 'var(--bg-subtle)'
+                      : 'var(--bg-card)',
                   }}
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -740,12 +749,9 @@ function RecommendationsPanel({
                         >
                           {item.severityLabel}
                         </span>
-                        <SecurityRouteBadge routing={item.finding.routing} />
-                        <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
-                          {item.finding.categoryLabel}
-                        </span>
-                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                          {item.typeLabel}
+                        <SecurityRouteCodeBadge route={item.finding.routing.route} />
+                        <span className="text-[11px] font-medium text-[var(--text-faint)]">
+                          {item.finding.categoryLabel} · {item.typeLabel}
                         </span>
                       </div>
                       <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
@@ -755,7 +761,7 @@ function RecommendationsPanel({
                         {item.finding.summary}
                       </p>
                     </div>
-                    <div className="flex shrink-0 flex-wrap gap-2">
+                    <div className="flex flex-wrap gap-2">
                       <button
                         type="button"
                         onClick={() =>
@@ -776,7 +782,7 @@ function RecommendationsPanel({
                     </div>
                   </div>
 
-                  <div className="mt-3 grid gap-3 md:grid-cols-[minmax(0,0.9fr)_minmax(0,1fr)_auto]">
+                  <div className="mt-3 grid gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
                         Affected scope
@@ -785,15 +791,7 @@ function RecommendationsPanel({
                         {item.finding.affectedScopeLabel}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                        Evidence
-                      </p>
-                      <p className="mt-1 max-h-10 overflow-hidden text-xs leading-relaxed text-[var(--text-muted)]">
-                        {item.evidence.join(' · ')}
-                      </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2 md:justify-end">
+                    <div className="flex flex-wrap gap-2">
                       <span className="inline-flex h-7 items-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-card)] px-2.5 text-xs font-medium text-[var(--text-main)]">
                         {getRecommendationWorkflowLabel(item.workflow.status)}
                       </span>
@@ -806,82 +804,24 @@ function RecommendationsPanel({
                       </span>
                     </div>
                   </div>
-
-                  {isSelected ? (
-                    <div className="mt-4 border-t border-[var(--border-soft)] pt-4">
-                      <p className="text-xs leading-relaxed text-[var(--text-faint)]">
-                        {item.finding.routing.routeDescription}
-                      </p>
-                      <div className="mt-3 grid gap-3 md:grid-cols-2">
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                            {item.finding.evidenceQuestion}
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                            {humanizeActorText(item.reason, actorNames)}
-                          </p>
-                        </div>
-                        <div>
-                          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                            Next action
-                          </p>
-                          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                            <span className="font-medium text-[var(--text-main)]">
-                              {item.finding.nextStepLabel}
-                            </span>
-                            {': '}
-                            {humanizeActorText(item.recommendedAction, actorNames)}
-                          </p>
-                        </div>
-                      </div>
-
-                      {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
-                        <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-                          {item.affectedDocumentIds.map((docId) => (
-                            <span
-                              key={docId}
-                              className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                            >
-                              doc {truncateMiddle(docId, 18)}
-                            </span>
-                          ))}
-                          {item.affectedActorIds.map((actorId) => (
-                            <span
-                              key={actorId}
-                              className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                            >
-                              actor <ActorLabel id={actorId} length={18} />
-                            </span>
-                          ))}
-                        </div>
-                      ) : null}
-
-                      <RecommendationWorkflowControls
-                        key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
-                        item={item}
-                        isPending={pendingRecommendationId === item.id}
-                        isDisabled={pendingRecommendationId !== null}
-                        error={workflowError?.id === item.id ? workflowError.message : null}
-                        onSave={onSaveWorkflow}
-                      />
-
-                      <RecommendationPlaybook playbook={item.playbook} />
-
-                      <RecommendationHistoryControls
-                        item={item}
-                        auditChain={auditChain}
-                        isExpanded={expandedHistoryIds.includes(item.id)}
-                        isLoading={historyLoadingId === item.id}
-                        error={historyErrors[item.id] ?? null}
-                        history={workflowHistoryByRecommendationId[item.id] ?? []}
-                        onToggleHistory={onToggleHistory}
-                        onDownloadEvidence={onDownloadEvidence}
-                      />
-                    </div>
-                  ) : null}
                 </div>
               );
             })}
+            </div>
+            <RecommendationDetailPanel
+              item={selectedItem}
+              auditChain={auditChain}
+              actorNames={actorNames}
+              pendingRecommendationId={pendingRecommendationId}
+              workflowError={workflowError}
+              expandedHistoryIds={expandedHistoryIds}
+              workflowHistoryByRecommendationId={workflowHistoryByRecommendationId}
+              historyLoadingId={historyLoadingId}
+              historyErrors={historyErrors}
+              onSaveWorkflow={onSaveWorkflow}
+              onToggleHistory={onToggleHistory}
+              onDownloadEvidence={onDownloadEvidence}
+            />
           </div>
           {filteredItems.length > SECURITY_RECOMMENDATION_PREVIEW_LIMIT ? (
             <ShowMoreListToggle
@@ -893,6 +833,223 @@ function RecommendationsPanel({
         </>
       )}
     </div>
+  );
+}
+
+function RecommendationDetailPanel({
+  item,
+  auditChain,
+  actorNames,
+  pendingRecommendationId,
+  workflowError,
+  expandedHistoryIds,
+  workflowHistoryByRecommendationId,
+  historyLoadingId,
+  historyErrors,
+  onSaveWorkflow,
+  onToggleHistory,
+  onDownloadEvidence,
+}: {
+  item:
+    | ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number]
+    | null;
+  auditChain: AuditChainStatus;
+  actorNames: ActorNameMap;
+  pendingRecommendationId: string | null;
+  workflowError: { id: string; message: string } | null;
+  expandedHistoryIds: string[];
+  workflowHistoryByRecommendationId: RecommendationHistoryState;
+  historyLoadingId: string | null;
+  historyErrors: RecommendationHistoryErrors;
+  onSaveWorkflow: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+  onToggleHistory: (id: string) => Promise<void>;
+  onDownloadEvidence: (
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
+  ) => Promise<void>;
+}) {
+  return (
+    <aside
+      className="rounded-lg border p-4 xl:sticky xl:top-4 xl:self-start"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Recommendation detail
+          </p>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+            Finding details
+          </h3>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          Metadata only
+        </span>
+      </div>
+
+      {!item ? (
+        <div className="mt-4 rounded-lg border border-dashed border-[var(--border-soft)] bg-[var(--bg-subtle)] px-4 py-6">
+          <p className="text-sm font-medium text-[var(--text-main)]">
+            No finding selected
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Case workflow and evidence details stay here while the queue remains compact.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                  style={{
+                    color: getRecommendationTone(item.severity).text,
+                    background: getRecommendationTone(item.severity).badgeBg,
+                  }}
+                >
+                  {item.severityLabel}
+                </span>
+                <SecurityRouteBadge routing={item.finding.routing} />
+                <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
+                  {item.finding.categoryLabel}
+                </span>
+              </div>
+              <h4 className="mt-2 text-base font-semibold text-[var(--text-strong)]">
+                {humanizeActorText(item.title, actorNames)}
+              </h4>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                {item.finding.summary}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+                {item.finding.routing.routeDescription}
+              </p>
+            </div>
+            <Link
+              href={buildRecommendationAuditHref(item.auditFilters)}
+              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+            >
+              Open audit
+              <ExternalLink className="h-4 w-4" />
+            </Link>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Scope
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {item.finding.affectedScopeLabel}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Status
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationWorkflowLabel(item.workflow.status)}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                SLA
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationSlaLabel(item.playbook.slaState)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                {item.finding.evidenceQuestion}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                {humanizeActorText(item.reason, actorNames)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Next action
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text-main)]">
+                  {item.finding.nextStepLabel}
+                </span>
+                {': '}
+                {humanizeActorText(item.recommendedAction, actorNames)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Evidence
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {item.evidence.map((evidence) => (
+                <span
+                  key={evidence}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                >
+                  {humanizeActorText(evidence, actorNames)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+              {item.affectedDocumentIds.map((docId) => (
+                <span
+                  key={docId}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono"
+                >
+                  doc {truncateMiddle(docId, 18)}
+                </span>
+              ))}
+              {item.affectedActorIds.map((actorId) => (
+                <span
+                  key={actorId}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono"
+                >
+                  actor <ActorLabel id={actorId} length={18} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <RecommendationWorkflowControls
+            key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
+            item={item}
+            isPending={pendingRecommendationId === item.id}
+            isDisabled={pendingRecommendationId !== null}
+            error={workflowError?.id === item.id ? workflowError.message : null}
+            onSave={onSaveWorkflow}
+          />
+
+          <RecommendationPlaybook playbook={item.playbook} />
+
+          <RecommendationHistoryControls
+            item={item}
+            auditChain={auditChain}
+            isExpanded={expandedHistoryIds.includes(item.id)}
+            isLoading={historyLoadingId === item.id}
+            error={historyErrors[item.id] ?? null}
+            history={workflowHistoryByRecommendationId[item.id] ?? []}
+            onToggleHistory={onToggleHistory}
+            onDownloadEvidence={onDownloadEvidence}
+          />
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -2184,6 +2341,18 @@ function SecurityRouteBadge({
       className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
     >
       {routing.routeLabel}
+    </span>
+  );
+}
+
+function SecurityRouteCodeBadge({ route }: { route: SecurityAlertRoute }) {
+  const tone = getSecurityRouteTone(route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {route}
     </span>
   );
 }

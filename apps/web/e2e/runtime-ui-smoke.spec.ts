@@ -950,6 +950,7 @@ test('security page scopes recommendation queue by workflow status', async ({
     .getByRole('button', { name: /Start case|Continue case/ })
     .first()
     .click();
+  await expect(page.getByRole('heading', { name: 'Finding details' })).toBeVisible();
   await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Resolved 0' }).click();

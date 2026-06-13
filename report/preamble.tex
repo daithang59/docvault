@@ -6,21 +6,19 @@
 \else
   \usepackage{fontspec}
   \usepackage[english,vietnamese]{babel}
-  \IfFontExistsTF{CMU Serif}
-    {\setmainfont{CMU Serif}}
-    {\IfFontExistsTF{Latin Modern Roman}
-      {\setmainfont{Latin Modern Roman}}
-      {\setmainfont{TeX Gyre Termes}}}
-  \IfFontExistsTF{CMU Sans Serif}
-    {\setsansfont{CMU Sans Serif}}
-    {\IfFontExistsTF{Latin Modern Sans}
-      {\setsansfont{Latin Modern Sans}}
-      {\setsansfont{Arial}}}
-  \IfFontExistsTF{CMU Typewriter Text}
-    {\setmonofont{CMU Typewriter Text}}
-    {\IfFontExistsTF{Latin Modern Mono}
-      {\setmonofont{Latin Modern Mono}}
-      {\setmonofont{Consolas}}}
+  \IfFontExistsTF{Latin Modern Roman}
+    {\setmainfont{Latin Modern Roman}}
+    {\setmainfont{TeX Gyre Termes}}
+  \IfFontExistsTF{Latin Modern Sans}
+    {\setsansfont{Latin Modern Sans}}
+    {\setsansfont{Arial}}
+  \IfFontExistsTF{Latin Modern Mono}
+    {\setmonofont{Latin Modern Mono}[
+      BoldFont={Latin Modern Mono},
+      ItalicFont={Latin Modern Mono},
+      BoldItalicFont={Latin Modern Mono}
+    ]}
+    {\setmonofont{Consolas}}
 \fi
 
 \usepackage{geometry}
