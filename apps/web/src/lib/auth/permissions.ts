@@ -40,6 +40,13 @@ export interface DocumentAccessDecision {
   reason?: string;
 }
 
+export interface AnalyticsVisibility {
+  canViewApprovalAggregates: boolean;
+  canViewRetentionAggregates: boolean;
+  canViewSecurityAggregates: boolean;
+  canViewSensitiveDocumentAggregates: boolean;
+}
+
 function allow(): DocumentAccessDecision {
   return { allowed: true };
 }
@@ -403,4 +410,17 @@ export function canManageLegalHold(session: Session | null): boolean {
 
 export function canViewApprovals(session: Session | null): boolean {
   return hasAnyRole(session, ['approver', 'admin']);
+}
+
+// ── Analytics visibility ─────────────────────────────────────────────────────
+
+export function getAnalyticsVisibility(session: Session | null): AnalyticsVisibility {
+  const canViewComplianceAggregates = hasAnyRole(session, ['compliance_officer', 'admin']);
+
+  return {
+    canViewApprovalAggregates: canViewApprovals(session),
+    canViewRetentionAggregates: canViewComplianceAggregates,
+    canViewSecurityAggregates: canViewComplianceAggregates,
+    canViewSensitiveDocumentAggregates: canViewComplianceAggregates,
+  };
 }

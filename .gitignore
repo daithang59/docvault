@@ -161,6 +161,7 @@ Desktop.ini
 .tmp/
 .omc/
 .codex/
+.playwright-mcp/
 .omx/state/
 .omx/logs/
 .omx/notepad.md

@@ -71,6 +71,7 @@ export const apiEndpoints = {
   audit: {
     query: '/audit/query',
     verifyChain: '/audit/verify-chain',
+    sealChainAndStartEpoch: '/audit/chain/seal-and-start-epoch',
     securitySummary: '/audit/security-summary',
     securityRecommendationWorkflow: (id: string) =>
       `/audit/security-recommendations/${encodeURIComponent(id)}/workflow`,

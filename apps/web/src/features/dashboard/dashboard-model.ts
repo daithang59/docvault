@@ -1,5 +1,6 @@
 import { ROUTES } from '@/lib/constants/routes';
 import type { DocumentListItem } from '@/features/documents/documents.types';
+import type { AnalyticsVisibility } from '@/lib/auth/permissions';
 import type { UserRole } from '@/types/enums';
 
 export type DashboardWidgetTone = 'info' | 'success' | 'warning' | 'critical';
@@ -15,6 +16,9 @@ export interface DashboardStats {
 export interface DashboardOperationalWidget {
   key:
     | 'pending-approvals'
+    | 'total-documents'
+    | 'published-documents'
+    | 'draft-handoff'
     | 'dlp-detected'
     | 'retention-due-soon'
     | 'unread-notifications';
@@ -56,9 +60,33 @@ export interface DashboardDemoReadiness {
   signals: DashboardDemoReadinessSignal[];
 }
 
+export interface DashboardGaugeSummary {
+  label: string;
+  value: number;
+  tone: DashboardWidgetTone;
+  description: string;
+  href: string;
+}
+
+export interface DashboardCommandSegment {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+  tone: DashboardWidgetTone;
+  href?: string;
+}
+
+export interface DashboardCommandCenter {
+  readinessGauge: DashboardGaugeSummary;
+  lifecycleSegments: DashboardCommandSegment[];
+  attentionSegments: DashboardCommandSegment[];
+}
+
 export interface DashboardModel {
   stats: DashboardStats;
   demoReadiness: DashboardDemoReadiness;
+  commandCenter: DashboardCommandCenter;
   operationalWidgets: DashboardOperationalWidget[];
   workQueue: DashboardWorkQueueItem[];
   recentDocuments: DocumentListItem[];
@@ -67,69 +95,266 @@ export interface DashboardModel {
 interface DashboardModelOptions {
   unreadNotifications?: number;
   now?: Date;
+  analyticsVisibility?: AnalyticsVisibility;
   actor?: {
     id: string;
     roles: UserRole[];
   };
 }
 
+const DEFAULT_ANALYTICS_VISIBILITY: AnalyticsVisibility = {
+  canViewApprovalAggregates: false,
+  canViewRetentionAggregates: false,
+  canViewSecurityAggregates: false,
+  canViewSensitiveDocumentAggregates: false,
+};
+
 export function buildDashboardModel(
   documents: DocumentListItem[],
   options: DashboardModelOptions = {},
 ): DashboardModel {
   const now = options.now ?? new Date();
+  const visibility = options.analyticsVisibility ?? DEFAULT_ANALYTICS_VISIBILITY;
   const stats = buildStats(documents);
   const dlpDetected = documents.filter((document) => document.dlpStatus === 'DETECTED');
   const retentionDueSoon = documents.filter((document) =>
     isRetentionDueSoon(document, now),
   );
+  const demoReadiness = buildDemoReadiness(
+    documents,
+    stats,
+    dlpDetected,
+    visibility,
+    options.actor,
+  );
+  const operationalWidgets = buildOperationalWidgets(
+    stats,
+    dlpDetected.length,
+    retentionDueSoon.length,
+    options.unreadNotifications ?? 0,
+    visibility,
+  );
+  const workQueue = buildWorkQueue(documents, now, options.actor);
 
   return {
     stats,
-    demoReadiness: buildDemoReadiness(documents, stats, dlpDetected, options.actor),
-    operationalWidgets: [
-      {
-        key: 'pending-approvals',
-        label: 'Pending approvals',
-        value: stats.PENDING,
-        description: 'Documents waiting for workflow decisions.',
-        href: ROUTES.APPROVALS,
-        tone: stats.PENDING > 0 ? 'warning' : 'success',
-      },
-      {
-        key: 'dlp-detected',
-        label: 'DLP detected',
-        value: dlpDetected.length,
-        description: 'Sensitive findings that need review.',
-        href: ROUTES.SECURITY,
-        tone: dlpDetected.length > 0 ? 'critical' : 'success',
-      },
-      {
-        key: 'retention-due-soon',
-        label: 'Retention due soon',
-        value: retentionDueSoon.length,
-        description: 'Records approaching their retention deadline.',
-        href: ROUTES.RETENTION,
-        tone: retentionDueSoon.length > 0 ? 'warning' : 'success',
-      },
-      {
-        key: 'unread-notifications',
-        label: 'Unread notifications',
-        value: options.unreadNotifications ?? 0,
-        description: 'Actionable workflow and compliance queue items.',
-        href: ROUTES.NOTIFICATIONS,
-        tone: (options.unreadNotifications ?? 0) > 0 ? 'info' : 'success',
-      },
-    ],
-    workQueue: buildWorkQueue(documents, now, options.actor),
+    demoReadiness,
+    commandCenter: buildCommandCenter(
+      documents,
+      now,
+      stats,
+      demoReadiness,
+      visibility,
+    ),
+    operationalWidgets,
+    workQueue,
     recentDocuments: sortByUpdatedDesc(documents).slice(0, 5),
   };
+}
+
+function buildOperationalWidgets(
+  stats: DashboardStats,
+  dlpDetected: number,
+  retentionDueSoon: number,
+  unreadNotifications: number,
+  visibility: AnalyticsVisibility,
+): DashboardOperationalWidget[] {
+  const widgets: DashboardOperationalWidget[] = [];
+
+  if (visibility.canViewApprovalAggregates) {
+    widgets.push({
+      key: 'pending-approvals',
+      label: 'Pending approvals',
+      value: stats.PENDING,
+      description: 'Documents waiting for workflow decisions.',
+      href: ROUTES.APPROVALS,
+      tone: stats.PENDING > 0 ? 'warning' : 'success',
+    });
+  } else {
+    widgets.push({
+      key: 'total-documents',
+      label: 'Total documents',
+      value: stats.total,
+      description: 'Documents visible in your current library.',
+      href: ROUTES.DOCUMENTS,
+      tone: 'info',
+    });
+  }
+
+  if (visibility.canViewSecurityAggregates) {
+    widgets.push({
+      key: 'dlp-detected',
+      label: 'DLP detected',
+      value: dlpDetected,
+      description: 'Sensitive findings that need review.',
+      href: ROUTES.SECURITY,
+      tone: dlpDetected > 0 ? 'critical' : 'success',
+    });
+  } else {
+    widgets.push({
+      key: 'published-documents',
+      label: 'Published',
+      value: stats.PUBLISHED,
+      description: 'Approved documents visible to your role.',
+      href: ROUTES.DOCUMENTS,
+      tone: stats.PUBLISHED > 0 ? 'success' : 'info',
+    });
+  }
+
+  if (visibility.canViewRetentionAggregates) {
+    widgets.push({
+      key: 'retention-due-soon',
+      label: 'Retention due soon',
+      value: retentionDueSoon,
+      description: 'Records approaching their retention deadline.',
+      href: ROUTES.RETENTION,
+      tone: retentionDueSoon > 0 ? 'warning' : 'success',
+    });
+  } else {
+    widgets.push({
+      key: 'draft-handoff',
+      label: 'Draft handoff',
+      value: stats.DRAFT,
+      description: 'Drafts visible in the document workflow.',
+      href: ROUTES.DOCUMENTS,
+      tone: stats.DRAFT > 0 ? 'info' : 'success',
+    });
+  }
+
+  widgets.push({
+    key: 'unread-notifications',
+    label: 'Unread notifications',
+    value: unreadNotifications,
+    description: 'Actionable workflow and compliance queue items.',
+    href: ROUTES.NOTIFICATIONS,
+    tone: unreadNotifications > 0 ? 'info' : 'success',
+  });
+
+  return widgets;
+}
+
+function buildCommandCenter(
+  documents: DocumentListItem[],
+  now: Date,
+  stats: DashboardStats,
+  demoReadiness: DashboardDemoReadiness,
+  visibility: AnalyticsVisibility,
+): DashboardCommandCenter {
+  return {
+    readinessGauge: {
+      label: 'Business readiness',
+      value: demoReadiness.score,
+      tone: demoReadiness.score >= 75 ? 'success' : demoReadiness.score >= 50 ? 'warning' : 'info',
+      description: demoReadiness.description,
+      href: ROUTES.DEMO_KIT,
+    },
+    lifecycleSegments: buildLifecycleSegments(stats),
+    attentionSegments: buildAttentionSegments(documents, now, visibility),
+  };
+}
+
+function buildLifecycleSegments(stats: DashboardStats): DashboardCommandSegment[] {
+  const total = stats.total;
+
+  return [
+    {
+      key: 'DRAFT',
+      label: 'Draft',
+      value: stats.DRAFT,
+      percentage: toPercentage(stats.DRAFT, total),
+      tone: 'info',
+      href: ROUTES.DOCUMENTS,
+    },
+    {
+      key: 'PENDING',
+      label: 'Pending',
+      value: stats.PENDING,
+      percentage: toPercentage(stats.PENDING, total),
+      tone: 'warning',
+      href: ROUTES.APPROVALS,
+    },
+    {
+      key: 'PUBLISHED',
+      label: 'Published',
+      value: stats.PUBLISHED,
+      percentage: toPercentage(stats.PUBLISHED, total),
+      tone: 'success',
+      href: ROUTES.DOCUMENTS,
+    },
+    {
+      key: 'ARCHIVED',
+      label: 'Archived',
+      value: stats.ARCHIVED,
+      percentage: toPercentage(stats.ARCHIVED, total),
+      tone: 'info',
+      href: ROUTES.RETENTION,
+    },
+  ];
+}
+
+function buildAttentionSegments(
+  documents: DocumentListItem[],
+  now: Date,
+  visibility: AnalyticsVisibility,
+): DashboardCommandSegment[] {
+  const counts = documents.reduce<Record<'critical' | 'warning' | 'info', number>>(
+    (acc, document) => {
+      if (visibility.canViewSecurityAggregates && document.dlpStatus === 'DETECTED') {
+        acc.critical += 1;
+      } else if (
+        (visibility.canViewApprovalAggregates && document.status === 'PENDING') ||
+        (visibility.canViewRetentionAggregates && isRetentionDueSoon(document, now))
+      ) {
+        acc.warning += 1;
+      } else if (document.status === 'DRAFT') {
+        acc.info += 1;
+      }
+
+      return acc;
+    },
+    { critical: 0, warning: 0, info: 0 },
+  );
+  const total = counts.critical + counts.warning + counts.info;
+
+  const segments: DashboardCommandSegment[] = [];
+
+  if (visibility.canViewSecurityAggregates) {
+    segments.push({
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: ROUTES.SECURITY,
+    });
+  }
+
+  segments.push({
+    key: 'warning',
+    label: 'Warning',
+    value: counts.warning,
+    percentage: toPercentage(counts.warning, total),
+    tone: 'warning',
+    href: visibility.canViewApprovalAggregates ? ROUTES.APPROVALS : ROUTES.NOTIFICATIONS,
+  });
+
+  segments.push({
+    key: 'info',
+    label: 'Info',
+    value: counts.info,
+    percentage: toPercentage(counts.info, total),
+    tone: 'info',
+    href: ROUTES.NOTIFICATIONS,
+  });
+
+  return segments;
 }
 
 function buildDemoReadiness(
   documents: DocumentListItem[],
   stats: DashboardStats,
   dlpDetected: DocumentListItem[],
+  visibility: AnalyticsVisibility,
   actor?: DashboardModelOptions['actor'],
 ): DashboardDemoReadiness {
   const governedDocuments = documents.filter(
@@ -137,7 +362,7 @@ function buildDemoReadiness(
   );
   const hasLifecycleCoverage = governedDocuments.length > 0;
   const hasApprovalWorkflow = stats.PENDING > 0;
-  const hasSecurityStory = dlpDetected.length > 0;
+  const hasSecurityStory = visibility.canViewSecurityAggregates && dlpDetected.length > 0;
   const canExportEvidence = Boolean(
     actor?.roles.some((role) => role === 'admin' || role === 'compliance_officer'),
   );
@@ -175,10 +400,14 @@ function buildDemoReadiness(
     {
       key: 'security-posture',
       label: 'Security posture',
-      value: `${dlpDetected.length} finding${dlpDetected.length === 1 ? '' : 's'}`,
+      value: visibility.canViewSecurityAggregates
+        ? `${dlpDetected.length} finding${dlpDetected.length === 1 ? '' : 's'}`
+        : 'Role gated',
       description: hasSecurityStory
         ? 'DLP findings and policy denies create a security review story.'
-        : 'Seed a DLP-detected document to demonstrate security review.',
+        : visibility.canViewSecurityAggregates
+          ? 'Seed a DLP-detected document to demonstrate security review.'
+          : 'Compliance Officer or Admin role is required for security posture aggregates.',
       tone: hasSecurityStory ? 'critical' : 'info',
       href: ROUTES.SECURITY,
     },
@@ -361,6 +590,11 @@ function isRetentionDueSoon(document: DocumentListItem, now: Date): boolean {
   const nowTime = now.getTime();
   const dueSoonLimit = nowTime + 30 * 24 * 60 * 60 * 1000;
   return retentionTime >= nowTime && retentionTime <= dueSoonLimit;
+}
+
+function toPercentage(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
 }
 
 function sortByUpdatedDesc(documents: DocumentListItem[]): DocumentListItem[] {

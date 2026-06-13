@@ -361,6 +361,93 @@ describe('AuditService security summary', () => {
     );
   });
 
+  it('scopes mass content access recommendation audit filters to content grants in the signal window', async () => {
+    const countDocuments = jest.fn().mockResolvedValue(0);
+    const aggregateExec = jest.fn().mockResolvedValue([]);
+    const riskFindLean = jest.fn().mockResolvedValue([]);
+    const behaviorFindLean = jest.fn().mockResolvedValue([
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:00:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret-1' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-secret-2',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:02:00.000Z'),
+        metadata: { classification: 'SECRET', docId: 'doc-secret-2' },
+      },
+      {
+        action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-confidential-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:04:00.000Z'),
+        metadata: {
+          classification: 'CONFIDENTIAL',
+          docId: 'doc-confidential-1',
+        },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-internal-1',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:06:00.000Z'),
+        metadata: { classification: 'INTERNAL', docId: 'doc-internal-1' },
+      },
+      {
+        action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+        actorId: 'editor-1',
+        resourceType: 'DOCUMENT',
+        resourceId: 'doc-internal-2',
+        result: 'SUCCESS',
+        timestamp: new Date('2026-05-30T10:08:00.000Z'),
+        metadata: { classification: 'INTERNAL', docId: 'doc-internal-2' },
+      },
+    ]);
+    const riskFind = makeFindChain(riskFindLean);
+    const behaviorFind = makeFindChain(behaviorFindLean);
+    const workflowFind = makeFindChain(jest.fn().mockResolvedValue([]));
+    const find = jest
+      .fn()
+      .mockReturnValueOnce(riskFind)
+      .mockReturnValueOnce(behaviorFind)
+      .mockReturnValue(workflowFind);
+    const service = new AuditService({
+      countDocuments,
+      find,
+      findOne: makeWorkflowFindOne(),
+      aggregate: jest.fn().mockReturnValue({ exec: aggregateExec }),
+    } as any);
+    jest
+      .spyOn(service, 'verifyChain')
+      .mockResolvedValue({ valid: true, checked: 42 });
+
+    const result = await service.securitySummary();
+
+    expect(result.recommendations).toEqual([
+      expect.objectContaining({
+        id: 'actor-access-review:MASS_CONTENT_ACCESS:editor-1',
+        auditFilters: {
+          actorId: 'editor-1',
+          actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+          from: '2026-05-30T10:00:00.000Z',
+          to: '2026-05-30T10:08:00.000Z',
+        },
+      }),
+    ]);
+  });
+
   it('generates deterministic recommendations from audit chain, DLP, risk, and anomaly evidence', async () => {
     const countDocuments = jest.fn((filter: Record<string, unknown>) => {
       if (filter.result === 'DENY') return Promise.resolve(4);
@@ -510,7 +597,12 @@ describe('AuditService security summary', () => {
         evidence: ['3 denied security events', '3 distinct documents'],
         affectedDocumentIds: [],
         affectedActorIds: ['viewer-1'],
-        auditFilters: { actorId: 'viewer-1' },
+        auditFilters: {
+          actorId: 'viewer-1',
+          result: 'DENY',
+          from: '2026-05-30T10:01:00.000Z',
+          to: '2026-05-30T10:03:00.000Z',
+        },
         workflow: { status: 'OPEN' },
       },
       {

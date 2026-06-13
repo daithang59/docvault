@@ -1,14 +1,26 @@
 import {
   BadRequestException,
   Injectable,
+  Optional,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { createHash, createHmac, randomUUID } from 'crypto';
+import {
+  AuditChainEpoch,
+  AuditChainEpochDocument,
+} from '../mongo/audit-chain-epoch.schema';
+import {
+  AuditChainIncident,
+  AuditChainIncidentDocument,
+} from '../mongo/audit-chain-incident.schema';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
-import { QueryAuditDto } from './dto/query-audit.dto';
+import {
+  QueryAuditDto,
+  type AuditActionGroup,
+} from './dto/query-audit.dto';
 import {
   SECURITY_RECOMMENDATION_WORKFLOW_STATUSES,
   SecurityRecommendationWorkflowDto,
@@ -20,19 +32,32 @@ import {
 // prevHash index. Bounded so a pathological contention storm fails loudly
 // rather than spinning forever.
 const MAX_CHAIN_APPEND_ATTEMPTS = 25;
+const DEFAULT_EPOCH_ID = 'default';
 
 const AUTHORIZED_CONTENT_ACTIONS = [
   'DOCUMENT_DOWNLOAD_AUTHORIZED',
   'DOCUMENT_PREVIEW_AUTHORIZED',
 ] as const;
 
+const DESTRUCTIVE_ACTIVITY_ACTIONS = [
+  'DOCUMENT_ACL_DELETED',
+  'DOCUMENT_ARCHIVE',
+  'DOCUMENT_AUTO_ARCHIVED',
+] as const;
+
+const AUDIT_ACTION_GROUP_ACTIONS: Record<
+  AuditActionGroup,
+  readonly string[]
+> = {
+  AUTHORIZED_CONTENT_ACCESS: AUTHORIZED_CONTENT_ACTIONS,
+  DESTRUCTIVE_ACTIVITY: DESTRUCTIVE_ACTIVITY_ACTIONS,
+};
+
 const BEHAVIOR_SIGNAL_ACTIONS = [
   ...AUTHORIZED_CONTENT_ACTIONS,
   'DOCUMENT_DOWNLOAD_DENIED',
   'DOCUMENT_METADATA_READ_DENIED',
-  'DOCUMENT_ACL_DELETED',
-  'DOCUMENT_ARCHIVE',
-  'DOCUMENT_AUTO_ARCHIVED',
+  ...DESTRUCTIVE_ACTIVITY_ACTIONS,
   'DOCUMENT_METADATA_UPDATED',
   'DOCUMENT_UPLOADED',
 ] as const;
@@ -47,6 +72,25 @@ const BEHAVIOR_SIGNAL_WINDOW_DAYS = (() => {
 })();
 
 const DAY_IN_MS = 24 * 60 * 60 * 1000;
+
+function addAuditScope(
+  filter: Record<string, any>,
+  scope: Record<string, any>,
+) {
+  if (filter.$and) {
+    filter.$and.push(scope);
+    return;
+  }
+
+  if (filter.$or) {
+    const existingScope = { $or: filter.$or };
+    delete filter.$or;
+    filter.$and = [existingScope, scope];
+    return;
+  }
+
+  filter.$and = [scope];
+}
 
 export interface RiskyDocumentSummary {
   documentId: string;
@@ -115,10 +159,13 @@ export interface SecurityRecommendationSummary {
   auditFilters: {
     actorId?: string;
     action?: string;
+    actionGroup?: AuditActionGroup;
     result?: string;
     resourceType?: string;
     resourceId?: string;
     documentId?: string;
+    from?: string;
+    to?: string;
   };
   workflow: SecurityRecommendationWorkflow;
 }
@@ -128,6 +175,45 @@ export interface SecuritySummaryViewer {
   roles?: string[];
   ip?: string;
   traceId?: string;
+}
+
+export interface AuditChainCompromisedEpochSummary {
+  epochId: string;
+  status: 'COMPROMISED';
+  startedAt?: Date | string;
+  endedAt?: Date | string;
+  incidentId?: string;
+  firstBrokenIndex?: number;
+  firstBrokenEventId?: string;
+  lastTrustedHash?: string;
+  reason?: string;
+}
+
+export interface AuditChainActiveEpochSummary {
+  epochId: string;
+  status: string;
+  valid: boolean;
+  checked: number;
+  startedAt?: Date | string;
+  genesisReason?: string;
+  previousEpochId?: string;
+  incidentId?: string;
+}
+
+export interface AuditChainVerificationResult {
+  valid: boolean;
+  checked: number;
+  firstBrokenIndex?: number;
+  firstBrokenEventId?: string;
+  lastTrustedHash?: string;
+  message?: string;
+  signedCount?: number;
+  unsignedCount?: number;
+  signatureValid?: boolean;
+  epochId?: string;
+  activeEpoch?: AuditChainActiveEpochSummary;
+  historicalCompromisedCount?: number;
+  compromisedEpochs?: AuditChainCompromisedEpochSummary[];
 }
 
 interface RiskBucket {
@@ -166,6 +252,12 @@ export class AuditService {
   constructor(
     @InjectModel(AuditEvent.name)
     private readonly auditEvent: Model<AuditEventDocument>,
+    @Optional()
+    @InjectModel(AuditChainEpoch.name)
+    private readonly auditChainEpoch?: Model<AuditChainEpochDocument>,
+    @Optional()
+    @InjectModel(AuditChainIncident.name)
+    private readonly auditChainIncident?: Model<AuditChainIncidentDocument>,
   ) {}
 
   async create(dto: CreateAuditEventDto) {
@@ -185,6 +277,7 @@ export class AuditService {
   private async appendEvent(dto: CreateAuditEventDto) {
     const eventId = dto.eventId ?? randomUUID();
     const eventTimestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
+    const epochId = await this.getActiveEpochId();
 
     // 2. Build canonical payload for deterministic hashing. The canonical
     // fields never change across retries, so compute them once.
@@ -216,7 +309,7 @@ export class AuditService {
     for (let attempt = 0; attempt < MAX_CHAIN_APPEND_ATTEMPTS; attempt += 1) {
       // 1. Get hash of the most recent event for chain linking
       const lastEvent = await this.auditEvent
-        .findOne({}, { hash: 1 })
+        .findOne(this.epochEventFilter(epochId), { hash: 1 })
         .sort({ timestamp: -1, _id: -1 })
         .lean();
 
@@ -234,6 +327,7 @@ export class AuditService {
       try {
         // 3. Insert the event
         const saved = await this.auditEvent.create({
+          epochId,
           eventId,
           timestamp: eventTimestamp,
           actorId: dto.actorId,
@@ -300,11 +394,69 @@ export class AuditService {
     }
   }
 
+  private async getActiveEpochId(): Promise<string> {
+    const activeEpoch = await this.getActiveEpochRecord();
+    return activeEpoch?.epochId ?? DEFAULT_EPOCH_ID;
+  }
+
+  private async getActiveEpochRecord(): Promise<any | null> {
+    if (!this.auditChainEpoch) return null;
+
+    const activeEpoch = await this.auditChainEpoch
+      .findOne({ status: 'ACTIVE' }, { _id: 0 })
+      .sort({ startedAt: -1, _id: -1 })
+      .lean();
+
+    if (activeEpoch?.epochId) return activeEpoch;
+
+    try {
+      const created = await this.auditChainEpoch.create({
+        epochId: DEFAULT_EPOCH_ID,
+        status: 'ACTIVE',
+        startedAt: new Date(),
+        genesisReason: 'INITIAL',
+        createdBy: 'system',
+        reason: 'Initial audit chain epoch',
+      });
+      return created.toObject();
+    } catch (error: unknown) {
+      if (!this.isDuplicateKey(error)) throw error;
+      const existing = await this.auditChainEpoch
+        .findOne({ status: 'ACTIVE' }, { _id: 0 })
+        .sort({ startedAt: -1, _id: -1 })
+        .lean();
+      return existing ?? null;
+    }
+  }
+
+  private epochEventFilter(epochId: string): Record<string, unknown> {
+    if (epochId !== DEFAULT_EPOCH_ID) {
+      return { epochId };
+    }
+
+    return {
+      $or: [{ epochId }, { epochId: { $exists: false } }],
+    };
+  }
+
+  private isDuplicateKey(error: unknown): boolean {
+    return (
+      !!error &&
+      typeof error === 'object' &&
+      (error as { code?: number }).code === 11000
+    );
+  }
+
   async query(dto: QueryAuditDto) {
     const filter: Record<string, any> = {};
 
     if (dto.actorId) filter.actorId = dto.actorId;
     if (dto.action) filter.action = dto.action;
+    if (dto.actionGroup) {
+      addAuditScope(filter, {
+        action: { $in: AUDIT_ACTION_GROUP_ACTIONS[dto.actionGroup] },
+      });
+    }
     if (dto.resourceType) filter.resourceType = dto.resourceType;
     if (dto.resourceId) filter.resourceId = dto.resourceId;
     if (dto.result) filter.result = dto.result;
@@ -319,8 +471,27 @@ export class AuditService {
       if (Object.keys(filter).length === 0) {
         Object.assign(filter, documentScope);
       } else {
-        filter.$and = [documentScope];
+        addAuditScope(filter, documentScope);
       }
+    }
+    if (dto.aclId) {
+      addAuditScope(filter, {
+        $or: [
+          { 'metadata.aclId': dto.aclId },
+          { 'metadata.removedAclId': dto.aclId },
+        ],
+      });
+    }
+    if (dto.recommendationId) {
+      addAuditScope(filter, {
+        $or: [
+          {
+            resourceType: 'SECURITY_RECOMMENDATION',
+            resourceId: dto.recommendationId,
+          },
+          { 'metadata.recommendationId': dto.recommendationId },
+        ],
+      });
     }
 
     if (dto.from || dto.to) {
@@ -998,7 +1169,7 @@ export class AuditService {
         evidence: signal.reasons,
         affectedDocumentIds: [],
         affectedActorIds: [signal.actorId],
-        auditFilters: { actorId: signal.actorId },
+        auditFilters: this.getBehaviorSignalAuditFilters(signal),
         workflow: { status: 'OPEN' },
       });
     }
@@ -1227,6 +1398,35 @@ export class AuditService {
     }
   }
 
+  private getBehaviorSignalAuditFilters(
+    signal: BehaviorSignalSummary,
+  ): SecurityRecommendationSummary['auditFilters'] {
+    const windowFilters = {
+      actorId: signal.actorId,
+      from: signal.windowStartedAt,
+      to: signal.windowEndedAt,
+    };
+
+    if (signal.type === 'MASS_CONTENT_ACCESS') {
+      return {
+        ...windowFilters,
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+      };
+    }
+
+    if (signal.type === 'DESTRUCTIVE_ACTIVITY') {
+      return {
+        ...windowFilters,
+        actionGroup: 'DESTRUCTIVE_ACTIVITY',
+      };
+    }
+
+    return {
+      ...windowFilters,
+      result: 'DENY',
+    };
+  }
+
   private plural(count: number, singular: string): string {
     return count === 1 ? singular : `${singular}s`;
   }
@@ -1345,25 +1545,154 @@ export class AuditService {
     return new Date(0);
   }
 
+  async sealCompromisedChainAndStartEpoch(
+    dto: { reason: string },
+    viewer?: SecuritySummaryViewer,
+  ): Promise<any> {
+    if (!this.auditChainEpoch || !this.auditChainIncident) {
+      throw new ServiceUnavailableException(
+        'Audit chain epoch storage is not configured.',
+      );
+    }
+
+    const activeEpoch = await this.getActiveEpochRecord();
+    const verification = await this.verifyChain(5000);
+
+    if (verification.valid) {
+      throw new BadRequestException(
+        'Audit chain is valid; no recovery epoch is needed.',
+      );
+    }
+
+    const now = new Date();
+    const previousEpochId =
+      verification.epochId ?? activeEpoch?.epochId ?? DEFAULT_EPOCH_ID;
+    const incidentId = `AUDIT-INC-${randomUUID()}`;
+    const actorId = viewer?.actorId ?? 'unknown';
+    const roles = viewer?.roles ?? [];
+
+    const incident = await this.auditChainIncident.create({
+      incidentId,
+      detectedAt: now,
+      detectedBy: actorId,
+      affectedEpochId: previousEpochId,
+      firstBrokenIndex: verification.firstBrokenIndex ?? 0,
+      firstBrokenEventId: verification.firstBrokenEventId,
+      lastTrustedHash: verification.lastTrustedHash,
+      verifyMessage:
+        verification.message ?? 'Audit chain verification failed.',
+      status: 'OPEN',
+      resolution: 'NEW_EPOCH_STARTED',
+      reason: dto.reason,
+    });
+
+    await this.auditChainEpoch.updateOne(
+      { epochId: previousEpochId },
+      {
+        $set: {
+          status: 'COMPROMISED',
+          endedAt: now,
+          firstBrokenIndex: verification.firstBrokenIndex ?? 0,
+          firstBrokenEventId: verification.firstBrokenEventId,
+          lastTrustedHash: verification.lastTrustedHash,
+          incidentId,
+          reason: dto.reason,
+        },
+      },
+    );
+
+    const previousEpoch = {
+      ...(activeEpoch ?? { epochId: previousEpochId }),
+      status: 'COMPROMISED',
+      endedAt: now,
+      firstBrokenIndex: verification.firstBrokenIndex ?? 0,
+      firstBrokenEventId: verification.firstBrokenEventId,
+      lastTrustedHash: verification.lastTrustedHash,
+      incidentId,
+      reason: dto.reason,
+    };
+
+    const newEpoch = await this.auditChainEpoch.create({
+      epochId: `epoch-${randomUUID()}`,
+      status: 'ACTIVE',
+      startedAt: now,
+      genesisReason: 'COMPROMISE_RECOVERY',
+      previousEpochId,
+      incidentId,
+      createdBy: actorId,
+      reason: dto.reason,
+    });
+    const newEpochObject = newEpoch.toObject();
+
+    const event = await this.create({
+      timestamp: now.toISOString(),
+      actorId,
+      actorRoles: roles,
+      action: 'AUDIT_CHAIN_EPOCH_STARTED',
+      resourceType: 'AUDIT_CHAIN_EPOCH',
+      resourceId: newEpochObject.epochId,
+      result: 'SUCCESS',
+      reason: dto.reason,
+      ip: viewer?.ip,
+      traceId: viewer?.traceId,
+      metadata: {
+        previousEpochId,
+        incidentId,
+        firstBrokenIndex: verification.firstBrokenIndex,
+        firstBrokenEventId: verification.firstBrokenEventId,
+        lastTrustedHash: verification.lastTrustedHash,
+      },
+    });
+
+    return {
+      incident: incident.toObject(),
+      previousEpoch,
+      newEpoch: newEpochObject,
+      event,
+    };
+  }
+
   /**
    * Verify the integrity of the hash chain from the first event up to `limit` events.
    * Returns { valid: true } if every hash links correctly; otherwise throws with details.
    */
-  async verifyChain(limit = 1000): Promise<{
-    valid: boolean;
-    checked: number;
-    firstBrokenIndex?: number;
-    message?: string;
-    signedCount?: number;
-    unsignedCount?: number;
-    signatureValid?: boolean;
-  }> {
+  async verifyChain(limit = 1000): Promise<AuditChainVerificationResult> {
+    const activeEpoch = await this.getActiveEpochRecord();
+    const epochId = activeEpoch?.epochId ?? DEFAULT_EPOCH_ID;
+    const filter = this.auditChainEpoch ? this.epochEventFilter(epochId) : {};
     const events = await this.auditEvent
-      .find({}, { _id: 0 })
+      .find(filter, { _id: 0 })
       .sort({ timestamp: 1, _id: 1 })
       .limit(limit)
       .lean();
 
+    const chain = this.verifyEventSequence(events);
+
+    if (!this.auditChainEpoch) {
+      return chain;
+    }
+
+    const compromisedEpochs = await this.getCompromisedEpochs();
+
+    return {
+      ...chain,
+      epochId,
+      activeEpoch: {
+        epochId,
+        status: activeEpoch?.status ?? 'ACTIVE',
+        valid: chain.valid,
+        checked: chain.checked,
+        startedAt: activeEpoch?.startedAt,
+        genesisReason: activeEpoch?.genesisReason,
+        previousEpochId: activeEpoch?.previousEpochId,
+        incidentId: activeEpoch?.incidentId,
+      },
+      historicalCompromisedCount: compromisedEpochs.length,
+      compromisedEpochs,
+    };
+  }
+
+  private verifyEventSequence(events: any[]): AuditChainVerificationResult {
     if (events.length === 0) {
       return { valid: true, checked: 0, signedCount: 0, unsignedCount: 0 };
     }
@@ -1401,6 +1730,8 @@ export class AuditService {
           valid: false,
           checked: i + 1,
           firstBrokenIndex: i,
+          firstBrokenEventId: event.eventId,
+          lastTrustedHash: i === 0 ? undefined : (events[i - 1] as any).hash,
           message: `Hash mismatch at event index ${i} (eventId=${event.eventId}). Expected=${expectedHash}, got=${event.hash}`,
         };
       }
@@ -1410,6 +1741,8 @@ export class AuditService {
           valid: false,
           checked: i + 1,
           firstBrokenIndex: i,
+          firstBrokenEventId: event.eventId,
+          lastTrustedHash: i === 0 ? undefined : (events[i - 1] as any).hash,
           message: `prevHash mismatch at event index ${i} (eventId=${event.eventId}). Expected=${i === 0 ? null : (events[i - 1] as any).hash}, got=${event.prevHash}`,
         };
       }
@@ -1425,6 +1758,8 @@ export class AuditService {
             valid: false,
             checked: i + 1,
             firstBrokenIndex: i,
+            firstBrokenEventId: event.eventId,
+            lastTrustedHash: i === 0 ? undefined : (events[i - 1] as any).hash,
             signatureValid: false,
             message: `Signature mismatch at event index ${i} (eventId=${event.eventId}).`,
           };
@@ -1443,5 +1778,29 @@ export class AuditService {
       unsignedCount,
       signatureValid: unsignedCount === 0 ? true : undefined,
     };
+  }
+
+  private async getCompromisedEpochs(): Promise<
+    AuditChainCompromisedEpochSummary[]
+  > {
+    if (!this.auditChainEpoch) return [];
+
+    const epochs = await this.auditChainEpoch
+      .find({ status: 'COMPROMISED' }, { _id: 0 })
+      .sort({ endedAt: -1, startedAt: -1 })
+      .limit(20)
+      .lean();
+
+    return (epochs as any[]).map((epoch) => ({
+      epochId: epoch.epochId,
+      status: 'COMPROMISED',
+      startedAt: epoch.startedAt,
+      endedAt: epoch.endedAt,
+      incidentId: epoch.incidentId,
+      firstBrokenIndex: epoch.firstBrokenIndex,
+      firstBrokenEventId: epoch.firstBrokenEventId,
+      lastTrustedHash: epoch.lastTrustedHash,
+      reason: epoch.reason,
+    }));
   }
 }

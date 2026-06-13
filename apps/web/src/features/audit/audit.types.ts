@@ -23,13 +23,20 @@ export interface AuditLogItemDto {
 
 export type AuditLogEntry = AuditLogItemDto;
 
+export type AuditActionGroup =
+  | 'AUTHORIZED_CONTENT_ACCESS'
+  | 'DESTRUCTIVE_ACTIVITY';
+
 export interface AuditQueryFilters extends PaginationParams {
   actorId?: string;
   action?: string;
+  actionGroup?: AuditActionGroup;
   result?: AuditResult;
   resourceId?: string;
   resourceType?: string;
   documentId?: string;
+  aclId?: string;
+  recommendationId?: string;
   from?: string;
   to?: string;
   limit?: number;
@@ -41,7 +48,49 @@ export interface AuditChainStatus {
   valid: boolean;
   checked: number;
   firstBrokenIndex?: number;
+  firstBrokenEventId?: string;
+  lastTrustedHash?: string;
   message?: string;
+  epochId?: string;
+  activeEpoch?: {
+    epochId: string;
+    status: string;
+    valid: boolean;
+    checked: number;
+    startedAt?: string;
+    genesisReason?: string;
+    previousEpochId?: string;
+    incidentId?: string;
+  };
+  historicalCompromisedCount?: number;
+  compromisedEpochs?: Array<{
+    epochId: string;
+    status: 'COMPROMISED';
+    startedAt?: string;
+    endedAt?: string;
+    incidentId?: string;
+    firstBrokenIndex?: number;
+    firstBrokenEventId?: string;
+    lastTrustedHash?: string;
+    reason?: string;
+  }>;
+}
+
+export interface SealAuditChainRequest {
+  reason: string;
+}
+
+export interface SealAuditChainResponse {
+  incident: Record<string, unknown>;
+  previousEpoch: Record<string, unknown>;
+  newEpoch: {
+    epochId: string;
+    status: string;
+    previousEpochId?: string;
+    genesisReason?: string;
+    incidentId?: string;
+  };
+  event: AuditLogItemDto;
 }
 
 export interface RiskyDocumentSummary {

@@ -25,6 +25,12 @@ import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
+import {
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -51,8 +57,15 @@ import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  filterSecurityRecommendationRows,
+  getSecurityRecommendationQueueCounts,
+  getSecurityRouteCounts,
+  SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  type SecurityAlertRoute,
+  type SecurityAlertRouting,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
+  type SecurityRecommendationQueueView,
   type SecurityRecommendationSlaState,
 } from '@/features/audit/security-dashboard';
 
@@ -99,6 +112,8 @@ function humanizeActorText(text: string, names: ActorNameMap): string {
 }
 
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
+const SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT = 5;
+const SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT = 4;
 const recommendationWorkflowOptions: Array<{
   value: SecurityRecommendationWorkflowStatus;
   label: string;
@@ -136,6 +151,9 @@ export default function SecurityPage() {
     useState<RecommendationHistoryState>({});
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [historyErrors, setHistoryErrors] = useState<RecommendationHistoryErrors>({});
+  const [recommendationQueueView, setRecommendationQueueView] =
+    useState<SecurityRecommendationQueueView>('active');
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -371,6 +389,10 @@ export default function SecurityPage() {
   }
 
   const auditChain = summaryQuery.data?.chain ?? { valid: false, checked: 0 };
+  const routeCounts = getSecurityRouteCounts(
+    model.alerts,
+    model.recommendations.items,
+  );
 
   return (
     <ActorNamesContext.Provider value={actorNameMap}>
@@ -401,7 +423,55 @@ export default function SecurityPage() {
         }
       />
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]">
+        <ScoreGauge
+          className="min-h-[180px]"
+          description={model.commandCenter.postureGauge.description}
+          href={model.commandCenter.postureGauge.href}
+          label={model.commandCenter.postureGauge.label}
+          tone={model.commandCenter.postureGauge.tone}
+          value={model.commandCenter.postureGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {model.metrics.map((metric) => {
+            const Icon = metricIcons[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                description={metric.description}
+                href={buildMetricAuditHref(metric.key)}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.value > 0 ? 'warning' : 'success'}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SegmentDonut
+          label="Alert distribution"
+          segments={model.commandCenter.alertSegments}
+        />
+        <PriorityBarList
+          label="Document risk bands"
+          segments={model.commandCenter.riskBandSegments}
+        />
+        <PriorityBarList
+          label="Behavior anomaly bands"
+          segments={model.commandCenter.anomalyBandSegments}
+        />
+        <PriorityBarList
+          label="Recommendation SLA"
+          segments={model.commandCenter.recommendationSlaSegments}
+        />
+      </section>
+
+      <AlertRoutingSummary counts={routeCounts} />
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <PosturePanel
           level={model.posture.level}
           label={model.posture.label}
@@ -411,34 +481,13 @@ export default function SecurityPage() {
           isVerifying={isVerifyingChain}
           verifyError={verifyChainError}
         />
-        <QuickFilters filters={model.quickFilters} />
-      </section>
-
-      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {model.metrics.map((metric) => {
-          const Icon = metricIcons[metric.key];
-          return (
-            <div
-              key={metric.key}
-              className="rounded-lg border p-4"
-              style={{
-                background: 'var(--bg-card)',
-                borderColor: 'var(--border-soft)',
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--text-muted)]">{metric.label}</p>
-                <Icon className="h-4 w-4 text-[var(--text-faint)]" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                {metric.value}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-[var(--text-faint)]">
-                {metric.description}
-              </p>
-            </div>
-          );
-        })}
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+          <PriorityBarList
+            label="Content access signals"
+            segments={model.commandCenter.accessSegments}
+          />
+          <QuickFilters filters={model.quickFilters} />
+        </div>
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -454,6 +503,15 @@ export default function SecurityPage() {
         <RecommendationsPanel
           recommendations={model.recommendations}
           auditChain={auditChain}
+          queueView={recommendationQueueView}
+          showAll={showAllRecommendations}
+          onQueueViewChange={(view) => {
+            setRecommendationQueueView(view);
+            setShowAllRecommendations(false);
+          }}
+          onToggleShowAll={() =>
+            setShowAllRecommendations((current) => !current)
+          }
           pendingRecommendationId={pendingRecommendationId}
           workflowError={workflowError}
           expandedHistoryIds={expandedHistoryIds}
@@ -484,9 +542,54 @@ export default function SecurityPage() {
   );
 }
 
+function AlertRoutingSummary({
+  counts,
+}: {
+  counts: Record<SecurityAlertRoute, number>;
+}) {
+  const routes: SecurityAlertRoute[] = ['CASE', 'REVIEW', 'SIGNAL'];
+
+  return (
+    <section className="mt-4 grid gap-3 md:grid-cols-3">
+      {routes.map((route) => {
+        const tone = getSecurityRouteTone(route);
+
+        return (
+          <div
+            key={route}
+            className={`rounded-lg border px-4 py-3 ${tone.container}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase text-[var(--text-faint)]">
+                {getSecurityRouteShortLabel(route)}
+              </p>
+              <SecurityRouteBadge
+                routing={{
+                  route,
+                  routeLabel: getSecurityRouteBadgeLabel(route),
+                }}
+              />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+              {counts[route]}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+              {getSecurityRouteDescription(route)}
+            </p>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function RecommendationsPanel({
   recommendations,
   auditChain,
+  queueView,
+  showAll,
+  onQueueViewChange,
+  onToggleShowAll,
   pendingRecommendationId,
   workflowError,
   expandedHistoryIds,
@@ -499,6 +602,10 @@ function RecommendationsPanel({
 }: {
   recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
   auditChain: AuditChainStatus;
+  queueView: SecurityRecommendationQueueView;
+  showAll: boolean;
+  onQueueViewChange: (view: SecurityRecommendationQueueView) => void;
+  onToggleShowAll: () => void;
   pendingRecommendationId: string | null;
   workflowError: { id: string; message: string } | null;
   expandedHistoryIds: string[];
@@ -514,11 +621,23 @@ function RecommendationsPanel({
     item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
   ) => Promise<void>;
 }) {
-  const items = recommendations.items;
+  const counts = getSecurityRecommendationQueueCounts(recommendations.items);
+  const filteredItems = filterSecurityRecommendationRows(
+    recommendations.items,
+    queueView,
+  );
+  const hiddenCount = Math.max(
+    0,
+    filteredItems.length - SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  );
+  const items = showAll
+    ? filteredItems
+    : filteredItems.slice(0, SECURITY_RECOMMENDATION_PREVIEW_LIMIT);
   const actorNames = useActorNames();
 
   return (
     <div
+      id="security-recommendations"
       className="rounded-lg border p-5"
       style={{
         background: 'var(--bg-card)',
@@ -530,12 +649,12 @@ function RecommendationsPanel({
           <div className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-[var(--text-faint)]" />
             <p className="text-sm font-semibold text-[var(--text-strong)]">
-              Security recommendations
+              Evidence-backed findings
             </p>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-            Deterministic actions from audit-chain, DLP, malware, risk scoring,
-            and behavior anomaly evidence.
+            Security warnings grouped by risk category with affected scope,
+            rationale, next action, and metadata-only evidence.
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
@@ -543,118 +662,205 @@ function RecommendationsPanel({
         </span>
       </div>
 
-      {items.length === 0 ? (
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex w-fit rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+          {(['active', 'resolved', 'all'] as SecurityRecommendationQueueView[]).map(
+            (view) => (
+              <button
+                key={view}
+                type="button"
+                aria-pressed={queueView === view}
+                onClick={() => onQueueViewChange(view)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  queueView === view
+                    ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                {getRecommendationQueueViewLabel(view)} {counts[view]}
+              </button>
+            ),
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">
+          Active hides resolved recommendations without deleting audit evidence.
+        </p>
+      </div>
+
+      {filteredItems.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--text-muted)]">
-          No recommendation is raised by the current security summary.
+          {queueView === 'active'
+            ? 'No active recommendations need review.'
+            : queueView === 'resolved'
+              ? 'No resolved recommendations are available.'
+              : 'No recommendation is raised by the current security summary.'}
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {items.map((item) => {
-            const tone = getRecommendationTone(item.severity);
-            return (
-              <div
-                key={item.id}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {item.severityLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {item.typeLabel}
-                      </span>
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {items.map((item) => {
+              const tone = getRecommendationTone(item.severity);
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {item.severityLabel}
+                        </span>
+                        <SecurityRouteBadge routing={item.finding.routing} />
+                        <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
+                          {item.finding.categoryLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {item.typeLabel}
+                        </span>
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                        {humanizeActorText(item.title, actorNames)}
+                      </h3>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.finding.summary}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                        {item.finding.routing.routeDescription}
+                      </p>
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
-                      {humanizeActorText(item.title, actorNames)}
-                    </h3>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.reason, actorNames)}
-                    </p>
+                    <Link
+                      href={buildRecommendationAuditHref(item.auditFilters)}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                    >
+                      Open audit
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
-                  <Link
-                    href={buildRecommendationAuditHref(item.auditFilters)}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Affected scope
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.finding.affectedScopeLabel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        {item.finding.evidenceQuestion}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {humanizeActorText(item.reason, actorNames)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Next action
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        <span className="font-medium text-[var(--text-main)]">
+                          {item.finding.nextStepLabel}
+                        </span>
+                        {': '}
+                        {humanizeActorText(item.recommendedAction, actorNames)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Evidence
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.evidence.join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+                      {item.affectedDocumentIds.map((docId) => (
+                        <span
+                          key={docId}
+                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                        >
+                          doc {truncateMiddle(docId, 18)}
+                        </span>
+                      ))}
+                      {item.affectedActorIds.map((actorId) => (
+                        <span
+                          key={actorId}
+                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                        >
+                          actor <ActorLabel id={actorId} length={18} />
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <RecommendationWorkflowControls
+                    key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
+                    item={item}
+                    isPending={pendingRecommendationId === item.id}
+                    isDisabled={pendingRecommendationId !== null}
+                    error={workflowError?.id === item.id ? workflowError.message : null}
+                    onSave={onSaveWorkflow}
+                  />
+
+                  <RecommendationPlaybook playbook={item.playbook} />
+
+                  <RecommendationHistoryControls
+                    item={item}
+                    auditChain={auditChain}
+                    isExpanded={expandedHistoryIds.includes(item.id)}
+                    isLoading={historyLoadingId === item.id}
+                    error={historyErrors[item.id] ?? null}
+                    history={workflowHistoryByRecommendationId[item.id] ?? []}
+                    onToggleHistory={onToggleHistory}
+                    onDownloadEvidence={onDownloadEvidence}
+                  />
                 </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Recommended action
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.recommendedAction, actorNames)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Evidence
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {item.evidence.join(' · ')}
-                    </p>
-                  </div>
-                </div>
-
-                {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-                    {item.affectedDocumentIds.map((docId) => (
-                      <span
-                        key={docId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        doc {truncateMiddle(docId, 18)}
-                      </span>
-                    ))}
-                    {item.affectedActorIds.map((actorId) => (
-                      <span
-                        key={actorId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        actor <ActorLabel id={actorId} length={18} />
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                <RecommendationWorkflowControls
-                  key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
-                  item={item}
-                  isPending={pendingRecommendationId === item.id}
-                  isDisabled={pendingRecommendationId !== null}
-                  error={workflowError?.id === item.id ? workflowError.message : null}
-                  onSave={onSaveWorkflow}
-                />
-
-                <RecommendationPlaybook playbook={item.playbook} />
-
-                <RecommendationHistoryControls
-                  item={item}
-                  auditChain={auditChain}
-                  isExpanded={expandedHistoryIds.includes(item.id)}
-                  isLoading={historyLoadingId === item.id}
-                  error={historyErrors[item.id] ?? null}
-                  history={workflowHistoryByRecommendationId[item.id] ?? []}
-                  onToggleHistory={onToggleHistory}
-                  onDownloadEvidence={onDownloadEvidence}
-                />
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {filteredItems.length > SECURITY_RECOMMENDATION_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={onToggleShowAll}
+            />
+          ) : null}
+        </>
       )}
+    </div>
+  );
+}
+
+function ShowMoreListToggle({
+  hiddenCount,
+  showAll,
+  onToggle,
+}: {
+  hiddenCount: number;
+  showAll: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mt-4 flex justify-center">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+      >
+        {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+      </button>
     </div>
   );
 }
@@ -1110,9 +1316,17 @@ function AlertsPanel({
                     : 'var(--status-pending-bg)',
               }}
             >
-              <p className="text-sm font-semibold text-[var(--text-strong)]">{alert.title}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecurityRouteBadge routing={alert.routing} />
+                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                  {alert.title}
+                </p>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
                 {alert.description}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                {alert.routing.routeDescription}
               </p>
               <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
                 {alert.action}
@@ -1134,7 +1348,15 @@ function AccessActivityPanel({
   isLoading: boolean;
   isError: boolean;
 }) {
-  const sensitiveEvents = activity.sensitiveAccessEvents.slice(0, 5);
+  const [showAll, setShowAll] = useState(false);
+  const sensitiveAccessEvents = activity.sensitiveAccessEvents;
+  const hiddenCount = Math.max(
+    0,
+    sensitiveAccessEvents.length - SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT,
+  );
+  const sensitiveEvents = showAll
+    ? sensitiveAccessEvents
+    : sensitiveAccessEvents.slice(0, SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT);
 
   return (
     <div
@@ -1179,34 +1401,43 @@ function AccessActivityPanel({
           Failed to load authorized access events.
         </p>
       ) : null}
-      {!isLoading && !isError && sensitiveEvents.length === 0 ? (
+      {!isLoading && !isError && sensitiveAccessEvents.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--text-muted)]">
           No recent sensitive preview or download grants returned by audit query.
         </p>
       ) : null}
-      {!isLoading && !isError && sensitiveEvents.length > 0 ? (
-        <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {sensitiveEvents.map((event) => (
-            <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                  {event.action}
+      {!isLoading && !isError && sensitiveAccessEvents.length > 0 ? (
+        <>
+          <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
+            {sensitiveEvents.map((event) => (
+              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                    {event.action}
+                  </p>
+                  <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
+                    {getClassificationLabel(event)}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                 </p>
-                <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
-                  {getClassificationLabel(event)}
-                </span>
+                <p className="mt-1 text-xs text-[var(--text-faint)]">
+                  {event.resourceId
+                    ? `Document ${truncateMiddle(event.resourceId, 20)}`
+                    : event.resourceType}
+                </p>
               </div>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-faint)]">
-                {event.resourceId
-                  ? `Document ${truncateMiddle(event.resourceId, 20)}`
-                  : event.resourceType}
-              </p>
-            </div>
-          ))}
-        </div>
+            ))}
+          </div>
+          {sensitiveAccessEvents.length > SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );
@@ -1268,6 +1499,15 @@ function RepeatedActorsPanel({
 }: {
   actors: ReturnType<typeof buildSecurityDashboardModel>['repeatedDenyActors'];
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const hiddenCount = Math.max(
+    0,
+    actors.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleActors = showAll
+    ? actors
+    : actors.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
+
   return (
     <div
       className="rounded-lg border p-5"
@@ -1282,21 +1522,30 @@ function RepeatedActorsPanel({
           No actor crossed the repeated-deny threshold.
         </p>
       ) : (
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {actors.map((actor) => (
-            <div
-              key={actor.actorId}
-              className="rounded-lg border border-[var(--border-soft)] p-3"
-            >
-              <p className="text-xs font-medium text-[var(--text-main)]">
-                <ActorLabel id={actor.actorId} length={22} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {actor.denyCount} denied request{actor.denyCount === 1 ? '' : 's'} · {actor.riskLabel}
-              </p>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {visibleActors.map((actor) => (
+              <div
+                key={actor.actorId}
+                className="rounded-lg border border-[var(--border-soft)] p-3"
+              >
+                <p className="text-xs font-medium text-[var(--text-main)]">
+                  <ActorLabel id={actor.actorId} length={22} />
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {actor.denyCount} denied request{actor.denyCount === 1 ? '' : 's'} · {actor.riskLabel}
+                </p>
+              </div>
+            ))}
+          </div>
+          {actors.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1307,7 +1556,15 @@ function RiskScoringPanel({
 }: {
   riskScoring: ReturnType<typeof buildSecurityDashboardModel>['riskScoring'];
 }) {
+  const [showAll, setShowAll] = useState(false);
   const documents = riskScoring.riskyDocuments;
+  const hiddenCount = Math.max(
+    0,
+    documents.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleDocuments = showAll
+    ? documents
+    : documents.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
 
   return (
     <div
@@ -1337,71 +1594,80 @@ function RiskScoringPanel({
           No elevated document access risk returned by the audit summary.
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {documents.map((document) => {
-            const tone = getRiskTone(document.riskBand);
-            return (
-              <div
-                key={document.documentId}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {document.riskLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {document.classification}
-                      </span>
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {visibleDocuments.map((document) => {
+              const tone = getRiskTone(document.riskBand);
+              return (
+                <div
+                  key={document.documentId}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {document.riskLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {document.classification}
+                        </span>
+                      </div>
+                      <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
+                        {truncateMiddle(document.documentId, 34)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {document.accessCount} access grant{document.accessCount === 1 ? '' : 's'} ·{' '}
+                        {document.actorCount} actor{document.actorCount === 1 ? '' : 's'} · latest{' '}
+                        {formatDateTime(document.latestAccessAt)}
+                      </p>
                     </div>
-                    <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
-                      {truncateMiddle(document.documentId, 34)}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {document.accessCount} access grant{document.accessCount === 1 ? '' : 's'} ·{' '}
-                      {document.actorCount} actor{document.actorCount === 1 ? '' : 's'} · latest{' '}
-                      {formatDateTime(document.latestAccessAt)}
-                    </p>
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                        {document.riskScore}
+                      </p>
+                      <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                        risk score
+                      </p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
-                      {document.riskScore}
-                    </p>
-                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
-                      risk score
-                    </p>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Reasons
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {document.reasons.join(' · ')}
-                    </p>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Reasons
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {document.reasons.join(' · ')}
+                      </p>
+                    </div>
+                    <Link
+                      href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                    >
+                      Open audit
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
-                  <Link
-                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {documents.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1412,7 +1678,15 @@ function BehaviorAnomaliesPanel({
 }: {
   behaviorAnomalies: ReturnType<typeof buildSecurityDashboardModel>['behaviorAnomalies'];
 }) {
+  const [showAll, setShowAll] = useState(false);
   const signals = behaviorAnomalies.signals;
+  const hiddenCount = Math.max(
+    0,
+    signals.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleSignals = showAll
+    ? signals
+    : signals.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
 
   return (
     <div
@@ -1442,71 +1716,80 @@ function BehaviorAnomaliesPanel({
           No actor crossed the behavior anomaly thresholds.
         </p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {signals.map((signal) => {
-            const tone = getRiskTone(signal.riskBand);
-            return (
-              <div
-                key={signal.signalId}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {signal.riskLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {signal.typeLabel}
-                      </span>
+        <>
+          <div className="mt-4 space-y-3">
+            {visibleSignals.map((signal) => {
+              const tone = getRiskTone(signal.riskBand);
+              return (
+                <div
+                  key={signal.signalId}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {signal.riskLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {signal.typeLabel}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-[var(--text-strong)]">
+                        <ActorLabel id={signal.actorId} length={34} />
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}
+                        {signal.documentCount} document{signal.documentCount === 1 ? '' : 's'} ·{' '}
+                        {formatDateTime(signal.windowStartedAt)} - {formatDateTime(signal.windowEndedAt)}
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm font-medium text-[var(--text-strong)]">
-                      <ActorLabel id={signal.actorId} length={34} />
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}
-                      {signal.documentCount} document{signal.documentCount === 1 ? '' : 's'} ·{' '}
-                      {formatDateTime(signal.windowStartedAt)} - {formatDateTime(signal.windowEndedAt)}
-                    </p>
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                        {signal.riskScore}
+                      </p>
+                      <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                        anomaly score
+                      </p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
-                      {signal.riskScore}
-                    </p>
-                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
-                      anomaly score
-                    </p>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Reasons
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {signal.reasons.join(' · ')}
-                    </p>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Reasons
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {signal.reasons.join(' · ')}
+                      </p>
+                    </div>
+                    <Link
+                      href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                    >
+                      Open audit
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
-                  <Link
-                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {signals.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1577,6 +1860,75 @@ function getRecommendationTone(severity: 'critical' | 'warning' | 'info') {
   };
 }
 
+function SecurityRouteBadge({
+  routing,
+}: {
+  routing: Pick<SecurityAlertRouting, 'route' | 'routeLabel'>;
+}) {
+  const tone = getSecurityRouteTone(routing.route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {routing.routeLabel}
+    </span>
+  );
+}
+
+function getSecurityRouteTone(route: SecurityAlertRoute): {
+  badge: string;
+  container: string;
+} {
+  switch (route) {
+    case 'CASE':
+      return {
+        badge:
+          'border border-[var(--state-error-border)] bg-[var(--state-error-bg)] text-[var(--state-error-text)]',
+        container:
+          'border-[var(--state-error-border)] bg-[var(--state-error-bg)]',
+      };
+    case 'REVIEW':
+      return {
+        badge:
+          'border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
+        container:
+          'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)]',
+      };
+    case 'SIGNAL':
+      return {
+        badge:
+          'border border-[var(--state-info-border)] bg-[var(--state-info-bg)] text-[var(--state-info-text)]',
+        container:
+          'border-[var(--state-info-border)] bg-[var(--state-info-bg)]',
+      };
+  }
+}
+
+function getSecurityRouteBadgeLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Case workflow required';
+  if (route === 'REVIEW') return 'Lightweight review';
+  return 'Monitor signal';
+}
+
+function getSecurityRouteShortLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Cases';
+  if (route === 'REVIEW') return 'Reviews';
+  return 'Signals';
+}
+
+function getSecurityRouteDescription(route: SecurityAlertRoute): string {
+  if (route === 'CASE') {
+    return 'Needs owner, SLA, investigation, remediation or accepted risk, verification, and evidence.';
+  }
+
+  if (route === 'REVIEW') {
+    return 'Needs human review, but full case workflow would be too heavy.';
+  }
+
+  return 'Track as a trend or monitoring signal without workflow overhead.';
+}
+
 function getRecommendationWorkflowLabel(
   status: SecurityRecommendationWorkflowStatus,
 ): string {
@@ -1589,6 +1941,19 @@ function getRecommendationWorkflowLabel(
       return 'Reviewed';
     case 'RESOLVED':
       return 'Resolved';
+  }
+}
+
+function getRecommendationQueueViewLabel(
+  view: SecurityRecommendationQueueView,
+): string {
+  switch (view) {
+    case 'active':
+      return 'Active';
+    case 'resolved':
+      return 'Resolved';
+    case 'all':
+      return 'All';
   }
 }
 
@@ -1627,4 +1992,17 @@ function buildRecommendationAuditHref(
 ): string {
   const query = buildAuditFilterQuery(filters);
   return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
+}
+
+function buildMetricAuditHref(key: SecurityDashboardMetric['key']): string {
+  switch (key) {
+    case 'deniedEvents':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ result: 'DENY' })}`;
+    case 'downloadDenied':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`;
+    case 'malwareBlocked':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`;
+    case 'dlpDetections':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`;
+  }
 }
