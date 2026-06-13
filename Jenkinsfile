@@ -1,4 +1,4 @@
-@Library('docvault@main') _
+@Library('docvault@feat/devsecops-main-intergation') _
 
 def cfg = [:]
 def builtServicesCsv = ''
