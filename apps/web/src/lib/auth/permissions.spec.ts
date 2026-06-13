@@ -4,6 +4,7 @@ import type { ClassificationLevel, DocumentStatus, UserRole } from '@/types/enum
 import {
   canDownloadDocument,
   canPreviewDocument,
+  getAnalyticsVisibility,
   canViewDocumentDetail,
   getDocumentAccessDecision,
   getExplainableDocumentAccessDecision,
@@ -249,5 +250,37 @@ describe('document access decisions', () => {
         }),
       ),
     ).toBe(false);
+  });
+});
+
+describe('analytics visibility decisions', () => {
+  it('keeps sensitive aggregate analytics behind compliance or admin roles', () => {
+    expect(getAnalyticsVisibility(session(['viewer']))).toEqual({
+      canViewApprovalAggregates: false,
+      canViewRetentionAggregates: false,
+      canViewSecurityAggregates: false,
+      canViewSensitiveDocumentAggregates: false,
+    });
+
+    expect(getAnalyticsVisibility(session(['approver']))).toEqual({
+      canViewApprovalAggregates: true,
+      canViewRetentionAggregates: false,
+      canViewSecurityAggregates: false,
+      canViewSensitiveDocumentAggregates: false,
+    });
+
+    expect(getAnalyticsVisibility(session(['compliance_officer']))).toEqual({
+      canViewApprovalAggregates: false,
+      canViewRetentionAggregates: true,
+      canViewSecurityAggregates: true,
+      canViewSensitiveDocumentAggregates: true,
+    });
+
+    expect(getAnalyticsVisibility(session(['admin']))).toEqual({
+      canViewApprovalAggregates: true,
+      canViewRetentionAggregates: true,
+      canViewSecurityAggregates: true,
+      canViewSensitiveDocumentAggregates: true,
+    });
   });
 });

@@ -1,9 +1,31 @@
 import { describe, expect, it } from 'vitest';
 import { buildDocumentSavedViewOptions } from './document-saved-views';
-import { buildDocumentCommandCenter } from './document-command-center';
+import {
+  buildDocumentCommandCenter,
+  filterDocumentQuickViewsByAnalyticsVisibility,
+  filterDocumentSavedViewsByAnalyticsVisibility,
+  filterDocumentSearchSuggestionsByAnalyticsVisibility,
+} from './document-command-center';
+import {
+  buildDocumentQuickViewOptions,
+  buildDocumentSearchSuggestions,
+} from './document-filter-model';
 import type { DocumentListItem } from './documents.types';
+import type { AnalyticsVisibility } from '@/lib/auth/permissions';
 
 const now = new Date('2026-06-13T09:00:00.000Z');
+const elevatedAnalytics: AnalyticsVisibility = {
+  canViewApprovalAggregates: true,
+  canViewRetentionAggregates: true,
+  canViewSecurityAggregates: true,
+  canViewSensitiveDocumentAggregates: true,
+};
+const approverAnalytics: AnalyticsVisibility = {
+  canViewApprovalAggregates: true,
+  canViewRetentionAggregates: false,
+  canViewSecurityAggregates: false,
+  canViewSensitiveDocumentAggregates: false,
+};
 
 const documents: DocumentListItem[] = [
   {
@@ -68,7 +90,10 @@ const documents: DocumentListItem[] = [
 describe('buildDocumentCommandCenter', () => {
   it('builds document control summaries from lifecycle, classification, saved views, and attention cues', () => {
     const savedViews = buildDocumentSavedViewOptions(documents);
-    const model = buildDocumentCommandCenter(documents, savedViews, { now });
+    const model = buildDocumentCommandCenter(documents, savedViews, {
+      now,
+      analyticsVisibility: elevatedAnalytics,
+    });
 
     expect(model.controlGauge).toEqual({
       label: 'Control queue clear',
@@ -179,7 +204,10 @@ describe('buildDocumentCommandCenter', () => {
   });
 
   it('returns stable empty summaries when there are no documents', () => {
-    const model = buildDocumentCommandCenter([], [], { now });
+    const model = buildDocumentCommandCenter([], [], {
+      now,
+      analyticsVisibility: elevatedAnalytics,
+    });
 
     expect(model.controlGauge).toEqual({
       label: 'Control queue clear',
@@ -193,5 +221,58 @@ describe('buildDocumentCommandCenter', () => {
     expect(model.classificationSegments.every((segment) => segment.percentage === 0)).toBe(true);
     expect(model.attentionSegments.every((segment) => segment.percentage === 0)).toBe(true);
     expect(model.savedViewSegments).toEqual([]);
+  });
+
+  it('keeps sensitive document aggregates hidden from approvers while preserving approval summaries', () => {
+    const savedViews = buildDocumentSavedViewOptions(documents);
+    const model = buildDocumentCommandCenter(documents, savedViews, {
+      now,
+      analyticsVisibility: approverAnalytics,
+    });
+
+    expect(model.metrics.map((metric) => metric.key)).toEqual([
+      'total-documents',
+      'pending-review',
+    ]);
+    expect(model.classificationSegments).toEqual([]);
+    expect(model.attentionSegments.map((segment) => segment.key)).toEqual([
+      'pending-review',
+      'draft-handoff',
+    ]);
+    expect(model.savedViewSegments.map((segment) => segment.key)).not.toContain(
+      'saved-sensitive-attention',
+    );
+    expect(model.savedViewSegments.map((segment) => segment.key)).not.toContain(
+      'saved-confidential-library',
+    );
+    expect(model.savedViewSegments.map((segment) => segment.key)).toContain(
+      'saved-pending-review',
+    );
+  });
+
+  it('filters sensitive document filter controls with the same analytics visibility policy', () => {
+    const quickViews = filterDocumentQuickViewsByAnalyticsVisibility(
+      buildDocumentQuickViewOptions(documents),
+      approverAnalytics,
+    );
+    const savedViews = filterDocumentSavedViewsByAnalyticsVisibility(
+      buildDocumentSavedViewOptions(documents),
+      approverAnalytics,
+    );
+    const suggestions = filterDocumentSearchSuggestionsByAnalyticsVisibility(
+      buildDocumentSearchSuggestions(documents),
+      approverAnalytics,
+    );
+
+    expect(quickViews.map((view) => view.value)).toContain('pending-review');
+    expect(quickViews.map((view) => view.value)).not.toContain('sensitive');
+    expect(savedViews.map((view) => view.id)).toContain('saved-pending-review');
+    expect(savedViews.map((view) => view.id)).not.toContain('saved-sensitive-attention');
+    expect(savedViews.map((view) => view.id)).not.toContain('saved-confidential-library');
+    expect(suggestions.map((suggestion) => suggestion.token)).toContain('status:pending');
+    expect(suggestions.map((suggestion) => suggestion.token)).not.toContain('class:confidential');
+    expect(suggestions.map((suggestion) => suggestion.token)).not.toContain('dlp:detected');
+    expect(suggestions.map((suggestion) => suggestion.token)).not.toContain('retention:due-soon');
+    expect(suggestions.map((suggestion) => suggestion.token)).not.toContain('has:legal-hold');
   });
 });

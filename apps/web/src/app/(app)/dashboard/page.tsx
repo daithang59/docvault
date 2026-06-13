@@ -4,16 +4,17 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDocuments } from '@/lib/hooks/use-documents';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getAnalyticsVisibility } from '@/lib/auth/permissions';
 import { PageHeader } from '@/components/common/page-header';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { ProtectedAction } from '@/components/common/protected-action';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
-  SegmentDonut,
 } from '@/components/analytics/analytics-primitives';
 import { fetchUnreadCount } from '@/features/notifications/notifications.api';
 import {
@@ -30,7 +31,6 @@ import {
   FilePlus,
   CheckSquare,
   Shield,
-  ShieldAlert,
   ArrowRight,
   type LucideIcon,
 } from 'lucide-react';
@@ -52,22 +52,25 @@ export default function DashboardPage() {
     retry: false,
   });
   const unreadCount = unreadQuery.data?.count ?? 0;
+  const analyticsVisibility = useMemo(
+    () => getAnalyticsVisibility(session),
+    [session],
+  );
 
   const dashboard = useMemo(
     () =>
       buildDashboardModel(documents ?? [], {
         unreadNotifications: unreadCount,
+        analyticsVisibility,
         actor: userId && userRoles
           ? { id: userId, roles: userRoles }
           : undefined,
       }),
-    [documents, unreadCount, userId, userRoles],
+    [analyticsVisibility, documents, unreadCount, userId, userRoles],
   );
 
   if (isLoading) return <LoadingState label="Loading dashboard..." />;
   if (isError) return <ErrorState message="Failed to load dashboard data." onRetry={refetch} />;
-
-  const riskSpotlight = dashboard.commandCenter.riskSpotlight;
 
   return (
     <div>
@@ -104,25 +107,16 @@ export default function DashboardPage() {
         </div>
       </section>
 
-      <section className="mb-5 grid gap-4 lg:grid-cols-[1fr_1fr_0.85fr]">
-        <SegmentDonut
+      <section className="mb-5 grid gap-4 lg:grid-cols-2">
+        <ColumnBarChart
           className="animate-in delay-2"
-          label="Lifecycle distribution"
+          label="Lifecycle pipeline"
           segments={dashboard.commandCenter.lifecycleSegments}
         />
         <PriorityBarList
           className="animate-in delay-3"
           label="Attention by priority"
           segments={dashboard.commandCenter.attentionSegments}
-        />
-        <MetricTile
-          className="animate-in delay-3"
-          description={riskSpotlight.description}
-          href={riskSpotlight.href}
-          icon={<ShieldAlert className="h-5 w-5" />}
-          label={riskSpotlight.label}
-          tone={riskSpotlight.tone}
-          value={riskSpotlight.value}
         />
       </section>
 
@@ -366,7 +360,10 @@ function QuickAction({ href, icon: Icon, label, description, badge }: {
 
 const WIDGET_ICONS: Record<DashboardOperationalWidget['key'], LucideIcon> = {
   'pending-approvals': CheckSquare,
-  'dlp-detected': ShieldAlert,
+  'total-documents': FileText,
+  'published-documents': FileText,
+  'draft-handoff': FileText,
+  'dlp-detected': Shield,
   'retention-due-soon': Archive,
   'unread-notifications': Bell,
 };
@@ -375,7 +372,7 @@ const DEMO_SIGNAL_ICONS: Record<DashboardDemoReadinessSignal['key'], LucideIcon>
   'lifecycle-coverage': FileText,
   'approval-workflow': CheckSquare,
   'evidence-export': Archive,
-  'security-posture': ShieldAlert,
+  'security-posture': Shield,
 };
 
 function DemoReadinessSignalCard({

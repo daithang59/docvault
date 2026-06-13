@@ -38,6 +38,7 @@
 - Principle 2: tables remain the main working surface for investigation-heavy screens
 - Principle 3: inspiration from polished SaaS dashboards is acceptable only when translated into DocVault-native compliance workflows
 - Principle 4: security-sensitive claims must be backed by metadata, status, or explicit empty/error states
+- Principle 5: aggregate charts are role-aware; sensitive, DLP, retention, legal-hold, and security-posture counts are shown only to roles authorized for those domains
 - Tradeoffs: sparse charts are preferred over visual density; reusable local primitives are preferred before adding chart dependencies
 
 ## Visual language
@@ -49,12 +50,13 @@
 - Motion: subtle page/card transitions; respect reduced motion
 - Imagery/iconography: Lucide icons for app actions and states; no decorative stock imagery in core app surfaces
 - Dashboard composition: borrow the reference pattern of a clear command header, one dominant visual score, small adjacent metrics, and compact chart modules; avoid recreating the reference's illustration-led marketing feel.
+- Chart mix: combine gauges, metric tiles, donuts, vertical bars, and horizontal progress bars by data shape and permission boundary; avoid repeating the same chart style across every adjacent module.
 
 ## Components
 
 - Existing components to reuse: `PageHeader`, `StatusBadge`, `ClassificationBadge`, `EmptyState`, `LoadingState`, `ErrorState`, app shell/sidebar/topbar, data table components
 - New/changed components: lightweight analytics primitives for score gauges, segmented donuts, priority bars, mini trends, and metric tiles
-- Variants and states: loading, empty, error, success, warning, critical, disabled, role-gated
+- Variants and states: loading, empty, error, success, warning, critical, disabled, role-gated; role-gated charts should be omitted or replaced with safe lifecycle/workflow summaries rather than showing masked sensitive counts
 - Token/component ownership: use CSS variables in `apps/web/src/app/globals.css`; keep domain derivation in feature models before rendering
 
 ## Accessibility

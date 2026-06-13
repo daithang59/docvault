@@ -34,6 +34,12 @@ interface PriorityBarListProps {
   className?: string;
 }
 
+interface ColumnBarChartProps {
+  label: string;
+  segments: AnalyticsSegment[];
+  className?: string;
+}
+
 interface MetricTileProps {
   label: string;
   value: number | string;
@@ -170,6 +176,41 @@ export function PriorityBarList({ label, segments, className }: PriorityBarListP
   );
 }
 
+export function ColumnBarChart({ label, segments, className }: ColumnBarChartProps) {
+  const summary = segments.map((segment) => `${segment.label} ${segment.value}`).join(', ');
+  const total = segments.reduce((sum, segment) => sum + segment.value, 0);
+
+  return (
+    <div
+      className={cn(
+        'rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] p-4',
+        className,
+      )}
+    >
+      <div className="flex items-start justify-between gap-4">
+        <div>
+          <p className="text-sm font-semibold text-[var(--text-strong)]">{label}</p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {total} total signals
+          </p>
+        </div>
+      </div>
+
+      <span className="sr-only" role="img" aria-label={`${label}: ${summary}`} />
+      <div
+        className="mt-4 grid min-h-[156px] items-end gap-3"
+        style={{
+          gridTemplateColumns: `repeat(${Math.max(segments.length, 1)}, minmax(0, 1fr))`,
+        }}
+      >
+        {segments.map((segment) => (
+          <ColumnBarItem key={segment.key} segment={segment} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function MetricTile({
   label,
   value,
@@ -227,6 +268,48 @@ export function MetricTile({
       {content}
     </div>
   );
+}
+
+function ColumnBarItem({ segment }: { segment: AnalyticsSegment }) {
+  const clampedPercentage = clampPercentage(segment.percentage);
+  const height = segment.value > 0 ? Math.max(clampedPercentage, 8) : 2;
+  const content = (
+    <>
+      <div className="flex h-28 items-end">
+        <div
+          className="w-full rounded-t-md"
+          style={{
+            height: `${height}%`,
+            background: toneColor(segment.tone),
+          }}
+        />
+      </div>
+      <div className="mt-2 text-center">
+        <p className="text-xs font-semibold text-[var(--text-strong)]">
+          {segment.value}
+        </p>
+        <p className="mt-0.5 truncate text-[11px] text-[var(--text-muted)]">
+          {segment.label}
+        </p>
+        <p className="mt-0.5 text-[10px] text-[var(--text-faint)]">
+          {clampedPercentage}%
+        </p>
+      </div>
+    </>
+  );
+
+  if (segment.href) {
+    return (
+      <Link
+        className="block rounded-md p-1 transition hover:bg-[var(--bg-card-hover)]"
+        href={segment.href}
+      >
+        {content}
+      </Link>
+    );
+  }
+
+  return <div className="rounded-md p-1">{content}</div>;
 }
 
 function SegmentBarItem({ segment }: { segment: AnalyticsSegment }) {

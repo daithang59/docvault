@@ -2,6 +2,8 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
+import { useAuth } from '@/lib/auth/auth-context';
+import { getAnalyticsVisibility } from '@/lib/auth/permissions';
 import { deleteDocument } from '@/lib/api/workflow';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { submitDocument, approveDocument, archiveDocument } from '@/lib/api/workflow';
@@ -46,6 +48,9 @@ import {
 } from '@/features/documents/document-saved-views.api';
 import {
   buildDocumentCommandCenter,
+  filterDocumentQuickViewsByAnalyticsVisibility,
+  filterDocumentSavedViewsByAnalyticsVisibility,
+  filterDocumentSearchSuggestionsByAnalyticsVisibility,
   type DocumentCommandMetric,
 } from '@/features/documents/document-command-center';
 import { EmptyState } from '@/components/common/empty-state';
@@ -74,6 +79,7 @@ import {
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
+  const { session } = useAuth();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
 
   const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
@@ -151,13 +157,36 @@ export default function DocumentsPage() {
       persistedSavedViewsQuery.isError,
     ],
   );
+  const analyticsVisibility = useMemo(
+    () => getAnalyticsVisibility(session),
+    [session],
+  );
+  const visibleQuickViews = useMemo(
+    () => filterDocumentQuickViewsByAnalyticsVisibility(quickViews, analyticsVisibility),
+    [analyticsVisibility, quickViews],
+  );
+  const visibleSavedViews = useMemo(
+    () => filterDocumentSavedViewsByAnalyticsVisibility(savedViews, analyticsVisibility),
+    [analyticsVisibility, savedViews],
+  );
+  const visibleSearchSuggestions = useMemo(
+    () =>
+      filterDocumentSearchSuggestionsByAnalyticsVisibility(
+        searchSuggestions,
+        analyticsVisibility,
+      ),
+    [analyticsVisibility, searchSuggestions],
+  );
   const commandCenter = useMemo(
-    () => buildDocumentCommandCenter(documents, savedViews),
-    [documents, savedViews],
+    () =>
+      buildDocumentCommandCenter(documents, visibleSavedViews, {
+        analyticsVisibility,
+      }),
+    [analyticsVisibility, documents, visibleSavedViews],
   );
   const activeSavedViewId = useMemo(
-    () => findMatchingDocumentSavedViewId(savedViews, filters),
-    [savedViews, filters],
+    () => findMatchingDocumentSavedViewId(visibleSavedViews, filters),
+    [visibleSavedViews, filters],
   );
   const filtered = useMemo(
     () => filterAndSortDocuments(documents, filters),
@@ -383,11 +412,13 @@ export default function DocumentsPage() {
       </section>
 
       <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
-        <SegmentDonut
-          className="animate-in delay-2"
-          label="Classification mix"
-          segments={commandCenter.classificationSegments}
-        />
+        {commandCenter.classificationSegments.length > 0 ? (
+          <SegmentDonut
+            className="animate-in delay-2"
+            label="Classification mix"
+            segments={commandCenter.classificationSegments}
+          />
+        ) : null}
         <PriorityBarList
           className="animate-in delay-3"
           label="Lifecycle pipeline"
@@ -398,20 +429,22 @@ export default function DocumentsPage() {
           label="Attention cues"
           segments={commandCenter.attentionSegments}
         />
-        <PriorityBarList
-          className="animate-in delay-3"
-          label="Saved view load"
-          segments={commandCenter.savedViewSegments}
-        />
+        {commandCenter.savedViewSegments.length > 0 ? (
+          <PriorityBarList
+            className="animate-in delay-3"
+            label="Saved view load"
+            segments={commandCenter.savedViewSegments}
+          />
+        ) : null}
       </section>
 
       <div className="animate-in delay-2">
         <DocumentFilters
           filters={filters}
           options={filterOptions}
-          quickViews={quickViews}
-          searchSuggestions={searchSuggestions}
-          savedViews={savedViews}
+          quickViews={visibleQuickViews}
+          searchSuggestions={visibleSearchSuggestions}
+          savedViews={visibleSavedViews}
           activeSavedViewId={activeSavedViewId}
           resultCount={filtered.length}
           totalCount={documents.length}

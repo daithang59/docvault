@@ -2,6 +2,7 @@ import React from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import {
+  ColumnBarChart,
   PriorityBarList,
   ScoreGauge,
   SegmentDonut,
@@ -71,6 +72,22 @@ describe('analytics primitives', () => {
     expect(markup).toContain('2');
     expect(markup).toContain('67%');
     expect(markup).toContain('Warning');
+    expect(markup).toContain('33%');
+  });
+
+  it('renders an accessible column bar chart for compact dashboard distributions', () => {
+    const markup = renderToStaticMarkup(
+      React.createElement(ColumnBarChart, {
+        label: 'Lifecycle pipeline',
+        segments,
+      }),
+    );
+
+    expect(markup).toContain('Lifecycle pipeline');
+    expect(markup).toContain('role="img"');
+    expect(markup).toContain('Critical 2');
+    expect(markup).toContain('Warning 1');
+    expect(markup).toContain('67%');
     expect(markup).toContain('33%');
   });
 });

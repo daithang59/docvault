@@ -790,21 +790,26 @@ test('documents page supports built-in and custom saved views', async ({ page },
 
 test('dashboard shows business demo readiness without horizontal overflow', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/dashboard');
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await expect(page.getByText('Business Demo Readiness')).toBeVisible();
+  await expect(page.getByText('Lifecycle pipeline')).toBeVisible();
+  await expect(page.getByText('Attention by priority')).toBeVisible();
+  await expect(page.getByText('DLP triage')).not.toBeVisible();
+  await expect(page.getByText('Demo story coverage')).toBeVisible();
   await expect(page.getByText('Demo ready')).toBeVisible();
   await expect(page.getByText('Lifecycle coverage')).toBeVisible();
   await expect(page.getByText('Approval workflow')).toBeVisible();
   await expect(page.getByText('Evidence export')).toBeVisible();
   await expect(page.getByText('Security posture')).toBeVisible();
 
+  await screenshot(page, testInfo.file, 'dashboard-command-center-playwright.png');
+
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/dashboard');
   const readinessPanel = page.getByTestId('business-demo-readiness');
-  await expect(readinessPanel.getByText('Business Demo Readiness')).toBeVisible();
+  await expect(readinessPanel.getByText('Demo story coverage')).toBeVisible();
   const readinessBox = await readinessPanel.boundingBox();
   expect(readinessBox).not.toBeNull();
   if (!readinessBox) throw new Error('Business Demo Readiness panel was not measurable.');
