@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
 import { deleteDocument } from '@/lib/api/workflow';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
@@ -13,7 +14,6 @@ import { DocumentFilters } from '@/components/documents/document-filters';
 import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
 import { DocumentPreviewPanel } from '@/components/documents/document-preview-panel';
 import {
-  DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
   buildDocumentSearchSuggestions,
@@ -58,12 +58,16 @@ import { scheduleDeferredAction } from '@/features/documents/deferred-action';
 export default function DocumentsPage() {
   const qc = useQueryClient();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
+  const searchParams = useSearchParams();
 
-  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
+  const [filters, setFilters] = useState<DocumentFiltersState>(() =>
+    parseDocumentFiltersFromSearchParams(
+      new URLSearchParams(searchParams.toString()),
+    ),
+  );
   const [localSavedViews, setLocalSavedViews] = useState<DocumentSavedView[]>(
     () => loadCustomDocumentSavedViews(),
   );
-  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
   const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
@@ -86,14 +90,6 @@ export default function DocumentsPage() {
   });
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setFilters(parseDocumentFiltersFromSearchParams(params));
-    setFiltersHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!filtersHydrated) return;
-
     const params = serializeDocumentFiltersToSearchParams(filters);
     const query = params.toString();
     const nextUrl = query
@@ -104,7 +100,7 @@ export default function DocumentsPage() {
     if (currentUrl !== nextUrl) {
       window.history.replaceState(null, '', nextUrl);
     }
-  }, [filters, filtersHydrated]);
+  }, [filters]);
 
   const documents = useMemo(() => docs?.data ?? [], [docs?.data]);
   const filterOptions = useMemo(

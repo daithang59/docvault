@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuditQuery } from '@/lib/hooks/use-audit';
@@ -37,7 +38,10 @@ import {
 
 export default function AuditPage() {
   const { session } = useAuth();
-  const [filters, setFilters] = useState<AuditQueryFilters>({});
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState<AuditQueryFilters>(() =>
+    parseAuditFiltersFromSearchParams(searchParams),
+  );
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [chainStatus, setChainStatus] = useState<AuditChainStatus | null>(null);
@@ -45,32 +49,6 @@ export default function AuditPage() {
   const [verifyChainError, setVerifyChainError] = useState<string | null>(null);
 
   const hasAccess = canViewAudit(session);
-
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const nextFilters: AuditQueryFilters = {};
-
-    const result = params.get('result');
-    const action = params.get('action');
-    const actorId = params.get('actorId');
-    const resourceType = params.get('resourceType');
-    const resourceId = params.get('resourceId');
-    const documentId = params.get('documentId');
-
-    if (result === 'SUCCESS' || result === 'DENY' || result === 'ERROR' || result === 'CONFLICT') {
-      nextFilters.result = result;
-    }
-    if (action) nextFilters.action = action;
-    if (actorId) nextFilters.actorId = actorId;
-    if (resourceType) nextFilters.resourceType = resourceType;
-    if (resourceId) nextFilters.resourceId = resourceId;
-    if (documentId) nextFilters.documentId = documentId;
-
-    if (Object.keys(nextFilters).length > 0) {
-      setFilters(nextFilters);
-      setPage(1);
-    }
-  }, []);
 
   const { data: logs, isLoading, isError, refetch } = useAuditQuery(
     filters,
@@ -336,4 +314,32 @@ export default function AuditPage() {
       )}
     </div>
   );
+}
+
+function parseAuditFiltersFromSearchParams(
+  params: Pick<URLSearchParams, 'get'>,
+): AuditQueryFilters {
+  const nextFilters: AuditQueryFilters = {};
+  const result = params.get('result');
+  const action = params.get('action');
+  const actorId = params.get('actorId');
+  const resourceType = params.get('resourceType');
+  const resourceId = params.get('resourceId');
+  const documentId = params.get('documentId');
+
+  if (
+    result === 'SUCCESS' ||
+    result === 'DENY' ||
+    result === 'ERROR' ||
+    result === 'CONFLICT'
+  ) {
+    nextFilters.result = result;
+  }
+  if (action) nextFilters.action = action;
+  if (actorId) nextFilters.actorId = actorId;
+  if (resourceType) nextFilters.resourceType = resourceType;
+  if (resourceId) nextFilters.resourceId = resourceId;
+  if (documentId) nextFilters.documentId = documentId;
+
+  return nextFilters;
 }
