@@ -252,7 +252,7 @@ EOF
  * Sync infra/k8s files from the source workspace to the GitOps worktree.
  *
  * Strategy:
- *   1. Save existing image tag/digest from every values file on the GitOps branch.
+ *   1. Save existing image repository/tag/digest from every values file on the GitOps branch.
  *   2. Copy the full infra/k8s directory from the workspace (charts, infra-deps, values).
  *   3. Restore the saved tag/digest so existing deployments keep their current image refs.
  *
@@ -287,37 +287,46 @@ def syncInfraFiles(cfg, gitOpsWorktree) {
 
     echo '>>> infra/k8s files synced.'
 
-    // ── Restore saved image refs so we don't accidentally downgrade tags ──
+    // ── Restore saved image refs so we don't accidentally downgrade registry, tags, or digests ──
     savedRefs.each { service, refs ->
-        if (refs.tag || refs.digest) {
+        if (refs.repository || refs.tag || refs.digest) {
             def fileName = valuesFileForService(cfg, service)
             def valuesFile = "${valuesDir}/${fileName}"
 
             if (sh(script: "test -f '${valuesFile}'", returnStatus: true) == 0) {
+                if (refs.repository) {
+                    sh "sed -i -E 's#^([[:space:]]*)repository:.*#\\1repository: \"${refs.repository}\"#' '${valuesFile}'"
+                }
                 if (refs.tag) {
                     sh "sed -i -E 's/^([[:space:]]*)tag:.*/\\1tag: \"${refs.tag}\"/' '${valuesFile}'"
                 }
                 if (refs.digest) {
                     sh "sed -i -E 's/^([[:space:]]*)digest:.*/\\1digest: \"${refs.digest}\"/' '${valuesFile}'"
                 }
-                echo ">>> Restored image refs for ${service}: tag=${refs.tag}, digest=${refs.digest}"
+                echo ">>> Restored image refs for ${service}: repository=${refs.repository}, tag=${refs.tag}, digest=${refs.digest}"
             }
         }
     }
 }
 
 /**
- * Read the current image tag and digest from a Helm values file.
- * Returns a map [tag: '...', digest: '...'] (either may be empty).
+ * Read the current image repository, tag, and digest from a Helm values file.
+ * Returns a map [repository: '...', tag: '...', digest: '...'] (values may be empty).
  */
 def readImageRefs(valuesFile) {
+    def repository = ''
     def tag = ''
     def digest = ''
 
     def exists = sh(script: "test -f '${valuesFile}'", returnStatus: true)
     if (exists != 0) {
-        return [tag: tag, digest: digest]
+        return [repository: repository, tag: tag, digest: digest]
     }
+
+    repository = sh(
+        script: "grep -E '^[[:space:]]*repository:' '${valuesFile}' | head -1 | sed -E 's/^[[:space:]]*repository:[[:space:]]*//' | tr -d '\"' || true",
+        returnStdout: true
+    ).trim()
 
     tag = sh(
         script: "grep -E '^[[:space:]]*tag:' '${valuesFile}' | head -1 | sed -E 's/^[[:space:]]*tag:[[:space:]]*//' | tr -d '\"' || true",
@@ -329,7 +338,7 @@ def readImageRefs(valuesFile) {
         returnStdout: true
     ).trim()
 
-    return [tag: tag, digest: digest]
+    return [repository: repository, tag: tag, digest: digest]
 }
 
 def pushWithRetry(gitOpsWorktree, targetBranch) {
