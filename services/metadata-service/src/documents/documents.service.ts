@@ -588,7 +588,7 @@ export class DocumentsService {
       throw new ForbiddenException('Only admins can change legal hold');
     }
 
-    const document = await this.findInOrgOrThrow(id, context);
+    await this.findInOrgOrThrow(id, context);
 
     const reason = input.reason?.trim();
     if (input.hold && !reason) {
