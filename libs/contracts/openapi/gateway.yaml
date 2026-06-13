@@ -92,7 +92,7 @@ components:
         dlpStatus: { type: string, enum: [NOT_SCANNED, CLEAR, DETECTED] }
         dlpFindings: { type: array, nullable: true, items: { type: object } }
         dlpDetectedAt: { type: string, format: date-time, nullable: true }
-        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionClass: { type: string, nullable: true, example: SECRET_90D }
         retentionUntil: { type: string, format: date-time, nullable: true }
         retentionReason: { type: string, nullable: true }
         status: { $ref: '#/components/schemas/DocumentStatus' }
@@ -224,7 +224,7 @@ components:
         classification: { $ref: '#/components/schemas/ClassificationLevel' }
         publishedAt: { type: string, format: date-time, nullable: true }
         archivedAt: { type: string, format: date-time, nullable: true }
-        retentionClass: { type: string, nullable: true, example: SECRET_30D }
+        retentionClass: { type: string, nullable: true, example: SECRET_90D }
         retentionUntil: { type: string, format: date-time, nullable: true }
         retentionReason: { type: string, nullable: true }
         retentionStatus: { $ref: '#/components/schemas/RetentionStatus' }

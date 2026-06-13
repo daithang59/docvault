@@ -1,11 +1,15 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { AclEntry, AddAclEntryDto, SubjectType, Permission, Effect } from '@/types/document';
 import { formatDateTime } from '@/lib/utils/date';
-import { Plus, Shield } from 'lucide-react';
+import { Plus, Shield, Search, Check, ChevronDown } from 'lucide-react';
 import { EmptyState } from '@/components/common/empty-state';
+import { UserCombobox } from '@/components/common/user-combobox';
 import { useAddAclEntry } from '@/lib/hooks/use-acl';
+import { useOrgGroups } from '@/features/org/org.hooks';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
+import { ALL_ROLES } from '@/lib/auth/roles';
 import { cn } from '@/lib/utils/cn';
 
 interface DocumentAclCardProps {
@@ -23,8 +27,19 @@ export function DocumentAclCard({ docId, entries, canManage }: DocumentAclCardPr
   const [showForm, setShowForm] = useState(false);
   const addEntry = useAddAclEntry(docId);
 
+  // Resolve display names for USER subjects so admins can confirm an id
+  // actually maps to a real person (answers "is this username/UUID valid?").
+  const userSubjectIds = useMemo(
+    () =>
+      entries
+        .filter((e) => e.subjectType === 'USER' && e.subjectId)
+        .map((e) => e.subjectId as string),
+    [entries],
+  );
+  const { data: displayNames } = useOwnerDisplayNames(userSubjectIds);
+
   return (
-    <div className="rounded-2xl border overflow-hidden" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
+    <div className="rounded-2xl border" style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}>
       <div className="flex items-center justify-between px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)' }}>
         <div>
           <h3 className="text-sm font-semibold" style={{ color: 'var(--text-strong)' }}>Access Control</h3>
@@ -42,7 +57,6 @@ export function DocumentAclCard({ docId, entries, canManage }: DocumentAclCardPr
         )}
       </div>
 
-      {/* Add form */}
       {showForm && (
         <AclAddForm
           onSubmit={async (data) => {
@@ -54,7 +68,6 @@ export function DocumentAclCard({ docId, entries, canManage }: DocumentAclCardPr
         />
       )}
 
-      {/* Entries */}
       {entries.length === 0 && !showForm ? (
         <EmptyState
           title="No access rules"
@@ -64,24 +77,36 @@ export function DocumentAclCard({ docId, entries, canManage }: DocumentAclCardPr
         />
       ) : (
         <div className="divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {entries.map((entry) => (
-            <div key={entry.id} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--bg-card-hover)]">
-              <Shield className="h-4 w-4 shrink-0" style={{ color: 'var(--text-faint)' }} />
-              <div className="flex-1 min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-xs font-medium" style={{ color: 'var(--text-main)' }}>{entry.subjectType}</span>
-                  {entry.subjectId && (
-                    <span className="text-xs font-mono" style={{ color: 'var(--text-muted)' }}>{entry.subjectId.slice(0, 12)}…</span>
-                  )}
-                  <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{entry.permission}</span>
-                  <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', EFFECT_STYLES[entry.effect])}>
-                    {entry.effect}
-                  </span>
+          {entries.map((entry) => {
+            const display =
+              entry.subjectType === 'USER' && entry.subjectId
+                ? displayNames?.[entry.subjectId]
+                : undefined;
+            const subjectLabel = display?.displayName ?? entry.subjectId ?? '';
+            return (
+              <div key={entry.id} className="flex items-center gap-3 px-5 py-3 transition-colors hover:bg-[var(--bg-card-hover)]">
+                <Shield className="h-4 w-4 shrink-0" style={{ color: 'var(--text-faint)' }} />
+                <div className="flex-1 min-w-0">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-xs font-medium" style={{ color: 'var(--text-main)' }}>{entry.subjectType}</span>
+                    {entry.subjectId && (
+                      <span className="text-xs" style={{ color: 'var(--text-muted)' }} title={entry.subjectId}>
+                        {subjectLabel}
+                      </span>
+                    )}
+                    {display?.username && display.username !== subjectLabel && (
+                      <span className="text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>{display.username}</span>
+                    )}
+                    <span className="text-xs" style={{ color: 'var(--text-faint)' }}>{entry.permission}</span>
+                    <span className={cn('text-[10px] px-1.5 py-0.5 rounded font-medium', EFFECT_STYLES[entry.effect])}>
+                      {entry.effect}
+                    </span>
+                  </div>
+                  <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{formatDateTime(entry.createdAt)}</p>
                 </div>
-                <p className="text-[11px] mt-0.5" style={{ color: 'var(--text-faint)' }}>{formatDateTime(entry.createdAt)}</p>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -105,45 +130,38 @@ function AclAddForm({
   });
   const [error, setError] = useState<string | null>(null);
 
+  function setSubjectType(subjectType: SubjectType) {
+    // Reset the subject id whenever the type changes — its meaning differs per type.
+    setForm((f) => ({ ...f, subjectType, subjectId: '' }));
+    setError(null);
+  }
+
   async function handleSubmit() {
-    const normalizedSubjectId = normalizeSubjectId(
-      form.subjectType,
-      form.subjectId,
-    );
+    const normalizedSubjectId = normalizeSubjectId(form.subjectType, form.subjectId);
 
     if (form.subjectType !== 'ALL' && !normalizedSubjectId) {
-      setError('Subject ID is required unless subject type is ALL.');
+      setError('Select or enter a subject for this rule.');
       return;
     }
 
     setError(null);
-    await onSubmit({
-      ...form,
-      subjectId: normalizedSubjectId,
-    });
+    await onSubmit({ ...form, subjectId: normalizedSubjectId });
   }
 
   return (
     <div className="px-5 py-4 border-b" style={{ borderColor: 'var(--border-soft)', background: 'var(--bg-subtle)' }}>
-      <div className="grid grid-cols-2 gap-3 mb-3">
-        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'GROUP', 'ALL']} onChange={(v) => setForm({ ...form, subjectType: v as SubjectType })} />
-        <div>
-          <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Subject ID</label>
-          <input
-            value={form.subjectId ?? ''}
-            onChange={(e) => setForm({ ...form, subjectId: e.target.value })}
-            placeholder={form.subjectType === 'ALL' ? 'Not required for ALL' : 'User ID, role name, or Keycloak group name'}
-            disabled={form.subjectType === 'ALL'}
-            className="w-full px-3 py-1.5 text-sm rounded-lg outline-none transition"
-            style={{
-              border: '1px solid var(--input-border)',
-              background: 'var(--input-bg)',
-              color: 'var(--input-text)',
-            }}
-          />
-        </div>
+      <div className="grid grid-cols-1 gap-3 mb-3 sm:grid-cols-3">
+        <Select label="Subject Type" value={form.subjectType} options={['USER', 'ROLE', 'GROUP', 'ALL']} onChange={(v) => setSubjectType(v as SubjectType)} />
         <Select label="Permission" value={form.permission} options={['READ', 'DOWNLOAD', 'WRITE', 'APPROVE']} onChange={(v) => setForm({ ...form, permission: v as Permission })} />
         <Select label="Effect" value={form.effect} options={['ALLOW', 'DENY']} onChange={(v) => setForm({ ...form, effect: v as Effect })} />
+      </div>
+      <div className="mb-3">
+        <label className="block text-xs font-medium mb-1" style={{ color: 'var(--text-muted)' }}>Subject</label>
+        <SubjectPicker
+          subjectType={form.subjectType}
+          value={form.subjectId ?? ''}
+          onChange={(v) => setForm((f) => ({ ...f, subjectId: v }))}
+        />
       </div>
       {error && (
         <p className="mb-3 text-xs" style={{ color: 'var(--state-error-text)' }}>{error}</p>
@@ -168,10 +186,141 @@ function AclAddForm({
   );
 }
 
-function normalizeSubjectId(
-  subjectType: SubjectType,
-  subjectId?: string,
-): string | undefined {
+function SubjectPicker({
+  subjectType,
+  value,
+  onChange,
+}: {
+  subjectType: SubjectType;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  if (subjectType === 'ALL') {
+    return (
+      <input
+        value=""
+        disabled
+        placeholder="Applies to everyone"
+        className="w-full px-3 py-1.5 text-sm rounded-lg outline-none transition opacity-60"
+        style={{ border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)' }}
+      />
+    );
+  }
+
+  if (subjectType === 'ROLE') {
+    return (
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full px-3 py-1.5 text-sm rounded-lg outline-none transition"
+        style={{ border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)' }}
+      >
+        <option value="">Select a role…</option>
+        {ALL_ROLES.map((r) => (
+          <option key={r} value={r}>{r}</option>
+        ))}
+      </select>
+    );
+  }
+
+  if (subjectType === 'USER') {
+    return <UserCombobox value={value} onChange={onChange} />;
+  }
+
+  return <GroupCombobox value={value} onChange={onChange} />;
+}
+
+function GroupCombobox({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState('');
+  const groupsQuery = useOrgGroups(true);
+
+  const options = useMemo(() => {
+    const rows = groupsQuery.data ?? [];
+    const q = query.trim().toLowerCase();
+    if (!q) return rows;
+    return rows.filter(
+      (g) => g.name.toLowerCase().includes(q) || g.path.toLowerCase().includes(q),
+    );
+  }, [groupsQuery.data, query]);
+
+  const unavailable = !groupsQuery.isLoading && (groupsQuery.data?.length ?? 0) === 0;
+
+  if (unavailable) {
+    // No group directory available — fall back to manual entry (validated server-side).
+    return (
+      <input
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Keycloak group name"
+        className="w-full px-3 py-1.5 text-sm rounded-lg outline-none transition"
+        style={{ border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)' }}
+      />
+    );
+  }
+
+  return (
+    <div className="relative">
+      <button
+        type="button"
+        onClick={() => setOpen((o) => !o)}
+        className="w-full flex items-center justify-between gap-2 px-3 py-1.5 text-sm rounded-lg outline-none transition text-left"
+        style={{ border: '1px solid var(--input-border)', background: 'var(--input-bg)', color: 'var(--input-text)' }}
+      >
+        <span className={cn('truncate', !value && 'opacity-60')}>{value || 'Select a group…'}</span>
+        <ChevronDown className="h-3.5 w-3.5 shrink-0 opacity-60" />
+      </button>
+      {open && (
+        <div
+          className="relative z-20 mt-1 w-full rounded-lg border shadow-lg overflow-hidden"
+          style={{ background: 'var(--bg-card)', borderColor: 'var(--border-soft)' }}
+        >
+          <div className="flex items-center gap-2 px-2.5 py-2 border-b" style={{ borderColor: 'var(--border-soft)' }}>
+            <Search className="h-3.5 w-3.5 opacity-60" />
+            <input
+              autoFocus
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search groups…"
+              className="w-full bg-transparent text-sm outline-none"
+              style={{ color: 'var(--input-text)' }}
+            />
+          </div>
+          <div className="max-h-48 overflow-auto py-1">
+            {groupsQuery.isLoading ? (
+              <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-faint)' }}>Loading groups…</p>
+            ) : options.length === 0 ? (
+              <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-faint)' }}>No matching groups.</p>
+            ) : (
+              options.map((g) => (
+                <button
+                  key={g.id}
+                  type="button"
+                  onClick={() => {
+                    onChange(g.name);
+                    setOpen(false);
+                    setQuery('');
+                  }}
+                  className="w-full flex items-center justify-between gap-2 px-3 py-2 text-left text-sm transition-colors hover:bg-[var(--bg-card-hover)]"
+                >
+                  <span className="min-w-0">
+                    <span className="block truncate" style={{ color: 'var(--text-main)' }}>{g.name}</span>
+                    {g.path !== '/' + g.name && (
+                      <span className="block truncate text-[11px] font-mono" style={{ color: 'var(--text-faint)' }}>{g.path}</span>
+                    )}
+                  </span>
+                  {g.name === value && <Check className="h-3.5 w-3.5 shrink-0" style={{ color: 'var(--color-primary)' }} />}
+                </button>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function normalizeSubjectId(subjectType: SubjectType, subjectId?: string): string | undefined {
   if (subjectType === 'ALL') {
     return undefined;
   }

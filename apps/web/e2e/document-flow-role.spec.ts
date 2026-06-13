@@ -453,7 +453,7 @@ function canReadMetadata(session: FlowSession, document: FlowDocument): boolean 
   if (roles.includes('compliance_officer')) {
     return ['PUBLISHED', 'ARCHIVED'].includes(document.status);
   }
-  if (document.status !== 'PUBLISHED') return false;
+  if (!['PUBLISHED', 'ARCHIVED'].includes(document.status)) return false;
   if (roles.includes('viewer')) {
     return ['PUBLIC', 'INTERNAL'].includes(document.classification);
   }

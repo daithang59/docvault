@@ -71,21 +71,30 @@ export class DocumentsController {
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('editor', 'admin')
   @ApiOperation({
-    summary: 'Restore a soft-deleted document back to DRAFT within the recovery window',
+    summary:
+      'Restore a soft-deleted document back to DRAFT within the recovery window',
   })
   restoreFromTrash(@Param('docId') docId: string, @Req() req: any) {
-    return this.documentsService.restoreFromTrash(docId, buildRequestContext(req));
+    return this.documentsService.restoreFromTrash(
+      docId,
+      buildRequestContext(req),
+    );
   }
 
   @Get(':docId')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({ summary: 'Get a document metadata record by id' })
-  findOne(@Param('docId') docId: string, @Req() req: any) {
+  findOne(
+    @Param('docId') docId: string,
+    @Req() req: any,
+    @Query('shareToken') shareToken?: string,
+  ) {
     return this.policyService.assertCanReadMetadata(
       docId,
       req.user,
       buildRequestContext(req),
+      { shareToken },
     );
   }
 
@@ -167,17 +176,25 @@ export class DocumentsController {
     @Body() body: ApprovalChainDto,
     @Req() req: any,
   ) {
-    return this.documentsService.setApprovalChain(docId, body, buildRequestContext(req));
+    return this.documentsService.setApprovalChain(
+      docId,
+      body,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/approval-step/advance')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('approver', 'admin')
   @ApiOperation({
-    summary: 'Advance the approval chain to the next step (internal, used by workflow)',
+    summary:
+      'Advance the approval chain to the next step (internal, used by workflow)',
   })
   advanceApprovalStep(@Param('docId') docId: string, @Req() req: any) {
-    return this.documentsService.advanceApprovalStep(docId, buildRequestContext(req));
+    return this.documentsService.advanceApprovalStep(
+      docId,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/legal-hold')
@@ -256,7 +273,12 @@ export class DocumentsController {
     @Body() body: CreateVersionDto,
     @Req() req: any,
   ) {
-    return this.versionsService.create(docId, body, req.user);
+    return this.versionsService.create(
+      docId,
+      body,
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/versions/:version/restore')
@@ -272,7 +294,12 @@ export class DocumentsController {
     @Param('version') version: string,
     @Req() req: any,
   ) {
-    return this.versionsService.restore(docId, Number(version), req.user);
+    return this.versionsService.restore(
+      docId,
+      Number(version),
+      req.user,
+      buildRequestContext(req),
+    );
   }
 
   @Post(':docId/status')

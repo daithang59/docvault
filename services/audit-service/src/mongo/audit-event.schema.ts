@@ -68,3 +68,9 @@ AuditEventSchema.index({ actorId: 1, timestamp: -1 });
 AuditEventSchema.index({ action: 1, timestamp: -1 });
 AuditEventSchema.index({ resourceType: 1, resourceId: 1 });
 AuditEventSchema.index({ result: 1, timestamp: -1 });
+
+// Enforce a single, fork-free hash chain at the database level: every hash can
+// be the predecessor of at most one event, and only one genesis event may have
+// prevHash=null. Concurrent inserts racing on the same head trigger a duplicate
+// key error, which AuditService.create() catches and retries against the new head.
+AuditEventSchema.index({ prevHash: 1 }, { unique: true });

@@ -66,6 +66,7 @@ const TYPE_LABELS: Record<string, string> = {
   MALWARE_BLOCKED: 'Malware blocked',
   DLP_DETECTED: 'DLP detection',
   AUDIT_CHAIN_INVALID: 'Audit chain invalid',
+  VERSION_UPLOADED: 'New version uploaded',
 };
 
 const TYPE_DESCRIPTIONS: Record<string, string> = {
@@ -81,6 +82,7 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
   MALWARE_BLOCKED: 'A malware upload attempt was blocked.',
   DLP_DETECTED: 'Sensitive content was detected by DLP controls.',
   AUDIT_CHAIN_INVALID: 'Audit tamper-evidence needs investigation.',
+  VERSION_UPLOADED: 'A new version was uploaded to a document.',
 };
 
 export function buildNotificationCenterModel(

@@ -10,6 +10,7 @@ import {
 } from '@/features/audit/audit.api';
 import { auditKeys } from '@/features/audit/audit.keys';
 import { buildSecurityDashboardModel } from '@/features/audit/security-dashboard';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
@@ -94,6 +95,11 @@ export default function AuditPage() {
     () => buildSecurityDashboardModel(securitySummary),
     [securitySummary],
   );
+  const repeatedDenyActorIds = useMemo(
+    () => (securitySummary?.repeatedDenyActors ?? []).map((a) => a.actorId),
+    [securitySummary],
+  );
+  const { data: denyActorNames } = useOwnerDisplayNames(repeatedDenyActorIds);
   const summaryCards = [
     {
       label: 'Denied events',
@@ -240,14 +246,18 @@ export default function AuditPage() {
             Repeated deny actors
           </p>
           <div className="mt-3 flex flex-wrap gap-2">
-            {securitySummary.repeatedDenyActors.map((actor) => (
-              <span
-                key={actor.actorId}
-                className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 text-xs text-[var(--text-muted)]"
-              >
-                {actor.actorId}: {actor.denyCount}
-              </span>
-            ))}
+            {securitySummary.repeatedDenyActors.map((actor) => {
+              const name = denyActorNames?.[actor.actorId]?.displayName;
+              return (
+                <span
+                  key={actor.actorId}
+                  title={actor.actorId}
+                  className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 text-xs text-[var(--text-muted)]"
+                >
+                  {name ?? actor.actorId}: {actor.denyCount}
+                </span>
+              );
+            })}
           </div>
         </div>
       ) : null}

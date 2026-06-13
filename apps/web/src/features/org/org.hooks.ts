@@ -7,7 +7,10 @@ import {
   fetchOrgMembers,
   updateMemberRole,
   removeMember,
+  addMember,
+  fetchOrgGroups,
 } from './org.api';
+import type { AddMemberInput } from './org.api';
 
 /**
  * Loads the current user's organization once a session is present.
@@ -55,5 +58,42 @@ export function useRemoveMember() {
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['org', 'members'] });
     },
+  });
+}
+
+/** Add a member; invalidates the member list on success. */
+export function useAddMember() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: AddMemberInput) => addMember(input),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['org', 'members'] });
+    },
+  });
+}
+
+/**
+ * Loads the org member list for ACL subject pickers.
+ * Available to editor/approver/compliance_officer/admin server-side.
+ */
+export function useOrgMembersForPicker(enabled = true) {
+  return useQuery({
+    queryKey: ['org', 'members', 'picker'] as const,
+    queryFn: fetchOrgMembers,
+    enabled,
+    staleTime: 60 * 1000,
+  });
+}
+
+/**
+ * Loads Keycloak realm groups for the GROUP ACL subject picker.
+ * Returns [] when admin credentials are not configured server-side.
+ */
+export function useOrgGroups(enabled = true) {
+  return useQuery({
+    queryKey: ['org', 'groups'] as const,
+    queryFn: fetchOrgGroups,
+    enabled,
+    staleTime: 5 * 60 * 1000,
   });
 }

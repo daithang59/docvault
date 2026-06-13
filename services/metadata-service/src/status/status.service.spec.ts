@@ -112,10 +112,10 @@ describe('StatusService', () => {
         data: expect.objectContaining({
           status: 'PUBLISHED',
           publishedAt: expect.any(Date),
-          retentionClass: 'SECRET_30D',
+          retentionClass: 'SECRET_90D',
           retentionUntil: expect.any(Date),
           retentionReason:
-            'SECRET records are retained for 30 days after publication',
+            'SECRET records are retained for 90 days after publication',
         }),
       }),
     );

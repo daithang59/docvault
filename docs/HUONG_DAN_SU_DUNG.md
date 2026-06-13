@@ -114,7 +114,7 @@ Hệ thống đã có sẵn 5 tài khoản mẫu với các vai trò khác nhau.
 
 | Tài khoản | Vai trò | Họ làm được gì |
 |---|---|---|
-| `viewer1` | Viewer | Xem danh sách, xem trước và tải xuống tài liệu đã xuất bản |
+| `viewer1` | Viewer | Xem danh sách/xem trước tài liệu đã xuất bản hoặc lưu trữ nếu policy cho phép; tải xuống tài liệu đã xuất bản |
 | `editor1` | Editor | Tạo tài liệu, tải file lên, gửi duyệt, lưu trữ |
 | `approver1` | Approver | Phê duyệt hoặc từ chối tài liệu |
 | `co1` | Compliance Officer | Xem audit log, kiểm tra tuân thủ (không được tải file) |
@@ -333,7 +333,7 @@ Hệ thống hỗ trợ giao diện tối. Vào **Settings** (menu thanh bên) �
 | **DRAFT** | Mới tạo hoặc bị từ chối | Editor: sửa, upload, gửi duyệt |
 | **PENDING** | Đang chờ duyệt | Approver: phê duyệt hoặc từ chối |
 | **PUBLISHED** | Đã duyệt, cho phép tải | Viewer/Editor: xem, tải; Editor: lưu trữ |
-| **ARCHIVED** | Đã lưu trữ | Chỉ cho xem trước, không tải |
+| **ARCHIVED** | Đã lưu trữ | Cho xem metadata/xem trước theo quyền đọc, không tải |
 
 ---
 

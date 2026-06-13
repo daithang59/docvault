@@ -1,4 +1,8 @@
-import { BadRequestException, Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  ServiceUnavailableException,
+} from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose';
 import { createHash, createHmac, randomUUID } from 'crypto';
@@ -10,6 +14,12 @@ import {
   SecurityRecommendationWorkflowDto,
   SecurityRecommendationWorkflowStatus,
 } from './dto/security-recommendation-workflow.dto';
+
+// Max attempts to append to the hash chain under concurrent write contention.
+// Each retry re-reads the current head after losing a race on the unique
+// prevHash index. Bounded so a pathological contention storm fails loudly
+// rather than spinning forever.
+const MAX_CHAIN_APPEND_ATTEMPTS = 25;
 
 const AUTHORIZED_CONTENT_ACTIONS = [
   'DOCUMENT_DOWNLOAD_AUTHORIZED',
@@ -26,6 +36,17 @@ const BEHAVIOR_SIGNAL_ACTIONS = [
   'DOCUMENT_METADATA_UPDATED',
   'DOCUMENT_UPLOADED',
 ] as const;
+
+// Sliding window for behavior-signal detection. Burst thresholds (>= N denies,
+// mass-access counts) only mean "burst" if scoped to recent activity; without
+// this, 3 denies spread across months would trip DENY_BURST. Overridable via
+// env so retention-heavy deployments can widen or narrow the window.
+const BEHAVIOR_SIGNAL_WINDOW_DAYS = (() => {
+  const parsed = Number(process.env.AUDIT_BEHAVIOR_WINDOW_DAYS);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 7;
+})();
+
+const DAY_IN_MS = 24 * 60 * 60 * 1000;
 
 export interface RiskyDocumentSummary {
   documentId: string;
@@ -134,24 +155,39 @@ interface BehaviorBucket {
 
 @Injectable()
 export class AuditService {
+  // In-process serialization of chain appends. The hash chain is inherently
+  // sequential (each event links to the previous head), so appends cannot run
+  // in parallel without forking. This promise queue funnels all concurrent
+  // create() calls through one at a time, eliminating intra-instance
+  // contention. The unique prevHash index + retry below remain the safety net
+  // for the rare cross-instance race.
+  private chainLock: Promise<unknown> = Promise.resolve();
+
   constructor(
     @InjectModel(AuditEvent.name)
     private readonly auditEvent: Model<AuditEventDocument>,
   ) {}
 
   async create(dto: CreateAuditEventDto) {
+    // Chain onto the lock regardless of whether the previous append resolved or
+    // rejected, so one failed write never wedges the queue.
+    const run = this.chainLock.then(
+      () => this.appendEvent(dto),
+      () => this.appendEvent(dto),
+    );
+    this.chainLock = run.then(
+      () => undefined,
+      () => undefined,
+    );
+    return run;
+  }
+
+  private async appendEvent(dto: CreateAuditEventDto) {
     const eventId = dto.eventId ?? randomUUID();
     const eventTimestamp = dto.timestamp ? new Date(dto.timestamp) : new Date();
 
-    // 1. Get hash of the most recent event for chain linking
-    const lastEvent = await this.auditEvent
-      .findOne({}, { hash: 1 })
-      .sort({ timestamp: -1, _id: -1 })
-      .lean();
-
-    const prevHash = lastEvent?.hash ?? null;
-
-    // 2. Build canonical payload for deterministic hashing
+    // 2. Build canonical payload for deterministic hashing. The canonical
+    // fields never change across retries, so compute them once.
     const canonicalFields: Record<string, any> = {
       eventId,
       timestamp: eventTimestamp.toISOString(),
@@ -169,36 +205,99 @@ export class AuditService {
     if (metadataStr !== undefined) {
       canonicalFields.metadata = metadataStr;
     }
-    const canonicalPayload = this.buildCanonicalPayload(canonicalFields);
 
-    const hash = this.computeHash(prevHash, canonicalPayload);
-
-    // Sign the hash with the server-side secret (if configured) so the chain
-    // cannot be silently recomputed by anyone with raw DB write access.
     const signing = this.getSigningSecret();
-    const signature = signing ? this.signHash(hash, signing.secret) : undefined;
-    const signatureKid = signing?.kid;
 
-    // 3. Insert the event
-    const saved = await this.auditEvent.create({
-      eventId,
-      timestamp: eventTimestamp,
-      actorId: dto.actorId,
-      actorRoles: dto.actorRoles,
-      action: dto.action,
-      resourceType: dto.resourceType,
-      resourceId: dto.resourceId,
-      result: dto.result,
-      reason: dto.reason,
-      ip: dto.ip,
-      traceId: dto.traceId,
-      metadata: dto.metadata,
-      prevHash,
-      hash,
-      ...(signature ? { signature, signatureKid } : {}),
-    });
+    // The hash chain is linearized by a unique index on `prevHash`: each head
+    // can be extended by exactly one event. Concurrent writers that read the
+    // same head will collide on insert (E11000); the loser re-reads the new
+    // head and retries. This guarantees a single, fork-free chain without a
+    // global lock or a transaction.
+    for (let attempt = 0; attempt < MAX_CHAIN_APPEND_ATTEMPTS; attempt += 1) {
+      // 1. Get hash of the most recent event for chain linking
+      const lastEvent = await this.auditEvent
+        .findOne({}, { hash: 1 })
+        .sort({ timestamp: -1, _id: -1 })
+        .lean();
 
-    return saved.toObject();
+      const prevHash = lastEvent?.hash ?? null;
+      const canonicalPayload = this.buildCanonicalPayload(canonicalFields);
+      const hash = this.computeHash(prevHash, canonicalPayload);
+
+      // Sign the hash with the server-side secret (if configured) so the chain
+      // cannot be silently recomputed by anyone with raw DB write access.
+      const signature = signing
+        ? this.signHash(hash, signing.secret)
+        : undefined;
+      const signatureKid = signing?.kid;
+
+      try {
+        // 3. Insert the event
+        const saved = await this.auditEvent.create({
+          eventId,
+          timestamp: eventTimestamp,
+          actorId: dto.actorId,
+          actorRoles: dto.actorRoles,
+          action: dto.action,
+          resourceType: dto.resourceType,
+          resourceId: dto.resourceId,
+          result: dto.result,
+          reason: dto.reason,
+          ip: dto.ip,
+          traceId: dto.traceId,
+          metadata: dto.metadata,
+          prevHash,
+          hash,
+          ...(signature ? { signature, signatureKid } : {}),
+        });
+
+        return saved.toObject();
+      } catch (error: unknown) {
+        if (this.isDuplicatePrevHash(error)) {
+          // Another writer extended this head first; back off with jitter to
+          // de-synchronize contending writers, then retry against the new head.
+          await this.backoff(attempt);
+          continue;
+        }
+        throw error;
+      }
+    }
+
+    throw new ServiceUnavailableException(
+      `Could not append audit event after ${MAX_CHAIN_APPEND_ATTEMPTS} attempts due to write contention.`,
+    );
+  }
+
+  /**
+   * True when the error is a MongoDB duplicate-key (E11000) violation on the
+   * unique prevHash index, meaning a concurrent writer already extended the
+   * head we read.
+   */
+  private isDuplicatePrevHash(error: unknown): boolean {
+    if (!error || typeof error !== 'object') return false;
+    const code = (error as { code?: number }).code;
+    if (code !== 11000) return false;
+    const keyPattern = (error as { keyPattern?: Record<string, unknown> })
+      .keyPattern;
+    if (keyPattern && 'prevHash' in keyPattern) return true;
+    const message = (error as { message?: string }).message ?? '';
+    return message.includes('prevHash');
+  }
+
+  /**
+   * Exponential backoff with full jitter, used between hash-chain append
+   * retries to de-synchronize writers contending on the same head and avoid a
+   * thundering-herd retry storm. Capped so a high-contention burst still
+   * resolves within the retry budget.
+   */
+  private async backoff(attempt: number): Promise<void> {
+    const baseMs = 5;
+    const capMs = 100;
+    const ceiling = Math.min(capMs, baseMs * 2 ** attempt);
+    const delay = Math.floor(Math.random() * ceiling);
+    if (delay > 0) {
+      await new Promise((resolve) => setTimeout(resolve, delay));
+    }
   }
 
   async query(dto: QueryAuditDto) {
@@ -495,8 +594,17 @@ export class AuditService {
   private async getRepeatedDenyActors(): Promise<
     Array<{ actorId: string; denyCount: number }>
   > {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const query = this.auditEvent.aggregate([
-      { $match: { result: 'DENY', actorId: { $ne: null } } },
+      {
+        $match: {
+          result: 'DENY',
+          actorId: { $ne: null },
+          timestamp: { $gte: windowStart },
+        },
+      },
       { $group: { _id: '$actorId', denyCount: { $sum: 1 } } },
       { $match: { denyCount: { $gte: 3 } } },
       { $sort: { denyCount: -1 } },
@@ -512,11 +620,15 @@ export class AuditService {
   }
 
   private async getRiskyDocuments(): Promise<RiskyDocumentSummary[]> {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const events = await this.auditEvent
       .find(
         {
           action: { $in: [...AUTHORIZED_CONTENT_ACTIONS] },
           result: 'SUCCESS',
+          timestamp: { $gte: windowStart },
         },
         {
           _id: 0,
@@ -583,10 +695,14 @@ export class AuditService {
   }
 
   private async getBehaviorSignals(): Promise<BehaviorSignalSummary[]> {
+    const windowStart = new Date(
+      Date.now() - BEHAVIOR_SIGNAL_WINDOW_DAYS * DAY_IN_MS,
+    );
     const events = await this.auditEvent
       .find(
         {
           action: { $in: [...BEHAVIOR_SIGNAL_ACTIONS] },
+          timestamp: { $gte: windowStart },
         },
         {
           _id: 0,

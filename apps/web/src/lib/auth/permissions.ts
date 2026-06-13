@@ -131,13 +131,14 @@ function getClassificationContentDecision(
   session: Session | null,
   doc: DocumentContext,
   permission: Extract<AclPermission, 'READ' | 'DOWNLOAD'>,
-  options?: { approverBypassesClassification?: boolean },
+  options?: { approverBypassesClassification?: boolean; ownerBypassesClassification?: boolean },
 ): DocumentAccessDecision {
   const classification = doc.classification;
   if (!classification) return allow();
 
   if (hasRole(session, 'admin')) return allow();
   if (options?.approverBypassesClassification && hasRole(session, 'approver')) return allow();
+  if (options?.ownerBypassesClassification && isOwner(session, doc.ownerId)) return allow();
 
   const explicitAllow = matchesAcl(session, doc, permission, 'ALLOW');
 
@@ -145,16 +146,19 @@ function getClassificationContentDecision(
     case 'PUBLIC':
       return allow();
     case 'INTERNAL':
-      return hasAnyUserRole(session, ['viewer', 'editor', 'approver', 'admin'])
+      return hasAnyUserRole(session, ['editor', 'approver', 'admin'])
         ? allow()
-        : deny('INTERNAL documents require at least the viewer role.');
+        : deny('INTERNAL documents require at least the editor role.');
     case 'CONFIDENTIAL':
+      // Option A: an explicit ACL ALLOW (or ownership) grants access regardless
+      // of role tier. DENY is evaluated by the caller and still wins.
+      if (isOwner(session, doc.ownerId) || explicitAllow) {
+        return allow();
+      }
       if (!hasAnyUserRole(session, ['editor', 'approver', 'admin'])) {
         return deny('CONFIDENTIAL documents require at least the editor role.');
       }
-      return isOwner(session, doc.ownerId) || explicitAllow
-        ? allow()
-        : deny(`CONFIDENTIAL documents require ownership or explicit ${permission} ACL allow.`);
+      return deny(`CONFIDENTIAL documents require ownership or explicit ${permission} ACL allow.`);
     case 'SECRET':
       if (!hasAnyUserRole(session, ['approver', 'admin'])) {
         return deny('SECRET documents require at least the approver role.');
@@ -177,7 +181,12 @@ function getMetadataAccessDecision(
   if (hasRole(session, 'admin')) return allow();
 
   const explicitReadAllow = matchesAcl(session, doc, 'READ', 'ALLOW');
-  if (isOwner(session, doc.ownerId) || explicitReadAllow) return allow();
+  // A DOWNLOAD allow is strictly stronger than READ: whoever may download may
+  // also read metadata. Treat it as a metadata-read grant too.
+  const explicitDownloadAllow = matchesAcl(session, doc, 'DOWNLOAD', 'ALLOW');
+  if (isOwner(session, doc.ownerId) || explicitReadAllow || explicitDownloadAllow) {
+    return allow();
+  }
 
   if (hasRole(session, 'compliance_officer')) {
     return ['PUBLISHED', 'ARCHIVED'].includes(doc.status)
@@ -191,12 +200,12 @@ function getMetadataAccessDecision(
       : deny('Approvers can only read pending, published, or archived metadata.');
   }
 
-  if (doc.status !== 'PUBLISHED') {
-    return deny('Only published documents are readable by this user.');
+  if (!['PUBLISHED', 'ARCHIVED'].includes(doc.status)) {
+    return deny('Only published or archived documents are readable by this user.');
   }
 
   if (!doc.classification || doc.classification === 'PUBLIC') return allow();
-  if (doc.classification === 'INTERNAL' && hasAnyUserRole(session, ['viewer', 'editor'])) {
+  if (doc.classification === 'INTERNAL' && hasAnyUserRole(session, ['editor'])) {
     return allow();
   }
   if (doc.classification === 'CONFIDENTIAL' && hasRole(session, 'editor') && explicitReadAllow) {
@@ -235,6 +244,7 @@ function getPreviewAccessDecision(
 
   return getClassificationContentDecision(session, doc, 'READ', {
     approverBypassesClassification: true,
+    ownerBypassesClassification: true,
   });
 }
 

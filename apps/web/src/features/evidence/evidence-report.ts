@@ -1,11 +1,14 @@
-import type {
-  EvidenceBundleManifest,
-  EvidenceCaseNarrative,
+import {
+  resolveActorIdsInText,
+  type EvidenceBundleManifest,
+  type EvidenceCaseNarrative,
+  type UserDisplayNameMap,
 } from './evidence-center';
 
 export function buildEvidenceReportHtml(
   bundle: EvidenceBundleManifest,
   narrative: EvidenceCaseNarrative,
+  actorDisplayNames?: UserDisplayNameMap,
 ): string {
   const sectionCards = narrative.sections
     .map(
@@ -57,7 +60,7 @@ export function buildEvidenceReportHtml(
       (item) => `
         <tr>
           <td>${item.sequence}</td>
-          <td>${escapeHtml(item.title)}</td>
+          <td>${escapeHtml(resolveActorIdsInText(item.title, item.affectedActorIds, actorDisplayNames))}</td>
           <td>${escapeHtml(item.severity)}</td>
           <td>${escapeHtml(item.workflowStatus)}</td>
           <td>${escapeHtml(item.packetFilename)}</td>

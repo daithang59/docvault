@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getComplianceEvidencePacket } from './documents.api';
+import { getComplianceEvidencePacket, getDocument } from './documents.api';
 
 const apiClientMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -14,6 +14,26 @@ beforeEach(() => {
 });
 
 describe('documents API sensitive actions', () => {
+  it('sends a redeemed share token when fetching document detail', async () => {
+    const document = {
+      id: 'doc-1',
+      title: 'Shared document',
+      versions: [],
+      aclEntries: [],
+    };
+    apiClientMock.get.mockResolvedValue({ data: document });
+
+    const result = await getDocument('doc-1', 'raw token');
+
+    expect(apiClientMock.get).toHaveBeenCalledWith(
+      '/metadata/documents/doc-1?shareToken=raw+token',
+    );
+    expect(result).toMatchObject({
+      id: 'doc-1',
+      title: 'Shared document',
+    });
+  });
+
   it('sends the backend step-up proof when exporting an evidence packet', async () => {
     const packet = {
       metadataOnly: true,

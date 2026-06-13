@@ -182,6 +182,7 @@ describe('AuditService security summary', () => {
           $in: ['DOCUMENT_DOWNLOAD_AUTHORIZED', 'DOCUMENT_PREVIEW_AUTHORIZED'],
         },
         result: 'SUCCESS',
+        timestamp: { $gte: expect.any(Date) },
       },
       {
         _id: 0,
@@ -345,6 +346,7 @@ describe('AuditService security summary', () => {
             'DOCUMENT_UPLOADED',
           ],
         },
+        timestamp: { $gte: expect.any(Date) },
       },
       {
         _id: 0,

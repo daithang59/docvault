@@ -8,7 +8,7 @@ export const CLASSIFICATION_RETENTION_DAYS: Record<
   PUBLIC: 730, // 2 years
   INTERNAL: 365, // 1 year
   CONFIDENTIAL: 180, // 6 months
-  SECRET: 30, // 1 month
+  SECRET: 90, // 3 months
 };
 
 export interface RetentionPolicy {
@@ -38,8 +38,8 @@ export const RETENTION_POLICY_BY_CLASSIFICATION: Record<
   },
   SECRET: {
     days: CLASSIFICATION_RETENTION_DAYS.SECRET,
-    retentionClass: 'SECRET_30D',
-    reason: 'SECRET records are retained for 30 days after publication',
+    retentionClass: 'SECRET_90D',
+    reason: 'SECRET records are retained for 90 days after publication',
   },
 };
 

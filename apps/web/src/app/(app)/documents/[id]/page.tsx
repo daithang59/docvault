@@ -40,6 +40,8 @@ import {
   getLatestDocumentVersion,
   getVersionPreviewPosture,
 } from '@/features/documents/document-detail-presentation';
+import { applySharePermissionToDocumentDecision } from '@/features/share-links/share-link-access';
+import { getSharePermission } from '@/features/share-links/share-token-store';
 import { toast } from 'sonner';
 import type { DocumentVersion } from '@/features/documents/documents.types';
 
@@ -66,8 +68,17 @@ export default function DocumentDetailPage({ params }: Props) {
   if (isLoading) return <LoadingState label="Loading document..." />;
   if (isError || !doc) return <ErrorState message="Failed to load document." onRetry={refetch} />;
 
-  const downloadDecision = getDocumentAccessDecision(session, doc, 'download');
-  const previewDecision = getDocumentAccessDecision(session, doc, 'preview');
+  const sharePermission = getSharePermission(id);
+  const downloadDecision = applySharePermissionToDocumentDecision(
+    getDocumentAccessDecision(session, doc, 'download'),
+    'download',
+    sharePermission,
+  );
+  const previewDecision = applySharePermissionToDocumentDecision(
+    getDocumentAccessDecision(session, doc, 'preview'),
+    'preview',
+    sharePermission,
+  );
   const latestVersion = getLatestDocumentVersion(doc.versions ?? []);
   const latestPreviewPosture = latestVersion
     ? getVersionPreviewPosture(latestVersion, previewDecision)
@@ -155,6 +166,8 @@ export default function DocumentDetailPage({ params }: Props) {
             <DocumentActionPanel
               doc={{ ...doc, aclEntries, versions: doc.versions ?? [] }}
               onActionComplete={handleActionComplete}
+              previewDecision={previewDecision}
+              downloadDecision={downloadDecision}
               onPreview={
                 latestVersion && latestPreviewSupported
                   ? () => setPreviewVersion(latestVersion)

@@ -6,6 +6,7 @@ import {
   Get,
   Param,
   Patch,
+  Post,
   Req,
   UseGuards,
 } from '@nestjs/common';
@@ -25,24 +26,42 @@ export class OrgController {
   @Get('me')
   @UseGuards(AuthGuard('jwt'))
   @ApiOperation({
-    summary:
-      'Get the current user organization (auto-provisions on first call)',
+    summary: 'Get the current user organization',
   })
   getMyOrg(@Req() req: any) {
     const ctx = buildRequestContext(req);
-    const displayName = req.user?.username ?? req.headers['x-user-id'];
-    return this.orgService.getMyOrg(ctx.actorId, displayName);
+    return this.orgService.getMyOrg(ctx.actorId);
   }
 
   @Get('members')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('admin')
+  @Roles('editor', 'approver', 'compliance_officer', 'admin')
   @ApiOperation({
-    summary: 'List members of the current user organization (admin only)',
+    summary:
+      'List members of the current user organization (editor, approver, compliance officer, or admin). Used for ACL subject pickers.',
   })
   listMembers(@Req() req: any) {
     const ctx = buildRequestContext(req);
     return this.orgService.listMembers(ctx.actorId);
+  }
+
+  @Post('members')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('admin')
+  @ApiOperation({
+    summary: 'Add a user to the current organization (admin only)',
+  })
+  addMember(@Body() body: { userId?: string; role?: string }, @Req() req: any) {
+    const ctx = buildRequestContext(req);
+    const userId = body?.userId?.trim();
+    if (!userId) {
+      throw new BadRequestException('userId is required');
+    }
+    const role = body?.role ?? 'MEMBER';
+    if (role !== 'MEMBER' && role !== 'ADMIN') {
+      throw new BadRequestException('role must be either MEMBER or ADMIN');
+    }
+    return this.orgService.addMember(ctx, userId, role);
   }
 
   @Patch('members/:userId')

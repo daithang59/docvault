@@ -110,6 +110,25 @@ services:
     networks: [docvault-net]
     restart: "no"
 
+  clamav:
+    image: clamav/clamav:stable
+    container_name: docvault-clamav
+    ports:
+      - "${CLAMAV_PORT}:3310"
+    volumes:
+      - clamav_data:/var/lib/clamav
+    healthcheck:
+      # clamdcheck.sh PINGs clamd over the local socket. start_period is long
+      # because the first boot runs freshclam to download the virus database
+      # (~hundreds of MB) before clamd accepts connections.
+      test: ["CMD", "clamdcheck.sh"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 180s
+    networks: [docvault-net]
+    restart: unless-stopped
+
   mongo-express:
     image: mongo-express:latest
     container_name: docvault-mongo-express
@@ -135,3 +154,4 @@ volumes:
   postgres_data:
   mongo_data:
   minio_data:
+  clamav_data:

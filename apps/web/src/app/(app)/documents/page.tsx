@@ -11,6 +11,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters } from '@/components/documents/document-filters';
 import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
+import { DocumentPreviewPanel } from '@/components/documents/document-preview-panel';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
@@ -64,6 +65,7 @@ export default function DocumentsPage() {
   );
   const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
+  const [previewDoc, setPreviewDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
   const [page, setPage] = useState(1);
@@ -381,6 +383,8 @@ export default function DocumentsPage() {
                 <DocumentsTable
                   data={paginated}
                   enableSelection
+                  onRowClick={(doc) => setPreviewDoc(doc)}
+                  activeRowId={previewDoc?.id ?? null}
                   onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
                   onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
                   onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
@@ -405,6 +409,17 @@ export default function DocumentsPage() {
           )}
         </div>
       </div>
+
+      <DocumentPreviewPanel
+        doc={previewDoc}
+        onClose={() => setPreviewDoc(null)}
+        onSubmit={(doc) => { setTargetDoc(doc); setActionType('submit'); }}
+        onApprove={(doc) => { setTargetDoc(doc); setActionType('approve'); }}
+        onReject={(doc) => { setTargetDoc(doc); setActionType('reject'); }}
+        onArchive={(doc) => { setTargetDoc(doc); setActionType('archive'); }}
+        onDelete={(doc) => { setTargetDoc(doc); setActionType('delete'); }}
+        onDownload={(doc) => download(doc.id)}
+      />
 
       <ConfirmDialog
         open={actionType === 'submit'}

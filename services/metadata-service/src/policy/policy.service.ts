@@ -46,6 +46,13 @@ const SIMULATED_ROLES: SimulatedRole[] = [
   'admin',
 ];
 
+const SHARE_LINK_RECIPIENT_ROLES = new Set([
+  'viewer',
+  'editor',
+  'approver',
+  'admin',
+]);
+
 function requireEnv(name: string): string {
   const value = process.env[name];
   if (!value || value.trim().length === 0) {
@@ -348,6 +355,7 @@ export class PolicyService {
     docId: string,
     user: ServiceUser,
     context: RequestContext,
+    options: { shareToken?: string } = {},
   ) {
     const organizationId = await this.orgService.requireOrgId(context.actorId);
     const document = await this.prisma.document.findFirst({
@@ -365,6 +373,10 @@ export class PolicyService {
     const actorId = buildActorId(user);
     const roles = user.roles ?? context.roles ?? [];
     const groups = this.getActorGroups(user, context);
+    const shareGrant = await this.resolveShareGrant(docId, options.shareToken);
+    const shareAllowsMetadata =
+      (shareGrant === 'VIEW' || shareGrant === 'DOWNLOAD') &&
+      roles.some((role) => SHARE_LINK_RECIPIENT_ROLES.has(role));
 
     const deny = async (reason: string) => {
       await this.auditClient.emitEvent(context, {
@@ -384,6 +396,10 @@ export class PolicyService {
       });
       throw new ForbiddenException(reason);
     };
+
+    if (shareAllowsMetadata) {
+      return document;
+    }
 
     if (
       this.matchesPreviewAcl(
@@ -409,7 +425,21 @@ export class PolicyService {
       AclEffect.ALLOW,
     );
 
-    if (actorId === document.ownerId || hasExplicitReadAllow) {
+    // A DOWNLOAD allow is strictly stronger than READ: anyone who may download
+    // the file may also read its metadata. Treat it as a metadata-read grant.
+    const hasExplicitDownloadAllow = this.matchesAcl(
+      document.aclEntries,
+      actorId,
+      roles,
+      groups,
+      AclEffect.ALLOW,
+    );
+
+    if (
+      actorId === document.ownerId ||
+      hasExplicitReadAllow ||
+      hasExplicitDownloadAllow
+    ) {
       return document;
     }
 
@@ -431,8 +461,10 @@ export class PolicyService {
       );
     }
 
-    if (document.status !== 'PUBLISHED') {
-      return deny('Only published documents are readable by this user');
+    if (!['PUBLISHED', 'ARCHIVED'].includes(document.status)) {
+      return deny(
+        'Only published or archived documents are readable by this user',
+      );
     }
 
     const classification = document.classification as ClassificationLevel;
@@ -443,7 +475,7 @@ export class PolicyService {
 
     if (
       classification === 'INTERNAL' &&
-      roles.some((role) => ['viewer', 'editor'].includes(role))
+      roles.some((role) => ['editor'].includes(role))
     ) {
       return document;
     }
@@ -516,23 +548,35 @@ export class PolicyService {
       ],
     };
 
-    await this.auditClient.emitEvent(context, {
-      action: 'AI_GUARDRAILS_EVALUATED',
-      resourceType: 'DOCUMENT',
-      resourceId: docId,
-      result: 'SUCCESS',
-      metadata: {
-        docId,
-        actorId,
-        roles,
-        groups,
-        classification: document.classification,
-        status: document.status,
-        canUseContent: result.canUseContent,
-        allowedOperations,
-        deniedOperations,
-      },
-    });
+    // Only audit when the guardrail actually restricts something. A plain page
+    // view where every AI operation is allowed produces no security signal, and
+    // emitting it on every render floods the activity timeline (this endpoint
+    // runs once per document-detail load). Denials are the auditable decision —
+    // matching how metadata-read only logs DENY, never routine allows.
+    //
+    // result stays SUCCESS: the evaluation succeeded and merely reports which
+    // operations are unavailable. Marking it DENY would feed deny-burst and
+    // repeated-deny detection, turning normal browsing by a restricted role
+    // (e.g. compliance officer) into false anomaly signals.
+    if (deniedOperations.length > 0) {
+      await this.auditClient.emitEvent(context, {
+        action: 'AI_GUARDRAILS_EVALUATED',
+        resourceType: 'DOCUMENT',
+        resourceId: docId,
+        result: 'SUCCESS',
+        metadata: {
+          docId,
+          actorId,
+          roles,
+          groups,
+          classification: document.classification,
+          status: document.status,
+          canUseContent: result.canUseContent,
+          allowedOperations,
+          deniedOperations,
+        },
+      });
+    }
 
     return result;
   }
@@ -747,14 +791,14 @@ export class PolicyService {
     if (role === 'approver') {
       return ['PENDING', 'PUBLISHED', 'ARCHIVED'].includes(status);
     }
-    if (status !== 'PUBLISHED') {
+    if (!['PUBLISHED', 'ARCHIVED'].includes(status)) {
       return false;
     }
     if (classification === 'PUBLIC') {
       return true;
     }
     if (classification === 'INTERNAL') {
-      return role === 'viewer' || role === 'editor';
+      return role === 'editor';
     }
     return false;
   }
@@ -913,6 +957,12 @@ export class PolicyService {
       return null;
     }
 
+    // Owner can preview their own documents regardless of classification
+    // (Practical Security model: allows owner to verify uploaded content)
+    if (actorId === ownerId) {
+      return null;
+    }
+
     return this.getClassificationDeniedReason(
       classification,
       roles,
@@ -939,23 +989,21 @@ export class PolicyService {
         return null;
 
       case 'INTERNAL':
-        if (
-          !roles.some((r) =>
-            ['viewer', 'editor', 'approver', 'admin'].includes(r),
-          )
-        ) {
-          return 'INTERNAL documents require at least the viewer role';
+        if (!roles.some((r) => ['editor', 'approver', 'admin'].includes(r))) {
+          return 'INTERNAL documents require at least the editor role';
         }
         return null;
 
       case 'CONFIDENTIAL':
+        // Option A: an explicit ACL ALLOW (or ownership) grants access regardless
+        // of role tier. DENY is evaluated earlier by the caller and still wins.
+        if (hasExplicitAllow || actorId === ownerId) {
+          return null;
+        }
         if (!roles.some((r) => ['editor', 'approver', 'admin'].includes(r))) {
           return 'CONFIDENTIAL documents require at least the editor role';
         }
-        if (actorId !== ownerId && !hasExplicitAllow) {
-          return 'CONFIDENTIAL documents require explicit ACL grant or document ownership';
-        }
-        return null;
+        return 'CONFIDENTIAL documents require explicit ACL grant or document ownership';
 
       case 'SECRET':
         if (!roles.some((r) => ['approver', 'admin'].includes(r))) {

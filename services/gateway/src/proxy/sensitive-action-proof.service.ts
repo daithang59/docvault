@@ -52,7 +52,9 @@ export class SensitiveActionProofService {
     if (
       normalizePhrase(body.challengePhrase) !== normalizePhrase(expectedPhrase)
     ) {
-      throw new BadRequestException('Invalid sensitive action challenge phrase');
+      throw new BadRequestException(
+        'Invalid sensitive action challenge phrase',
+      );
     }
 
     const actor = this.getActor(req);
@@ -144,14 +146,16 @@ export class SensitiveActionProofService {
 
     const nowSeconds = Math.floor(Date.now() / 1000);
     const ageSeconds = nowSeconds - authTimeSeconds;
-    if (ageSeconds > maxAgeSeconds) {
+    // Only block on a stale auth_time when recent-auth is actually required.
+    // Otherwise the age is reported for audit but never gates the action.
+    if (requireRecentAuth && ageSeconds > maxAgeSeconds) {
       throw new ForbiddenException(
         'Recent authentication is required for sensitive actions',
       );
     }
 
     return {
-      checked: true,
+      checked: requireRecentAuth,
       maxAgeSeconds,
       authTime: new Date(authTimeSeconds * 1000).toISOString(),
       ageSeconds,

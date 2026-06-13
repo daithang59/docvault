@@ -63,11 +63,18 @@ export function DocumentWorkflowTimeline({
 }: DocumentWorkflowTimelineProps) {
   const { session } = useAuth();
   const currentSub = session?.user.sub;
-  const actorIds = [...new Set(history.map((h) => h.actorId).filter(Boolean))];
-  const { data: displayNames } = useOwnerDisplayNames(actorIds);
   const lifecycle = document
     ? buildDocumentLifecycleTimeline(document, history)
     : null;
+  const actorIds = [
+    ...new Set(
+      [
+        ...history.map((h) => h.actorId),
+        ...(lifecycle?.stages.map((s) => s.actorId) ?? []),
+      ].filter((id): id is string => Boolean(id)),
+    ),
+  ];
+  const { data: displayNames } = useOwnerDisplayNames(actorIds);
   const sorted = [...history].sort(
     (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
   );
@@ -104,11 +111,17 @@ export function DocumentWorkflowTimeline({
                     {formatDateTime(stage.timestamp)}
                   </p>
                 )}
-                {stage.actorLabel && (
-                  <p className="mt-1 truncate text-[11px] font-medium text-[var(--text-muted)]">
-                    {stage.actorLabel}
-                  </p>
-                )}
+                {(() => {
+                  const resolved =
+                    (stage.actorId === currentSub && session?.user.displayName) ||
+                    (stage.actorId && displayNames?.[stage.actorId]?.displayName) ||
+                    stage.actorLabel;
+                  return resolved ? (
+                    <p className="mt-1 truncate text-[11px] font-medium text-[var(--text-muted)]">
+                      {resolved}
+                    </p>
+                  ) : null;
+                })()}
               </div>
             ))}
           </div>

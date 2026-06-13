@@ -4,7 +4,7 @@ import { firstValueFrom } from 'rxjs';
 import { RequestContext } from '../common/request-context';
 
 type NotifyPayload = {
-  type: 'MENTIONED' | 'COMMENTED';
+  type: 'MENTIONED' | 'COMMENTED' | 'VERSION_UPLOADED' | 'DLP_DETECTED';
   docId: string;
   recipientIds?: string[];
   recipientId?: string;

@@ -23,7 +23,7 @@ export default function SharedRedeemPage() {
         if (cancelled) return;
         // Remember the raw token so download/preview can re-authorize using the
         // link's permission for this document during the session.
-        rememberShareToken(res.docId, token);
+        rememberShareToken(res.docId, token, res.permission);
         router.replace(ROUTES.DOCUMENT_DETAIL(res.docId));
       })
       .catch((err) => {

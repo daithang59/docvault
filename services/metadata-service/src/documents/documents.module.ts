@@ -8,6 +8,7 @@ import { AuditModule } from '../audit/audit.module';
 import { PolicyModule } from '../policy/policy.module';
 import { StatusModule } from '../status/status.module';
 import { VersionsModule } from '../versions/versions.module';
+import { ApproverDirectoryModule } from '../approvers/approver-directory.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { VersionsModule } from '../versions/versions.module';
     StatusModule,
     VersionsModule,
     CommentsModule,
+    ApproverDirectoryModule,
   ],
   controllers: [DocumentsController],
   providers: [DocumentsService, TrashPurgeService],

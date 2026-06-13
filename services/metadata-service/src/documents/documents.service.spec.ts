@@ -36,6 +36,7 @@ describe('DocumentsService DLP downgrade guard', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -145,6 +146,7 @@ describe('DocumentsService access-controlled list visibility', () => {
       } as any,
       { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -182,6 +184,36 @@ describe('DocumentsService access-controlled list visibility', () => {
     expect(queryText).toContain('"subjectId":"/blocked-team"');
     expect(queryText).toContain('"NOT"');
     expect(queryText).toContain('"effect":"DENY"');
+  });
+
+  it('limits viewer baseline list visibility to PUBLIC records', async () => {
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'viewer-1',
+      roles: ['viewer'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"status":{"in":["PUBLISHED","ARCHIVED"]}');
+    expect(queryText).toContain('"classification":"PUBLIC"');
+    // Viewers no longer see INTERNAL records in the baseline list.
+    expect(queryText).not.toContain('"classification":"INTERNAL"');
+  });
+
+  it('includes INTERNAL records in baseline list visibility for editor+', async () => {
+    await service.findAll({
+      traceId: 'trace-1',
+      actorId: 'editor-1',
+      roles: ['editor'],
+      groups: [],
+    } as any);
+
+    const queryText = JSON.stringify(mockDocumentFindMany.mock.calls[0][0]);
+
+    expect(queryText).toContain('"classification":"PUBLIC"');
+    expect(queryText).toContain('"classification":"INTERNAL"');
   });
 
   it('returns latest version file metadata in document list summaries', async () => {
@@ -341,6 +373,7 @@ describe('DocumentsService legal hold', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -466,6 +499,7 @@ describe('DocumentsService trash', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -605,6 +639,7 @@ describe('DocumentsService approval chain', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -721,6 +756,7 @@ describe('DocumentsService purge expired trash', () => {
       } as any,
       { emitEvent: mockEmitEvent } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-1') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 
@@ -796,6 +832,7 @@ describe('DocumentsService tenant isolation', () => {
       } as any,
       { emitEvent: jest.fn().mockResolvedValue(undefined) } as any,
       { requireOrgId: jest.fn().mockResolvedValue('org-acme') } as any,
+      { getApprovers: jest.fn().mockResolvedValue({ userIds: [] }) } as any,
     );
   });
 

@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import type { FormEvent } from 'react';
-import { useMemo, useState } from 'react';
+import { createContext, useContext, useMemo, useState } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import {
   Clock,
@@ -30,6 +30,7 @@ import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateMiddle } from '@/lib/utils/format';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { auditKeys } from '@/features/audit/audit.keys';
 import {
   getSecurityRecommendationWorkflowHistory,
@@ -61,6 +62,41 @@ const metricIcons: Record<SecurityDashboardMetric['key'], typeof ShieldX> = {
   malwareBlocked: Bug,
   dlpDetections: FileWarning,
 };
+
+type ActorNameMap = Record<string, { displayName: string; username: string }>;
+
+// Resolved actor display names, provided once at the page level so every panel
+// can swap opaque keycloak ids for human names without re-fetching.
+const ActorNamesContext = createContext<ActorNameMap>({});
+
+function useActorNames(): ActorNameMap {
+  return useContext(ActorNamesContext);
+}
+
+function resolveActorName(id: string, names: ActorNameMap, fallbackLength: number): string {
+  const displayName = names[id]?.displayName;
+  // Keep a truncated id when the directory can't resolve the actor — it stays
+  // correlatable for investigation, which "Unknown User" would lose.
+  if (displayName && displayName !== 'Unknown User') return displayName;
+  return truncateMiddle(id, fallbackLength);
+}
+
+function ActorLabel({ id, length = 18 }: { id: string; length?: number }) {
+  const names = useActorNames();
+  return <>{resolveActorName(id, names, length)}</>;
+}
+
+// Server-built titles/reasons embed full actor ids (e.g. "...access by <uuid>").
+// Swap each known id for its display name so the prose reads naturally.
+function humanizeActorText(text: string, names: ActorNameMap): string {
+  let result = text;
+  for (const [id, info] of Object.entries(names)) {
+    if (info.displayName && info.displayName !== 'Unknown User' && result.includes(id)) {
+      result = result.split(id).join(info.displayName);
+    }
+  }
+  return result;
+}
 
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
 const recommendationWorkflowOptions: Array<{
@@ -158,6 +194,24 @@ export default function SecurityPage() {
     () => mergeRecentEvents(deniedQuery.data?.data ?? [], dlpQuery.data?.data ?? []),
     [deniedQuery.data?.data, dlpQuery.data?.data],
   );
+  // Gather every actor id surfaced across the dashboard so we can resolve all
+  // display names in a single batched request shared by the panels below.
+  const actorIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const actor of model.repeatedDenyActors) ids.add(actor.actorId);
+    for (const signal of model.behaviorAnomalies.signals) ids.add(signal.actorId);
+    for (const item of model.recommendations.items) {
+      for (const actorId of item.affectedActorIds) ids.add(actorId);
+      if (item.workflow.updatedBy) ids.add(item.workflow.updatedBy);
+    }
+    for (const event of recentEvents) if (event.actorId) ids.add(event.actorId);
+    for (const event of model.activity.sensitiveAccessEvents) {
+      if (event.actorId) ids.add(event.actorId);
+    }
+    return [...ids];
+  }, [model, recentEvents]);
+  const { data: actorNames } = useOwnerDisplayNames(actorIds);
+  const actorNameMap = useMemo<ActorNameMap>(() => actorNames ?? {}, [actorNames]);
   const isSecurityFetching =
     summaryQuery.isFetching ||
     deniedQuery.isFetching ||
@@ -319,6 +373,7 @@ export default function SecurityPage() {
   const auditChain = summaryQuery.data?.chain ?? { valid: false, checked: 0 };
 
   return (
+    <ActorNamesContext.Provider value={actorNameMap}>
     <div>
       <PageHeader
         title="Security"
@@ -425,6 +480,7 @@ export default function SecurityPage() {
         <BehaviorAnomaliesPanel behaviorAnomalies={model.behaviorAnomalies} />
       </section>
     </div>
+    </ActorNamesContext.Provider>
   );
 }
 
@@ -459,6 +515,7 @@ function RecommendationsPanel({
   ) => Promise<void>;
 }) {
   const items = recommendations.items;
+  const actorNames = useActorNames();
 
   return (
     <div
@@ -517,10 +574,10 @@ function RecommendationsPanel({
                       </span>
                     </div>
                     <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
-                      {item.title}
+                      {humanizeActorText(item.title, actorNames)}
                     </h3>
                     <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {item.reason}
+                      {humanizeActorText(item.reason, actorNames)}
                     </p>
                   </div>
                   <Link
@@ -538,7 +595,7 @@ function RecommendationsPanel({
                       Recommended action
                     </p>
                     <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {item.recommendedAction}
+                      {humanizeActorText(item.recommendedAction, actorNames)}
                     </p>
                   </div>
                   <div>
@@ -566,7 +623,7 @@ function RecommendationsPanel({
                         key={actorId}
                         className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
                       >
-                        actor {truncateMiddle(actorId, 18)}
+                        actor <ActorLabel id={actorId} length={18} />
                       </span>
                     ))}
                   </div>
@@ -757,7 +814,7 @@ function RecommendationHistoryControls({
                   </span>
                 </div>
                 <p className="mt-1 text-[11px] text-[var(--text-faint)]">
-                  actor {truncateMiddle(entry.updatedBy, 18)} · event{' '}
+                  actor <ActorLabel id={entry.updatedBy} length={18} /> · event{' '}
                   {truncateMiddle(entry.eventId, 18)}
                 </p>
                 {entry.note ? (
@@ -832,9 +889,11 @@ function RecommendationWorkflowControls({
               {item.workflow.updatedAt
                 ? `Updated ${formatDateTime(item.workflow.updatedAt)}`
                 : 'Updated'}{' '}
-              {item.workflow.updatedBy
-                ? `by ${truncateMiddle(item.workflow.updatedBy, 18)}`
-                : ''}
+              {item.workflow.updatedBy ? (
+                <>
+                  by <ActorLabel id={item.workflow.updatedBy} length={18} />
+                </>
+              ) : null}
             </p>
           ) : null}
         </div>
@@ -1138,7 +1197,7 @@ function AccessActivityPanel({
                 </span>
               </div>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor {truncateMiddle(event.actorId, 16)}
+                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
               </p>
               <p className="mt-1 text-xs text-[var(--text-faint)]">
                 {event.resourceId
@@ -1191,7 +1250,7 @@ function RecentSecurityEvents({
                 </span>
               </div>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor {truncateMiddle(event.actorId, 16)}
+                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
               </p>
               <p className="mt-1 text-xs text-[var(--text-faint)]">
                 {event.reason ?? event.resourceType}
@@ -1229,8 +1288,8 @@ function RepeatedActorsPanel({
               key={actor.actorId}
               className="rounded-lg border border-[var(--border-soft)] p-3"
             >
-              <p className="font-mono text-xs text-[var(--text-main)]">
-                {truncateMiddle(actor.actorId, 22)}
+              <p className="text-xs font-medium text-[var(--text-main)]">
+                <ActorLabel id={actor.actorId} length={22} />
               </p>
               <p className="mt-1 text-xs text-[var(--text-muted)]">
                 {actor.denyCount} denied request{actor.denyCount === 1 ? '' : 's'} · {actor.riskLabel}
@@ -1408,8 +1467,8 @@ function BehaviorAnomaliesPanel({
                         {signal.typeLabel}
                       </span>
                     </div>
-                    <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
-                      {truncateMiddle(signal.actorId, 34)}
+                    <p className="mt-2 text-sm font-medium text-[var(--text-strong)]">
+                      <ActorLabel id={signal.actorId} length={34} />
                     </p>
                     <p className="mt-1 text-xs text-[var(--text-muted)]">
                       {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}

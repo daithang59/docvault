@@ -134,7 +134,7 @@ Runbook: `docs/web-key-rotation-and-mfa-runbook.md`.
   - `PUBLIC_730D`
   - `INTERNAL_365D`
   - `CONFIDENTIAL_180D`
-  - `SECRET_30D`
+  - `SECRET_90D`
 - Compliance/admin can inspect retention evidence through `GET /metadata/retention/documents`.
 - Admin can trigger the local demo retention run through `POST /metadata/retention/run`.
 - Due records are auto-archived as `ARCHIVED`.

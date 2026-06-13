@@ -87,8 +87,15 @@ export async function getDocuments(
   );
 }
 
-export async function getDocument(id: string): Promise<DocumentDetail> {
-  const res = await apiClient.get<DocumentDetail>(apiEndpoints.metadata.documents.detail(id));
+export async function getDocument(
+  id: string,
+  shareToken?: string,
+): Promise<DocumentDetail> {
+  const endpoint = apiEndpoints.metadata.documents.detail(id);
+  const params = new URLSearchParams();
+  if (shareToken) params.set('shareToken', shareToken);
+  const url = params.toString() ? `${endpoint}?${params}` : endpoint;
+  const res = await apiClient.get<DocumentDetail>(url);
   return normalizeDocumentDetail(unwrap(res));
 }
 

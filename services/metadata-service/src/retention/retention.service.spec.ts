@@ -30,10 +30,10 @@ function makeDocument(overrides: Record<string, unknown> = {}) {
     classification: 'SECRET',
     publishedAt: new Date('2026-04-01T00:00:00.000Z'),
     archivedAt: null,
-    retentionClass: 'SECRET_30D',
-    retentionUntil: new Date('2026-05-01T00:00:00.000Z'),
+    retentionClass: 'SECRET_90D',
+    retentionUntil: new Date('2026-06-30T00:00:00.000Z'),
     retentionReason:
-      'SECRET records are retained for 30 days after publication',
+      'SECRET records are retained for 90 days after publication',
     ...overrides,
   };
 }
@@ -51,7 +51,7 @@ describe('RetentionService', () => {
   });
 
   it('archives due published records with workflow and audit evidence', async () => {
-    const now = new Date('2026-05-30T00:00:00.000Z');
+    const now = new Date('2026-07-01T00:00:00.000Z');
     mockDocumentFindMany.mockResolvedValueOnce([makeDocument()]);
 
     const result = await service.runRetention({
@@ -75,7 +75,7 @@ describe('RetentionService', () => {
         toStatus: 'ARCHIVED',
         action: 'RETENTION',
         actorId: 'system:retention',
-        reason: 'Auto-archived by retention policy SECRET_30D',
+        reason: 'Auto-archived by retention policy SECRET_90D',
       },
     });
     expect(mockEmitEvent).toHaveBeenCalledWith(
@@ -89,8 +89,8 @@ describe('RetentionService', () => {
         resourceId: 'doc-1',
         result: 'SUCCESS',
         metadata: expect.objectContaining({
-          retentionClass: 'SECRET_30D',
-          retentionUntil: '2026-05-01T00:00:00.000Z',
+          retentionClass: 'SECRET_90D',
+          retentionUntil: '2026-06-30T00:00:00.000Z',
           requestedBy: 'admin1',
           triggeredBy: 'system:retention',
         }),
