@@ -5,6 +5,7 @@ import {
   type SecurityRecommendationRow,
   type SecurityRecommendationSlaState,
 } from '@/features/audit/security-dashboard';
+import { ROUTES } from '@/lib/constants/routes';
 import type {
   RetentionEvidenceResult,
   RetentionStatus,
@@ -16,6 +17,11 @@ import type {
 import type { ClassificationLevel, DocumentStatus } from '@/types/enums';
 
 export type EvidenceSourceState = 'ready' | 'attention' | 'empty';
+export type EvidenceCommandCenterTone =
+  | 'info'
+  | 'success'
+  | 'warning'
+  | 'critical';
 
 export type UserDisplayNameMap = Record<
   string,
@@ -63,6 +69,44 @@ export interface EvidenceSourceCard {
   state: EvidenceSourceState;
 }
 
+export interface EvidenceReadinessGauge {
+  label: string;
+  value: number;
+  tone: EvidenceCommandCenterTone;
+  description: string;
+  href: string;
+}
+
+export interface EvidenceCommandMetric {
+  key:
+    | 'recommendation-packets'
+    | 'document-packets'
+    | 'retention-records'
+    | 'audit-events';
+  label: string;
+  value: number;
+  description: string;
+  tone: EvidenceCommandCenterTone;
+  href: string;
+}
+
+export interface EvidenceCommandSegment {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+  tone: EvidenceCommandCenterTone;
+  href?: string;
+}
+
+export interface EvidenceCommandCenter {
+  readinessGauge: EvidenceReadinessGauge;
+  metrics: EvidenceCommandMetric[];
+  sourceStateSegments: EvidenceCommandSegment[];
+  packetTargetSegments: EvidenceCommandSegment[];
+  retentionSegments: EvidenceCommandSegment[];
+}
+
 export interface EvidenceRecommendationTarget {
   id: string;
   title: string;
@@ -88,6 +132,7 @@ export interface EvidenceDocumentPacketTarget {
 export interface EvidenceCenterModel {
   generatedAt: string;
   auditChain: AuditChainStatus;
+  commandCenter: EvidenceCommandCenter;
   sourceCards: EvidenceSourceCard[];
   recommendationTargets: EvidenceRecommendationTarget[];
   documentPacketTargets: EvidenceDocumentPacketTarget[];
@@ -270,55 +315,290 @@ export function buildEvidenceCenterModel({
   );
   const documentPacketTargets =
     retentionEvidence.records.map(buildDocumentPacketTarget);
+  const sourceCards = buildEvidenceSourceCards({
+    auditChain: securitySummary.chain,
+    recommendationTargets,
+    retentionEvidence,
+    documentPacketTargets,
+  });
 
   return {
     generatedAt,
     auditChain: securitySummary.chain,
-    sourceCards: [
-      {
-        key: 'audit-chain',
-        label: 'Audit Chain',
-        value: String(securitySummary.chain.checked),
-        description: securitySummary.chain.valid
-          ? 'Hash-chain verification is available for audit exports.'
-          : 'Hash-chain verification needs review before evidence export.',
-        state: securitySummary.chain.valid ? 'ready' : 'attention',
-      },
-      {
-        key: 'recommendations',
-        label: 'Recommendation Packets',
-        value: String(recommendationTargets.length),
-        description:
-          'Metadata-only recommendation packets with workflow history and playbook.',
-        state: recommendationTargets.length > 0 ? 'attention' : 'empty',
-      },
-      {
-        key: 'retention',
-        label: 'Retention Evidence',
-        value: String(retentionEvidence.summary.tracked),
-        description:
-          'Records lifecycle evidence, due-soon and overdue retention status.',
-        state:
-          retentionEvidence.summary.dueSoon > 0 ||
-          retentionEvidence.summary.overdue > 0
-            ? 'attention'
-            : retentionEvidence.summary.tracked > 0
-              ? 'ready'
-              : 'empty',
-      },
-      {
-        key: 'document-packets',
-        label: 'Document Packets',
-        value: String(documentPacketTargets.length),
-        description:
-          'Document compliance packet targets from retention evidence records.',
-        state: documentPacketTargets.length > 0 ? 'ready' : 'empty',
-      },
-    ],
+    commandCenter: buildEvidenceCommandCenter({
+      auditChain: securitySummary.chain,
+      sourceCards,
+      recommendationTargets,
+      documentPacketTargets,
+      retentionSummary: retentionEvidence.summary,
+    }),
+    sourceCards,
     recommendationTargets,
     documentPacketTargets,
     retentionSummary: retentionEvidence.summary,
   };
+}
+
+function buildEvidenceSourceCards({
+  auditChain,
+  recommendationTargets,
+  retentionEvidence,
+  documentPacketTargets,
+}: {
+  auditChain: AuditChainStatus;
+  recommendationTargets: EvidenceRecommendationTarget[];
+  retentionEvidence: RetentionEvidenceResult;
+  documentPacketTargets: EvidenceDocumentPacketTarget[];
+}): EvidenceSourceCard[] {
+  return [
+    {
+      key: 'audit-chain',
+      label: 'Audit Chain',
+      value: String(auditChain.checked),
+      description: auditChain.valid
+        ? 'Hash-chain verification is available for audit exports.'
+        : 'Hash-chain verification needs review before evidence export.',
+      state: auditChain.valid ? 'ready' : 'attention',
+    },
+    {
+      key: 'recommendations',
+      label: 'Recommendation Packets',
+      value: String(recommendationTargets.length),
+      description:
+        'Metadata-only recommendation packets with workflow history and playbook.',
+      state: recommendationTargets.length > 0 ? 'attention' : 'empty',
+    },
+    {
+      key: 'retention',
+      label: 'Retention Evidence',
+      value: String(retentionEvidence.summary.tracked),
+      description:
+        'Records lifecycle evidence, due-soon and overdue retention status.',
+      state:
+        retentionEvidence.summary.dueSoon > 0 ||
+        retentionEvidence.summary.overdue > 0
+          ? 'attention'
+          : retentionEvidence.summary.tracked > 0
+            ? 'ready'
+            : 'empty',
+    },
+    {
+      key: 'document-packets',
+      label: 'Document Packets',
+      value: String(documentPacketTargets.length),
+      description:
+        'Document compliance packet targets from retention evidence records.',
+      state: documentPacketTargets.length > 0 ? 'ready' : 'empty',
+    },
+  ];
+}
+
+function buildEvidenceCommandCenter({
+  auditChain,
+  sourceCards,
+  recommendationTargets,
+  documentPacketTargets,
+  retentionSummary,
+}: {
+  auditChain: AuditChainStatus;
+  sourceCards: EvidenceSourceCard[];
+  recommendationTargets: EvidenceRecommendationTarget[];
+  documentPacketTargets: EvidenceDocumentPacketTarget[];
+  retentionSummary: RetentionEvidenceResult['summary'];
+}): EvidenceCommandCenter {
+  const readySources = sourceCards.filter((card) => card.state === 'ready').length;
+  const attentionSources = sourceCards.length - readySources;
+  const readinessScore = Math.round(
+    sourceCards.reduce((score, card) => score + sourceStateScore(card.state), 0) /
+      Math.max(sourceCards.length, 1),
+  );
+
+  return {
+    readinessGauge: {
+      label: 'Evidence readiness',
+      value: readinessScore,
+      tone: getReadinessTone(readinessScore),
+      description: `${readySources} of ${sourceCards.length} evidence sources are ready; ${attentionSources} need attention or source data.`,
+      href: ROUTES.EVIDENCE,
+    },
+    metrics: [
+      {
+        key: 'recommendation-packets',
+        label: 'Recommendation packets',
+        value: recommendationTargets.length,
+        description: 'Security recommendation packets available for export.',
+        tone: sourceStateToneValue(
+          sourceCards.find((card) => card.key === 'recommendations')?.state,
+        ),
+        href: '#recommendation-packets',
+      },
+      {
+        key: 'document-packets',
+        label: 'Document packets',
+        value: documentPacketTargets.length,
+        description: 'Document evidence packets from retention records.',
+        tone: sourceStateToneValue(
+          sourceCards.find((card) => card.key === 'document-packets')?.state,
+        ),
+        href: '#document-packets',
+      },
+      {
+        key: 'retention-records',
+        label: 'Retention records',
+        value: retentionSummary.tracked,
+        description: 'Tracked retention records included in evidence posture.',
+        tone: sourceStateToneValue(
+          sourceCards.find((card) => card.key === 'retention')?.state,
+        ),
+        href: ROUTES.RETENTION,
+      },
+      {
+        key: 'audit-events',
+        label: 'Audit events',
+        value: auditChain.checked,
+        description: 'Hash-chain checked events supporting evidence integrity.',
+        tone: sourceStateToneValue(
+          sourceCards.find((card) => card.key === 'audit-chain')?.state,
+        ),
+        href: ROUTES.AUDIT,
+      },
+    ],
+    sourceStateSegments: buildSourceStateSegments(sourceCards),
+    packetTargetSegments: buildPacketTargetSegments(
+      recommendationTargets.length,
+      documentPacketTargets.length,
+    ),
+    retentionSegments: buildRetentionSegments(retentionSummary),
+  };
+}
+
+function buildSourceStateSegments(
+  sourceCards: EvidenceSourceCard[],
+): EvidenceCommandSegment[] {
+  const counts = sourceCards.reduce<Record<EvidenceSourceState, number>>(
+    (acc, card) => {
+      acc[card.state] += 1;
+      return acc;
+    },
+    { ready: 0, attention: 0, empty: 0 },
+  );
+  const total = sourceCards.length;
+
+  return [
+    {
+      key: 'ready',
+      label: 'Ready',
+      value: counts.ready,
+      percentage: toPercentage(counts.ready, total),
+      tone: 'success',
+    },
+    {
+      key: 'attention',
+      label: 'Attention',
+      value: counts.attention,
+      percentage: toPercentage(counts.attention, total),
+      tone: 'warning',
+    },
+    {
+      key: 'empty',
+      label: 'Empty',
+      value: counts.empty,
+      percentage: toPercentage(counts.empty, total),
+      tone: 'info',
+    },
+  ];
+}
+
+function buildPacketTargetSegments(
+  recommendationCount: number,
+  documentCount: number,
+): EvidenceCommandSegment[] {
+  const total = recommendationCount + documentCount;
+
+  return [
+    {
+      key: 'recommendations',
+      label: 'Recommendations',
+      value: recommendationCount,
+      percentage: toPercentage(recommendationCount, total),
+      tone: recommendationCount > 0 ? 'warning' : 'info',
+      href: '#recommendation-packets',
+    },
+    {
+      key: 'documents',
+      label: 'Documents',
+      value: documentCount,
+      percentage: toPercentage(documentCount, total),
+      tone: documentCount > 0 ? 'success' : 'info',
+      href: '#document-packets',
+    },
+  ];
+}
+
+function buildRetentionSegments(
+  summary: RetentionEvidenceResult['summary'],
+): EvidenceCommandSegment[] {
+  const total = summary.tracked;
+
+  return [
+    {
+      key: 'active',
+      label: 'Active',
+      value: summary.active,
+      percentage: toPercentage(summary.active, total),
+      tone: 'success',
+      href: ROUTES.RETENTION,
+    },
+    {
+      key: 'due-soon',
+      label: 'Due soon',
+      value: summary.dueSoon,
+      percentage: toPercentage(summary.dueSoon, total),
+      tone: summary.dueSoon > 0 ? 'warning' : 'success',
+      href: ROUTES.RETENTION,
+    },
+    {
+      key: 'overdue',
+      label: 'Overdue',
+      value: summary.overdue,
+      percentage: toPercentage(summary.overdue, total),
+      tone: summary.overdue > 0 ? 'critical' : 'success',
+      href: ROUTES.RETENTION,
+    },
+    {
+      key: 'archived',
+      label: 'Archived',
+      value: summary.archived,
+      percentage: toPercentage(summary.archived, total),
+      tone: 'info',
+      href: ROUTES.RETENTION,
+    },
+  ];
+}
+
+function sourceStateScore(state: EvidenceSourceState): number {
+  if (state === 'ready') return 100;
+  if (state === 'attention') return 50;
+  return 0;
+}
+
+function sourceStateToneValue(
+  state: EvidenceSourceState | undefined,
+): EvidenceCommandCenterTone {
+  if (state === 'ready') return 'success';
+  if (state === 'attention') return 'warning';
+  return 'info';
+}
+
+function getReadinessTone(value: number): EvidenceCommandCenterTone {
+  if (value >= 80) return 'success';
+  if (value >= 50) return 'warning';
+  return 'critical';
+}
+
+function toPercentage(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
 }
 
 export function buildEvidenceCenterManifest(

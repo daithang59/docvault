@@ -23,4 +23,17 @@ describe('parseAuditFilterQuery', () => {
       recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
     });
   });
+
+  it('parses behavior-signal audit evidence deep links', () => {
+    expect(
+      parseAuditFilterQuery(
+        'actionGroup=AUTHORIZED_CONTENT_ACCESS&actorId=editor-1&from=2026-05-30T10%3A00%3A00.000Z&to=2026-05-30T10%3A08%3A00.000Z',
+      ),
+    ).toEqual({
+      actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+      actorId: 'editor-1',
+      from: '2026-05-30T10:00:00.000Z',
+      to: '2026-05-30T10:08:00.000Z',
+    });
+  });
 });

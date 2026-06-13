@@ -431,9 +431,14 @@ components:
       properties:
         actorId: { type: string }
         action: { type: string }
+        actionGroup:
+          type: string
+          enum: [AUTHORIZED_CONTENT_ACCESS, DESTRUCTIVE_ACTIVITY]
         resourceType: { type: string }
         resourceId: { type: string }
         documentId: { type: string, description: Matches DOCUMENT resourceId and related events carrying metadata.docId }
+        aclId: { type: string, description: Matches ACL-level audit events carrying metadata.aclId or metadata.removedAclId }
+        recommendationId: { type: string, description: Matches SECURITY_RECOMMENDATION workflow events and recommendation metadata references }
         result: { $ref: '#/components/schemas/AuditEventResult' }
         from: { type: string, format: date-time }
         to: { type: string, format: date-time }
@@ -591,10 +596,15 @@ components:
           properties:
             actorId: { type: string }
             action: { type: string }
+            actionGroup:
+              type: string
+              enum: [AUTHORIZED_CONTENT_ACCESS, DESTRUCTIVE_ACTIVITY]
             result: { $ref: '#/components/schemas/AuditEventResult' }
             resourceType: { type: string }
             resourceId: { type: string }
             documentId: { type: string }
+            from: { type: string, format: date-time }
+            to: { type: string, format: date-time }
         workflow:
           $ref: '#/components/schemas/SecurityRecommendationWorkflowSummary'
 
@@ -1724,6 +1734,12 @@ paths:
         - in: query
           name: action
           schema: { type: string }
+        - in: query
+          name: actionGroup
+          schema:
+            type: string
+            enum: [AUTHORIZED_CONTENT_ACCESS, DESTRUCTIVE_ACTIVITY]
+          description: Expands to a supported evidence action set, such as authorized preview/download grants.
         - in: query
           name: resourceType
           schema: { type: string }

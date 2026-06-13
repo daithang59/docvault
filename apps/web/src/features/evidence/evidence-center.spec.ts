@@ -135,6 +135,63 @@ describe('buildEvidenceCenterModel', () => {
         state: 'ready',
       }),
     ]);
+    expect(model.commandCenter.readinessGauge).toEqual({
+      label: 'Evidence readiness',
+      value: 75,
+      tone: 'warning',
+      description:
+        '2 of 4 evidence sources are ready; 2 need attention or source data.',
+      href: '/evidence',
+    });
+    expect(model.commandCenter.metrics).toEqual([
+      expect.objectContaining({
+        key: 'recommendation-packets',
+        label: 'Recommendation packets',
+        value: 2,
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'document-packets',
+        label: 'Document packets',
+        value: 2,
+        tone: 'success',
+      }),
+      expect.objectContaining({
+        key: 'retention-records',
+        label: 'Retention records',
+        value: 2,
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'audit-events',
+        label: 'Audit events',
+        value: 42,
+        tone: 'success',
+      }),
+    ]);
+    expect(model.commandCenter.sourceStateSegments).toEqual([
+      expect.objectContaining({ key: 'ready', value: 2, percentage: 50 }),
+      expect.objectContaining({ key: 'attention', value: 2, percentage: 50 }),
+      expect.objectContaining({ key: 'empty', value: 0, percentage: 0 }),
+    ]);
+    expect(model.commandCenter.packetTargetSegments).toEqual([
+      expect.objectContaining({
+        key: 'recommendations',
+        value: 2,
+        percentage: 50,
+      }),
+      expect.objectContaining({
+        key: 'documents',
+        value: 2,
+        percentage: 50,
+      }),
+    ]);
+    expect(model.commandCenter.retentionSegments).toEqual([
+      expect.objectContaining({ key: 'active', value: 1, percentage: 50 }),
+      expect.objectContaining({ key: 'due-soon', value: 1, percentage: 50 }),
+      expect.objectContaining({ key: 'overdue', value: 0, percentage: 0 }),
+      expect.objectContaining({ key: 'archived', value: 0, percentage: 0 }),
+    ]);
     expect(model.recommendationTargets[0]).toMatchObject({
       id: 'document-access-review:doc-secret',
       title: 'Tighten access for high-risk SECRET document',

@@ -392,6 +392,7 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
 
   if (filters.result) params.set('result', filters.result);
   if (filters.action) params.set('action', filters.action);
+  if (filters.actionGroup) params.set('actionGroup', filters.actionGroup);
   if (filters.actorId) params.set('actorId', filters.actorId);
   if (filters.resourceType) params.set('resourceType', filters.resourceType);
   if (filters.resourceId) params.set('resourceId', filters.resourceId);
@@ -400,6 +401,8 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
   if (filters.recommendationId) {
     params.set('recommendationId', filters.recommendationId);
   }
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
 
   return params.toString();
 }
@@ -427,9 +430,38 @@ function buildBehaviorSignalRows(
       typeLabel: getBehaviorSignalLabel(signal.type),
       riskBand,
       riskLabel: getRiskLabel(riskBand),
-      auditFilters: { actorId: signal.actorId },
+      auditFilters: getBehaviorSignalAuditFilters(signal),
     };
   });
+}
+
+function getBehaviorSignalAuditFilters(
+  signal: BehaviorSignalSummary,
+): AuditQueryFilters {
+  const windowFilters = {
+    actorId: signal.actorId,
+    from: signal.windowStartedAt,
+    to: signal.windowEndedAt,
+  };
+
+  if (signal.type === 'MASS_CONTENT_ACCESS') {
+    return {
+      ...windowFilters,
+      actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+    };
+  }
+
+  if (signal.type === 'DESTRUCTIVE_ACTIVITY') {
+    return {
+      ...windowFilters,
+      actionGroup: 'DESTRUCTIVE_ACTIVITY',
+    };
+  }
+
+  return {
+    ...windowFilters,
+    result: 'DENY',
+  };
 }
 
 function buildCommandCenter({

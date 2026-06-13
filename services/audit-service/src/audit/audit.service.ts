@@ -17,7 +17,10 @@ import {
 } from '../mongo/audit-chain-incident.schema';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
-import { QueryAuditDto } from './dto/query-audit.dto';
+import {
+  QueryAuditDto,
+  type AuditActionGroup,
+} from './dto/query-audit.dto';
 import {
   SECURITY_RECOMMENDATION_WORKFLOW_STATUSES,
   SecurityRecommendationWorkflowDto,
@@ -36,13 +39,25 @@ const AUTHORIZED_CONTENT_ACTIONS = [
   'DOCUMENT_PREVIEW_AUTHORIZED',
 ] as const;
 
+const DESTRUCTIVE_ACTIVITY_ACTIONS = [
+  'DOCUMENT_ACL_DELETED',
+  'DOCUMENT_ARCHIVE',
+  'DOCUMENT_AUTO_ARCHIVED',
+] as const;
+
+const AUDIT_ACTION_GROUP_ACTIONS: Record<
+  AuditActionGroup,
+  readonly string[]
+> = {
+  AUTHORIZED_CONTENT_ACCESS: AUTHORIZED_CONTENT_ACTIONS,
+  DESTRUCTIVE_ACTIVITY: DESTRUCTIVE_ACTIVITY_ACTIONS,
+};
+
 const BEHAVIOR_SIGNAL_ACTIONS = [
   ...AUTHORIZED_CONTENT_ACTIONS,
   'DOCUMENT_DOWNLOAD_DENIED',
   'DOCUMENT_METADATA_READ_DENIED',
-  'DOCUMENT_ACL_DELETED',
-  'DOCUMENT_ARCHIVE',
-  'DOCUMENT_AUTO_ARCHIVED',
+  ...DESTRUCTIVE_ACTIVITY_ACTIONS,
   'DOCUMENT_METADATA_UPDATED',
   'DOCUMENT_UPLOADED',
 ] as const;
@@ -144,10 +159,13 @@ export interface SecurityRecommendationSummary {
   auditFilters: {
     actorId?: string;
     action?: string;
+    actionGroup?: AuditActionGroup;
     result?: string;
     resourceType?: string;
     resourceId?: string;
     documentId?: string;
+    from?: string;
+    to?: string;
   };
   workflow: SecurityRecommendationWorkflow;
 }
@@ -434,6 +452,11 @@ export class AuditService {
 
     if (dto.actorId) filter.actorId = dto.actorId;
     if (dto.action) filter.action = dto.action;
+    if (dto.actionGroup) {
+      addAuditScope(filter, {
+        action: { $in: AUDIT_ACTION_GROUP_ACTIONS[dto.actionGroup] },
+      });
+    }
     if (dto.resourceType) filter.resourceType = dto.resourceType;
     if (dto.resourceId) filter.resourceId = dto.resourceId;
     if (dto.result) filter.result = dto.result;
@@ -448,7 +471,7 @@ export class AuditService {
       if (Object.keys(filter).length === 0) {
         Object.assign(filter, documentScope);
       } else {
-        filter.$and = [documentScope];
+        addAuditScope(filter, documentScope);
       }
     }
     if (dto.aclId) {
@@ -456,6 +479,17 @@ export class AuditService {
         $or: [
           { 'metadata.aclId': dto.aclId },
           { 'metadata.removedAclId': dto.aclId },
+        ],
+      });
+    }
+    if (dto.recommendationId) {
+      addAuditScope(filter, {
+        $or: [
+          {
+            resourceType: 'SECURITY_RECOMMENDATION',
+            resourceId: dto.recommendationId,
+          },
+          { 'metadata.recommendationId': dto.recommendationId },
         ],
       });
     }
@@ -1135,7 +1169,7 @@ export class AuditService {
         evidence: signal.reasons,
         affectedDocumentIds: [],
         affectedActorIds: [signal.actorId],
-        auditFilters: { actorId: signal.actorId },
+        auditFilters: this.getBehaviorSignalAuditFilters(signal),
         workflow: { status: 'OPEN' },
       });
     }
@@ -1362,6 +1396,35 @@ export class AuditService {
       case 'DESTRUCTIVE_ACTIVITY':
         return 'Review workflow history, validate retention intent, and restore documents if activity was unauthorized.';
     }
+  }
+
+  private getBehaviorSignalAuditFilters(
+    signal: BehaviorSignalSummary,
+  ): SecurityRecommendationSummary['auditFilters'] {
+    const windowFilters = {
+      actorId: signal.actorId,
+      from: signal.windowStartedAt,
+      to: signal.windowEndedAt,
+    };
+
+    if (signal.type === 'MASS_CONTENT_ACCESS') {
+      return {
+        ...windowFilters,
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+      };
+    }
+
+    if (signal.type === 'DESTRUCTIVE_ACTIVITY') {
+      return {
+        ...windowFilters,
+        actionGroup: 'DESTRUCTIVE_ACTIVITY',
+      };
+    }
+
+    return {
+      ...windowFilters,
+      result: 'DENY',
+    };
   }
 
   private plural(count: number, singular: string): string {

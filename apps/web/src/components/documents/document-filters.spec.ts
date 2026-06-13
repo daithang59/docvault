@@ -1,5 +1,6 @@
 import { createElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DOCUMENT_FILTERS,
@@ -27,34 +28,40 @@ const documents: DocumentListItem[] = [
 ];
 
 describe('DocumentFilters', () => {
-  it('renders saved views alongside quick views and save controls', () => {
+  it('renders quick views, saved views, and filter controls', () => {
+    const queryClient = new QueryClient({
+      defaultOptions: { queries: { retry: false } },
+    });
     const html = renderToStaticMarkup(
-      createElement(DocumentFilters, {
-        filters: DEFAULT_DOCUMENT_FILTERS,
-        options: buildDocumentFilterOptions(documents),
-        quickViews: buildDocumentQuickViewOptions(documents),
-        searchSuggestions: buildDocumentSearchSuggestions(documents),
-        savedViews: buildDocumentSavedViewOptions(documents),
-        activeSavedViewId: null,
-        resultCount: documents.length,
-        totalCount: documents.length,
-        onChange: () => undefined,
-        onApplySavedView: () => undefined,
-        onSaveCurrentView: () => undefined,
-        onDeleteSavedView: () => undefined,
-      }),
+      createElement(
+        QueryClientProvider,
+        { client: queryClient },
+        createElement(DocumentFilters, {
+          filters: DEFAULT_DOCUMENT_FILTERS,
+          options: buildDocumentFilterOptions(documents),
+          quickViews: buildDocumentQuickViewOptions(documents),
+          searchSuggestions: buildDocumentSearchSuggestions(documents),
+          savedViews: buildDocumentSavedViewOptions(documents),
+          activeSavedViewId: null,
+          resultCount: documents.length,
+          totalCount: documents.length,
+          onChange: () => undefined,
+          onApplySavedView: () => undefined,
+          onSaveCurrentView: () => undefined,
+          onDeleteSavedView: () => undefined,
+        }),
+      ),
     );
 
-    expect(html).toContain('Saved views');
+    expect(html).toContain('Document views');
+    expect(html).toContain('All');
+    expect(html).toContain('Needs action');
     expect(html).toContain('Pending review');
     expect(html).toContain('Sensitive attention');
-    expect(html).toContain('Name current view');
-    expect(html).toContain('Document quick views');
-    expect(html).toContain('Smart folders');
-    expect(html).toContain('Query chips');
-    expect(html).toContain('status:pending');
-    expect(html).toContain('class:confidential');
-    expect(html).toContain('file:board-report.pdf');
-    expect(html).toContain('Folder: finance');
+    expect(html).toContain('Search documents');
+    expect(html).toContain('Filter');
+    expect(html).toContain('Recently updated');
+    expect(html).toContain('Save view');
+    expect(html).toContain('Reset all filters');
   });
 });

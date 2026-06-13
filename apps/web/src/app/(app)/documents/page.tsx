@@ -13,6 +13,12 @@ import { DocumentFilters } from '@/components/documents/document-filters';
 import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
 import { DocumentPreviewPanel } from '@/components/documents/document-preview-panel';
 import {
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
+import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
@@ -38,6 +44,10 @@ import {
   deletePersistedDocumentSavedView,
   listPersistedDocumentSavedViews,
 } from '@/features/documents/document-saved-views.api';
+import {
+  buildDocumentCommandCenter,
+  type DocumentCommandMetric,
+} from '@/features/documents/document-command-center';
 import { EmptyState } from '@/components/common/empty-state';
 import { TableSkeleton } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
@@ -46,7 +56,6 @@ import { ConfirmDialog } from '@/components/common/confirm-dialog';
 import { TablePagination } from '@/components/data-table/table-pagination';
 import { DocumentListItem } from '@/types/document';
 import { ROUTES } from '@/lib/constants/routes';
-import { FilePlus } from 'lucide-react';
 import Link from 'next/link';
 import { toast } from 'sonner';
 import { TOAST_MESSAGES } from '@/lib/constants/labels';
@@ -54,6 +63,14 @@ import { ApiError } from '@/types/api';
 import { getErrorMessage, parseApiError } from '@/lib/api/errors';
 import { DEFAULT_PAGE_SIZE } from '@/types/pagination';
 import { scheduleDeferredAction } from '@/features/documents/deferred-action';
+import {
+  Archive,
+  CheckSquare,
+  FilePlus,
+  FileText,
+  ShieldAlert,
+  type LucideIcon,
+} from 'lucide-react';
 
 export default function DocumentsPage() {
   const qc = useQueryClient();
@@ -133,6 +150,10 @@ export default function DocumentsPage() {
       persistedSavedViewsQuery.data,
       persistedSavedViewsQuery.isError,
     ],
+  );
+  const commandCenter = useMemo(
+    () => buildDocumentCommandCenter(documents, savedViews),
+    [documents, savedViews],
   );
   const activeSavedViewId = useMemo(
     () => findMatchingDocumentSavedViewId(savedViews, filters),
@@ -327,6 +348,63 @@ export default function DocumentsPage() {
         />
       </div>
 
+      <section
+        aria-labelledby="documents-command-center"
+        className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]"
+      >
+        <h2 id="documents-command-center" className="sr-only">
+          Document control center
+        </h2>
+        <ScoreGauge
+          className="animate-in delay-1 min-h-[180px]"
+          description={commandCenter.controlGauge.description}
+          href={commandCenter.controlGauge.href}
+          label={commandCenter.controlGauge.label}
+          tone={commandCenter.controlGauge.tone}
+          value={commandCenter.controlGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {commandCenter.metrics.map((metric) => {
+            const Icon = DOCUMENT_METRIC_ICONS[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                className="animate-in delay-2"
+                description={metric.description}
+                href={metric.href}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.tone}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SegmentDonut
+          className="animate-in delay-2"
+          label="Classification mix"
+          segments={commandCenter.classificationSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Lifecycle pipeline"
+          segments={commandCenter.lifecycleSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Attention cues"
+          segments={commandCenter.attentionSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Saved view load"
+          segments={commandCenter.savedViewSegments}
+        />
+      </section>
+
       <div className="animate-in delay-2">
         <DocumentFilters
           filters={filters}
@@ -475,6 +553,13 @@ export default function DocumentsPage() {
     </div>
   );
 }
+
+const DOCUMENT_METRIC_ICONS: Record<DocumentCommandMetric['key'], LucideIcon> = {
+  'total-documents': FileText,
+  'pending-review': CheckSquare,
+  'sensitive-documents': ShieldAlert,
+  'retention-due-soon': Archive,
+};
 
 function loadCustomDocumentSavedViews(): DocumentSavedView[] {
   if (typeof window === 'undefined') return [];

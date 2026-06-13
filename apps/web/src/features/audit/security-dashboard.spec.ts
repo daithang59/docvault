@@ -184,7 +184,7 @@ describe('buildSecurityDashboardModel', () => {
     ).toBe('documentId=doc-secret');
   });
 
-  it('exposes behavior anomaly rows with actor-scoped audit deep links', () => {
+  it('exposes behavior anomaly rows with signal-scoped audit deep links', () => {
     const model = buildSecurityDashboardModel(
       summary({
         behaviorSignals: [
@@ -213,14 +213,21 @@ describe('buildSecurityDashboardModel', () => {
       typeLabel: 'Mass content access',
       riskBand: 'critical',
       riskLabel: 'Critical risk',
-      auditFilters: { actorId: 'editor-1' },
+      auditFilters: {
+        actorId: 'editor-1',
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        from: '2026-05-30T10:00:00.000Z',
+        to: '2026-05-30T10:08:00.000Z',
+      },
     });
     expect(model.alerts.map((alert) => alert.title)).toContain(
       'Behavior anomaly detected',
     );
     expect(
       buildAuditFilterQuery(model.behaviorAnomalies.signals[0].auditFilters),
-    ).toBe('actorId=editor-1');
+    ).toBe(
+      'actionGroup=AUTHORIZED_CONTENT_ACCESS&actorId=editor-1&from=2026-05-30T10%3A00%3A00.000Z&to=2026-05-30T10%3A08%3A00.000Z',
+    );
   });
 
   it('builds command-center presentation data for security visuals', () => {
@@ -619,6 +626,16 @@ describe('buildSecurityDashboardModel', () => {
         recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
       }),
     ).toBe('recommendationId=actor-access-review%3ADENY_BURST%3Aviewer-1');
+    expect(
+      buildAuditFilterQuery({
+        actorId: 'editor-1',
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        from: '2026-05-30T10:00:00.000Z',
+        to: '2026-05-30T10:08:00.000Z',
+      }),
+    ).toBe(
+      'actionGroup=AUTHORIZED_CONTENT_ACCESS&actorId=editor-1&from=2026-05-30T10%3A00%3A00.000Z&to=2026-05-30T10%3A08%3A00.000Z',
+    );
   });
 
   it('builds metadata-only evidence packets for recommendation export', () => {

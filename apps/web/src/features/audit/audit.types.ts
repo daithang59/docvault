@@ -23,9 +23,14 @@ export interface AuditLogItemDto {
 
 export type AuditLogEntry = AuditLogItemDto;
 
+export type AuditActionGroup =
+  | 'AUTHORIZED_CONTENT_ACCESS'
+  | 'DESTRUCTIVE_ACTIVITY';
+
 export interface AuditQueryFilters extends PaginationParams {
   actorId?: string;
   action?: string;
+  actionGroup?: AuditActionGroup;
   result?: AuditResult;
   resourceId?: string;
   resourceType?: string;

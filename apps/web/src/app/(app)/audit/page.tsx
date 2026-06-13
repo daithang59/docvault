@@ -11,11 +11,21 @@ import {
 } from '@/features/audit/audit.api';
 import { parseAuditFilterQuery } from '@/features/audit/audit-filter-query';
 import { auditKeys } from '@/features/audit/audit.keys';
-import { buildSecurityDashboardModel } from '@/features/audit/security-dashboard';
+import {
+  buildAuditFilterQuery,
+  buildSecurityDashboardModel,
+  type SecurityDashboardMetric,
+} from '@/features/audit/security-dashboard';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
+import {
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { TablePagination } from '@/components/data-table/table-pagination';
 import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
@@ -35,6 +45,7 @@ import {
   ShieldAlert,
   ShieldCheck,
   ShieldX,
+  type LucideIcon,
 } from 'lucide-react';
 
 export default function AuditPage() {
@@ -91,28 +102,6 @@ export default function AuditPage() {
     [securitySummary],
   );
   const { data: denyActorNames } = useOwnerDisplayNames(repeatedDenyActorIds);
-  const summaryCards = [
-    {
-      label: 'Denied events',
-      value: securitySummary?.totals.deniedEvents,
-      icon: ShieldX,
-    },
-    {
-      label: 'Malware blocked',
-      value: securitySummary?.totals.malwareBlocked,
-      icon: Bug,
-    },
-    {
-      label: 'DLP hits',
-      value: securitySummary?.totals.dlpDetections,
-      icon: FileWarning,
-    },
-    {
-      label: 'Download denied',
-      value: securitySummary?.totals.downloadDenied,
-      icon: Download,
-    },
-  ];
 
   async function handleVerifyChain() {
     setIsVerifyingChain(true);
@@ -178,6 +167,98 @@ export default function AuditPage() {
           subtitle="Inspect immutable audit records and access events."
         />
       </div>
+
+      <section
+        aria-labelledby="audit-command-center"
+        className="mb-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]"
+      >
+        <h2 id="audit-command-center" className="sr-only">
+          Audit command center
+        </h2>
+        <ScoreGauge
+          className="animate-in delay-1 min-h-[180px]"
+          description={securityDashboardModel.commandCenter.postureGauge.description}
+          href={securityDashboardModel.commandCenter.postureGauge.href}
+          label={securityDashboardModel.commandCenter.postureGauge.label}
+          tone={securityDashboardModel.commandCenter.postureGauge.tone}
+          value={securityDashboardModel.commandCenter.postureGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {securityDashboardModel.metrics.map((metric) => {
+            const Icon = AUDIT_METRIC_ICONS[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                className="animate-in delay-2"
+                description={metric.description}
+                href={buildMetricAuditHref(metric.key)}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.value > 0 ? 'warning' : 'success'}
+                value={isSummaryLoading ? '...' : metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SegmentDonut
+          className="animate-in delay-2"
+          label="Alert distribution"
+          segments={securityDashboardModel.commandCenter.alertSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Document risk bands"
+          segments={securityDashboardModel.commandCenter.riskBandSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Behavior anomaly bands"
+          segments={securityDashboardModel.commandCenter.anomalyBandSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Recommendation SLA"
+          segments={securityDashboardModel.commandCenter.recommendationSlaSegments}
+        />
+      </section>
+
+      <section className="mb-5 grid gap-4 lg:grid-cols-[minmax(0,0.8fr)_minmax(0,1.2fr)]">
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Content access signals"
+          segments={securityDashboardModel.commandCenter.accessSegments}
+        />
+        {securitySummary?.repeatedDenyActors.length ? (
+          <div
+            className="animate-in delay-3 rounded-lg border p-4"
+            style={{
+              background: 'var(--bg-card)',
+              borderColor: 'var(--border-soft)',
+            }}
+          >
+            <p className="text-sm font-semibold text-[var(--text-strong)]">
+              Repeated deny actors
+            </p>
+            <div className="mt-3 flex flex-wrap gap-2">
+              {securitySummary.repeatedDenyActors.map((actor) => {
+                const name = denyActorNames?.[actor.actorId]?.displayName;
+                return (
+                  <span
+                    key={actor.actorId}
+                    title={actor.actorId}
+                    className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 text-xs text-[var(--text-muted)]"
+                  >
+                    {name ?? actor.actorId}: {actor.denyCount}
+                  </span>
+                );
+              })}
+            </div>
+          </div>
+        ) : null}
+      </section>
 
       <div
         className="mb-5 flex flex-col gap-3 rounded-lg border p-4 sm:flex-row sm:items-center sm:justify-between"
@@ -278,60 +359,6 @@ export default function AuditPage() {
         </div>
       ) : null}
 
-      <div className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {summaryCards.map((card) => {
-          const Icon = card.icon;
-          return (
-            <div
-              key={card.label}
-              className="rounded-lg border p-4"
-              style={{
-                background: 'var(--bg-card)',
-                borderColor: 'var(--border-soft)',
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--text-muted)]">
-                  {card.label}
-                </p>
-                <Icon className="h-4 w-4 text-[var(--text-faint)]" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                {isSummaryLoading ? '...' : (card.value ?? 0)}
-              </p>
-            </div>
-          );
-        })}
-      </div>
-
-      {securitySummary?.repeatedDenyActors.length ? (
-        <div
-          className="mb-5 rounded-lg border p-4"
-          style={{
-            background: 'var(--bg-card)',
-            borderColor: 'var(--border-soft)',
-          }}
-        >
-          <p className="text-sm font-semibold text-[var(--text-strong)]">
-            Repeated deny actors
-          </p>
-          <div className="mt-3 flex flex-wrap gap-2">
-            {securitySummary.repeatedDenyActors.map((actor) => {
-              const name = denyActorNames?.[actor.actorId]?.displayName;
-              return (
-                <span
-                  key={actor.actorId}
-                  title={actor.actorId}
-                  className="rounded-md border border-[var(--border-soft)] px-2.5 py-1 text-xs text-[var(--text-muted)]"
-                >
-                  {name ?? actor.actorId}: {actor.denyCount}
-                </span>
-              );
-            })}
-          </div>
-        </div>
-      ) : null}
-
       <div className="animate-in delay-2">
         <div
           className="mb-5 rounded-lg border p-4"
@@ -406,4 +433,24 @@ export default function AuditPage() {
       )}
     </div>
   );
+}
+
+const AUDIT_METRIC_ICONS: Record<SecurityDashboardMetric['key'], LucideIcon> = {
+  deniedEvents: ShieldX,
+  downloadDenied: Download,
+  malwareBlocked: Bug,
+  dlpDetections: FileWarning,
+};
+
+function buildMetricAuditHref(key: SecurityDashboardMetric['key']): string {
+  switch (key) {
+    case 'deniedEvents':
+      return `/audit?${buildAuditFilterQuery({ result: 'DENY' })}`;
+    case 'downloadDenied':
+      return `/audit?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`;
+    case 'malwareBlocked':
+      return `/audit?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`;
+    case 'dlpDetections':
+      return `/audit?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`;
+  }
 }

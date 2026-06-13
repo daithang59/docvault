@@ -64,6 +64,7 @@ describe('queryAuditLog', () => {
       params: {
         actorId: undefined,
         action: undefined,
+        actionGroup: undefined,
         resourceType: undefined,
         resourceId: undefined,
         documentId: 'doc-secret-board',
@@ -100,6 +101,7 @@ describe('queryAuditLog', () => {
       params: {
         actorId: undefined,
         action: undefined,
+        actionGroup: undefined,
         resourceType: undefined,
         resourceId: undefined,
         documentId: undefined,
@@ -108,6 +110,47 @@ describe('queryAuditLog', () => {
         result: undefined,
         from: undefined,
         to: undefined,
+        page: 1,
+        pageSize: 20,
+      },
+    });
+  });
+
+  it('passes behavior signal filters through to the audit query endpoint', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+      },
+    });
+
+    await queryAuditLog(
+      {
+        actorId: 'editor-1',
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        from: '2026-05-30T10:00:00.000Z',
+        to: '2026-05-30T10:08:00.000Z',
+      },
+      1,
+      20,
+    );
+
+    expect(apiClientMock.get).toHaveBeenCalledWith('/audit/query', {
+      params: {
+        actorId: 'editor-1',
+        action: undefined,
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        resourceType: undefined,
+        resourceId: undefined,
+        documentId: undefined,
+        aclId: undefined,
+        recommendationId: undefined,
+        result: undefined,
+        from: '2026-05-30T10:00:00.000Z',
+        to: '2026-05-30T10:08:00.000Z',
         page: 1,
         pageSize: 20,
       },

@@ -38,6 +38,7 @@ function toAuditQueryParams(
   return {
     actorId: filters.actorId,
     action: filters.action,
+    actionGroup: filters.actionGroup,
     resourceType: filters.resourceType ?? filters.targetType,
     resourceId: filters.resourceId ?? filters.targetId,
     documentId: filters.documentId,

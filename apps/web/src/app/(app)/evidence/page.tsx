@@ -13,7 +13,14 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react';
+import {
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
@@ -36,9 +43,9 @@ import {
   type EvidenceBundleManifest,
   type EvidenceCaseNarrative,
   type EvidenceCenterModel,
+  type EvidenceCommandMetric,
   type EvidenceDocumentPacketTarget,
   type EvidenceRecommendationTarget,
-  type EvidenceSourceState,
   type UserDisplayNameMap,
 } from '@/features/evidence/evidence-center';
 import { buildEvidenceReportHtml } from '@/features/evidence/evidence-report';
@@ -52,15 +59,6 @@ import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 import { getErrorMessage } from '@/lib/api/errors';
 import { formatDateTime } from '@/lib/utils/date';
-
-const sourceStateTone: Record<EvidenceSourceState, string> = {
-  ready:
-    'border-[var(--status-published-border)] bg-[var(--status-published-bg)] text-[var(--status-published-text)]',
-  attention:
-    'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
-  empty:
-    'border-[var(--border-soft)] bg-[var(--bg-subtle)] text-[var(--text-muted)]',
-};
 
 type EvidenceCenterView = 'builder' | 'presentation';
 
@@ -336,36 +334,52 @@ export default function EvidenceCenterPage() {
         </p>
       ) : null}
 
-      <section className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {model.sourceCards.map((card) => (
-          <div
-            key={card.key}
-            className="rounded-lg border p-4"
-            style={{
-              background: 'var(--bg-card)',
-              borderColor: 'var(--border-soft)',
-            }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase text-[var(--text-faint)]">
-                  {card.label}
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--text-main)]">
-                  {card.value}
-                </p>
-              </div>
-              <span
-                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${sourceStateTone[card.state]}`}
-              >
-                {card.state}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-              {card.description}
-            </p>
-          </div>
-        ))}
+      <section
+        aria-labelledby="evidence-command-center"
+        className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]"
+      >
+        <h2 id="evidence-command-center" className="sr-only">
+          Evidence command center
+        </h2>
+        <ScoreGauge
+          className="min-h-[180px]"
+          description={model.commandCenter.readinessGauge.description}
+          href={model.commandCenter.readinessGauge.href}
+          label={model.commandCenter.readinessGauge.label}
+          tone={model.commandCenter.readinessGauge.tone}
+          value={model.commandCenter.readinessGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {model.commandCenter.metrics.map((metric) => {
+            const Icon = EVIDENCE_METRIC_ICONS[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                description={metric.description}
+                href={metric.href}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.tone}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-3">
+        <SegmentDonut
+          label="Evidence source states"
+          segments={model.commandCenter.sourceStateSegments}
+        />
+        <PriorityBarList
+          label="Packet targets"
+          segments={model.commandCenter.packetTargetSegments}
+        />
+        <PriorityBarList
+          label="Retention posture"
+          segments={model.commandCenter.retentionSegments}
+        />
       </section>
 
       <div className="mt-4 inline-flex rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
@@ -397,7 +411,10 @@ export default function EvidenceCenterPage() {
 
       {activeView === 'builder' ? (
         <>
-          <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <section
+            id="recommendation-packets"
+            className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]"
+          >
             <RecommendationPacketQueue
               items={model.recommendationTargets}
               pendingId={pendingRecommendationId}
@@ -417,7 +434,7 @@ export default function EvidenceCenterPage() {
             />
           </section>
 
-          <section className="mt-4">
+          <section id="document-packets" className="mt-4">
             <DocumentPacketTargets
               items={model.documentPacketTargets}
               pendingId={pendingDocumentId}
@@ -454,6 +471,13 @@ export default function EvidenceCenterPage() {
     </div>
   );
 }
+
+const EVIDENCE_METRIC_ICONS: Record<EvidenceCommandMetric['key'], LucideIcon> = {
+  'recommendation-packets': Clipboard,
+  'document-packets': FileJson,
+  'retention-records': Archive,
+  'audit-events': ShieldCheck,
+};
 
 function EvidenceBundlePanel({
   model,

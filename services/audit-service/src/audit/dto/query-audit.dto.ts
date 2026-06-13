@@ -1,12 +1,20 @@
 import { Type } from 'class-transformer';
 import {
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
+
+export const AUDIT_ACTION_GROUPS = [
+  'AUTHORIZED_CONTENT_ACCESS',
+  'DESTRUCTIVE_ACTIVITY',
+] as const;
+
+export type AuditActionGroup = (typeof AUDIT_ACTION_GROUPS)[number];
 
 export class QueryAuditDto {
   @IsOptional()
@@ -16,6 +24,10 @@ export class QueryAuditDto {
   @IsOptional()
   @IsString()
   action?: string;
+
+  @IsOptional()
+  @IsIn([...AUDIT_ACTION_GROUPS])
+  actionGroup?: AuditActionGroup;
 
   @IsOptional()
   @IsString()
