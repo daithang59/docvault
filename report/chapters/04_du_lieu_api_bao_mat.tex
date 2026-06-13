@@ -1,0 +1,142 @@
+\chapter{Thiết kế dữ liệu, API và chính sách bảo mật}
+
+\section{Tổng quan thiết kế dữ liệu}
+
+DocVault tách dữ liệu thành ba nhóm chính. Metadata tài liệu thuộc metadata-service và lưu trong PostgreSQL. Nội dung file thuộc document-service và lưu trong MinIO/S3. Audit event thuộc audit-service và lưu trong MongoDB. Việc tách này giúp mỗi service sở hữu dữ liệu của mình, tránh việc service khác truy vấn trực tiếp vào database không thuộc bounded context của nó.
+
+Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Cách thiết kế này giúp hệ thống vừa có thể truy vấn metadata nhanh, vừa có thể lưu file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
+
+\section{Các thực thể chính}
+
+\subsection{documents}
+
+Bảng \code{documents} là nguồn sự thật cho tài liệu logic. Mỗi record đại diện cho một tài liệu, gồm tiêu đề, mô tả, owner, classification, tags, status, current version và các mốc thời gian như createdAt, updatedAt, publishedAt, archivedAt.
+
+Trạng thái tài liệu gồm \code{DRAFT}, \code{PENDING}, \code{PUBLISHED} và \code{ARCHIVED}. Classification gồm \code{PUBLIC}, \code{INTERNAL}, \code{CONFIDENTIAL} và \code{SECRET}. Hai trường này là nền tảng cho phần lớn quyết định policy.
+
+\subsection{document\_versions}
+
+Bảng \code{document\_versions} lưu thông tin từng phiên bản file. Mỗi version có docId, version number, object key, checksum, size, filename, contentType và createdBy. File thật không nằm trong PostgreSQL; database chỉ giữ pointer đến object storage.
+
+Checksum SHA-256 hỗ trợ kiểm tra tính nhất quán và làm evidence. Khi export evidence packet, hệ thống có thể chứng minh tài liệu có version cụ thể và checksum cụ thể mà không cần đưa nội dung file vào packet.
+
+\subsection{document\_acl}
+
+Bảng \code{document\_acl} lưu các rule truy cập theo tài liệu. Rule có subjectType, subjectId, permission và effect. SubjectType hỗ trợ \code{USER}, \code{ROLE}, \code{GROUP} và \code{ALL}. Permission hỗ trợ \code{READ}, \code{DOWNLOAD}, \code{WRITE} và \code{APPROVE}. Effect là \code{ALLOW} hoặc \code{DENY}.
+
+ACL không thay thế RBAC mà bổ sung cho RBAC. RBAC xác định năng lực chung theo vai trò, trong khi ACL xác định ngoại lệ hoặc quyền cụ thể theo tài liệu. Khi có rule deny phù hợp, hệ thống ưu tiên từ chối.
+
+\subsection{document\_workflow\_history}
+
+Bảng \code{document\_workflow\_history} lưu lịch sử chuyển trạng thái nghiệp vụ. Mỗi record có docId, fromStatus, toStatus, action, actorId, reason và createdAt. Bảng này phục vụ truy vấn nhanh lịch sử phê duyệt trong màn hình chi tiết tài liệu, tách khỏi audit-service vốn ghi nhiều loại sự kiện hệ thống hơn.
+
+\subsection{audit\_events}
+
+Audit event ghi lại hành động trong hệ thống. Mỗi event chứa actor, action, resource type, resource id, result, reason, metadata và hash. Audit-service áp dụng hash-chain để phát hiện sửa đổi ngoài luồng. Vì audit là bounded context riêng, audit event không dùng foreign key cứng đến documents.
+
+\section{Document lifecycle}
+
+Luồng trạng thái tài liệu trong DocVault được giữ đơn giản để phù hợp với phạm vi MVP nhưng vẫn đủ cho demo doanh nghiệp:
+
+\begin{lstlisting}[caption={Vòng đời tài liệu trong DocVault},label={fig:document-lifecycle}]
+DRAFT --submit--> PENDING --approve--> PUBLISHED --archive--> ARCHIVED
+                       |
+                       +--reject--> DRAFT
+\end{lstlisting}
+
+Khi Approver approve tài liệu, hệ thống set \code{publishedAt}. Khi archive, hệ thống set \code{archivedAt}. Mỗi transition được ghi vào workflow history và audit event. Điều này giúp trang chi tiết tài liệu hiển thị timeline nghiệp vụ, đồng thời compliance có thể đối chiếu với audit log.
+
+\section{Ma trận phân quyền}
+
+Policy của DocVault không chỉ dựa trên role. Kết quả truy cập được xác định bởi nhiều yếu tố: role, owner, ACL, classification, status, version existence và trạng thái deleted/archived. Tuy nhiên, ở mức tổng quan, ma trận dưới đây thể hiện ý nghĩa các vai trò chính.
+
+\begin{table}[H]
+\centering
+\caption{Ma trận quyền tổng quan theo vai trò}
+\label{tab:role-permission-summary}
+\begin{tabularx}{\textwidth}{p{0.22\textwidth}Y}
+\toprule
+\textbf{Vai trò} & \textbf{Quyền chính} \\
+\midrule
+Viewer & Xem danh sách/metadata và preview/download tài liệu đã published trong phạm vi policy. \\
+Editor & Tạo tài liệu, upload version, chỉnh metadata, submit, archive tài liệu thuộc quyền sở hữu hoặc được cấp quyền. \\
+Approver & Xem hàng đợi duyệt, kiểm tra tài liệu pending, approve hoặc reject. \\
+Compliance Officer & Xem audit, security summary, retention, evidence và metadata được phép; luôn bị chặn nội dung file. \\
+Admin & Quản trị tài liệu, thành viên, evidence, retention và các thao tác nhạy cảm. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Chính sách Compliance Officer}
+
+Một quyết định thiết kế quan trọng của DocVault là tách rõ quyền compliance và quyền nội dung file. Compliance Officer cần xem metadata và audit để đánh giá tuân thủ, nhưng không nên có quyền tải file chỉ vì họ có quyền audit. Điều này giảm rủi ro lạm dụng vai trò compliance để truy cập tài liệu nhạy cảm.
+
+Trong DocVault, Compliance Officer:
+
+\begin{itemize}
+  \item được truy vấn audit events;
+  \item được verify audit hash-chain;
+  \item được xem security summary;
+  \item được xem retention evidence;
+  \item được export evidence packet;
+  \item không được preview, stream, presign hoặc download nội dung file.
+\end{itemize}
+
+Quy tắc này được enforce ở nhiều tầng: frontend permission helper để hiển thị lý do deny, gateway proxy để chặn đường gọi phù hợp và service policy để đảm bảo backend là nguồn quyết định cuối cùng.
+
+\section{Thiết kế preview/download authorization}
+
+Download được thiết kế thành luồng hai bước. Ở bước đầu, frontend gọi metadata-service thông qua gateway để xin authorize. Metadata-service kiểm tra policy và nếu hợp lệ sẽ cấp grant token ngắn hạn. Ở bước sau, frontend dùng grant token để gọi document-service. Document-service xác minh grant token hoặc tái authorize trước khi cấp presigned URL hoặc stream endpoint.
+
+\begin{lstlisting}[caption={Luồng cấp quyền download trong DocVault},label={fig:download-authorization}]
+User -> Gateway -> Metadata Service: request download authorization
+Metadata Service: check role, status, classification, ACL, owner
+Metadata Service -> User: short-lived grant token
+User -> Gateway -> Document Service: presign/stream with grant
+Document Service: verify grant or re-authorize
+Document Service -> User: presigned URL OR controlled stream endpoint
+\end{lstlisting}
+
+Với tài liệu \code{PUBLIC} hoặc \code{INTERNAL}, nếu policy cho phép, hệ thống có thể trả về presigned URL. Với tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET}, hệ thống trả về \code{url: null}, \code{watermarkRequired: true} và \code{streamingEndpoint}. Cách này giúp document-service kiểm soát đường tải nội dung nhạy cảm tốt hơn.
+
+\section{Malware scanning và DLP}
+
+Document-service thực hiện scanning trước khi ghi object vào MinIO. Với payload EICAR trong môi trường demo, upload bị chặn và không tạo object cũng như không đăng ký metadata version. Đây là một điểm quan trọng: nếu scan chỉ phát hiện sau khi file đã lưu, hệ thống sẽ phải xử lý cleanup phức tạp hơn.
+
+DLP scan phát hiện một số pattern nhạy cảm như email, số điện thoại/số định danh và từ khóa như \code{secret}, \code{confidential}, \code{internal only}. Khi phát hiện dữ liệu nhạy cảm trong tài liệu public/internal, hệ thống nâng classification lên \code{CONFIDENTIAL}. Người dùng không có quyền không thể hạ classification xuống public/internal nếu không có lý do override hợp lệ.
+
+\section{Audit ingest boundary}
+
+Audit-service không cho phép người dùng thường append audit event trực tiếp. Các service tin cậy phải gửi header service token \code{x-docvault-service-token}. Token này được cấu hình bằng \code{AUDIT\_INGEST\_TOKEN}. Điều này ngăn người dùng có JWT hợp lệ tạo audit event giả để che giấu hoặc làm sai lệch lịch sử.
+
+\section{API contract tổng quan}
+
+API của hệ thống được expose qua gateway với base path \code{/api}. Các nhóm endpoint chính gồm:
+
+\begingroup
+\small
+\begin{longtable}{p{0.23\textwidth}p{0.34\textwidth}p{0.33\textwidth}}
+\caption{Nhóm API chính của DocVault}
+\label{tab:api-groups} \\
+\toprule
+\textbf{Nhóm API} & \textbf{Ví dụ endpoint} & \textbf{Mục đích} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Nhóm API} & \textbf{Ví dụ endpoint} & \textbf{Mục đích} \\
+\midrule
+\endhead
+Auth & \code{/auth/login}, \code{/auth/me}, \code{/auth/logout} & Đăng nhập, callback, logout và lấy người dùng hiện tại. \\
+Metadata & \code{/metadata/documents}, \code{/metadata/documents/:id} & Tạo, đọc, cập nhật metadata tài liệu. \\
+ACL & \codecell{\code{/metadata/documents/:id/}\\\code{acl}} & Thêm/xem rule ACL theo tài liệu. \\
+Version & \codecell{\code{/metadata/documents/:id/}\\\code{versions}} & Đăng ký version metadata sau upload. \\
+Download authorization & \codecell{\code{/metadata/documents/:id/}\\\code{download-authorize}} & Xin quyền download và grant token. \\
+Preview authorization & \codecell{\code{/metadata/documents/:id/}\\\code{preview-authorize}} & Xin quyền preview nội dung file. \\
+Document blob & \codecell{\code{/documents/:id/upload}\\\code{/documents/:id/}\\\code{presign-download}\\\code{/documents/:id/versions/}\\\code{:v/stream}} & Upload, presign hoặc stream file. \\
+Workflow & \code{/workflow/:id/submit}, \code{/workflow/:id/approve} & Chuyển trạng thái tài liệu. \\
+Audit & \code{/audit/query}, \code{/audit/verify-chain}, \code{/audit/security-summary} & Truy vấn audit và kiểm tra hash-chain. \\
+Evidence & \codecell{\code{/metadata/documents/:id/}\\\code{evidence-packet}} & Xuất evidence packet metadata-only. \\
+Retention & \codecell{\code{/metadata/retention/}\\\code{documents}\\\code{/metadata/retention/run}} & Xem và chạy retention demo. \\
+\bottomrule
+\end{longtable}
+\endgroup

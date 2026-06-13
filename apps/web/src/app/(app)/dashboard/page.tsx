@@ -14,12 +14,10 @@ import {
   ColumnBarChart,
   MetricTile,
   PriorityBarList,
-  ScoreGauge,
 } from '@/components/analytics/analytics-primitives';
 import { fetchUnreadCount } from '@/features/notifications/notifications.api';
 import {
   buildDashboardModel,
-  type DashboardDemoReadinessSignal,
   type DashboardOperationalWidget,
   type DashboardWidgetTone,
 } from '@/features/dashboard/dashboard-model';
@@ -79,32 +77,22 @@ export default function DashboardPage() {
         subtitle="Command center for document lifecycle, approvals, security, and evidence readiness."
       />
 
-      <section className="mb-5 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]">
-        <ScoreGauge
-          className="animate-in delay-1 min-h-[180px]"
-          description={dashboard.commandCenter.readinessGauge.description}
-          href={dashboard.commandCenter.readinessGauge.href}
-          label={dashboard.commandCenter.readinessGauge.label}
-          tone={dashboard.commandCenter.readinessGauge.tone}
-          value={dashboard.commandCenter.readinessGauge.value}
-        />
-        <div className="grid gap-3 sm:grid-cols-2">
-          {dashboard.operationalWidgets.map((widget) => {
-            const Icon = WIDGET_ICONS[widget.key];
-            return (
-              <MetricTile
-                key={widget.key}
-                className="animate-in delay-2"
-                description={widget.description}
-                href={widget.href}
-                icon={<Icon className="h-5 w-5" />}
-                label={widget.label}
-                tone={widget.tone}
-                value={widget.value}
-              />
-            );
-          })}
-        </div>
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {dashboard.operationalWidgets.map((widget, index) => {
+          const Icon = WIDGET_ICONS[widget.key];
+          return (
+            <MetricTile
+              key={widget.key}
+              className={cn('animate-in', index < 2 ? 'delay-1' : 'delay-2')}
+              description={widget.description}
+              href={widget.href}
+              icon={<Icon className="h-5 w-5" />}
+              label={widget.label}
+              tone={widget.tone}
+              value={widget.value}
+            />
+          );
+        })}
       </section>
 
       <section className="mb-5 grid gap-4 lg:grid-cols-2">
@@ -119,32 +107,6 @@ export default function DashboardPage() {
           segments={dashboard.commandCenter.attentionSegments}
         />
       </section>
-
-      <div
-        data-testid="business-demo-readiness"
-        className="mb-6 overflow-hidden rounded-lg border"
-        style={{
-          background: 'var(--bg-card)',
-          borderColor: 'var(--border-soft)',
-        }}
-      >
-        <div
-          className="border-b px-5 py-4"
-          style={{ borderColor: 'var(--border-soft)' }}
-        >
-          <p className="text-sm font-semibold text-[var(--text-strong)]">
-            Demo story coverage
-          </p>
-          <p className="mt-1 text-xs text-[var(--text-muted)]">
-            {dashboard.demoReadiness.label} · {dashboard.demoReadiness.description}
-          </p>
-        </div>
-        <div className="grid gap-px bg-[var(--border-soft)] sm:grid-cols-2 xl:grid-cols-4">
-          {dashboard.demoReadiness.signals.map((signal) => (
-            <DemoReadinessSignalCard key={signal.key} signal={signal} />
-          ))}
-        </div>
-      </div>
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Recent documents */}
@@ -367,55 +329,6 @@ const WIDGET_ICONS: Record<DashboardOperationalWidget['key'], LucideIcon> = {
   'retention-due-soon': Archive,
   'unread-notifications': Bell,
 };
-
-const DEMO_SIGNAL_ICONS: Record<DashboardDemoReadinessSignal['key'], LucideIcon> = {
-  'lifecycle-coverage': FileText,
-  'approval-workflow': CheckSquare,
-  'evidence-export': Archive,
-  'security-posture': Shield,
-};
-
-function DemoReadinessSignalCard({
-  signal,
-}: {
-  signal: DashboardDemoReadinessSignal;
-}) {
-  const Icon = DEMO_SIGNAL_ICONS[signal.key];
-
-  return (
-    <Link
-      href={signal.href}
-      className="group flex min-h-[132px] min-w-0 flex-col justify-between bg-[var(--bg-card)] p-4 transition hover:bg-[var(--bg-card-hover)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            {signal.label}
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-[var(--text-strong)]">
-            {signal.value}
-          </p>
-        </div>
-        <div
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
-            toneClass(signal.tone),
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-      </div>
-      <div>
-        <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
-          {signal.description}
-        </p>
-        <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)]">
-          Open <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
-        </p>
-      </div>
-    </Link>
-  );
-}
 
 function toneClass(tone: DashboardWidgetTone): string {
   if (tone === 'critical') {

@@ -1,0 +1,141 @@
+\chapter{Quy trình DevSecOps và hạ tầng triển khai}
+
+\section{Mục tiêu của DevSecOps pipeline}
+
+Pipeline DevSecOps của DocVault được thiết kế để tự động hóa các bước từ mã nguồn đến triển khai, đồng thời tích hợp các kiểm soát bảo mật vào từng giai đoạn. Mục tiêu không chỉ là build được ứng dụng, mà còn là tạo bằng chứng cho thấy mã nguồn, phụ thuộc, image, cấu hình hạ tầng và ứng dụng sau triển khai đã được kiểm tra ở mức phù hợp.
+
+Các mục tiêu cụ thể của pipeline gồm:
+
+\begin{itemize}
+  \item Cài đặt phụ thuộc và kiểm tra môi trường build.
+  \item Chạy unit test và kiểm tra chất lượng mã nguồn.
+  \item Chạy SAST, SCA, filesystem scan và IaC scan trước khi build image.
+  \item Build Docker image cho frontend và các service backend.
+  \item Quét Docker image trước khi push registry.
+  \item Push image và cập nhật Helm values trên GitOps branch.
+  \item Để Argo CD đồng bộ trạng thái mong muốn lên Kubernetes/EKS.
+  \item Kiểm tra health của Argo CD application và smoke test ứng dụng đã deploy.
+  \item Chạy DAST bằng OWASP ZAP trên web base URL.
+  \item Archive report và cleanup workspace.
+\end{itemize}
+
+\section{Jenkins pipeline tổng thể}
+
+Pipeline chính nằm trong \code{Jenkinsfile}. Shared library được lấy từ thư viện DocVault trên branch DevSecOps pipeline; cấu hình chung nằm trong \code{vars/docvaultConfig.groovy}. Pipeline chạy trên Jenkins agent có Docker, Git, kubectl và các công cụ cần thiết.
+
+Các tham số quan trọng gồm:
+
+\begin{itemize}
+  \item \code{FORCE\_BUILD\_ALL}: build lại toàn bộ service dù change detection không yêu cầu.
+  \item \code{GITOPS\_BRANCH}: branch chứa Helm values để Argo CD sync.
+  \item \code{DEPLOY\_TARGET\_URL}: URL web sau deploy để smoke test.
+  \item \code{RUN\_ARGO\_HEALTH\_CHECK}: bật/tắt kiểm tra Argo CD health.
+  \item \code{RUN\_ZAP}: bật/tắt DAST bằng OWASP ZAP.
+  \item \code{ZAP\_TARGET}: URL target cho ZAP baseline scan.
+\end{itemize}
+
+\begin{lstlisting}[caption={Luồng DevSecOps pipeline của DocVault},label={fig:jenkins-pipeline-flow}]
+Checkout -> Prevent Loop -> System Check -> Install
+  -> Pre-build Security (parallel)
+     SCA | Trivy FS | Unit Tests | SonarQube | Checkov | Terraform Validate
+  -> Build & Scan Services
+  -> Push & GitOps
+  -> Argo CD Health Check
+  -> Post-deploy Smoke Test
+  -> DAST - OWASP ZAP
+  -> Post Cleanup
+\end{lstlisting}
+
+\section{Pre-build Security}
+
+Stage \code{Pre-build Security} chạy song song các bước độc lập. Việc chạy song song giúp giảm thời gian pipeline nhưng vẫn giữ đầy đủ kiểm soát. Các bước gồm:
+
+\begin{itemize}
+  \item \textbf{SCA - Dependency Check}: phân tích dependency để phát hiện lỗ hổng thư viện.
+  \item \textbf{Trivy FS Scan}: quét filesystem repository.
+  \item \textbf{Unit Tests}: chạy test của các package/service.
+  \item \textbf{SAST - SonarQube}: phân tích chất lượng và bảo mật mã nguồn \cite{sonarqube_docs}.
+  \item \textbf{IaC - Checkov Scan}: quét Terraform/Kubernetes/IaC để phát hiện cấu hình rủi ro \cite{checkov_docs}.
+  \item \textbf{IaC - Terraform Validate}: kiểm tra cú pháp và tính hợp lệ của Terraform.
+\end{itemize}
+
+Việc đặt các bước này trước build image giúp phát hiện lỗi sớm. Ví dụ, nếu dependency có lỗ hổng nghiêm trọng hoặc Terraform không validate được, pipeline có thể dừng trước khi tốn thời gian build/push image.
+
+\section{Build và scan image}
+
+Stage \code{Build \& Scan Services} build Docker image cho các service chính và frontend. Cấu hình trong \code{docvaultConfig.groovy} liệt kê các service backend: gateway, metadata-service, document-service, notification-service, workflow-service và audit-service. Frontend được build từ \code{apps/web/Dockerfile}; backend dùng \code{Dockerfile.backend}.
+
+Sau khi build, image được scan bằng Trivy. Trivy hỗ trợ quét container image, filesystem, lockfile và các loại artifact khác để phát hiện lỗ hổng, misconfiguration hoặc secret tùy cấu hình \cite{trivy_docs}. Với DocVault, image scan đóng vai trò gate trước khi push image lên registry.
+
+\section{Push image và GitOps update}
+
+Khi có service được build hoặc infra thay đổi, stage \code{Push \& GitOps} thực hiện push image và cập nhật Helm values trong GitOps branch. Thay vì triển khai trực tiếp từ Jenkins vào cluster, pipeline cập nhật source of truth trong Git. Argo CD sau đó đọc branch GitOps và đồng bộ cluster.
+
+Mô hình này có ba lợi ích. Thứ nhất, lịch sử triển khai được lưu trong Git commit. Thứ hai, Jenkins không cần sở hữu toàn bộ logic reconcile trạng thái Kubernetes. Thứ ba, có thể rollback bằng cách quay lại commit hoặc tag tương ứng trong GitOps branch.
+
+\section{Argo CD health check}
+
+Nếu \code{RUN\_ARGO\_HEALTH\_CHECK=true}, pipeline chạy stage kiểm tra Argo CD application. Các application chính gồm gateway, metadata, document-service, workflow-service, audit-service, notification-service và web. Pipeline chờ đến khi các application đạt trạng thái \code{Synced} và \code{Healthy} trong thời gian timeout cấu hình.
+
+Argo CD đóng vai trò GitOps controller cho Kubernetes. Nó so sánh trạng thái mong muốn trong Git với trạng thái thực tế trong cluster, sau đó sync khi cần \cite{argocd_docs}. Với DocVault, Argo CD giúp quá trình triển khai lên EKS có tính lặp lại và quan sát được.
+
+\section{Post-deploy smoke test}
+
+Sau khi deploy, pipeline có thể chạy smoke test trên \code{DEPLOY\_TARGET\_URL}. Stage này kiểm tra:
+
+\begin{itemize}
+  \item \code{GET <DEPLOY\_TARGET\_URL>}
+  \item \code{GET <DEPLOY\_TARGET\_URL>/api/health}
+\end{itemize}
+
+Kết quả kỳ vọng là HTTP 2xx hoặc 3xx cho web root và 2xx cho health endpoint. Smoke test không thay thế test nghiệp vụ đầy đủ, nhưng là gate nhanh để đảm bảo deployment cơ bản đã hoạt động.
+
+\section{DAST bằng OWASP ZAP}
+
+Khi \code{RUN\_ZAP=true}, pipeline chạy OWASP ZAP baseline scan trên web base URL. ZAP baseline scan phù hợp cho pipeline vì có thể crawl nhẹ ứng dụng và sinh report HTML/JSON \cite{zap_baseline}. Trong cấu hình DocVault, cảnh báo low/medium được archive làm bằng chứng, trong khi high/critical findings cần được xem là action item hoặc fail pipeline tùy cấu hình.
+
+Artifacts quan trọng gồm:
+
+\begin{itemize}
+  \item \code{zap-report/zap\_report.html}
+  \item \code{zap-report/zap\_report.json}
+\end{itemize}
+
+\section{Observability}
+
+DocVault có cấu hình observability thông qua Argo CD applications cho Prometheus/Grafana và Loki/promtail. Prometheus/Grafana phục vụ metric và dashboard; Loki/promtail phục vụ log tập trung từ Kubernetes namespace \code{docvault}. Các bằng chứng nên chụp gồm pod health, CPU/RAM, workload status và Grafana Explore với query \code{\{namespace="docvault"\}}.
+
+\section{Mapping stage, công cụ và bằng chứng}
+
+\begin{longtable}{p{0.2\textwidth}p{0.18\textwidth}p{0.28\textwidth}p{0.22\textwidth}}
+\caption{Mapping pipeline stage với công cụ và bằng chứng}
+\label{tab:pipeline-stage-evidence} \\
+\toprule
+\textbf{Stage} & \textbf{Công cụ} & \textbf{Bằng chứng/artifact} & \textbf{Điều kiện fail chính} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Stage} & \textbf{Công cụ} & \textbf{Bằng chứng/artifact} & \textbf{Điều kiện fail chính} \\
+\midrule
+\endhead
+Install & pnpm & Log cài đặt phụ thuộc & Dependency install lỗi \\
+Unit Tests & Jest/Vitest & Test report/log & Test fail \\
+SAST & SonarQube & Quality report/dashboard & Quality gate hoặc lỗi scanner \\
+SCA & Dependency Check & Dependency report & Vulnerability vượt ngưỡng \\
+Trivy FS & Trivy & FS scan report/log & Lỗ hổng hoặc cấu hình lỗi vượt ngưỡng \\
+IaC Scan & Checkov & Checkov report/log & Rule nghiêm trọng fail \\
+Terraform Validate & Terraform & Validate log & Terraform không hợp lệ \\
+Build image & Docker & Image tag/build log & Build lỗi \\
+Image scan & Trivy & Image scan report/log & CVE vượt ngưỡng \\
+GitOps update & Git/Helm values & Commit trên GitOps branch & Push/update lỗi \\
+Argo CD health & kubectl/Argo CD & Synced/Healthy status & App không healthy trong timeout \\
+Smoke test & HTTP client & HTTP status log & Web/health không reachable \\
+DAST & OWASP ZAP & HTML/JSON report & High/Critical finding hoặc target unreachable \\
+\bottomrule
+\end{longtable}
+
+\section{Trạng thái hiện tại của pipeline}
+
+Theo tài liệu \code{docs/pipeline-hardening-summary.md}, Jenkins pipeline đã có build chạy xanh toàn bộ ở build \#61 trên branch \code{devsecops-pipeline}. Các stage đã pass gồm Pre-build Security, Build \& Scan Services, Push \& GitOps, Argo CD Health Check, Post-deploy Smoke Test và DAST OWASP ZAP.
+
+Tuy nhiên, báo cáo vẫn trình bày pipeline ở trạng thái đang hoàn thiện vì một pipeline DevSecOps production-ready cần thêm nhiều năng lực: SBOM, ký image/artifact, provenance, policy-as-code admission, quản lý secret/KMS chặt hơn, alerting hoàn chỉnh, rollback runbook và evidence retention có cấu trúc. Những nội dung này được xem là hướng phát triển tiếp theo.

@@ -1,0 +1,53 @@
+\chapter{Danh sách hình ảnh minh họa}
+
+\section{Ảnh UI đã có}
+
+Các ảnh trong \code{docs/images/web} có thể dùng cho phần triển khai ứng dụng:
+
+\begin{itemize}
+  \item \code{login.png}: màn hình đăng nhập.
+  \item \code{dashboard.png}: dashboard.
+  \item \code{documents.png}: danh sách tài liệu.
+  \item \code{new-document.png}: tạo tài liệu.
+  \item \code{approvals.png}: phê duyệt.
+  \item \code{audit.png}: audit log.
+  \item \code{security.png}: security posture.
+  \item \code{evidence.png}: evidence center.
+  \item \code{retention.png}: retention.
+  \item \code{notifications.png}: notification center.
+\end{itemize}
+
+\section{Ảnh evidence đã có}
+
+Các ảnh trong \code{docs/evidence/screenshots} có thể dùng cho phần kiểm thử:
+
+\begin{itemize}
+  \item \code{dashboard-command-center-playwright.png}
+  \item \code{documents-saved-views-playwright.png}
+  \item \code{documents-mobile-filters-playwright.png}
+  \item \code{approvals-sla-readiness-playwright.png}
+  \item \code{audit-command-center-playwright.png}
+  \item \code{security-recommendation-queue-playwright.png}
+  \item \code{evidence-command-center-playwright.png}
+  \item \code{demo-kit-playwright.png}
+\end{itemize}
+
+\section{Ảnh cần bổ sung trước khi nộp}
+
+Trước khi nộp bản cuối, nên bổ sung các ảnh pipeline/evidence sau:
+
+\begin{itemize}
+  \item Jenkins stage view của build mới nhất.
+  \item SonarQube project dashboard.
+  \item Dependency Check report.
+  \item Trivy image scan log/report.
+  \item Checkov/Terraform validate log.
+  \item Docker Hub hoặc registry image tags.
+  \item GitOps commit cập nhật Helm values.
+  \item Argo CD applications Synced/Healthy.
+  \item ZAP HTML report summary.
+  \item Grafana workload dashboard.
+  \item Loki query log namespace \code{docvault}.
+\end{itemize}
+
+Khi chụp ảnh, cần che hoặc loại bỏ token, secret, kubeconfig, IP nhạy cảm và thông tin tài khoản không dùng cho demo công khai.

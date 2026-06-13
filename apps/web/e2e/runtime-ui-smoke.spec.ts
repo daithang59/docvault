@@ -789,7 +789,7 @@ test('documents page supports built-in and custom saved views', async ({ page },
   await screenshot(page, testInfo.file, 'documents-saved-views-playwright.png');
 });
 
-test('dashboard shows business demo readiness without horizontal overflow', async ({
+test('dashboard shows operational command center without demo readiness surfaces', async ({
   page,
 }, testInfo) => {
   await page.goto('/dashboard');
@@ -798,36 +798,26 @@ test('dashboard shows business demo readiness without horizontal overflow', asyn
   await expect(page.getByText('Lifecycle pipeline')).toBeVisible();
   await expect(page.getByText('Attention by priority')).toBeVisible();
   await expect(page.getByText('DLP triage')).not.toBeVisible();
-  await expect(page.getByText('Demo story coverage')).toBeVisible();
-  await expect(page.getByText('Demo ready')).toBeVisible();
-  await expect(page.getByText('Lifecycle coverage')).toBeVisible();
-  await expect(page.getByText('Approval workflow')).toBeVisible();
-  await expect(page.getByText('Evidence export')).toBeVisible();
-  await expect(page.getByText('Security posture')).toBeVisible();
+  await expect(page.getByText('Operational Work Queue')).toBeVisible();
+  await expect(page.getByText('Pending approvals')).toBeVisible();
+  await expect(page.getByText('DLP detected')).toBeVisible();
+  await expect(page.getByText('Demo story coverage')).toHaveCount(0);
+  await expect(page.getByText('Business readiness')).toHaveCount(0);
+  await expect(page.getByTestId('business-demo-readiness')).toHaveCount(0);
 
   await screenshot(page, testInfo.file, 'dashboard-command-center-playwright.png');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/dashboard');
-  const readinessPanel = page.getByTestId('business-demo-readiness');
-  await expect(readinessPanel.getByText('Demo story coverage')).toBeVisible();
-  const readinessBox = await readinessPanel.boundingBox();
-  expect(readinessBox).not.toBeNull();
-  if (!readinessBox) throw new Error('Business Demo Readiness panel was not measurable.');
-
-  const viewportWidth = await page.evaluate(() => window.innerWidth);
-  expect(readinessBox.x).toBeGreaterThanOrEqual(0);
-  expect(readinessBox.x + readinessBox.width).toBeLessThanOrEqual(viewportWidth + 1);
+  await expect(page.getByText('Operational Work Queue')).toBeVisible();
+  await expect(page.getByText('Demo story coverage')).toHaveCount(0);
+  await expect(page.getByText('Business readiness')).toHaveCount(0);
+  await expect(page.getByTestId('business-demo-readiness')).toHaveCount(0);
   await expect
     .poll(async () =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth + 1,
       ),
-    )
-    .toBe(true);
-  await expect
-    .poll(async () =>
-      readinessPanel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     )
     .toBe(true);
 });
@@ -951,9 +941,16 @@ test('security page scopes recommendation queue by workflow status', async ({
   await expect(page.getByText('Signals', { exact: true })).toBeVisible();
   await expect(page.getByText('Case workflow required', { exact: true }).first()).toBeVisible();
   await expect(page.getByText('Lightweight review', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Case workflow', { exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /Start case|Continue case/ })
+    .first()
+    .click();
+  await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: 'Resolved 0' }).click();
   await expect(page.getByText('No resolved recommendations are available.')).toBeVisible();
@@ -999,6 +996,11 @@ test('security case workflow requires evidence before resolving a case', async (
 
   await page.goto('/security');
 
+  await expect(page.getByText('Case workflow', { exact: true })).toHaveCount(0);
+  await page
+    .getByRole('button', { name: /Start case|Continue case/ })
+    .first()
+    .click();
   await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
 
   const resolveButton = page.getByRole('button', { name: 'Resolve case' });
