@@ -260,6 +260,12 @@ describe('buildSecurityDashboardModel', () => {
   it('builds command-center presentation data for security visuals', () => {
     const model = buildSecurityDashboardModel(
       summary({
+        totals: {
+          deniedEvents: 7,
+          downloadDenied: 3,
+          malwareBlocked: 1,
+          dlpDetections: 2,
+        },
         riskyDocuments: [
           {
             documentId: 'doc-critical',
@@ -396,13 +402,19 @@ describe('buildSecurityDashboardModel', () => {
 
     expect(commandCenter.postureGauge).toMatchObject({
       label: 'Security posture',
-      value: 59,
+      value: 43,
       tone: 'critical',
     });
     expect(commandCenter.alertSegments).toEqual([
-      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
-      expect.objectContaining({ key: 'warning', value: 2, percentage: 67 }),
+      expect.objectContaining({ key: 'critical', value: 1, percentage: 20 }),
+      expect.objectContaining({ key: 'warning', value: 4, percentage: 80 }),
       expect.objectContaining({ key: 'info', value: 0, percentage: 0 }),
+    ]);
+    expect(commandCenter.eventTypeSegments).toEqual([
+      expect.objectContaining({ key: 'denied-events', value: 7, percentage: 54 }),
+      expect.objectContaining({ key: 'download-denied', value: 3, percentage: 23 }),
+      expect.objectContaining({ key: 'malware-blocked', value: 1, percentage: 8 }),
+      expect.objectContaining({ key: 'dlp-detections', value: 2, percentage: 15 }),
     ]);
     expect(commandCenter.riskBandSegments).toEqual([
       expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),

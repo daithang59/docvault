@@ -50,6 +50,7 @@ export interface SecurityDashboardSegment {
 export interface SecurityCommandCenter {
   postureGauge: SecurityDashboardGaugeSummary;
   alertSegments: SecurityDashboardSegment[];
+  eventTypeSegments: SecurityDashboardSegment[];
   riskBandSegments: SecurityDashboardSegment[];
   anomalyBandSegments: SecurityDashboardSegment[];
   recommendationSlaSegments: SecurityDashboardSegment[];
@@ -333,6 +334,7 @@ export function buildSecurityDashboardModel(
       behaviorSignalRows: behaviorSignals,
       recommendationRows: recommendations,
       auditChain: summary?.chain,
+      totals,
       downloadAuthorizedTotal,
       sensitiveAccessCount: sensitiveAccessEvents.length,
     }),
@@ -500,6 +502,7 @@ function buildCommandCenter({
   behaviorSignalRows,
   recommendationRows,
   auditChain,
+  totals,
   downloadAuthorizedTotal,
   sensitiveAccessCount,
 }: {
@@ -509,6 +512,7 @@ function buildCommandCenter({
   behaviorSignalRows: SecurityBehaviorSignalRow[];
   recommendationRows: SecurityRecommendationRow[];
   auditChain?: AuditChainStatus;
+  totals: SecuritySummary['totals'];
   downloadAuthorizedTotal: number;
   sensitiveAccessCount: number;
 }): SecurityCommandCenter {
@@ -521,6 +525,7 @@ function buildCommandCenter({
       href: ROUTES.AUDIT,
     },
     alertSegments: buildAlertSegments(alerts),
+    eventTypeSegments: buildEventTypeSegments(totals),
     riskBandSegments: buildRiskBandSegments(riskScoringRows),
     anomalyBandSegments: buildAnomalyBandSegments(behaviorSignalRows),
     recommendationSlaSegments: buildRecommendationSlaSegments(recommendationRows),
@@ -529,6 +534,51 @@ function buildCommandCenter({
       sensitiveAccessCount,
     ),
   };
+}
+
+function buildEventTypeSegments(
+  totals: SecuritySummary['totals'],
+): SecurityDashboardSegment[] {
+  const total =
+    totals.deniedEvents +
+    totals.downloadDenied +
+    totals.malwareBlocked +
+    totals.dlpDetections;
+
+  return [
+    {
+      key: 'denied-events',
+      label: 'Denied events',
+      value: totals.deniedEvents,
+      percentage: toPercentage(totals.deniedEvents, total),
+      tone: totals.deniedEvents > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ result: 'DENY' })}`,
+    },
+    {
+      key: 'download-denied',
+      label: 'Download denied',
+      value: totals.downloadDenied,
+      percentage: toPercentage(totals.downloadDenied, total),
+      tone: totals.downloadDenied > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`,
+    },
+    {
+      key: 'malware-blocked',
+      label: 'Malware blocked',
+      value: totals.malwareBlocked,
+      percentage: toPercentage(totals.malwareBlocked, total),
+      tone: totals.malwareBlocked > 0 ? 'critical' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`,
+    },
+    {
+      key: 'dlp-detections',
+      label: 'DLP hits',
+      value: totals.dlpDetections,
+      percentage: toPercentage(totals.dlpDetections, total),
+      tone: totals.dlpDetections > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`,
+    },
+  ];
 }
 
 function buildAlertSegments(

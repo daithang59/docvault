@@ -16,6 +16,7 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
@@ -379,8 +380,8 @@ export default function EvidenceCenterPage() {
           label="Evidence source states"
           segments={model.commandCenter.sourceStateSegments}
         />
-        <PriorityBarList
-          label="Packet targets"
+        <ColumnBarChart
+          label="Export packet targets"
           segments={model.commandCenter.packetTargetSegments}
         />
         <PriorityBarList

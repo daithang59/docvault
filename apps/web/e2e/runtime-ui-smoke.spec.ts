@@ -409,6 +409,7 @@ async function fulfillApi(route: Route) {
         checkedAt: new Date().toISOString(),
         summary: {
           tracked: 1,
+          active: 0,
           dueSoon: 1,
           overdue: 0,
           archived: 0,
@@ -904,10 +905,13 @@ test('audit page renders command center and keeps filters usable', async ({
   ).toBeVisible();
   await expect(page.getByText('Security posture')).toBeVisible();
   await expect(page.getByText('Alert distribution')).toBeVisible();
+  await expect(page.getByText('Audit event distribution')).toBeVisible();
   await expect(page.getByText('Document risk bands')).toBeVisible();
   await expect(page.getByText('Behavior anomaly bands')).toBeVisible();
   await expect(page.getByText('Recommendation SLA')).toBeVisible();
   await expect(page.getByText('Quick investigations')).toBeVisible();
+
+  await screenshot(page, testInfo.file, 'audit-command-center-playwright.png');
 
   await page.getByRole('button', { name: 'DLP DETECTED' }).click();
   await expect(page.getByLabel('Action')).toHaveValue('DLP_PATTERN_DETECTED');
@@ -931,8 +935,6 @@ test('audit page renders command center and keeps filters usable', async ({
       ),
     )
     .toBe(true);
-
-  await screenshot(page, testInfo.file, 'audit-command-center-playwright.png');
 });
 
 test('security page scopes recommendation queue by workflow status', async ({
@@ -975,13 +977,15 @@ test('evidence center renders readiness visuals and packet builder', async ({
   ).toBeVisible();
   await expect(page.getByText('Evidence readiness')).toBeVisible();
   await expect(page.getByText('Evidence source states')).toBeVisible();
-  await expect(page.getByText('Packet targets')).toBeVisible();
+  await expect(page.getByText('Export packet targets')).toBeVisible();
   await expect(page.getByText('Retention posture')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recommendation packet queue' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Document evidence packets' })).toBeVisible();
+
+  await screenshot(page, testInfo.file, 'evidence-command-center-playwright.png');
 
   await page.getByRole('button', { name: 'Resolved 0' }).click();
   await expect(page.getByText('No resolved recommendation packets are available.')).toBeVisible();
@@ -993,8 +997,6 @@ test('evidence center renders readiness visuals and packet builder', async ({
       ),
     )
     .toBe(true);
-
-  await screenshot(page, testInfo.file, 'evidence-command-center-playwright.png');
 
   await page.getByRole('button', { name: 'Presentation' }).click();
   await expect(page.getByText(/Evidence packet sections/i)).toBeVisible();

@@ -21,6 +21,7 @@ import { PageHeader } from '@/components/common/page-header';
 import { AuditFilters } from '@/components/audit/audit-filters';
 import { AuditTable } from '@/components/audit/audit-table';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
@@ -202,11 +203,16 @@ export default function AuditPage() {
         </div>
       </section>
 
-      <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+      <section className="mb-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-5">
         <SegmentDonut
           className="animate-in delay-2"
           label="Alert distribution"
           segments={securityDashboardModel.commandCenter.alertSegments}
+        />
+        <ColumnBarChart
+          className="animate-in delay-3"
+          label="Audit event distribution"
+          segments={securityDashboardModel.commandCenter.eventTypeSegments}
         />
         <PriorityBarList
           className="animate-in delay-3"
