@@ -67,6 +67,24 @@ function recommendationFixture(
   };
 }
 
+function recommendation(
+  overrides: Partial<SecurityRecommendationSummary>,
+): SecurityRecommendationSummary {
+  return {
+    id: overrides.id ?? 'recommendation:test',
+    type: overrides.type ?? 'ACTOR_ACCESS_REVIEW',
+    severity: overrides.severity ?? 'warning',
+    title: overrides.title ?? 'Review test recommendation',
+    reason: overrides.reason ?? 'Test recommendation',
+    recommendedAction: overrides.recommendedAction ?? 'Review the audit evidence.',
+    evidence: overrides.evidence ?? ['1 audit signal'],
+    affectedDocumentIds: overrides.affectedDocumentIds ?? [],
+    affectedActorIds: overrides.affectedActorIds ?? [],
+    auditFilters: overrides.auditFilters ?? {},
+    workflow: overrides.workflow ?? { status: 'OPEN' },
+  };
+}
+
 describe('buildSecurityDashboardModel', () => {
   it('marks invalid audit chain as critical and first alert', () => {
     const model = buildSecurityDashboardModel(
@@ -668,6 +686,229 @@ describe('buildSecurityDashboardModel', () => {
           isComplete: false,
         },
       ],
+    });
+  });
+
+  it('attaches evidence-backed finding metadata to access exposure recommendations', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          {
+            id: 'document-access-review:doc-secret',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'critical',
+            title: 'Tighten access for high-risk SECRET document',
+            reason:
+              'Document doc-secret reached risk score 95 from classification and access metadata.',
+            recommendedAction:
+              'Review ACLs, confirm business need for recent grants, and keep watermark-required delivery for sensitive content.',
+            evidence: ['SECRET classification', 'ALLOW DOWNLOAD for viewer-1'],
+            affectedDocumentIds: ['doc-secret'],
+            affectedActorIds: ['viewer-1'],
+            auditFilters: { documentId: 'doc-secret' },
+            workflow: { status: 'OPEN' },
+          },
+        ],
+      }),
+    );
+
+    expect(model.recommendations.items[0].finding).toMatchObject({
+      category: 'ACCESS_EXPOSURE',
+      categoryLabel: 'Access Exposure',
+      summary: 'Sensitive document access needs review before evidence export.',
+      affectedScopeLabel: '1 document · 1 actor',
+      evidenceQuestion: 'Why was this raised?',
+      nextStepLabel: 'Review ACL and confirm business need',
+      routing: {
+        route: 'CASE',
+        routeLabel: 'Case workflow required',
+      },
+    });
+  });
+
+  it('maps every recommendation type to a stable warning category', () => {
+    const recommendationTypes: Array<
+      [SecurityRecommendationSummary['type'], string, string]
+    > = [
+      ['AUDIT_CHAIN_REVIEW', 'AUDIT_INTEGRITY', 'Audit Integrity'],
+      ['DLP_CLASSIFICATION_REVIEW', 'SENSITIVE_DATA_CONTROL', 'Sensitive Data Control'],
+      ['MALWARE_UPLOAD_REVIEW', 'MALWARE_OBJECT_SAFETY', 'Malware/Object Safety'],
+      ['DOCUMENT_ACCESS_REVIEW', 'ACCESS_EXPOSURE', 'Access Exposure'],
+      ['ACTOR_ACCESS_REVIEW', 'SUSPICIOUS_BEHAVIOR', 'Suspicious Behavior'],
+    ];
+
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: recommendationTypes.map(([type]) => ({
+          id: `recommendation:${type}`,
+          type,
+          severity: 'warning',
+          title: `Review ${type}`,
+          reason: 'Test recommendation',
+          recommendedAction: 'Review the audit evidence.',
+          evidence: ['1 audit signal'],
+          affectedDocumentIds: [],
+          affectedActorIds: [],
+          auditFilters: {},
+          workflow: { status: 'OPEN' },
+        })),
+      }),
+    );
+
+    expect(
+      model.recommendations.items.map((item) => [
+        item.type,
+        item.finding.category,
+        item.finding.categoryLabel,
+      ]),
+    ).toEqual(recommendationTypes);
+  });
+
+  it('routes audit integrity and critical access exposure findings to case workflow', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          recommendation({
+            id: 'audit-chain-review',
+            type: 'AUDIT_CHAIN_REVIEW',
+            severity: 'critical',
+            auditFilters: {},
+          }),
+          recommendation({
+            id: 'document-access-review:doc-secret',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'critical',
+            affectedDocumentIds: ['doc-secret'],
+            auditFilters: { documentId: 'doc-secret' },
+          }),
+        ],
+      }),
+    );
+
+    expect(
+      model.recommendations.items.map((item) => [
+        item.id,
+        item.finding.routing.route,
+        item.finding.routing.routeLabel,
+      ]),
+    ).toEqual([
+      ['audit-chain-review', 'CASE', 'Case workflow required'],
+      [
+        'document-access-review:doc-secret',
+        'CASE',
+        'Case workflow required',
+      ],
+    ]);
+  });
+
+  it('routes warning access exposure and aggregate control findings to lightweight review', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          recommendation({
+            id: 'document-access-review:doc-internal',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'warning',
+            affectedDocumentIds: ['doc-internal'],
+            auditFilters: { documentId: 'doc-internal' },
+          }),
+          recommendation({
+            id: 'dlp-classification-review',
+            type: 'DLP_CLASSIFICATION_REVIEW',
+            severity: 'warning',
+            affectedDocumentIds: [],
+            affectedActorIds: [],
+            auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+          }),
+          recommendation({
+            id: 'malware-upload-review',
+            type: 'MALWARE_UPLOAD_REVIEW',
+            severity: 'warning',
+            affectedDocumentIds: [],
+            affectedActorIds: [],
+            auditFilters: { action: 'MALWARE_UPLOAD_BLOCKED' },
+          }),
+        ],
+      }),
+    );
+
+    expect(
+      model.recommendations.items.map((item) => [
+        item.id,
+        item.finding.routing.route,
+        item.finding.routing.routeLabel,
+      ]),
+    ).toEqual([
+      [
+        'document-access-review:doc-internal',
+        'REVIEW',
+        'Lightweight review',
+      ],
+      ['dlp-classification-review', 'REVIEW', 'Lightweight review'],
+      ['malware-upload-review', 'REVIEW', 'Lightweight review'],
+    ]);
+  });
+
+  it('routes high download volume dashboard alerts to monitor signal', () => {
+    const model = buildSecurityDashboardModel(summary(), {
+      downloadAuthorizedTotal: 12,
+    });
+
+    expect(model.alerts).toContainEqual(
+      expect.objectContaining({
+        title: 'High download volume',
+        routing: expect.objectContaining({
+          route: 'SIGNAL',
+          routeLabel: 'Monitor signal',
+        }),
+      }),
+    );
+  });
+
+  it('routes critical actor behavior with affected scope to case workflow', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        behaviorSignals: [
+          {
+            signalId: 'MASS_CONTENT_ACCESS:editor-1',
+            type: 'MASS_CONTENT_ACCESS',
+            severity: 'critical',
+            actorId: 'editor-1',
+            actionCount: 18,
+            documentCount: 7,
+            windowStartedAt: '2026-05-30T10:00:00.000Z',
+            windowEndedAt: '2026-05-30T10:08:00.000Z',
+            riskScore: 92,
+            reasons: ['18 content access events in 8 minutes'],
+          },
+        ],
+        recommendations: [
+          recommendation({
+            id: 'actor-access-review:MASS_CONTENT_ACCESS:editor-1',
+            type: 'ACTOR_ACCESS_REVIEW',
+            severity: 'critical',
+            affectedActorIds: ['editor-1'],
+            auditFilters: {
+              actorId: 'editor-1',
+              actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+            },
+          }),
+        ],
+      }),
+    );
+
+    expect(model.alerts).toContainEqual(
+      expect.objectContaining({
+        title: 'Behavior anomaly detected',
+        routing: expect.objectContaining({
+          route: 'CASE',
+          routeLabel: 'Case workflow required',
+        }),
+      }),
+    );
+    expect(model.recommendations.items[0].finding.routing).toMatchObject({
+      route: 'CASE',
+      routeLabel: 'Case workflow required',
     });
   });
 

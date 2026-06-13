@@ -945,7 +945,12 @@ test('security page scopes recommendation queue by workflow status', async ({
   await expect(
     page.getByRole('heading', { name: 'Security', exact: true }),
   ).toBeVisible();
-  await expect(page.getByText('Security recommendations')).toBeVisible();
+  await expect(page.getByText('Evidence-backed findings')).toBeVisible();
+  await expect(page.getByText('Cases', { exact: true })).toBeVisible();
+  await expect(page.getByText('Reviews', { exact: true })).toBeVisible();
+  await expect(page.getByText('Signals', { exact: true })).toBeVisible();
+  await expect(page.getByText('Case workflow required', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Lightweight review', { exact: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
   await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();

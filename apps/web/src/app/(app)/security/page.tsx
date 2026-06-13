@@ -59,7 +59,10 @@ import {
   buildRecommendationEvidencePacket,
   filterSecurityRecommendationRows,
   getSecurityRecommendationQueueCounts,
+  getSecurityRouteCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  type SecurityAlertRoute,
+  type SecurityAlertRouting,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
   type SecurityRecommendationQueueView,
@@ -386,6 +389,10 @@ export default function SecurityPage() {
   }
 
   const auditChain = summaryQuery.data?.chain ?? { valid: false, checked: 0 };
+  const routeCounts = getSecurityRouteCounts(
+    model.alerts,
+    model.recommendations.items,
+  );
 
   return (
     <ActorNamesContext.Provider value={actorNameMap}>
@@ -462,6 +469,8 @@ export default function SecurityPage() {
         />
       </section>
 
+      <AlertRoutingSummary counts={routeCounts} />
+
       <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <PosturePanel
           level={model.posture.level}
@@ -533,6 +542,47 @@ export default function SecurityPage() {
   );
 }
 
+function AlertRoutingSummary({
+  counts,
+}: {
+  counts: Record<SecurityAlertRoute, number>;
+}) {
+  const routes: SecurityAlertRoute[] = ['CASE', 'REVIEW', 'SIGNAL'];
+
+  return (
+    <section className="mt-4 grid gap-3 md:grid-cols-3">
+      {routes.map((route) => {
+        const tone = getSecurityRouteTone(route);
+
+        return (
+          <div
+            key={route}
+            className={`rounded-lg border px-4 py-3 ${tone.container}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase text-[var(--text-faint)]">
+                {getSecurityRouteShortLabel(route)}
+              </p>
+              <SecurityRouteBadge
+                routing={{
+                  route,
+                  routeLabel: getSecurityRouteBadgeLabel(route),
+                }}
+              />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+              {counts[route]}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+              {getSecurityRouteDescription(route)}
+            </p>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function RecommendationsPanel({
   recommendations,
   auditChain,
@@ -599,12 +649,12 @@ function RecommendationsPanel({
           <div className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-[var(--text-faint)]" />
             <p className="text-sm font-semibold text-[var(--text-strong)]">
-              Security recommendations
+              Evidence-backed findings
             </p>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-            Deterministic actions from audit-chain, DLP, malware, risk scoring,
-            and behavior anomaly evidence.
+            Security warnings grouped by risk category with affected scope,
+            rationale, next action, and metadata-only evidence.
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
@@ -668,6 +718,10 @@ function RecommendationsPanel({
                         >
                           {item.severityLabel}
                         </span>
+                        <SecurityRouteBadge routing={item.finding.routing} />
+                        <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
+                          {item.finding.categoryLabel}
+                        </span>
                         <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
                           {item.typeLabel}
                         </span>
@@ -676,7 +730,10 @@ function RecommendationsPanel({
                         {humanizeActorText(item.title, actorNames)}
                       </h3>
                       <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                        {humanizeActorText(item.reason, actorNames)}
+                        {item.finding.summary}
+                      </p>
+                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                        {item.finding.routing.routeDescription}
                       </p>
                     </div>
                     <Link
@@ -691,9 +748,29 @@ function RecommendationsPanel({
                   <div className="mt-3 grid gap-3 md:grid-cols-2">
                     <div>
                       <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                        Recommended action
+                        Affected scope
                       </p>
                       <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.finding.affectedScopeLabel}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        {item.finding.evidenceQuestion}
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {humanizeActorText(item.reason, actorNames)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Next action
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        <span className="font-medium text-[var(--text-main)]">
+                          {item.finding.nextStepLabel}
+                        </span>
+                        {': '}
                         {humanizeActorText(item.recommendedAction, actorNames)}
                       </p>
                     </div>
@@ -1239,9 +1316,17 @@ function AlertsPanel({
                     : 'var(--status-pending-bg)',
               }}
             >
-              <p className="text-sm font-semibold text-[var(--text-strong)]">{alert.title}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecurityRouteBadge routing={alert.routing} />
+                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                  {alert.title}
+                </p>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
                 {alert.description}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                {alert.routing.routeDescription}
               </p>
               <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
                 {alert.action}
@@ -1773,6 +1858,75 @@ function getRecommendationTone(severity: 'critical' | 'warning' | 'info') {
     text: 'var(--text-muted)',
     badgeBg: 'var(--bg-subtle)',
   };
+}
+
+function SecurityRouteBadge({
+  routing,
+}: {
+  routing: Pick<SecurityAlertRouting, 'route' | 'routeLabel'>;
+}) {
+  const tone = getSecurityRouteTone(routing.route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {routing.routeLabel}
+    </span>
+  );
+}
+
+function getSecurityRouteTone(route: SecurityAlertRoute): {
+  badge: string;
+  container: string;
+} {
+  switch (route) {
+    case 'CASE':
+      return {
+        badge:
+          'border border-[var(--state-error-border)] bg-[var(--state-error-bg)] text-[var(--state-error-text)]',
+        container:
+          'border-[var(--state-error-border)] bg-[var(--state-error-bg)]',
+      };
+    case 'REVIEW':
+      return {
+        badge:
+          'border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
+        container:
+          'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)]',
+      };
+    case 'SIGNAL':
+      return {
+        badge:
+          'border border-[var(--state-info-border)] bg-[var(--state-info-bg)] text-[var(--state-info-text)]',
+        container:
+          'border-[var(--state-info-border)] bg-[var(--state-info-bg)]',
+      };
+  }
+}
+
+function getSecurityRouteBadgeLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Case workflow required';
+  if (route === 'REVIEW') return 'Lightweight review';
+  return 'Monitor signal';
+}
+
+function getSecurityRouteShortLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Cases';
+  if (route === 'REVIEW') return 'Reviews';
+  return 'Signals';
+}
+
+function getSecurityRouteDescription(route: SecurityAlertRoute): string {
+  if (route === 'CASE') {
+    return 'Needs owner, SLA, investigation, remediation or accepted risk, verification, and evidence.';
+  }
+
+  if (route === 'REVIEW') {
+    return 'Needs human review, but full case workflow would be too heavy.';
+  }
+
+  return 'Track as a trend or monitoring signal without workflow overhead.';
 }
 
 function getRecommendationWorkflowLabel(
