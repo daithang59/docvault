@@ -1,5 +1,5 @@
 def call(cfg, builtServicesCsv) {
-    def tag = "v${env.BUILD_NUMBER}"
+    def tag = resolveImageTag(cfg)
     def builtList = parseBuiltServices(builtServicesCsv)
     def infraChanged = env.INFRA_CHANGED == 'true'
 
@@ -17,6 +17,16 @@ def call(cfg, builtServicesCsv) {
     }
 
     updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged)
+}
+
+String resolveImageTag(cfg) {
+    if (cfg.imageTag?.trim()) {
+        return cfg.imageTag.trim()
+    }
+    if (env.IMAGE_TAG?.trim()) {
+        return env.IMAGE_TAG.trim()
+    }
+    return "v${env.BUILD_NUMBER}"
 }
 
 def parseBuiltServices(builtServicesCsv) {

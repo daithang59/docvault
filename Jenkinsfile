@@ -1,4 +1,4 @@
-@Library('docvault@devsecops-pipeline') _
+@Library('docvault@main') _
 
 def cfg = [:]
 def builtServicesCsv = ''
@@ -15,6 +15,11 @@ pipeline {
             name: 'FORCE_BUILD_ALL',
             defaultValue: false,
             description: 'Rebuild and rescan all images regardless of detected file changes.'
+        )
+        string(
+            name: 'RELEASE_BRANCH',
+            defaultValue: 'main',
+            description: 'Trusted branch that is allowed to publish images and update GitOps.'
         )
         string(
             name: 'REGISTRY_HOST',
@@ -137,6 +142,10 @@ pipeline {
                         ? params.GITOPS_BRANCH.trim()
                         : cfg.gitOpsBranch
 
+                    cfg.releaseBranch = params.RELEASE_BRANCH?.trim()
+                        ? params.RELEASE_BRANCH.trim()
+                        : cfg.releaseBranch
+
                     cfg.registryHost = params.REGISTRY_HOST?.trim()
                         ? params.REGISTRY_HOST.trim()
                         : cfg.registryHost
@@ -185,6 +194,32 @@ pipeline {
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
                     cfg.dependencyCheckDataDir = params.DEPENDENCY_CHECK_DATA_DIR?.trim()
 
+                    def resolvedBranchName = env.BRANCH_NAME?.trim()
+                    if (!resolvedBranchName && env.GIT_BRANCH?.trim()) {
+                        resolvedBranchName = env.GIT_BRANCH.trim().replaceFirst(/^origin\//, '')
+                    }
+                    if (!resolvedBranchName) {
+                        resolvedBranchName = sh(
+                            script: 'git branch --show-current || true',
+                            returnStdout: true
+                        ).trim()
+                    }
+
+                    cfg.branchName = resolvedBranchName ?: '(unknown)'
+                    cfg.isPullRequest = env.CHANGE_ID?.trim() ? true : false
+                    cfg.isReleaseBuild = !cfg.isPullRequest && cfg.branchName == cfg.releaseBranch
+                    cfg.imageTag = "v${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
+
+                    env.IS_PULL_REQUEST = cfg.isPullRequest ? 'true' : 'false'
+                    env.IS_RELEASE_BUILD = cfg.isReleaseBuild ? 'true' : 'false'
+                    env.IMAGE_TAG = cfg.imageTag
+
+                    echo ">>> Branch name: ${cfg.branchName}"
+                    echo ">>> Change request: ${env.CHANGE_ID ?: '(none)'}"
+                    echo ">>> Change target: ${env.CHANGE_TARGET ?: '(none)'}"
+                    echo ">>> Release branch: ${cfg.releaseBranch}"
+                    echo ">>> Pipeline mode: ${cfg.isReleaseBuild ? 'CD release' : 'CI validation'}"
+                    echo ">>> Image tag: ${cfg.imageTag}"
                     echo ">>> Effective GitOps branch: ${cfg.gitOpsBranch}"
                     echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
                     echo ">>> Registry namespace/project: ${cfg.registryNamespace}"
@@ -267,6 +302,22 @@ pipeline {
                     }
                 }
 
+                stage('Lint') {
+                    steps {
+                        script {
+                            runPnpmTask(cfg, 'lint')
+                        }
+                    }
+                }
+
+                stage('Workspace Build') {
+                    steps {
+                        script {
+                            runPnpmTask(cfg, 'build')
+                        }
+                    }
+                }
+
                 stage('SAST - SonarQube') {
                     steps {
                         script {
@@ -335,7 +386,7 @@ pipeline {
         stage('Push & GitOps') {
             when {
                 expression {
-                    return builtServicesCsv?.trim() || env.INFRA_CHANGED == 'true'
+                    return env.IS_RELEASE_BUILD == 'true' && (builtServicesCsv?.trim() || env.INFRA_CHANGED == 'true')
                 }
             }
             steps {
@@ -349,7 +400,7 @@ pipeline {
         stage('Argo CD Health Check') {
             when {
                 expression {
-                    return params.RUN_ARGO_HEALTH_CHECK
+                    return env.IS_RELEASE_BUILD == 'true' && params.RUN_ARGO_HEALTH_CHECK
                 }
             }
             steps {
@@ -362,7 +413,7 @@ pipeline {
         stage('Post-deploy Smoke Test') {
             when {
                 expression {
-                    return cfg.deployTargetUrl?.trim() ? true : false
+                    return env.IS_RELEASE_BUILD == 'true' && (cfg.deployTargetUrl?.trim() ? true : false)
                 }
             }
             steps {
@@ -375,7 +426,7 @@ pipeline {
         stage('DAST - OWASP ZAP') {
             when {
                 expression {
-                    return params.RUN_ZAP
+                    return env.IS_RELEASE_BUILD == 'true' && params.RUN_ZAP
                 }
             }
             steps {
@@ -394,4 +445,26 @@ pipeline {
             }
         }
     }
+}
+
+def runPnpmTask(cfg, String taskName) {
+    def allowedTasks = ['lint', 'build']
+    if (!allowedTasks.contains(taskName)) {
+        error("Unsupported pnpm task '${taskName}'. Allowed tasks: ${allowedTasks.join(', ')}")
+    }
+
+    echo ">>> Running pnpm ${taskName}..."
+    def pnpmStoreVolume = cfg.pnpmStoreVolume ?: 'docvault-pnpm-store'
+
+    sh """
+        set -eu
+        docker volume create '${pnpmStoreVolume}' >/dev/null
+        docker run --rm \\
+            --network host \\
+            -v ${env.WORKSPACE}:/app \\
+            -v ${pnpmStoreVolume}:/pnpm/store \\
+            -w /app \\
+            ${cfg.nodeImage} \\
+            sh -c "corepack enable && pnpm config set store-dir /pnpm/store && pnpm ${taskName}"
+    """
 }

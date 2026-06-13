@@ -1,5 +1,5 @@
 def call(cfg) {
-    def tag = "v${env.BUILD_NUMBER}"
+    def tag = resolveImageTag(cfg)
     def forceBuildAll = shouldForceBuildAll()
     def diffRange = resolveDiffRange()
     def changedFiles = []
@@ -58,6 +58,16 @@ def call(cfg) {
     def builtList = buildTargets ? runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady) : []
 
     return builtList.join(',')
+}
+
+String resolveImageTag(cfg) {
+    if (cfg.imageTag?.trim()) {
+        return cfg.imageTag.trim()
+    }
+    if (env.IMAGE_TAG?.trim()) {
+        return env.IMAGE_TAG.trim()
+    }
+    return "v${env.BUILD_NUMBER}"
 }
 
 def shouldForceBuildAll() {
