@@ -3,6 +3,8 @@ kind: Application
 metadata:
   name: docvault-gateway
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -11,6 +13,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/gateway.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -33,6 +36,8 @@ kind: Application
 metadata:
   name: docvault-metadata
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -41,6 +46,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/metadata-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -63,6 +69,8 @@ kind: Application
 metadata:
   name: docvault-audit-service
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -71,6 +79,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/audit-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -93,6 +102,8 @@ kind: Application
 metadata:
   name: docvault-notification-service
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -101,6 +112,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/notification-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -123,6 +135,8 @@ kind: Application
 metadata:
   name: docvault-workflow-service
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -131,6 +145,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/workflow-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -153,6 +168,8 @@ kind: Application
 metadata:
   name: docvault-document-service
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -161,6 +178,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/document-service.yaml
   destination:
     server: 'https://kubernetes.default.svc'
@@ -183,6 +201,8 @@ kind: Application
 metadata:
   name: docvault-web
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
@@ -191,6 +211,7 @@ spec:
     path: infra/k8s/charts/docvault-service
     helm:
       valueFiles:
+        - ../../values/common-harbor.yaml
         - ../../values/web.yaml
   destination:
     server: 'https://kubernetes.default.svc'
