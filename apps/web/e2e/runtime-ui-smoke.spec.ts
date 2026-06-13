@@ -972,6 +972,81 @@ test('security page scopes recommendation queue by workflow status', async ({
   await screenshot(page, testInfo.file, 'security-recommendation-queue-playwright.png');
 });
 
+test('security case workflow requires evidence before resolving a case', async ({
+  page,
+}) => {
+  await page.route(
+    /\/api\/audit\/security-recommendations\/.+\/workflow$/,
+    async (route) => {
+      const payload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        json: {
+          eventId: 'evt-case-workflow-resolved',
+          action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+          actorId: 'admin1',
+          actorRoles: ['admin'],
+          resourceType: 'SECURITY_RECOMMENDATION',
+          resourceId: 'document-access-review:doc-secret-overdue',
+          result: 'SUCCESS',
+          reason: payload.note,
+          metadata: payload,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    },
+  );
+
+  await page.goto('/security');
+
+  await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
+
+  const resolveButton = page.getByRole('button', { name: 'Resolve case' });
+  await expect(resolveButton).toBeDisabled();
+  await expect(page.getByText('Missing before resolve')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Investigation note · Remediation or accepted-risk decision · Remediation or accepted-risk evidence · Verification confirmation',
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await page
+    .getByLabel('Investigation')
+    .fill('Confirmed SECRET document exposes DOWNLOAD to Everyone.');
+  await page.getByLabel('Remediated').check();
+  await page
+    .getByLabel('Remediation or accepted-risk evidence')
+    .fill('Removed Everyone DOWNLOAD grant and kept owner READ only.');
+  await page.getByLabel(/Verification confirmed/).check();
+
+  await expect(resolveButton).toBeEnabled();
+
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' &&
+      request
+        .url()
+        .includes(
+          '/api/audit/security-recommendations/document-access-review%3Adoc-secret-overdue/workflow',
+        ),
+  );
+  await resolveButton.click();
+
+  const request = await requestPromise;
+  const payload = request.postDataJSON() as { status?: string; note?: string };
+  expect(payload.status).toBe('RESOLVED');
+  expect(payload.note).toContain('Case workflow');
+  expect(payload.note).toContain(
+    'Investigation: Confirmed SECRET document exposes DOWNLOAD to Everyone.',
+  );
+  expect(payload.note).toContain('Decision: Remediated');
+  expect(payload.note).toContain(
+    'Resolution evidence: Removed Everyone DOWNLOAD grant and kept owner READ only.',
+  );
+  expect(payload.note).toContain('Verification: Confirmed');
+});
+
 test('evidence center renders readiness visuals and packet builder', async ({
   page,
 }, testInfo) => {
