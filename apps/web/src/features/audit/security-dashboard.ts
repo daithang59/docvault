@@ -185,6 +185,19 @@ export function buildSecurityDashboardModel(
     });
   }
 
+  const compromisedEpochCount =
+    summary?.chain.historicalCompromisedCount ??
+    summary?.chain.compromisedEpochs?.length ??
+    0;
+  if (summary?.chain.valid !== false && compromisedEpochCount > 0) {
+    alerts.push({
+      severity: 'warning',
+      title: 'Historical audit epoch compromised',
+      description: `${compromisedEpochCount} previous audit epoch${compromisedEpochCount === 1 ? ' is' : 's are'} marked compromised.`,
+      action: 'Review the incident-linked audit epoch before exporting historical evidence.',
+    });
+  }
+
   if (totals.malwareBlocked > 0) {
     alerts.push({
       severity: 'warning',
@@ -342,6 +355,7 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
   if (filters.resourceType) params.set('resourceType', filters.resourceType);
   if (filters.resourceId) params.set('resourceId', filters.resourceId);
   if (filters.documentId) params.set('documentId', filters.documentId);
+  if (filters.aclId) params.set('aclId', filters.aclId);
 
   return params.toString();
 }

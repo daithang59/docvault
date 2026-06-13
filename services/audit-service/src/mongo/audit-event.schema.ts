@@ -5,6 +5,9 @@ export type AuditEventDocument = AuditEvent & Document;
 
 @Schema({ collection: 'audit_events', timestamps: false })
 export class AuditEvent {
+  @Prop({ required: true, default: 'default', index: true })
+  epochId: string;
+
   @Prop({ required: true })
   eventId: string;
 
@@ -73,4 +76,4 @@ AuditEventSchema.index({ result: 1, timestamp: -1 });
 // be the predecessor of at most one event, and only one genesis event may have
 // prevHash=null. Concurrent inserts racing on the same head trigger a duplicate
 // key error, which AuditService.create() catches and retries against the new head.
-AuditEventSchema.index({ prevHash: 1 }, { unique: true });
+AuditEventSchema.index({ epochId: 1, prevHash: 1 }, { unique: true });

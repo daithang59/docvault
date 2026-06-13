@@ -12,6 +12,7 @@ describe('AuditService — Hash Chain', () => {
   // Plain mock model — no NestJS/Mongoose dependency
   let mockLean: jest.Mock;
   let mockCreate: jest.Mock;
+  let mockFindOne: jest.Mock;
   let mockFindOneSort: jest.Mock;
   let mockFindSort: jest.Mock;
   let service: AuditService;
@@ -26,12 +27,14 @@ describe('AuditService — Hash Chain', () => {
       }),
     });
 
+    mockFindOne = jest.fn().mockReturnValue({
+      sort: mockFindOneSort,
+    });
+
     const mockModel = {
       create: mockCreate,
       // MongoDB: findOne({}).sort(...).lean()
-      findOne: jest.fn().mockReturnValue({
-        sort: mockFindOneSort,
-      }),
+      findOne: mockFindOne,
       find: jest.fn().mockReturnValue({
         sort: mockFindSort,
       }),
@@ -111,6 +114,7 @@ describe('AuditService — Hash Chain', () => {
     const result = await service.create(baseDto);
 
     expect(result.prevHash).toBeNull();
+    expect(result.epochId).toBe('default');
     expect(result.hash).toBeDefined();
     expect(typeof result.hash).toBe('string');
     expect(result.hash).toHaveLength(64); // SHA-256 hex
@@ -176,6 +180,12 @@ describe('AuditService — Hash Chain', () => {
   it('selects the previous chain head with deterministic timestamp and _id ordering', async () => {
     await service.create(baseDto);
 
+    expect(mockFindOne).toHaveBeenCalledWith(
+      {
+        $or: [{ epochId: 'default' }, { epochId: { $exists: false } }],
+      },
+      { hash: 1 },
+    );
     expect(mockFindOneSort).toHaveBeenCalledWith({
       timestamp: -1,
       _id: -1,
@@ -551,5 +561,271 @@ describe('AuditService — concurrent append (race fix)', () => {
         eventId: 'doomed-event',
       }),
     ).rejects.toThrow(/write contention/i);
+  });
+});
+
+describe('AuditService — audit chain epochs', () => {
+  function matchesFilter(event: any, filter: Record<string, any>): boolean {
+    if (!filter || Object.keys(filter).length === 0) return true;
+
+    if (Array.isArray(filter.$or)) {
+      return filter.$or.some((item: Record<string, any>) =>
+        matchesFilter(event, item),
+      );
+    }
+
+    return Object.entries(filter).every(([key, value]) => {
+      if (
+        value &&
+        typeof value === 'object' &&
+        '$exists' in (value as Record<string, unknown>)
+      ) {
+        return (key in event) === Boolean((value as any).$exists);
+      }
+
+      return event[key] === value;
+    });
+  }
+
+  function sortByDirection(events: any[], sort: Record<string, 1 | -1>) {
+    const entries = Object.entries(sort);
+    return [...events].sort((a, b) => {
+      for (const [field, direction] of entries) {
+        const left =
+          a[field] instanceof Date ? a[field].getTime() : String(a[field]);
+        const right =
+          b[field] instanceof Date ? b[field].getTime() : String(b[field]);
+        if (left < right) return -1 * direction;
+        if (left > right) return 1 * direction;
+      }
+      return 0;
+    });
+  }
+
+  function makeEpochAwareModels(seedEpochs: any[]) {
+    const events: any[] = [];
+    const epochs = [...seedEpochs];
+    const incidents: any[] = [];
+
+    const eventModel = {
+      _events: events,
+      create: jest.fn(async (data) => {
+        const savedEvent = {
+          _id: `event-${String(events.length + 1).padStart(3, '0')}`,
+          ...data,
+        };
+        events.push(savedEvent);
+        return { ...savedEvent, toObject: () => ({ ...savedEvent }) };
+      }),
+      findOne: jest.fn((filter: Record<string, any>) => ({
+        sort: jest.fn((sort: Record<string, 1 | -1>) => ({
+          lean: jest.fn(async () => {
+            const [head] = sortByDirection(
+              events.filter((event) => matchesFilter(event, filter)),
+              sort,
+            );
+            return head ?? null;
+          }),
+        })),
+      })),
+      find: jest.fn((filter: Record<string, any>) => ({
+        sort: jest.fn((sort: Record<string, 1 | -1>) => ({
+          limit: jest.fn((limit: number) => ({
+            lean: jest.fn(async () =>
+              sortByDirection(
+                events.filter((event) => matchesFilter(event, filter)),
+                sort,
+              ).slice(0, limit),
+            ),
+          })),
+        })),
+      })),
+    };
+
+    const epochModel = {
+      _epochs: epochs,
+      create: jest.fn(async (data) => {
+        const savedEpoch = {
+          _id: `epoch-${String(epochs.length + 1).padStart(3, '0')}`,
+          ...data,
+        };
+        epochs.push(savedEpoch);
+        return { ...savedEpoch, toObject: () => ({ ...savedEpoch }) };
+      }),
+      findOne: jest.fn((filter: Record<string, any>) => ({
+        sort: jest.fn((sort: Record<string, 1 | -1>) => ({
+          lean: jest.fn(async () => {
+            const [epoch] = sortByDirection(
+              epochs.filter((item) => matchesFilter(item, filter)),
+              sort,
+            );
+            return epoch ?? null;
+          }),
+        })),
+      })),
+      find: jest.fn((filter: Record<string, any>) => ({
+        sort: jest.fn((sort: Record<string, 1 | -1>) => ({
+          limit: jest.fn((limit: number) => ({
+            lean: jest.fn(async () =>
+              sortByDirection(
+                epochs.filter((item) => matchesFilter(item, filter)),
+                sort,
+              ).slice(0, limit),
+            ),
+          })),
+        })),
+      })),
+      updateOne: jest.fn(async (filter: Record<string, any>, update: any) => {
+        const epoch = epochs.find((item) => matchesFilter(item, filter));
+        if (!epoch) return { modifiedCount: 0 };
+        Object.assign(epoch, update.$set ?? {});
+        return { modifiedCount: 1 };
+      }),
+    };
+
+    const incidentModel = {
+      _incidents: incidents,
+      create: jest.fn(async (data) => {
+        const savedIncident = {
+          _id: `incident-${String(incidents.length + 1).padStart(3, '0')}`,
+          ...data,
+        };
+        incidents.push(savedIncident);
+        return {
+          ...savedIncident,
+          toObject: () => ({ ...savedIncident }),
+        };
+      }),
+    };
+
+    return { eventModel, epochModel, incidentModel };
+  }
+
+  const baseDto = {
+    actorId: 'admin-1',
+    actorRoles: ['admin'],
+    action: 'DOCUMENT_VIEWED',
+    resourceType: 'DOCUMENT',
+    resourceId: 'doc-epoch',
+    result: 'SUCCESS',
+  };
+
+  it('reports a valid active epoch separately from compromised history', async () => {
+    const { eventModel, epochModel, incidentModel } = makeEpochAwareModels([
+      {
+        epochId: 'old-epoch',
+        status: 'COMPROMISED',
+        startedAt: new Date('2026-06-01T00:00:00.000Z'),
+        endedAt: new Date('2026-06-13T00:00:00.000Z'),
+        genesisReason: 'INITIAL',
+        createdBy: 'system',
+        reason: 'Compromised during test',
+        incidentId: 'AUDIT-INC-old',
+        firstBrokenIndex: 1,
+        firstBrokenEventId: 'old-event-2',
+        lastTrustedHash: 'a'.repeat(64),
+      },
+      {
+        epochId: 'active-epoch',
+        status: 'ACTIVE',
+        startedAt: new Date('2026-06-13T00:00:01.000Z'),
+        genesisReason: 'COMPROMISE_RECOVERY',
+        previousEpochId: 'old-epoch',
+        createdBy: 'admin-1',
+        reason: 'New epoch after incident',
+      },
+    ]);
+    const service = new AuditService(
+      eventModel as any,
+      epochModel as any,
+      incidentModel as any,
+    );
+
+    await service.create({
+      ...baseDto,
+      eventId: 'active-event-1',
+      timestamp: '2026-06-13T00:01:00.000Z',
+    });
+
+    const result = await service.verifyChain();
+
+    expect(result.valid).toBe(true);
+    expect(result.epochId).toBe('active-epoch');
+    expect(result.activeEpoch).toMatchObject({
+      epochId: 'active-epoch',
+      status: 'ACTIVE',
+      valid: true,
+      checked: 1,
+    });
+    expect(result.historicalCompromisedCount).toBe(1);
+    expect(result.compromisedEpochs).toEqual([
+      expect.objectContaining({
+        epochId: 'old-epoch',
+        status: 'COMPROMISED',
+        incidentId: 'AUDIT-INC-old',
+        firstBrokenIndex: 1,
+      }),
+    ]);
+  });
+
+  it('seals an invalid active epoch and starts a new trusted epoch', async () => {
+    const { eventModel, epochModel, incidentModel } = makeEpochAwareModels([
+      {
+        epochId: 'active-epoch',
+        status: 'ACTIVE',
+        startedAt: new Date('2026-06-13T00:00:00.000Z'),
+        genesisReason: 'INITIAL',
+        createdBy: 'system',
+        reason: 'Initial epoch',
+      },
+    ]);
+    const service = new AuditService(
+      eventModel as any,
+      epochModel as any,
+      incidentModel as any,
+    );
+
+    await service.create({
+      ...baseDto,
+      eventId: 'active-event-1',
+      timestamp: '2026-06-13T00:01:00.000Z',
+    });
+    await service.create({
+      ...baseDto,
+      eventId: 'active-event-2',
+      timestamp: '2026-06-13T00:02:00.000Z',
+      action: 'DOCUMENT_DOWNLOADED',
+    });
+    eventModel._events[1].action = 'DOCUMENT_DELETED';
+
+    const result = await service.sealCompromisedChainAndStartEpoch(
+      { reason: 'Unrecoverable tamper evidence in active epoch' },
+      { actorId: 'admin-1', roles: ['admin'] },
+    );
+
+    expect(result.previousEpoch).toMatchObject({
+      epochId: 'active-epoch',
+      status: 'COMPROMISED',
+      firstBrokenIndex: 1,
+      firstBrokenEventId: 'active-event-2',
+    });
+    expect(result.newEpoch).toMatchObject({
+      status: 'ACTIVE',
+      previousEpochId: 'active-epoch',
+      genesisReason: 'COMPROMISE_RECOVERY',
+    });
+    expect(incidentModel._incidents).toHaveLength(1);
+    expect(incidentModel._incidents[0]).toMatchObject({
+      affectedEpochId: 'active-epoch',
+      firstBrokenIndex: 1,
+      resolution: 'NEW_EPOCH_STARTED',
+    });
+    expect(eventModel._events.at(-1)).toMatchObject({
+      epochId: result.newEpoch.epochId,
+      action: 'AUDIT_CHAIN_EPOCH_STARTED',
+      resourceType: 'AUDIT_CHAIN_EPOCH',
+      resourceId: result.newEpoch.epochId,
+      result: 'SUCCESS',
+    });
   });
 });

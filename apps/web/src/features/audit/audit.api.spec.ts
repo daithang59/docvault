@@ -3,13 +3,16 @@ import type { PaginatedResponse } from '@/types/pagination';
 import type { AuditLogEntry, AuditQueryFilters } from './audit.types';
 import {
   getSecurityRecommendationWorkflowHistory,
+  queryAuditLog,
   queryAuditLogWindow,
+  sealAuditChainAndStartEpoch,
   updateSecurityRecommendationWorkflow,
 } from './audit.api';
 
 const apiClientMock = vi.hoisted(() => ({
   get: vi.fn(),
   patch: vi.fn(),
+  post: vi.fn(),
 }));
 
 vi.mock('@/lib/api/client', () => ({
@@ -19,6 +22,7 @@ vi.mock('@/lib/api/client', () => ({
 beforeEach(() => {
   apiClientMock.get.mockReset();
   apiClientMock.patch.mockReset();
+  apiClientMock.post.mockReset();
 });
 
 function auditEvent(eventId: string): AuditLogEntry {
@@ -34,6 +38,45 @@ function auditEvent(eventId: string): AuditLogEntry {
     metadata: { classification: 'SECRET' },
   };
 }
+
+describe('queryAuditLog', () => {
+  it('passes ACL-level filters through to the audit query endpoint', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+      },
+    });
+
+    await queryAuditLog(
+      {
+        documentId: 'doc-secret-board',
+        aclId: 'acl-all-download',
+      },
+      1,
+      20,
+    );
+
+    expect(apiClientMock.get).toHaveBeenCalledWith('/audit/query', {
+      params: {
+        actorId: undefined,
+        action: undefined,
+        resourceType: undefined,
+        resourceId: undefined,
+        documentId: 'doc-secret-board',
+        aclId: 'acl-all-download',
+        result: undefined,
+        from: undefined,
+        to: undefined,
+        page: 1,
+        pageSize: 20,
+      },
+    });
+  });
+});
 
 describe('queryAuditLogWindow', () => {
   it('fetches every reported page before returning audit activity', async () => {
@@ -119,6 +162,36 @@ describe('updateSecurityRecommendationWorkflow', () => {
     expect(result).toEqual({
       eventId: 'event-recommendation-updated',
       action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+    });
+  });
+});
+
+describe('sealAuditChainAndStartEpoch', () => {
+  it('posts the recovery reason and unwraps the new epoch response', async () => {
+    apiClientMock.post.mockResolvedValue({
+      data: {
+        newEpoch: {
+          epochId: 'epoch-new',
+          status: 'ACTIVE',
+        },
+      },
+    });
+
+    const result = await sealAuditChainAndStartEpoch({
+      reason: 'Unrecoverable tamper evidence after DB incident review',
+    });
+
+    expect(apiClientMock.post).toHaveBeenCalledWith(
+      '/audit/chain/seal-and-start-epoch',
+      {
+        reason: 'Unrecoverable tamper evidence after DB incident review',
+      },
+    );
+    expect(result).toEqual({
+      newEpoch: {
+        epochId: 'epoch-new',
+        status: 'ACTIVE',
+      },
     });
   });
 });

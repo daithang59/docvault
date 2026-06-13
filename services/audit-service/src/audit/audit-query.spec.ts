@@ -50,4 +50,36 @@ describe('AuditService query filters', () => {
     expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
     expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
   });
+
+  it('matches ACL-level audit events by created or removed ACL id', async () => {
+    const auditModel = makeAuditModel([], 0);
+    const service = new AuditService(auditModel.model as any);
+
+    await service.query({
+      action: 'DOCUMENT_ACL_UPDATED',
+      documentId: 'doc-1',
+      aclId: 'acl-1',
+      pageSize: 50,
+    } as any);
+
+    const expectedFilter = {
+      action: 'DOCUMENT_ACL_UPDATED',
+      $and: [
+        {
+          $or: [
+            { resourceType: 'DOCUMENT', resourceId: 'doc-1' },
+            { 'metadata.docId': 'doc-1' },
+          ],
+        },
+        {
+          $or: [
+            { 'metadata.aclId': 'acl-1' },
+            { 'metadata.removedAclId': 'acl-1' },
+          ],
+        },
+      ],
+    };
+    expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
+    expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
+  });
 });

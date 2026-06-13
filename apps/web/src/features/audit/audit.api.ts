@@ -6,6 +6,8 @@ import type {
   AuditChainStatus,
   AuditLogEntry,
   AuditQueryFilters,
+  SealAuditChainRequest,
+  SealAuditChainResponse,
   SecurityRecommendationWorkflowHistoryEntry,
   SecuritySummary,
   UpdateSecurityRecommendationWorkflowRequest,
@@ -39,6 +41,7 @@ function toAuditQueryParams(
     resourceType: filters.resourceType ?? filters.targetType,
     resourceId: filters.resourceId ?? filters.targetId,
     documentId: filters.documentId,
+    aclId: filters.aclId,
     result: filters.result,
     from: filters.from ? new Date(filters.from).toISOString() : undefined,
     to: filters.to ? new Date(filters.to).toISOString() : undefined,
@@ -109,6 +112,13 @@ export async function queryAuditLogWindow(
 export async function verifyAuditChain(): Promise<AuditChainStatus> {
   const res = await apiClient.get(apiEndpoints.audit.verifyChain);
   return unwrap(res) as AuditChainStatus;
+}
+
+export async function sealAuditChainAndStartEpoch(
+  dto: SealAuditChainRequest,
+): Promise<SealAuditChainResponse> {
+  const res = await apiClient.post(apiEndpoints.audit.sealChainAndStartEpoch, dto);
+  return unwrap(res) as SealAuditChainResponse;
 }
 
 export async function getSecuritySummary(): Promise<SecuritySummary> {

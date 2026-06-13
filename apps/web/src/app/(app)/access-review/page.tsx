@@ -17,8 +17,14 @@ import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { PageHeader } from '@/components/common/page-header';
-import { buildAccessReviewModel } from '@/features/access-review/access-review';
+import {
+  buildAccessReviewModel,
+  getAccessReviewUserSubjectIds,
+  getResolvedAccessReviewEvidence,
+  getResolvedAccessReviewSubject,
+} from '@/features/access-review/access-review';
 import { getAccessReviewDocuments } from '@/features/access-review/access-review.api';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -42,6 +48,11 @@ export default function AccessReviewPage() {
     () => buildAccessReviewModel(documentsQuery.data ?? []),
     [documentsQuery.data],
   );
+  const userSubjectIds = useMemo(
+    () => getAccessReviewUserSubjectIds(model.reviews),
+    [model.reviews],
+  );
+  const { data: userDisplayNames } = useOwnerDisplayNames(userSubjectIds);
   const isLoading = documentsQuery.isLoading;
   const isError = documentsQuery.isError;
   const isFetching = documentsQuery.isFetching;
@@ -198,73 +209,84 @@ export default function AccessReviewPage() {
                 </tr>
               </thead>
               <tbody>
-                {model.reviews.map((review) => (
-                  <tr
-                    key={review.id}
-                    className="border-b last:border-0"
-                    style={{ borderColor: 'var(--table-row-border)' }}
-                  >
-                    <td className="min-w-72 px-4 py-3">
-                      <Link
-                        href={review.href}
-                        className="text-sm font-medium text-[var(--text-main)] transition-colors hover:text-[var(--color-primary)]"
-                      >
-                        {review.title}
-                      </Link>
-                      <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <ClassificationBadge classification={review.classification} />
-                        <StatusBadge status={review.status} />
-                      </div>
-                      <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
-                        {review.reason}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <span
-                        className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold capitalize ${
-                          review.severity === 'critical'
-                            ? postureStyles.critical
-                            : postureStyles.warning
-                        }`}
-                      >
-                        {review.severity}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-sm text-[var(--text-main)]">
-                      {review.subject}
-                    </td>
-                    <td className="px-4 py-3 font-mono text-xs text-[var(--text-muted)]">
-                      {review.permission}
-                    </td>
-                    <td className="min-w-72 px-4 py-3">
-                      <ul className="space-y-1 text-xs text-[var(--text-muted)]">
-                        {review.evidence.map((item) => (
-                          <li key={item}>{item}</li>
-                        ))}
-                      </ul>
-                      <p className="mt-2 text-xs leading-5 text-[var(--text-faint)]">
-                        {review.recommendedAction}
-                      </p>
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-col gap-2">
+                {model.reviews.map((review) => {
+                  const subject = getResolvedAccessReviewSubject(
+                    review,
+                    userDisplayNames,
+                  );
+                  const evidence = getResolvedAccessReviewEvidence(
+                    review,
+                    userDisplayNames,
+                  );
+
+                  return (
+                    <tr
+                      key={review.id}
+                      className="border-b last:border-0"
+                      style={{ borderColor: 'var(--table-row-border)' }}
+                    >
+                      <td className="min-w-72 px-4 py-3">
                         <Link
                           href={review.href}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
+                          className="text-sm font-medium text-[var(--text-main)] transition-colors hover:text-[var(--color-primary)]"
                         >
-                          {review.nextActionLabel}
+                          {review.title}
                         </Link>
-                        <Link
-                          href={review.auditHref}
-                          className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
-                          style={{ background: 'var(--color-primary)' }}
+                        <div className="mt-2 flex flex-wrap items-center gap-2">
+                          <ClassificationBadge classification={review.classification} />
+                          <StatusBadge status={review.status} />
+                        </div>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-muted)]">
+                          {review.reason}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span
+                          className={`inline-flex rounded-md border px-2 py-1 text-xs font-semibold capitalize ${
+                            review.severity === 'critical'
+                              ? postureStyles.critical
+                              : postureStyles.warning
+                          }`}
                         >
-                          Audit evidence
-                        </Link>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                          {review.severity}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 text-sm text-[var(--text-main)]">
+                        <span title={review.subjectId ?? subject}>{subject}</span>
+                      </td>
+                      <td className="px-4 py-3 font-mono text-xs text-[var(--text-muted)]">
+                        {review.permission}
+                      </td>
+                      <td className="min-w-72 px-4 py-3">
+                        <ul className="space-y-1 text-xs text-[var(--text-muted)]">
+                          {evidence.map((item) => (
+                            <li key={item}>{item}</li>
+                          ))}
+                        </ul>
+                        <p className="mt-2 text-xs leading-5 text-[var(--text-faint)]">
+                          {review.recommendedAction}
+                        </p>
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="flex flex-col gap-2">
+                          <Link
+                            href={review.href}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg border border-[var(--border-soft)] px-3 py-2 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--bg-muted)]"
+                          >
+                            {review.nextActionLabel}
+                          </Link>
+                          <Link
+                            href={review.auditHref}
+                            className="inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-xs font-semibold text-white transition hover:brightness-110"
+                            style={{ background: 'var(--color-primary)' }}
+                          >
+                            Audit evidence
+                          </Link>
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
               </tbody>
             </table>
           </div>

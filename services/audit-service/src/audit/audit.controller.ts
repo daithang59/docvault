@@ -17,6 +17,7 @@ import { ServiceTokenGuard } from '../auth/service-token.guard';
 import { AuditService } from './audit.service';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
 import { QueryAuditDto } from './dto/query-audit.dto';
+import { SealAuditChainDto } from './dto/seal-audit-chain.dto';
 import { SecurityRecommendationWorkflowDto } from './dto/security-recommendation-workflow.dto';
 
 @ApiTags('audit')
@@ -51,6 +52,24 @@ export class AuditController {
   verifyChain(@Query('limit') limitStr?: string) {
     const limit = limitStr ? Math.min(Number(limitStr), 5000) : 1000;
     return this.auditService.verifyChain(limit);
+  }
+
+  @Post('chain/seal-and-start-epoch')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Seal a compromised audit epoch and start a new active epoch',
+  })
+  sealCompromisedChainAndStartEpoch(
+    @Body() body: SealAuditChainDto,
+    @Req() req: any,
+  ) {
+    return this.auditService.sealCompromisedChainAndStartEpoch(body, {
+      actorId: req.user?.username ?? req.user?.sub,
+      roles: Array.isArray(req.user?.roles) ? req.user.roles : [],
+      ip: req.ip,
+      traceId: req.headers?.['x-trace-id'],
+    });
   }
 
   @Get('security-summary')

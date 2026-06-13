@@ -61,6 +61,34 @@ describe('buildSecurityDashboardModel', () => {
     });
   });
 
+  it('warns when a historical audit epoch is compromised', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        chain: {
+          valid: true,
+          checked: 3,
+          epochId: 'epoch-active',
+          historicalCompromisedCount: 1,
+          compromisedEpochs: [
+            {
+              epochId: 'epoch-old',
+              status: 'COMPROMISED',
+              incidentId: 'AUDIT-INC-1',
+              firstBrokenIndex: 2,
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(model.posture.level).toBe('warning');
+    expect(model.alerts[0]).toMatchObject({
+      severity: 'warning',
+      title: 'Historical audit epoch compromised',
+      description: '1 previous audit epoch is marked compromised.',
+    });
+  });
+
   it('raises warning alerts for malware, DLP, and repeated deny actors', () => {
     const model = buildSecurityDashboardModel(
       summary({
@@ -402,6 +430,12 @@ describe('buildSecurityDashboardModel', () => {
     expect(buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })).toBe(
       'action=DLP_PATTERN_DETECTED',
     );
+    expect(
+      buildAuditFilterQuery({
+        documentId: 'doc-secret-board',
+        aclId: 'acl-all-download',
+      }),
+    ).toBe('documentId=doc-secret-board&aclId=acl-all-download');
   });
 
   it('builds metadata-only evidence packets for recommendation export', () => {

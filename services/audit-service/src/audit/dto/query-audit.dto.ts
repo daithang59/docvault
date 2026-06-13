@@ -31,6 +31,10 @@ export class QueryAuditDto {
 
   @IsOptional()
   @IsString()
+  aclId?: string;
+
+  @IsOptional()
+  @IsString()
   result?: string;
 
   @IsOptional()

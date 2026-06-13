@@ -445,7 +445,46 @@ components:
         valid: { type: boolean }
         checked: { type: integer }
         firstBrokenIndex: { type: integer, nullable: true }
+        firstBrokenEventId: { type: string, nullable: true }
+        lastTrustedHash: { type: string, nullable: true }
         message: { type: string, nullable: true }
+        epochId: { type: string, nullable: true }
+        activeEpoch:
+          type: object
+          nullable: true
+          properties:
+            epochId: { type: string }
+            status: { type: string }
+            valid: { type: boolean }
+            checked: { type: integer }
+            startedAt: { type: string, format: date-time, nullable: true }
+            genesisReason: { type: string, nullable: true }
+            previousEpochId: { type: string, nullable: true }
+            incidentId: { type: string, nullable: true }
+        historicalCompromisedCount: { type: integer, nullable: true }
+        compromisedEpochs:
+          type: array
+          items:
+            type: object
+            properties:
+              epochId: { type: string }
+              status: { type: string, enum: [COMPROMISED] }
+              startedAt: { type: string, format: date-time, nullable: true }
+              endedAt: { type: string, format: date-time, nullable: true }
+              incidentId: { type: string, nullable: true }
+              firstBrokenIndex: { type: integer, nullable: true }
+              firstBrokenEventId: { type: string, nullable: true }
+              lastTrustedHash: { type: string, nullable: true }
+              reason: { type: string, nullable: true }
+
+    SealAuditChainRequest:
+      type: object
+      required: [reason]
+      properties:
+        reason:
+          type: string
+          minLength: 12
+          maxLength: 500
 
     RiskyDocumentSummary:
       type: object
@@ -1744,6 +1783,35 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/VerifyChainResult'
+        '401':
+          description: Unauthorized
+        '403':
+          description: Forbidden — compliance_officer or admin required
+
+  /audit/chain/seal-and-start-epoch:
+    post:
+      summary: Seal compromised audit epoch and start a new one
+      operationId: sealCompromisedAuditChainAndStartEpoch
+      description: Preserves the compromised epoch and starts a new active audit chain instead of recomputing historical hashes.
+      security:
+        - bearerAuth: []
+        - cookieAuth: []
+      tags: [Audit]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SealAuditChainRequest'
+      responses:
+        '200':
+          description: Recovery incident, previous epoch, new epoch, and audit event
+          content:
+            application/json:
+              schema:
+                type: object
+        '400':
+          description: Chain is currently valid or request is invalid
         '401':
           description: Unauthorized
         '403':

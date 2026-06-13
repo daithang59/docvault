@@ -59,6 +59,12 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
           onChange={(v) => setField('resourceId', v)}
           placeholder="Document ID..."
         />
+        <FilterInput
+          label="ACL ID"
+          value={filters.aclId ?? ''}
+          onChange={(v) => setField('aclId', v)}
+          placeholder="ACL rule ID..."
+        />
         <div>
           <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">Result</label>
           <select
