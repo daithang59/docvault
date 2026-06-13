@@ -107,6 +107,20 @@ export interface SecurityRecommendationFinding {
   routing: SecurityAlertRouting;
 }
 
+export type SecurityCaseResolutionKind = 'REMEDIATED' | 'ACCEPTED_RISK';
+
+export interface SecurityCaseWorkflowDraft {
+  investigationNote: string;
+  resolutionKind: SecurityCaseResolutionKind | null;
+  resolutionNote: string;
+  verificationConfirmed: boolean;
+}
+
+export interface SecurityCaseWorkflowValidation {
+  canResolve: boolean;
+  missingRequirements: string[];
+}
+
 export interface SecurityRecommendationRow
   extends Omit<SecurityRecommendationSummary, 'workflow'> {
   workflow: SecurityRecommendationWorkflow;
@@ -130,6 +144,52 @@ export function filterSecurityRecommendationRows(
     return items.filter((item) => item.workflow.status === 'RESOLVED');
   }
   return items.filter((item) => item.workflow.status !== 'RESOLVED');
+}
+
+export function validateSecurityCaseWorkflowDraft(
+  draft: SecurityCaseWorkflowDraft,
+): SecurityCaseWorkflowValidation {
+  const missingRequirements: string[] = [];
+
+  if (!draft.investigationNote.trim()) {
+    missingRequirements.push('Investigation note');
+  }
+
+  if (!draft.resolutionKind) {
+    missingRequirements.push('Remediation or accepted-risk decision');
+  }
+
+  if (!draft.resolutionNote.trim()) {
+    missingRequirements.push('Remediation or accepted-risk evidence');
+  }
+
+  if (!draft.verificationConfirmed) {
+    missingRequirements.push('Verification confirmation');
+  }
+
+  return {
+    canResolve: missingRequirements.length === 0,
+    missingRequirements,
+  };
+}
+
+export function buildSecurityCaseWorkflowNote(
+  draft: SecurityCaseWorkflowDraft,
+): string {
+  const decision =
+    draft.resolutionKind === 'REMEDIATED'
+      ? 'Remediated'
+      : draft.resolutionKind === 'ACCEPTED_RISK'
+        ? 'Accepted risk'
+        : 'Pending';
+
+  return [
+    'Case workflow',
+    `Investigation: ${draft.investigationNote.trim() || 'Pending'}`,
+    `Decision: ${decision}`,
+    `Resolution evidence: ${draft.resolutionNote.trim() || 'Pending'}`,
+    `Verification: ${draft.verificationConfirmed ? 'Confirmed' : 'Pending'}`,
+  ].join('\n');
 }
 
 export function getSecurityRecommendationQueueCounts(

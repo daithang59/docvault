@@ -57,12 +57,15 @@ import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  buildSecurityCaseWorkflowNote,
   filterSecurityRecommendationRows,
   getSecurityRecommendationQueueCounts,
   getSecurityRouteCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  validateSecurityCaseWorkflowDraft,
   type SecurityAlertRoute,
   type SecurityAlertRouting,
+  type SecurityCaseResolutionKind,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
   type SecurityRecommendationQueueView,
@@ -1037,6 +1040,265 @@ function RecommendationHistoryControls({
 }
 
 function RecommendationWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
+  if (item.finding.routing.route === 'CASE') {
+    return (
+      <RecommendationCaseWorkflowControls
+        item={item}
+        isPending={isPending}
+        isDisabled={isDisabled}
+        error={error}
+        onSave={onSave}
+      />
+    );
+  }
+
+  return (
+    <RecommendationLightweightWorkflowControls
+      item={item}
+      isPending={isPending}
+      isDisabled={isDisabled}
+      error={error}
+      onSave={onSave}
+    />
+  );
+}
+
+function RecommendationCaseWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
+  const [investigationNote, setInvestigationNote] = useState('');
+  const [resolutionKind, setResolutionKind] =
+    useState<SecurityCaseResolutionKind | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [verificationConfirmed, setVerificationConfirmed] = useState(false);
+
+  const draft = {
+    investigationNote,
+    resolutionKind,
+    resolutionNote,
+    verificationConfirmed,
+  };
+  const validation = validateSecurityCaseWorkflowDraft(draft);
+  const note = buildSecurityCaseWorkflowNote(draft);
+  const isResolved = item.workflow.status === 'RESOLVED';
+  const controlsDisabled = isDisabled || isResolved;
+  const canStart = item.workflow.status === 'OPEN' && !controlsDisabled;
+  const canSaveReview =
+    investigationNote.trim().length > 0 && !controlsDisabled;
+  const canResolve = validation.canResolve && !controlsDisabled;
+
+  async function startCase() {
+    if (!canStart) return;
+
+    await onSave(item.id, {
+      status: 'INVESTIGATING',
+      note: `Case workflow started: ${item.finding.categoryLabel}`,
+    });
+  }
+
+  async function saveReviewEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSaveReview) return;
+
+    await onSave(item.id, {
+      status: 'REVIEWED',
+      note,
+    });
+  }
+
+  async function resolveCase() {
+    if (!canResolve) return;
+
+    await onSave(item.id, {
+      status: 'RESOLVED',
+      note,
+    });
+  }
+
+  return (
+    <form
+      onSubmit={saveReviewEvidence}
+      className="mt-3 border-t border-[var(--border-soft)] pt-3"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Case workflow
+            </p>
+            <SecurityRouteBadge routing={item.finding.routing} />
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Current status:{' '}
+            <span className="font-semibold text-[var(--text-main)]">
+              {getRecommendationWorkflowLabel(item.workflow.status)}
+            </span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Resolve is gated by investigation, remediation or accepted risk, and
+            verification evidence.
+          </p>
+          {item.workflow.note ? (
+            <p className="mt-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+              Last note: {item.workflow.note}
+            </p>
+          ) : null}
+        </div>
+        {item.workflow.status === 'OPEN' ? (
+          <button
+            type="button"
+            onClick={startCase}
+            disabled={!canStart}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Clock className="h-4 w-4" />
+            {isPending ? 'Starting' : 'Start case'}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Investigation
+          <textarea
+            value={investigationNote}
+            onChange={(event) => setInvestigationNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Summarize affected scope and why this case is real"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <div>
+          <p className="text-xs font-medium text-[var(--text-main)]">
+            Decision
+          </p>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ['REMEDIATED', 'Remediated'],
+                ['ACCEPTED_RISK', 'Accepted risk'],
+              ] as Array<[SecurityCaseResolutionKind, string]>
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-main)]"
+              >
+                <input
+                  type="radio"
+                  name={`case-decision-${item.id}`}
+                  value={value}
+                  checked={resolutionKind === value}
+                  onChange={() => setResolutionKind(value)}
+                  disabled={controlsDisabled}
+                  className="accent-[var(--color-primary)]"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Remediation or accepted-risk evidence
+          <textarea
+            value={resolutionNote}
+            onChange={(event) => setResolutionNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Describe the fix, owner approval, expiry, or accepted-risk reason"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <label className="flex items-start gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs leading-relaxed text-[var(--text-muted)]">
+          <input
+            type="checkbox"
+            checked={verificationConfirmed}
+            onChange={(event) => setVerificationConfirmed(event.target.checked)}
+            disabled={controlsDisabled}
+            className="mt-0.5 accent-[var(--color-primary)]"
+          />
+          <span>
+            Verification confirmed: audit scope reviewed, decision recorded, and
+            evidence packet is ready for export.
+          </span>
+        </label>
+      </div>
+
+      {!isResolved && !validation.canResolve ? (
+        <div className="mt-3 rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-3 py-2">
+          <p className="text-xs font-semibold text-[var(--status-pending-text)]">
+            Missing before resolve
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {validation.missingRequirements.join(' · ')}
+          </p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-[var(--state-error-text)]">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={!canSaveReview}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {isPending ? 'Saving' : 'Save review evidence'}
+        </button>
+        <button
+          type="button"
+          onClick={resolveCase}
+          disabled={!canResolve}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-3 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {isPending ? 'Resolving' : 'Resolve case'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RecommendationLightweightWorkflowControls({
   item,
   isPending,
   isDisabled,

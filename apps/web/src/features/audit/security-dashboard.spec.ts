@@ -8,10 +8,12 @@ import type {
 import {
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  buildSecurityCaseWorkflowNote,
   buildSecurityDashboardModel,
   filterSecurityRecommendationRows,
   getSecurityRecommendationQueueCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  validateSecurityCaseWorkflowDraft,
 } from './security-dashboard';
 
 function summary(overrides?: Partial<SecuritySummary>): SecuritySummary {
@@ -910,6 +912,70 @@ describe('buildSecurityDashboardModel', () => {
       route: 'CASE',
       routeLabel: 'Case workflow required',
     });
+  });
+
+  it('blocks case resolution until investigation, decision, evidence, and verification are complete', () => {
+    const validation = validateSecurityCaseWorkflowDraft({
+      investigationNote: '',
+      resolutionKind: null,
+      resolutionNote: '',
+      verificationConfirmed: false,
+    });
+
+    expect(validation).toEqual({
+      canResolve: false,
+      missingRequirements: [
+        'Investigation note',
+        'Remediation or accepted-risk decision',
+        'Remediation or accepted-risk evidence',
+        'Verification confirmation',
+      ],
+    });
+  });
+
+  it('allows case resolution for complete remediation and accepted-risk drafts', () => {
+    expect(
+      validateSecurityCaseWorkflowDraft({
+        investigationNote: 'Confirmed confidential document has DOWNLOAD exposure.',
+        resolutionKind: 'REMEDIATED',
+        resolutionNote: 'Owner removed DOWNLOAD and left READ access only.',
+        verificationConfirmed: true,
+      }),
+    ).toEqual({
+      canResolve: true,
+      missingRequirements: [],
+    });
+
+    expect(
+      validateSecurityCaseWorkflowDraft({
+        investigationNote: 'Confirmed external auditor needs temporary access.',
+        resolutionKind: 'ACCEPTED_RISK',
+        resolutionNote: 'Risk accepted until 2026-07-01 with owner approval.',
+        verificationConfirmed: true,
+      }),
+    ).toEqual({
+      canResolve: true,
+      missingRequirements: [],
+    });
+  });
+
+  it('generates a case workflow evidence note for workflow history and packets', () => {
+    const note = buildSecurityCaseWorkflowNote({
+      investigationNote: 'Confirmed confidential document has DOWNLOAD exposure.',
+      resolutionKind: 'REMEDIATED',
+      resolutionNote: 'Owner removed DOWNLOAD and left READ access only.',
+      verificationConfirmed: true,
+    });
+
+    expect(note).toContain('Case workflow');
+    expect(note).toContain(
+      'Investigation: Confirmed confidential document has DOWNLOAD exposure.',
+    );
+    expect(note).toContain('Decision: Remediated');
+    expect(note).toContain(
+      'Resolution evidence: Owner removed DOWNLOAD and left READ access only.',
+    );
+    expect(note).toContain('Verification: Confirmed');
   });
 
   it('defines quick investigation filters for the required security event classes', () => {
