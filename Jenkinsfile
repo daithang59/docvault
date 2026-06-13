@@ -315,18 +315,22 @@ pipeline {
                 }
             }
             stages {
-                stage('Unit Tests') {
-                    steps {
-                        script {
-                            unitTests(cfg)
+                stage('Lint & Unit Tests') {
+                    parallel {
+                        stage('Unit Tests') {
+                            steps {
+                                script {
+                                    unitTests(cfg)
+                                }
+                            }
                         }
-                    }
-                }
 
-                stage('Lint') {
-                    steps {
-                        script {
-                            runPnpmTask(cfg, 'lint')
+                        stage('Lint') {
+                            steps {
+                                script {
+                                    runPnpmTask(cfg, 'lint')
+                                }
+                            }
                         }
                     }
                 }
