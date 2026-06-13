@@ -6,8 +6,13 @@ import {
   EVIDENCE_CENTER_EXCLUDED_SENSITIVE_FIELDS,
   buildEvidenceCenterModel,
   buildEvidenceCenterManifest,
+  filterEvidenceRecommendationTargets,
+  getEvidenceRecommendationQueueCounts,
 } from './evidence-center';
-import type { SecuritySummary } from '@/features/audit/audit.types';
+import type {
+  SecurityRecommendationWorkflowStatus,
+  SecuritySummary,
+} from '@/features/audit/audit.types';
 import type { ComplianceEvidencePacket } from '@/features/documents/documents.types';
 import type { RetentionEvidenceResult } from '@/features/retention/retention.types';
 
@@ -55,6 +60,27 @@ function securitySummary(): SecuritySummary {
         workflow: { status: 'OPEN' },
       },
     ],
+  };
+}
+
+function securitySummaryWithRecommendationStatuses(
+  statuses: Array<[string, SecurityRecommendationWorkflowStatus]>,
+): SecuritySummary {
+  return {
+    ...securitySummary(),
+    recommendations: statuses.map(([id, status]) => ({
+      id,
+      type: 'ACTOR_ACCESS_REVIEW',
+      severity: 'warning',
+      title: id,
+      reason: 'Test recommendation',
+      recommendedAction: 'Review audit evidence.',
+      evidence: ['1 audit signal'],
+      affectedDocumentIds: [],
+      affectedActorIds: [],
+      auditFilters: { actorId: 'actor-1' },
+      workflow: { status },
+    })),
   };
 }
 
@@ -219,6 +245,56 @@ describe('buildEvidenceCenterModel', () => {
     expect(JSON.stringify(model)).not.toContain('grantToken');
     expect(JSON.stringify(model)).not.toContain('presignedUrl');
     expect(JSON.stringify(model)).not.toContain('fileContent');
+  });
+
+  it('filters evidence recommendation packet targets by active, resolved, and all views', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummaryWithRecommendationStatuses([
+        ['open-rec', 'OPEN'],
+        ['reviewed-rec', 'REVIEWED'],
+        ['resolved-rec', 'RESOLVED'],
+      ]),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-13T10:00:00.000Z',
+    });
+
+    expect(
+      filterEvidenceRecommendationTargets(
+        model.recommendationTargets,
+        'active',
+      ).map((item) => item.id),
+    ).toEqual(['open-rec', 'reviewed-rec']);
+    expect(
+      filterEvidenceRecommendationTargets(
+        model.recommendationTargets,
+        'resolved',
+      ).map((item) => item.id),
+    ).toEqual(['resolved-rec']);
+    expect(
+      filterEvidenceRecommendationTargets(
+        model.recommendationTargets,
+        'all',
+      ).map((item) => item.id),
+    ).toEqual(['open-rec', 'reviewed-rec', 'resolved-rec']);
+  });
+
+  it('counts evidence recommendation packet queue views', () => {
+    const model = buildEvidenceCenterModel({
+      securitySummary: securitySummaryWithRecommendationStatuses([
+        ['open-rec', 'OPEN'],
+        ['resolved-rec', 'RESOLVED'],
+      ]),
+      retentionEvidence: retentionEvidence(),
+      generatedAt: '2026-06-13T10:00:00.000Z',
+    });
+
+    expect(
+      getEvidenceRecommendationQueueCounts(model.recommendationTargets),
+    ).toEqual({
+      active: 1,
+      resolved: 1,
+      all: 2,
+    });
   });
 });
 

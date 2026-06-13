@@ -39,12 +39,16 @@ import {
   buildEvidenceCenterManifest,
   buildEvidenceCenterModel,
   buildEvidenceCenterDocumentPacket,
+  filterEvidenceRecommendationTargets,
+  getEvidenceRecommendationQueueCounts,
   resolveActorIdsInText,
+  EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT,
   type EvidenceBundleManifest,
   type EvidenceCaseNarrative,
   type EvidenceCenterModel,
   type EvidenceCommandMetric,
   type EvidenceDocumentPacketTarget,
+  type EvidenceRecommendationQueueView,
   type EvidenceRecommendationTarget,
   type UserDisplayNameMap,
 } from '@/features/evidence/evidence-center';
@@ -74,6 +78,9 @@ export default function EvidenceCenterPage() {
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<EvidenceCenterView>('builder');
+  const [recommendationQueueView, setRecommendationQueueView] =
+    useState<EvidenceRecommendationQueueView>('active');
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
 
   const securityQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -417,9 +424,18 @@ export default function EvidenceCenterPage() {
           >
             <RecommendationPacketQueue
               items={model.recommendationTargets}
+              queueView={recommendationQueueView}
+              showAll={showAllRecommendations}
               pendingId={pendingRecommendationId}
               selectedIds={selectedRecommendationIdSet}
               actorDisplayNames={actorDisplayNames}
+              onQueueViewChange={(view) => {
+                setRecommendationQueueView(view);
+                setShowAllRecommendations(false);
+              }}
+              onToggleShowAll={() =>
+                setShowAllRecommendations((current) => !current)
+              }
               onToggleSelection={toggleRecommendationSelection}
               onDownload={downloadRecommendationPacket}
             />
@@ -1010,19 +1026,37 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
 
 function RecommendationPacketQueue({
   items,
+  queueView,
+  showAll,
   pendingId,
   selectedIds,
   actorDisplayNames,
+  onQueueViewChange,
+  onToggleShowAll,
   onToggleSelection,
   onDownload,
 }: {
   items: EvidenceRecommendationTarget[];
+  queueView: EvidenceRecommendationQueueView;
+  showAll: boolean;
   pendingId: string | null;
   selectedIds: Set<string>;
   actorDisplayNames?: UserDisplayNameMap;
+  onQueueViewChange: (view: EvidenceRecommendationQueueView) => void;
+  onToggleShowAll: () => void;
   onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceRecommendationTarget) => Promise<void>;
 }) {
+  const counts = getEvidenceRecommendationQueueCounts(items);
+  const filteredItems = filterEvidenceRecommendationTargets(items, queueView);
+  const hiddenCount = Math.max(
+    0,
+    filteredItems.length - EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT,
+  );
+  const visibleItems = showAll
+    ? filteredItems
+    : filteredItems.slice(0, EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT);
+
   return (
     <div
       className="rounded-lg border"
@@ -1036,15 +1070,43 @@ function RecommendationPacketQueue({
           Export recommendation packets with audit chain, workflow history, and
           playbook metadata.
         </p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex w-fit rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+            {(['active', 'resolved', 'all'] as EvidenceRecommendationQueueView[]).map(
+              (view) => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={queueView === view}
+                  onClick={() => onQueueViewChange(view)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    queueView === view
+                      ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                  }`}
+                >
+                  {getEvidenceQueueViewLabel(view)} {counts[view]}
+                </button>
+              ),
+            )}
+          </div>
+          <p className="text-xs text-[var(--text-muted)]">
+            Resolved packets remain exportable from history.
+          </p>
+        </div>
       </div>
 
-      {items.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <p className="p-4 text-sm text-[var(--text-muted)]">
-          No security recommendation packets are waiting.
+          {queueView === 'active'
+            ? 'No active recommendation packets are waiting.'
+            : queueView === 'resolved'
+              ? 'No resolved recommendation packets are available.'
+              : 'No security recommendation packets are waiting.'}
         </p>
       ) : (
         <div className="divide-y divide-[var(--border-soft)]">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -1105,6 +1167,17 @@ function RecommendationPacketQueue({
               </div>
             </div>
           ))}
+          {filteredItems.length > EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT ? (
+            <div className="px-4 py-3 text-center">
+              <button
+                type="button"
+                onClick={onToggleShowAll}
+                className="inline-flex items-center rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -1271,6 +1344,19 @@ function badgeClass(severity: EvidenceRecommendationTarget['severity']): string 
     return 'rounded bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold text-[var(--status-pending-text)]';
   }
   return 'rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]';
+}
+
+function getEvidenceQueueViewLabel(
+  view: EvidenceRecommendationQueueView,
+): string {
+  switch (view) {
+    case 'active':
+      return 'Active';
+    case 'resolved':
+      return 'Resolved';
+    case 'all':
+      return 'All';
+  }
 }
 
 function downloadJson(value: unknown, filename: string) {

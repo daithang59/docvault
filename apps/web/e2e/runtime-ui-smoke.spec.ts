@@ -930,6 +930,36 @@ test('audit page renders command center and keeps filters usable', async ({
   await screenshot(page, testInfo.file, 'audit-command-center-playwright.png');
 });
 
+test('security page scopes recommendation queue by workflow status', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/security');
+
+  await expect(
+    page.getByRole('heading', { name: 'Security', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Security recommendations')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Resolved 0' }).click();
+  await expect(page.getByText('No resolved recommendations are available.')).toBeVisible();
+  await page.getByRole('button', { name: 'All 2' }).click();
+  await expect(page.getByText('Tighten access for high-risk SECRET document')).toBeVisible();
+  await expect(page.getByText('Investigate denied access burst')).toBeVisible();
+
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+
+  await screenshot(page, testInfo.file, 'security-recommendation-queue-playwright.png');
+});
+
 test('evidence center renders readiness visuals and packet builder', async ({
   page,
 }, testInfo) => {
@@ -943,7 +973,14 @@ test('evidence center renders readiness visuals and packet builder', async ({
   await expect(page.getByText('Packet targets')).toBeVisible();
   await expect(page.getByText('Retention posture')).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Recommendation packet queue' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
   await expect(page.getByRole('heading', { name: 'Document evidence packets' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Resolved 0' }).click();
+  await expect(page.getByText('No resolved recommendation packets are available.')).toBeVisible();
+  await page.getByRole('button', { name: 'Active 2' }).click();
   await expect
     .poll(async () =>
       page.evaluate(

@@ -1,9 +1,17 @@
 import { describe, expect, it } from 'vitest';
-import type { AuditLogEntry, SecuritySummary } from './audit.types';
+import type {
+  AuditLogEntry,
+  SecurityRecommendationSummary,
+  SecurityRecommendationWorkflowStatus,
+  SecuritySummary,
+} from './audit.types';
 import {
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
   buildSecurityDashboardModel,
+  filterSecurityRecommendationRows,
+  getSecurityRecommendationQueueCounts,
+  SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
 } from './security-dashboard';
 
 function summary(overrides?: Partial<SecuritySummary>): SecuritySummary {
@@ -37,6 +45,25 @@ function auditEvent(overrides?: Partial<AuditLogEntry>): AuditLogEntry {
     resourceId: overrides?.resourceId ?? 'doc-1',
     timestamp: overrides?.timestamp ?? '2026-05-30T00:00:00.000Z',
     metadata: overrides?.metadata,
+  };
+}
+
+function recommendationFixture(
+  id: string,
+  status: SecurityRecommendationWorkflowStatus,
+): SecurityRecommendationSummary {
+  return {
+    id,
+    type: 'ACTOR_ACCESS_REVIEW',
+    severity: 'warning',
+    title: id,
+    reason: 'Test recommendation',
+    recommendedAction: 'Review the audit evidence.',
+    evidence: ['1 audit signal'],
+    affectedDocumentIds: [],
+    affectedActorIds: [],
+    auditFilters: { actorId: 'actor-1' },
+    workflow: { status },
   };
 }
 
@@ -508,6 +535,65 @@ describe('buildSecurityDashboardModel', () => {
     );
 
     expect(model.recommendations.items[0].workflow).toEqual({ status: 'OPEN' });
+  });
+
+  it('filters security recommendations by active, resolved, and all queue views', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          recommendationFixture('open-rec', 'OPEN'),
+          recommendationFixture('investigating-rec', 'INVESTIGATING'),
+          recommendationFixture('reviewed-rec', 'REVIEWED'),
+          recommendationFixture('resolved-rec', 'RESOLVED'),
+        ],
+      }),
+    );
+
+    expect(
+      filterSecurityRecommendationRows(model.recommendations.items, 'active').map(
+        (item) => item.id,
+      ),
+    ).toEqual(['open-rec', 'investigating-rec', 'reviewed-rec']);
+    expect(
+      filterSecurityRecommendationRows(
+        model.recommendations.items,
+        'resolved',
+      ).map((item) => item.id),
+    ).toEqual(['resolved-rec']);
+    expect(
+      filterSecurityRecommendationRows(model.recommendations.items, 'all').map(
+        (item) => item.id,
+      ),
+    ).toEqual([
+      'open-rec',
+      'investigating-rec',
+      'reviewed-rec',
+      'resolved-rec',
+    ]);
+  });
+
+  it('counts security recommendation queue views', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          recommendationFixture('open-rec', 'OPEN'),
+          recommendationFixture('reviewed-rec', 'REVIEWED'),
+          recommendationFixture('resolved-rec', 'RESOLVED'),
+        ],
+      }),
+    );
+
+    expect(
+      getSecurityRecommendationQueueCounts(model.recommendations.items),
+    ).toEqual({
+      active: 2,
+      resolved: 1,
+      all: 3,
+    });
+  });
+
+  it('exports the security recommendation preview limit', () => {
+    expect(SECURITY_RECOMMENDATION_PREVIEW_LIMIT).toBe(6);
   });
 
   it('attaches a deterministic playbook with owner, SLA, and checklist progress', () => {

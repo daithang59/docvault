@@ -120,6 +120,35 @@ export interface EvidenceRecommendationTarget {
   packetFilename: string;
 }
 
+export type EvidenceRecommendationQueueView = 'active' | 'resolved' | 'all';
+
+export const EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT = 6;
+
+export function filterEvidenceRecommendationTargets(
+  items: EvidenceRecommendationTarget[],
+  view: EvidenceRecommendationQueueView,
+): EvidenceRecommendationTarget[] {
+  if (view === 'all') return items;
+  if (view === 'resolved') {
+    return items.filter((item) => item.workflowStatus === 'RESOLVED');
+  }
+  return items.filter((item) => item.workflowStatus !== 'RESOLVED');
+}
+
+export function getEvidenceRecommendationQueueCounts(
+  items: EvidenceRecommendationTarget[],
+): Record<EvidenceRecommendationQueueView, number> {
+  const resolved = items.filter(
+    (item) => item.workflowStatus === 'RESOLVED',
+  ).length;
+
+  return {
+    active: items.length - resolved,
+    resolved,
+    all: items.length,
+  };
+}
+
 export interface EvidenceDocumentPacketTarget {
   docId: string;
   title: string;

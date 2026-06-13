@@ -78,6 +78,35 @@ export interface SecurityRecommendationRow
   auditFilters: AuditQueryFilters;
 }
 
+export type SecurityRecommendationQueueView = 'active' | 'resolved' | 'all';
+
+export const SECURITY_RECOMMENDATION_PREVIEW_LIMIT = 6;
+
+export function filterSecurityRecommendationRows(
+  items: SecurityRecommendationRow[],
+  view: SecurityRecommendationQueueView,
+): SecurityRecommendationRow[] {
+  if (view === 'all') return items;
+  if (view === 'resolved') {
+    return items.filter((item) => item.workflow.status === 'RESOLVED');
+  }
+  return items.filter((item) => item.workflow.status !== 'RESOLVED');
+}
+
+export function getSecurityRecommendationQueueCounts(
+  items: SecurityRecommendationRow[],
+): Record<SecurityRecommendationQueueView, number> {
+  const resolved = items.filter(
+    (item) => item.workflow.status === 'RESOLVED',
+  ).length;
+
+  return {
+    active: items.length - resolved,
+    resolved,
+    all: items.length,
+  };
+}
+
 export type SecurityRecommendationSlaState =
   | 'not-started'
   | 'on-track'

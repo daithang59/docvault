@@ -57,8 +57,12 @@ import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  filterSecurityRecommendationRows,
+  getSecurityRecommendationQueueCounts,
+  SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
+  type SecurityRecommendationQueueView,
   type SecurityRecommendationSlaState,
 } from '@/features/audit/security-dashboard';
 
@@ -142,6 +146,9 @@ export default function SecurityPage() {
     useState<RecommendationHistoryState>({});
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [historyErrors, setHistoryErrors] = useState<RecommendationHistoryErrors>({});
+  const [recommendationQueueView, setRecommendationQueueView] =
+    useState<SecurityRecommendationQueueView>('active');
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -485,6 +492,15 @@ export default function SecurityPage() {
         <RecommendationsPanel
           recommendations={model.recommendations}
           auditChain={auditChain}
+          queueView={recommendationQueueView}
+          showAll={showAllRecommendations}
+          onQueueViewChange={(view) => {
+            setRecommendationQueueView(view);
+            setShowAllRecommendations(false);
+          }}
+          onToggleShowAll={() =>
+            setShowAllRecommendations((current) => !current)
+          }
           pendingRecommendationId={pendingRecommendationId}
           workflowError={workflowError}
           expandedHistoryIds={expandedHistoryIds}
@@ -518,6 +534,10 @@ export default function SecurityPage() {
 function RecommendationsPanel({
   recommendations,
   auditChain,
+  queueView,
+  showAll,
+  onQueueViewChange,
+  onToggleShowAll,
   pendingRecommendationId,
   workflowError,
   expandedHistoryIds,
@@ -530,6 +550,10 @@ function RecommendationsPanel({
 }: {
   recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
   auditChain: AuditChainStatus;
+  queueView: SecurityRecommendationQueueView;
+  showAll: boolean;
+  onQueueViewChange: (view: SecurityRecommendationQueueView) => void;
+  onToggleShowAll: () => void;
   pendingRecommendationId: string | null;
   workflowError: { id: string; message: string } | null;
   expandedHistoryIds: string[];
@@ -545,7 +569,18 @@ function RecommendationsPanel({
     item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
   ) => Promise<void>;
 }) {
-  const items = recommendations.items;
+  const counts = getSecurityRecommendationQueueCounts(recommendations.items);
+  const filteredItems = filterSecurityRecommendationRows(
+    recommendations.items,
+    queueView,
+  );
+  const hiddenCount = Math.max(
+    0,
+    filteredItems.length - SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  );
+  const items = showAll
+    ? filteredItems
+    : filteredItems.slice(0, SECURITY_RECOMMENDATION_PREVIEW_LIMIT);
   const actorNames = useActorNames();
 
   return (
@@ -575,117 +610,159 @@ function RecommendationsPanel({
         </span>
       </div>
 
-      {items.length === 0 ? (
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex w-fit rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+          {(['active', 'resolved', 'all'] as SecurityRecommendationQueueView[]).map(
+            (view) => (
+              <button
+                key={view}
+                type="button"
+                aria-pressed={queueView === view}
+                onClick={() => onQueueViewChange(view)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  queueView === view
+                    ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                {getRecommendationQueueViewLabel(view)} {counts[view]}
+              </button>
+            ),
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">
+          Active hides resolved recommendations without deleting audit evidence.
+        </p>
+      </div>
+
+      {filteredItems.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--text-muted)]">
-          No recommendation is raised by the current security summary.
+          {queueView === 'active'
+            ? 'No active recommendations need review.'
+            : queueView === 'resolved'
+              ? 'No resolved recommendations are available.'
+              : 'No recommendation is raised by the current security summary.'}
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {items.map((item) => {
-            const tone = getRecommendationTone(item.severity);
-            return (
-              <div
-                key={item.id}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {item.severityLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {item.typeLabel}
-                      </span>
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {items.map((item) => {
+              const tone = getRecommendationTone(item.severity);
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {item.severityLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {item.typeLabel}
+                        </span>
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                        {humanizeActorText(item.title, actorNames)}
+                      </h3>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {humanizeActorText(item.reason, actorNames)}
+                      </p>
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
-                      {humanizeActorText(item.title, actorNames)}
-                    </h3>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.reason, actorNames)}
-                    </p>
+                    <Link
+                      href={buildRecommendationAuditHref(item.auditFilters)}
+                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                    >
+                      Open audit
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
-                  <Link
-                    href={buildRecommendationAuditHref(item.auditFilters)}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
+
+                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Recommended action
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {humanizeActorText(item.recommendedAction, actorNames)}
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Evidence
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.evidence.join(' · ')}
+                      </p>
+                    </div>
+                  </div>
+
+                  {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
+                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+                      {item.affectedDocumentIds.map((docId) => (
+                        <span
+                          key={docId}
+                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                        >
+                          doc {truncateMiddle(docId, 18)}
+                        </span>
+                      ))}
+                      {item.affectedActorIds.map((actorId) => (
+                        <span
+                          key={actorId}
+                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
+                        >
+                          actor <ActorLabel id={actorId} length={18} />
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+
+                  <RecommendationWorkflowControls
+                    key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
+                    item={item}
+                    isPending={pendingRecommendationId === item.id}
+                    isDisabled={pendingRecommendationId !== null}
+                    error={workflowError?.id === item.id ? workflowError.message : null}
+                    onSave={onSaveWorkflow}
+                  />
+
+                  <RecommendationPlaybook playbook={item.playbook} />
+
+                  <RecommendationHistoryControls
+                    item={item}
+                    auditChain={auditChain}
+                    isExpanded={expandedHistoryIds.includes(item.id)}
+                    isLoading={historyLoadingId === item.id}
+                    error={historyErrors[item.id] ?? null}
+                    history={workflowHistoryByRecommendationId[item.id] ?? []}
+                    onToggleHistory={onToggleHistory}
+                    onDownloadEvidence={onDownloadEvidence}
+                  />
                 </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Recommended action
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.recommendedAction, actorNames)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Evidence
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {item.evidence.join(' · ')}
-                    </p>
-                  </div>
-                </div>
-
-                {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-                    {item.affectedDocumentIds.map((docId) => (
-                      <span
-                        key={docId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        doc {truncateMiddle(docId, 18)}
-                      </span>
-                    ))}
-                    {item.affectedActorIds.map((actorId) => (
-                      <span
-                        key={actorId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        actor <ActorLabel id={actorId} length={18} />
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
-
-                <RecommendationWorkflowControls
-                  key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
-                  item={item}
-                  isPending={pendingRecommendationId === item.id}
-                  isDisabled={pendingRecommendationId !== null}
-                  error={workflowError?.id === item.id ? workflowError.message : null}
-                  onSave={onSaveWorkflow}
-                />
-
-                <RecommendationPlaybook playbook={item.playbook} />
-
-                <RecommendationHistoryControls
-                  item={item}
-                  auditChain={auditChain}
-                  isExpanded={expandedHistoryIds.includes(item.id)}
-                  isLoading={historyLoadingId === item.id}
-                  error={historyErrors[item.id] ?? null}
-                  history={workflowHistoryByRecommendationId[item.id] ?? []}
-                  onToggleHistory={onToggleHistory}
-                  onDownloadEvidence={onDownloadEvidence}
-                />
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {filteredItems.length > SECURITY_RECOMMENDATION_PREVIEW_LIMIT ? (
+            <div className="mt-4 flex justify-center">
+              <button
+                type="button"
+                onClick={onToggleShowAll}
+                className="inline-flex items-center rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+              </button>
+            </div>
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1621,6 +1698,19 @@ function getRecommendationWorkflowLabel(
       return 'Reviewed';
     case 'RESOLVED':
       return 'Resolved';
+  }
+}
+
+function getRecommendationQueueViewLabel(
+  view: SecurityRecommendationQueueView,
+): string {
+  switch (view) {
+    case 'active':
+      return 'Active';
+    case 'resolved':
+      return 'Resolved';
+    case 'all':
+      return 'All';
   }
 }
 
