@@ -31,6 +31,7 @@ export interface AuditQueryFilters extends PaginationParams {
   resourceType?: string;
   documentId?: string;
   aclId?: string;
+  recommendationId?: string;
   from?: string;
   to?: string;
   limit?: number;

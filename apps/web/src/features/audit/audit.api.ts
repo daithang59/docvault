@@ -42,6 +42,7 @@ function toAuditQueryParams(
     resourceId: filters.resourceId ?? filters.targetId,
     documentId: filters.documentId,
     aclId: filters.aclId,
+    recommendationId: filters.recommendationId,
     result: filters.result,
     from: filters.from ? new Date(filters.from).toISOString() : undefined,
     to: filters.to ? new Date(filters.to).toISOString() : undefined,

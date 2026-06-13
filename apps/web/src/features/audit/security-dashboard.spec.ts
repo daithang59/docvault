@@ -223,6 +223,184 @@ describe('buildSecurityDashboardModel', () => {
     ).toBe('actorId=editor-1');
   });
 
+  it('builds command-center presentation data for security visuals', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        riskyDocuments: [
+          {
+            documentId: 'doc-critical',
+            classification: 'SECRET',
+            accessCount: 5,
+            actorCount: 3,
+            latestAccessAt: '2026-06-01T10:00:00.000Z',
+            riskScore: 95,
+            reasons: ['SECRET classification'],
+          },
+          {
+            documentId: 'doc-warning',
+            classification: 'CONFIDENTIAL',
+            accessCount: 3,
+            actorCount: 2,
+            latestAccessAt: '2026-06-01T09:00:00.000Z',
+            riskScore: 65,
+            reasons: ['CONFIDENTIAL classification'],
+          },
+          {
+            documentId: 'doc-watch',
+            classification: 'INTERNAL',
+            accessCount: 1,
+            actorCount: 1,
+            latestAccessAt: '2026-06-01T08:00:00.000Z',
+            riskScore: 25,
+            reasons: ['Recent access'],
+          },
+        ],
+        behaviorSignals: [
+          {
+            signalId: 'MASS_CONTENT_ACCESS:editor-1',
+            type: 'MASS_CONTENT_ACCESS',
+            severity: 'critical',
+            actorId: 'editor-1',
+            actionCount: 5,
+            documentCount: 5,
+            windowStartedAt: '2026-06-01T10:00:00.000Z',
+            windowEndedAt: '2026-06-01T10:08:00.000Z',
+            riskScore: 100,
+            reasons: ['5 successful grants'],
+          },
+          {
+            signalId: 'DENY_BURST:viewer-1',
+            type: 'DENY_BURST',
+            severity: 'warning',
+            actorId: 'viewer-1',
+            actionCount: 3,
+            documentCount: 2,
+            windowStartedAt: '2026-06-01T09:00:00.000Z',
+            windowEndedAt: '2026-06-01T09:15:00.000Z',
+            riskScore: 58,
+            reasons: ['3 denied security events'],
+          },
+          {
+            signalId: 'DESTRUCTIVE_ACTIVITY:editor-2',
+            type: 'DESTRUCTIVE_ACTIVITY',
+            severity: 'watch',
+            actorId: 'editor-2',
+            actionCount: 1,
+            documentCount: 1,
+            windowStartedAt: '2026-06-01T08:00:00.000Z',
+            windowEndedAt: '2026-06-01T08:05:00.000Z',
+            riskScore: 35,
+            reasons: ['Deletion event'],
+          },
+        ],
+        recommendations: [
+          {
+            id: 'document-access-review:doc-critical',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'critical',
+            title: 'Tighten access for high-risk SECRET document',
+            reason: 'Document reached critical risk score.',
+            recommendedAction: 'Review ACLs.',
+            evidence: ['SECRET classification'],
+            affectedDocumentIds: ['doc-critical'],
+            affectedActorIds: [],
+            auditFilters: { documentId: 'doc-critical' },
+            workflow: {
+              status: 'INVESTIGATING',
+              updatedAt: '2026-06-01T10:00:00.000Z',
+            },
+          },
+          {
+            id: 'actor-access-review:DENY_BURST:viewer-1',
+            type: 'ACTOR_ACCESS_REVIEW',
+            severity: 'warning',
+            title: 'Investigate denied access burst',
+            reason: 'Actor triggered deny burst.',
+            recommendedAction: 'Inspect role membership.',
+            evidence: ['3 denied security events'],
+            affectedDocumentIds: [],
+            affectedActorIds: ['viewer-1'],
+            auditFilters: { actorId: 'viewer-1' },
+            workflow: {
+              status: 'INVESTIGATING',
+              updatedAt: '2026-06-01T10:00:00.000Z',
+            },
+          },
+          {
+            id: 'dlp-classification-review',
+            type: 'DLP_CLASSIFICATION_REVIEW',
+            severity: 'info',
+            title: 'Review DLP-driven classification controls',
+            reason: 'DLP signal needs confirmation.',
+            recommendedAction: 'Confirm classification escalation.',
+            evidence: ['DLP detection event'],
+            affectedDocumentIds: [],
+            affectedActorIds: [],
+            auditFilters: { action: 'DLP_PATTERN_DETECTED' },
+            workflow: { status: 'RESOLVED' },
+          },
+        ],
+      }),
+      {
+        downloadAuthorizedTotal: 8,
+        sensitiveAccessEvents: [
+          auditEvent({
+            eventId: 'event-secret-download',
+            action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+            metadata: { classification: 'SECRET' },
+          }),
+          auditEvent({
+            eventId: 'event-confidential-preview',
+            action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+            metadata: { classification: 'CONFIDENTIAL' },
+          }),
+        ],
+      },
+      { now: '2026-06-02T11:00:00.000Z' },
+    );
+    const { commandCenter } = model;
+
+    expect(commandCenter.postureGauge).toMatchObject({
+      label: 'Security posture',
+      value: 59,
+      tone: 'critical',
+    });
+    expect(commandCenter.alertSegments).toEqual([
+      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'warning', value: 2, percentage: 67 }),
+      expect.objectContaining({ key: 'info', value: 0, percentage: 0 }),
+    ]);
+    expect(commandCenter.riskBandSegments).toEqual([
+      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'warning', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'watch', value: 1, percentage: 33 }),
+    ]);
+    expect(commandCenter.anomalyBandSegments).toEqual([
+      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'warning', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'watch', value: 1, percentage: 33 }),
+    ]);
+    expect(commandCenter.recommendationSlaSegments).toEqual([
+      expect.objectContaining({ key: 'overdue', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'due-soon', value: 0, percentage: 0 }),
+      expect.objectContaining({ key: 'on-track', value: 1, percentage: 33 }),
+      expect.objectContaining({ key: 'not-started', value: 0, percentage: 0 }),
+      expect.objectContaining({ key: 'closed', value: 1, percentage: 33 }),
+    ]);
+    expect(commandCenter.accessSegments).toEqual([
+      expect.objectContaining({
+        key: 'download-authorized',
+        value: 8,
+        percentage: 100,
+      }),
+      expect.objectContaining({
+        key: 'sensitive-access',
+        value: 2,
+        percentage: 25,
+      }),
+    ]);
+  });
+
   it('exposes prioritized security recommendations with audit deep links', () => {
     const model = buildSecurityDashboardModel(
       summary({
@@ -436,6 +614,11 @@ describe('buildSecurityDashboardModel', () => {
         aclId: 'acl-all-download',
       }),
     ).toBe('documentId=doc-secret-board&aclId=acl-all-download');
+    expect(
+      buildAuditFilterQuery({
+        recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
+      }),
+    ).toBe('recommendationId=actor-access-review%3ADENY_BURST%3Aviewer-1');
   });
 
   it('builds metadata-only evidence packets for recommendation export', () => {

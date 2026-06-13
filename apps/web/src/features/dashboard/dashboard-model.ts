@@ -56,9 +56,42 @@ export interface DashboardDemoReadiness {
   signals: DashboardDemoReadinessSignal[];
 }
 
+export interface DashboardGaugeSummary {
+  label: string;
+  value: number;
+  tone: DashboardWidgetTone;
+  description: string;
+  href: string;
+}
+
+export interface DashboardCommandSegment {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+  tone: DashboardWidgetTone;
+  href?: string;
+}
+
+export interface DashboardRiskSpotlight {
+  label: string;
+  value: number;
+  tone: DashboardWidgetTone;
+  description: string;
+  href: string;
+}
+
+export interface DashboardCommandCenter {
+  readinessGauge: DashboardGaugeSummary;
+  lifecycleSegments: DashboardCommandSegment[];
+  attentionSegments: DashboardCommandSegment[];
+  riskSpotlight: DashboardRiskSpotlight;
+}
+
 export interface DashboardModel {
   stats: DashboardStats;
   demoReadiness: DashboardDemoReadiness;
+  commandCenter: DashboardCommandCenter;
   operationalWidgets: DashboardOperationalWidget[];
   workQueue: DashboardWorkQueueItem[];
   recentDocuments: DocumentListItem[];
@@ -83,46 +116,224 @@ export function buildDashboardModel(
   const retentionDueSoon = documents.filter((document) =>
     isRetentionDueSoon(document, now),
   );
+  const demoReadiness = buildDemoReadiness(documents, stats, dlpDetected, options.actor);
+  const operationalWidgets = buildOperationalWidgets(
+    stats,
+    dlpDetected.length,
+    retentionDueSoon.length,
+    options.unreadNotifications ?? 0,
+  );
+  const workQueue = buildWorkQueue(documents, now, options.actor);
 
   return {
     stats,
-    demoReadiness: buildDemoReadiness(documents, stats, dlpDetected, options.actor),
-    operationalWidgets: [
-      {
-        key: 'pending-approvals',
-        label: 'Pending approvals',
-        value: stats.PENDING,
-        description: 'Documents waiting for workflow decisions.',
-        href: ROUTES.APPROVALS,
-        tone: stats.PENDING > 0 ? 'warning' : 'success',
-      },
-      {
-        key: 'dlp-detected',
-        label: 'DLP detected',
-        value: dlpDetected.length,
-        description: 'Sensitive findings that need review.',
-        href: ROUTES.SECURITY,
-        tone: dlpDetected.length > 0 ? 'critical' : 'success',
-      },
-      {
-        key: 'retention-due-soon',
-        label: 'Retention due soon',
-        value: retentionDueSoon.length,
-        description: 'Records approaching their retention deadline.',
-        href: ROUTES.RETENTION,
-        tone: retentionDueSoon.length > 0 ? 'warning' : 'success',
-      },
-      {
-        key: 'unread-notifications',
-        label: 'Unread notifications',
-        value: options.unreadNotifications ?? 0,
-        description: 'Actionable workflow and compliance queue items.',
-        href: ROUTES.NOTIFICATIONS,
-        tone: (options.unreadNotifications ?? 0) > 0 ? 'info' : 'success',
-      },
-    ],
-    workQueue: buildWorkQueue(documents, now, options.actor),
+    demoReadiness,
+    commandCenter: buildCommandCenter(
+      documents,
+      now,
+      stats,
+      demoReadiness,
+      dlpDetected.length,
+      retentionDueSoon.length,
+    ),
+    operationalWidgets,
+    workQueue,
     recentDocuments: sortByUpdatedDesc(documents).slice(0, 5),
+  };
+}
+
+function buildOperationalWidgets(
+  stats: DashboardStats,
+  dlpDetected: number,
+  retentionDueSoon: number,
+  unreadNotifications: number,
+): DashboardOperationalWidget[] {
+  return [
+    {
+      key: 'pending-approvals',
+      label: 'Pending approvals',
+      value: stats.PENDING,
+      description: 'Documents waiting for workflow decisions.',
+      href: ROUTES.APPROVALS,
+      tone: stats.PENDING > 0 ? 'warning' : 'success',
+    },
+    {
+      key: 'dlp-detected',
+      label: 'DLP detected',
+      value: dlpDetected,
+      description: 'Sensitive findings that need review.',
+      href: ROUTES.SECURITY,
+      tone: dlpDetected > 0 ? 'critical' : 'success',
+    },
+    {
+      key: 'retention-due-soon',
+      label: 'Retention due soon',
+      value: retentionDueSoon,
+      description: 'Records approaching their retention deadline.',
+      href: ROUTES.RETENTION,
+      tone: retentionDueSoon > 0 ? 'warning' : 'success',
+    },
+    {
+      key: 'unread-notifications',
+      label: 'Unread notifications',
+      value: unreadNotifications,
+      description: 'Actionable workflow and compliance queue items.',
+      href: ROUTES.NOTIFICATIONS,
+      tone: unreadNotifications > 0 ? 'info' : 'success',
+    },
+  ];
+}
+
+function buildCommandCenter(
+  documents: DocumentListItem[],
+  now: Date,
+  stats: DashboardStats,
+  demoReadiness: DashboardDemoReadiness,
+  dlpDetected: number,
+  retentionDueSoon: number,
+): DashboardCommandCenter {
+  return {
+    readinessGauge: {
+      label: 'Business readiness',
+      value: demoReadiness.score,
+      tone: demoReadiness.score >= 75 ? 'success' : demoReadiness.score >= 50 ? 'warning' : 'info',
+      description: demoReadiness.description,
+      href: ROUTES.DEMO_KIT,
+    },
+    lifecycleSegments: buildLifecycleSegments(stats),
+    attentionSegments: buildAttentionSegments(documents, now),
+    riskSpotlight: buildRiskSpotlight(stats, dlpDetected, retentionDueSoon),
+  };
+}
+
+function buildLifecycleSegments(stats: DashboardStats): DashboardCommandSegment[] {
+  const total = stats.total;
+
+  return [
+    {
+      key: 'DRAFT',
+      label: 'Draft',
+      value: stats.DRAFT,
+      percentage: toPercentage(stats.DRAFT, total),
+      tone: 'info',
+      href: ROUTES.DOCUMENTS,
+    },
+    {
+      key: 'PENDING',
+      label: 'Pending',
+      value: stats.PENDING,
+      percentage: toPercentage(stats.PENDING, total),
+      tone: 'warning',
+      href: ROUTES.APPROVALS,
+    },
+    {
+      key: 'PUBLISHED',
+      label: 'Published',
+      value: stats.PUBLISHED,
+      percentage: toPercentage(stats.PUBLISHED, total),
+      tone: 'success',
+      href: ROUTES.DOCUMENTS,
+    },
+    {
+      key: 'ARCHIVED',
+      label: 'Archived',
+      value: stats.ARCHIVED,
+      percentage: toPercentage(stats.ARCHIVED, total),
+      tone: 'info',
+      href: ROUTES.RETENTION,
+    },
+  ];
+}
+
+function buildAttentionSegments(
+  documents: DocumentListItem[],
+  now: Date,
+): DashboardCommandSegment[] {
+  const counts = documents.reduce<Record<'critical' | 'warning' | 'info', number>>(
+    (acc, document) => {
+      if (document.dlpStatus === 'DETECTED') {
+        acc.critical += 1;
+      } else if (document.status === 'PENDING' || isRetentionDueSoon(document, now)) {
+        acc.warning += 1;
+      } else if (document.status === 'DRAFT') {
+        acc.info += 1;
+      }
+
+      return acc;
+    },
+    { critical: 0, warning: 0, info: 0 },
+  );
+  const total = counts.critical + counts.warning + counts.info;
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: ROUTES.SECURITY,
+    },
+    {
+      key: 'warning',
+      label: 'Warning',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: ROUTES.APPROVALS,
+    },
+    {
+      key: 'info',
+      label: 'Info',
+      value: counts.info,
+      percentage: toPercentage(counts.info, total),
+      tone: 'info',
+      href: ROUTES.NOTIFICATIONS,
+    },
+  ];
+}
+
+function buildRiskSpotlight(
+  stats: DashboardStats,
+  dlpDetected: number,
+  retentionDueSoon: number,
+): DashboardRiskSpotlight {
+  if (dlpDetected > 0) {
+    return {
+      label: 'DLP triage',
+      value: dlpDetected,
+      tone: 'critical',
+      description: `${dlpDetected} sensitive finding${dlpDetected === 1 ? '' : 's'} needs review.`,
+      href: ROUTES.SECURITY,
+    };
+  }
+
+  if (stats.PENDING > 0) {
+    return {
+      label: 'Approval queue',
+      value: stats.PENDING,
+      tone: 'warning',
+      description: `${stats.PENDING} document${stats.PENDING === 1 ? '' : 's'} waiting for workflow decisions.`,
+      href: ROUTES.APPROVALS,
+    };
+  }
+
+  if (retentionDueSoon > 0) {
+    return {
+      label: 'Retention review',
+      value: retentionDueSoon,
+      tone: 'warning',
+      description: `${retentionDueSoon} record${retentionDueSoon === 1 ? '' : 's'} approaching retention deadline.`,
+      href: ROUTES.RETENTION,
+    };
+  }
+
+  return {
+    label: 'Operationally clear',
+    value: 0,
+    tone: 'success',
+    description: 'No immediate dashboard risk signals.',
+    href: ROUTES.DOCUMENTS,
   };
 }
 
@@ -361,6 +572,11 @@ function isRetentionDueSoon(document: DocumentListItem, now: Date): boolean {
   const nowTime = now.getTime();
   const dueSoonLimit = nowTime + 30 * 24 * 60 * 60 * 1000;
   return retentionTime >= nowTime && retentionTime <= dueSoonLimit;
+}
+
+function toPercentage(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
 }
 
 function sortByUpdatedDesc(documents: DocumentListItem[]): DocumentListItem[] {

@@ -146,6 +146,11 @@ describe('buildEvidenceCenterModel', () => {
       packetFilename:
         'document-access-review-doc-secret-recommendation-evidence.json',
     });
+    expect(model.recommendationTargets[1]).toMatchObject({
+      id: 'actor-access-review:DENY_BURST:viewer-1',
+      auditQuery: 'actorId=viewer-1',
+      affectedActorIds: ['viewer-1'],
+    });
     expect(model.documentPacketTargets[0]).toMatchObject({
       docId: 'doc-secret',
       title: 'Secret Plan',

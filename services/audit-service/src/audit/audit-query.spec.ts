@@ -82,4 +82,33 @@ describe('AuditService query filters', () => {
     expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
     expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
   });
+
+  it('matches recommendation workflow audit events without matching recommendation list views', async () => {
+    const auditModel = makeAuditModel([], 0);
+    const service = new AuditService(auditModel.model as any);
+
+    await service.query({
+      recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
+      pageSize: 50,
+    } as any);
+
+    const expectedFilter = {
+      $and: [
+        {
+          $or: [
+            {
+              resourceType: 'SECURITY_RECOMMENDATION',
+              resourceId: 'actor-access-review:DENY_BURST:viewer-1',
+            },
+            {
+              'metadata.recommendationId':
+                'actor-access-review:DENY_BURST:viewer-1',
+            },
+          ],
+        },
+      ],
+    };
+    expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
+    expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
+  });
 });

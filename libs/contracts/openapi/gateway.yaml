@@ -1735,6 +1735,14 @@ paths:
           schema: { type: string }
           description: Matches direct DOCUMENT events and related events carrying metadata.docId.
         - in: query
+          name: aclId
+          schema: { type: string }
+          description: Matches ACL-level audit events carrying metadata.aclId or metadata.removedAclId.
+        - in: query
+          name: recommendationId
+          schema: { type: string }
+          description: Matches SECURITY_RECOMMENDATION workflow events and recommendation metadata references.
+        - in: query
           name: result
           schema: { $ref: '#/components/schemas/AuditEventResult' }
         - in: query

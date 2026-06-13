@@ -35,6 +35,10 @@ export class QueryAuditDto {
 
   @IsOptional()
   @IsString()
+  recommendationId?: string;
+
+  @IsOptional()
+  @IsString()
   result?: string;
 
   @IsOptional()

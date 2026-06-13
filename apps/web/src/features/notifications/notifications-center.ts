@@ -46,6 +46,15 @@ export interface NotificationCenterModel {
   items: NotificationCenterItem[];
 }
 
+export type NotificationActorNameMap = Record<
+  string,
+  { displayName?: string | null; username?: string | null }
+>;
+
+export interface NotificationCenterBuildOptions {
+  actorNames?: NotificationActorNameMap;
+}
+
 const GROUP_LABELS: Record<NotificationGroupKey, string> = {
   all: 'All',
   approvals: 'Approvals',
@@ -88,9 +97,10 @@ const TYPE_DESCRIPTIONS: Record<string, string> = {
 export function buildNotificationCenterModel(
   records: NotificationRecord[],
   filter: NotificationCenterFilter,
+  options: NotificationCenterBuildOptions = {},
 ): NotificationCenterModel {
   const decorated = records
-    .map(toNotificationCenterItem)
+    .map((record) => toNotificationCenterItem(record, options))
     .sort(
       (a, b) =>
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
@@ -133,6 +143,7 @@ export function buildNotificationCenterModel(
 
 export function toNotificationCenterItem(
   record: NotificationRecord,
+  options: NotificationCenterBuildOptions = {},
 ): NotificationCenterItem {
   const group = getNotificationGroup(record.type);
   const target = getNotificationTarget(record.type, record.docId);
@@ -149,8 +160,20 @@ export function toNotificationCenterItem(
       'A document notification needs attention.',
     targetHref: target.href,
     actionLabel: target.label,
-    workflowSummary: getWorkflowSummary(record.metadata),
+    workflowSummary: getWorkflowSummary(record.metadata, options.actorNames),
   };
+}
+
+export function getNotificationWorkflowActorIds(
+  records: NotificationRecord[],
+): string[] {
+  return [
+    ...new Set(
+      records
+        .map((record) => getWorkflowActorId(record.metadata))
+        .filter((id): id is string => Boolean(id)),
+    ),
+  ];
 }
 
 export function getNotificationGroup(
@@ -228,7 +251,10 @@ function formatTypeLabel(type: string): string {
     .join(' ');
 }
 
-function getWorkflowSummary(metadata: unknown): string | undefined {
+function getWorkflowSummary(
+  metadata: unknown,
+  actorNames?: NotificationActorNameMap,
+): string | undefined {
   if (!metadata || typeof metadata !== 'object') return undefined;
   const workflow = (metadata as { workflow?: unknown }).workflow;
   if (!workflow || typeof workflow !== 'object') return undefined;
@@ -251,5 +277,29 @@ function getWorkflowSummary(metadata: unknown): string | undefined {
     return undefined;
   }
 
-  return `${fromStatus} -> ${toStatus} by ${actorId}`;
+  return `${fromStatus} -> ${toStatus} by ${resolveWorkflowActorName(actorId, actorNames)}`;
+}
+
+function getWorkflowActorId(metadata: unknown): string | undefined {
+  if (!metadata || typeof metadata !== 'object') return undefined;
+  const workflow = (metadata as { workflow?: unknown }).workflow;
+  if (!workflow || typeof workflow !== 'object') return undefined;
+  const actorId = (workflow as { actorId?: unknown }).actorId;
+  return typeof actorId === 'string' && actorId.length > 0
+    ? actorId
+    : undefined;
+}
+
+function resolveWorkflowActorName(
+  actorId: string,
+  actorNames?: NotificationActorNameMap,
+): string {
+  const actor = actorNames?.[actorId];
+  const username = actor?.username?.trim();
+  if (username) return username;
+
+  const displayName = actor?.displayName?.trim();
+  if (displayName && displayName !== 'Unknown User') return displayName;
+
+  return actorId;
 }

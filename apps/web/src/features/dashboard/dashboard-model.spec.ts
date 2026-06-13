@@ -209,6 +209,86 @@ describe('buildDashboardModel', () => {
     });
   });
 
+  it('prepares command-center visual summaries from real dashboard data', () => {
+    const model = buildDashboardModel(documents, {
+      unreadNotifications: 3,
+      now,
+      actor: { id: 'admin-1', roles: ['admin'] },
+    });
+
+    expect(model.commandCenter.readinessGauge).toEqual({
+      label: 'Business readiness',
+      value: 100,
+      tone: 'success',
+      description: 'Lifecycle, approval, evidence, and security stories are available.',
+      href: '/demo-kit',
+    });
+    expect(model.commandCenter.lifecycleSegments).toEqual([
+      expect.objectContaining({
+        key: 'DRAFT',
+        label: 'Draft',
+        value: 1,
+        percentage: 25,
+        href: '/documents',
+        tone: 'info',
+      }),
+      expect.objectContaining({
+        key: 'PENDING',
+        label: 'Pending',
+        value: 1,
+        percentage: 25,
+        href: '/approvals',
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'PUBLISHED',
+        label: 'Published',
+        value: 1,
+        percentage: 25,
+        href: '/documents',
+        tone: 'success',
+      }),
+      expect.objectContaining({
+        key: 'ARCHIVED',
+        label: 'Archived',
+        value: 1,
+        percentage: 25,
+        href: '/retention',
+        tone: 'info',
+      }),
+    ]);
+    expect(model.commandCenter.attentionSegments).toEqual([
+      expect.objectContaining({
+        key: 'critical',
+        label: 'Critical',
+        value: 1,
+        percentage: 50,
+        tone: 'critical',
+      }),
+      expect.objectContaining({
+        key: 'warning',
+        label: 'Warning',
+        value: 0,
+        percentage: 0,
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'info',
+        label: 'Info',
+        value: 1,
+        percentage: 50,
+        tone: 'info',
+      }),
+    ]);
+    expect(model.commandCenter.riskSpotlight).toEqual({
+      label: 'DLP triage',
+      value: 1,
+      tone: 'critical',
+      description: '1 sensitive finding needs review.',
+      href: '/security',
+    });
+  });
+
   it('does not mark the business demo ready when seeded demo data is missing', () => {
     const model = buildDashboardModel([], {
       now,

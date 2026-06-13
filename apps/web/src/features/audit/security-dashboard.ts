@@ -1,3 +1,4 @@
+import { ROUTES } from '@/lib/constants/routes';
 import type {
   AuditChainStatus,
   AuditLogEntry,
@@ -13,6 +14,7 @@ import type {
 export type SecurityPostureLevel = 'healthy' | 'warning' | 'critical';
 export type SecurityAlertSeverity = 'info' | 'warning' | 'critical';
 export type SecurityRiskBand = 'critical' | 'warning' | 'watch';
+export type SecurityDashboardTone = 'info' | 'success' | 'warning' | 'critical';
 
 export interface SecurityDashboardMetric {
   key: keyof SecuritySummary['totals'];
@@ -26,6 +28,32 @@ export interface SecurityDashboardAlert {
   title: string;
   description: string;
   action: string;
+}
+
+export interface SecurityDashboardGaugeSummary {
+  label: string;
+  value: number;
+  tone: SecurityDashboardTone;
+  description: string;
+  href: string;
+}
+
+export interface SecurityDashboardSegment {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+  tone: SecurityDashboardTone;
+  href?: string;
+}
+
+export interface SecurityCommandCenter {
+  postureGauge: SecurityDashboardGaugeSummary;
+  alertSegments: SecurityDashboardSegment[];
+  riskBandSegments: SecurityDashboardSegment[];
+  anomalyBandSegments: SecurityDashboardSegment[];
+  recommendationSlaSegments: SecurityDashboardSegment[];
+  accessSegments: SecurityDashboardSegment[];
 }
 
 export interface SecurityRiskScoringRow extends RiskyDocumentSummary {
@@ -78,6 +106,7 @@ export interface SecurityDashboardModel {
     label: string;
     description: string;
   };
+  commandCenter: SecurityCommandCenter;
   metrics: SecurityDashboardMetric[];
   alerts: SecurityDashboardAlert[];
   repeatedDenyActors: Array<{
@@ -264,8 +293,20 @@ export function buildSecurityDashboardModel(
     });
   }
 
+  const posture = buildPosture(summary, alerts);
+
   return {
-    posture: buildPosture(summary, alerts),
+    posture,
+    commandCenter: buildCommandCenter({
+      posture,
+      alerts,
+      riskScoringRows: riskyDocuments,
+      behaviorSignalRows: behaviorSignals,
+      recommendationRows: recommendations,
+      auditChain: summary?.chain,
+      downloadAuthorizedTotal,
+      sensitiveAccessCount: sensitiveAccessEvents.length,
+    }),
     metrics: [
       {
         key: 'deniedEvents',
@@ -356,6 +397,9 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
   if (filters.resourceId) params.set('resourceId', filters.resourceId);
   if (filters.documentId) params.set('documentId', filters.documentId);
   if (filters.aclId) params.set('aclId', filters.aclId);
+  if (filters.recommendationId) {
+    params.set('recommendationId', filters.recommendationId);
+  }
 
   return params.toString();
 }
@@ -386,6 +430,272 @@ function buildBehaviorSignalRows(
       auditFilters: { actorId: signal.actorId },
     };
   });
+}
+
+function buildCommandCenter({
+  posture,
+  alerts,
+  riskScoringRows,
+  behaviorSignalRows,
+  recommendationRows,
+  auditChain,
+  downloadAuthorizedTotal,
+  sensitiveAccessCount,
+}: {
+  posture: SecurityDashboardModel['posture'];
+  alerts: SecurityDashboardAlert[];
+  riskScoringRows: SecurityRiskScoringRow[];
+  behaviorSignalRows: SecurityBehaviorSignalRow[];
+  recommendationRows: SecurityRecommendationRow[];
+  auditChain?: AuditChainStatus;
+  downloadAuthorizedTotal: number;
+  sensitiveAccessCount: number;
+}): SecurityCommandCenter {
+  return {
+    postureGauge: {
+      label: 'Security posture',
+      value: getPostureScore(posture.level, alerts),
+      tone: getPostureTone(posture.level),
+      description: `${posture.description} Audit chain checked ${auditChain?.checked ?? 0} event${auditChain?.checked === 1 ? '' : 's'}.`,
+      href: ROUTES.AUDIT,
+    },
+    alertSegments: buildAlertSegments(alerts),
+    riskBandSegments: buildRiskBandSegments(riskScoringRows),
+    anomalyBandSegments: buildAnomalyBandSegments(behaviorSignalRows),
+    recommendationSlaSegments: buildRecommendationSlaSegments(recommendationRows),
+    accessSegments: buildAccessSegments(
+      downloadAuthorizedTotal,
+      sensitiveAccessCount,
+    ),
+  };
+}
+
+function buildAlertSegments(
+  alerts: SecurityDashboardAlert[],
+): SecurityDashboardSegment[] {
+  const counts = alerts.reduce<Record<SecurityAlertSeverity, number>>(
+    (acc, alert) => {
+      acc[alert.severity] += 1;
+      return acc;
+    },
+    { critical: 0, warning: 0, info: 0 },
+  );
+  const total = alerts.length;
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'warning',
+      label: 'Warning',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'info',
+      label: 'Info',
+      value: counts.info,
+      percentage: toPercentage(counts.info, total),
+      tone: 'info',
+      href: ROUTES.AUDIT,
+    },
+  ];
+}
+
+function buildRiskBandSegments(
+  rows: SecurityRiskScoringRow[],
+): SecurityDashboardSegment[] {
+  const counts = countRiskBands(rows);
+  const total = rows.length;
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+    },
+    {
+      key: 'warning',
+      label: 'Elevated',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+    },
+    {
+      key: 'watch',
+      label: 'Watch',
+      value: counts.watch,
+      percentage: toPercentage(counts.watch, total),
+      tone: 'info',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+    },
+  ];
+}
+
+function buildAnomalyBandSegments(
+  rows: SecurityBehaviorSignalRow[],
+): SecurityDashboardSegment[] {
+  const counts = countRiskBands(rows);
+  const total = rows.length;
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'warning',
+      label: 'Elevated',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'watch',
+      label: 'Watch',
+      value: counts.watch,
+      percentage: toPercentage(counts.watch, total),
+      tone: 'info',
+      href: ROUTES.AUDIT,
+    },
+  ];
+}
+
+function buildRecommendationSlaSegments(
+  rows: SecurityRecommendationRow[],
+): SecurityDashboardSegment[] {
+  const counts = rows.reduce<Record<SecurityRecommendationSlaState, number>>(
+    (acc, row) => {
+      acc[row.playbook.slaState] += 1;
+      return acc;
+    },
+    {
+      'not-started': 0,
+      'on-track': 0,
+      'due-soon': 0,
+      overdue: 0,
+      closed: 0,
+    },
+  );
+  const total = rows.length;
+
+  return [
+    {
+      key: 'overdue',
+      label: 'Overdue',
+      value: counts.overdue,
+      percentage: toPercentage(counts.overdue, total),
+      tone: 'critical',
+      href: '#security-recommendations',
+    },
+    {
+      key: 'due-soon',
+      label: 'Due soon',
+      value: counts['due-soon'],
+      percentage: toPercentage(counts['due-soon'], total),
+      tone: 'warning',
+      href: '#security-recommendations',
+    },
+    {
+      key: 'on-track',
+      label: 'On track',
+      value: counts['on-track'],
+      percentage: toPercentage(counts['on-track'], total),
+      tone: 'info',
+      href: '#security-recommendations',
+    },
+    {
+      key: 'not-started',
+      label: 'Not started',
+      value: counts['not-started'],
+      percentage: toPercentage(counts['not-started'], total),
+      tone: 'warning',
+      href: '#security-recommendations',
+    },
+    {
+      key: 'closed',
+      label: 'Closed',
+      value: counts.closed,
+      percentage: toPercentage(counts.closed, total),
+      tone: 'success',
+      href: '#security-recommendations',
+    },
+  ];
+}
+
+function buildAccessSegments(
+  downloadAuthorizedTotal: number,
+  sensitiveAccessCount: number,
+): SecurityDashboardSegment[] {
+  const baseline = Math.max(downloadAuthorizedTotal, sensitiveAccessCount);
+
+  return [
+    {
+      key: 'download-authorized',
+      label: 'Download grants',
+      value: downloadAuthorizedTotal,
+      percentage: toPercentage(downloadAuthorizedTotal, baseline),
+      tone: downloadAuthorizedTotal >= 10 ? 'warning' : 'info',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_AUTHORIZED' })}`,
+    },
+    {
+      key: 'sensitive-access',
+      label: 'Sensitive grants',
+      value: sensitiveAccessCount,
+      percentage: toPercentage(sensitiveAccessCount, baseline),
+      tone: sensitiveAccessCount > 0 ? 'warning' : 'success',
+      href: ROUTES.AUDIT,
+    },
+  ];
+}
+
+function countRiskBands<T extends { riskBand: SecurityRiskBand }>(
+  rows: T[],
+): Record<SecurityRiskBand, number> {
+  return rows.reduce<Record<SecurityRiskBand, number>>(
+    (acc, row) => {
+      acc[row.riskBand] += 1;
+      return acc;
+    },
+    { critical: 0, warning: 0, watch: 0 },
+  );
+}
+
+function getPostureScore(
+  level: SecurityPostureLevel,
+  alerts: SecurityDashboardAlert[],
+): number {
+  const criticalAlerts = alerts.filter((alert) => alert.severity === 'critical').length;
+  const warningAlerts = alerts.filter((alert) => alert.severity === 'warning').length;
+  const infoAlerts = alerts.filter((alert) => alert.severity === 'info').length;
+  const rawScore = 100 - criticalAlerts * 25 - warningAlerts * 8 - infoAlerts * 3;
+
+  if (level === 'critical') return Math.max(0, Math.min(65, rawScore));
+  if (level === 'warning') return Math.max(0, Math.min(84, rawScore));
+  return Math.max(0, Math.min(100, rawScore));
+}
+
+function getPostureTone(level: SecurityPostureLevel): SecurityDashboardTone {
+  if (level === 'critical') return 'critical';
+  if (level === 'warning') return 'warning';
+  return 'success';
 }
 
 function buildRecommendationRows(
@@ -588,6 +898,11 @@ function getRiskLabel(riskBand: SecurityRiskBand): string {
   if (riskBand === 'critical') return 'Critical risk';
   if (riskBand === 'warning') return 'Elevated risk';
   return 'Watch';
+}
+
+function toPercentage(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
 }
 
 function buildPosture(

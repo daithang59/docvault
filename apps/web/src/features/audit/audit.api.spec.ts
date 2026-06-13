@@ -76,6 +76,43 @@ describe('queryAuditLog', () => {
       },
     });
   });
+
+  it('passes recommendation-level filters through to the audit query endpoint', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+      },
+    });
+
+    await queryAuditLog(
+      {
+        recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
+      },
+      1,
+      20,
+    );
+
+    expect(apiClientMock.get).toHaveBeenCalledWith('/audit/query', {
+      params: {
+        actorId: undefined,
+        action: undefined,
+        resourceType: undefined,
+        resourceId: undefined,
+        documentId: undefined,
+        aclId: undefined,
+        recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
+        result: undefined,
+        from: undefined,
+        to: undefined,
+        page: 1,
+        pageSize: 20,
+      },
+    });
+  });
 });
 
 describe('queryAuditLogWindow', () => {

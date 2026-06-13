@@ -13,4 +13,14 @@ describe('parseAuditFilterQuery', () => {
       aclId: 'acl-all-download',
     });
   });
+
+  it('parses recommendation-scoped audit evidence deep links', () => {
+    expect(
+      parseAuditFilterQuery(
+        'recommendationId=actor-access-review%3ADENY_BURST%3Aviewer-1',
+      ),
+    ).toEqual({
+      recommendationId: 'actor-access-review:DENY_BURST:viewer-1',
+    });
+  });
 });

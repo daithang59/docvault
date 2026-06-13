@@ -25,6 +25,12 @@ import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
+import {
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -401,7 +407,53 @@ export default function SecurityPage() {
         }
       />
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]">
+        <ScoreGauge
+          className="min-h-[180px]"
+          description={model.commandCenter.postureGauge.description}
+          href={model.commandCenter.postureGauge.href}
+          label={model.commandCenter.postureGauge.label}
+          tone={model.commandCenter.postureGauge.tone}
+          value={model.commandCenter.postureGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {model.metrics.map((metric) => {
+            const Icon = metricIcons[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                description={metric.description}
+                href={buildMetricAuditHref(metric.key)}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.value > 0 ? 'warning' : 'success'}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SegmentDonut
+          label="Alert distribution"
+          segments={model.commandCenter.alertSegments}
+        />
+        <PriorityBarList
+          label="Document risk bands"
+          segments={model.commandCenter.riskBandSegments}
+        />
+        <PriorityBarList
+          label="Behavior anomaly bands"
+          segments={model.commandCenter.anomalyBandSegments}
+        />
+        <PriorityBarList
+          label="Recommendation SLA"
+          segments={model.commandCenter.recommendationSlaSegments}
+        />
+      </section>
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <PosturePanel
           level={model.posture.level}
           label={model.posture.label}
@@ -411,34 +463,13 @@ export default function SecurityPage() {
           isVerifying={isVerifyingChain}
           verifyError={verifyChainError}
         />
-        <QuickFilters filters={model.quickFilters} />
-      </section>
-
-      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {model.metrics.map((metric) => {
-          const Icon = metricIcons[metric.key];
-          return (
-            <div
-              key={metric.key}
-              className="rounded-lg border p-4"
-              style={{
-                background: 'var(--bg-card)',
-                borderColor: 'var(--border-soft)',
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--text-muted)]">{metric.label}</p>
-                <Icon className="h-4 w-4 text-[var(--text-faint)]" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                {metric.value}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-[var(--text-faint)]">
-                {metric.description}
-              </p>
-            </div>
-          );
-        })}
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+          <PriorityBarList
+            label="Content access signals"
+            segments={model.commandCenter.accessSegments}
+          />
+          <QuickFilters filters={model.quickFilters} />
+        </div>
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -519,6 +550,7 @@ function RecommendationsPanel({
 
   return (
     <div
+      id="security-recommendations"
       className="rounded-lg border p-5"
       style={{
         background: 'var(--bg-card)',
@@ -1627,4 +1659,17 @@ function buildRecommendationAuditHref(
 ): string {
   const query = buildAuditFilterQuery(filters);
   return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
+}
+
+function buildMetricAuditHref(key: SecurityDashboardMetric['key']): string {
+  switch (key) {
+    case 'deniedEvents':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ result: 'DENY' })}`;
+    case 'downloadDenied':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`;
+    case 'malwareBlocked':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`;
+    case 'dlpDetections':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`;
+  }
 }

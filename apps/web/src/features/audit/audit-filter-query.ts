@@ -18,6 +18,7 @@ export function parseAuditFilterQuery(
   setStringFilter(filters, 'resourceId', params.get('resourceId'));
   setStringFilter(filters, 'documentId', params.get('documentId'));
   setStringFilter(filters, 'aclId', params.get('aclId'));
+  setStringFilter(filters, 'recommendationId', params.get('recommendationId'));
 
   return filters;
 }
