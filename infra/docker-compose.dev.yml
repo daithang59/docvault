@@ -111,7 +111,7 @@ services:
     restart: "no"
 
   clamav:
-    image: clamav/clamav:1.3
+    image: clamav/clamav:stable
     container_name: docvault-clamav
     ports:
       - "${CLAMAV_PORT}:3310"

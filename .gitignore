@@ -165,6 +165,8 @@ Desktop.ini
 .omx/logs/
 .omx/notepad.md
 .omx/project-memory.json
+.omx/
+.agent/
 
 # Test and generated reports
 **/playwright-report/
