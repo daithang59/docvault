@@ -104,6 +104,7 @@ def call(cfg = [:]) {
                     echo "NVD API connectivity check passed."
                 '
 
+            scan_status=0
             docker run --rm \
                 -v "$WORKSPACE:/src" \
                 -v "$WORKSPACE/dependency-check-report:/report" \
@@ -117,6 +118,7 @@ def call(cfg = [:]) {
                 --exclude "**/prisma/generated/**" \
                 --exclude "**/node_modules/**" \
                 --exclude "**/.pnpm-store/**" \
+                --exclude "**/.trivy-scan-src/**" \
                 --exclude "**/.turbo/**" \
                 --exclude "**/.next/**" \
                 --exclude "**/dist/**" \
@@ -134,7 +136,18 @@ def call(cfg = [:]) {
                 --failOnCVSS 7 \
                 --disableKnownExploited \
                 $nvd_args \
-                ${DEPENDENCY_CHECK_UPDATE_FLAG:-}
+                ${DEPENDENCY_CHECK_UPDATE_FLAG:-} || scan_status=$?
+
+            if [ "$scan_status" -ne 0 ]; then
+                echo "Dependency Check failed with exit code $scan_status."
+                if [ -f "$WORKSPACE/dependency-check-report/dependency-check.log" ]; then
+                    echo "Last 200 lines from dependency-check-report/dependency-check.log:"
+                    tail -n 200 "$WORKSPACE/dependency-check-report/dependency-check.log"
+                else
+                    echo "dependency-check-report/dependency-check.log was not created."
+                fi
+                exit "$scan_status"
+            fi
             '''
         }
     }

@@ -5,7 +5,7 @@ def call(cfg) {
         set -eu
 
         mkdir -p trivy-fs-report
-        scan_dir="${env.WORKSPACE}/.trivy-scan-src"
+        scan_dir="${env.WORKSPACE}/trivy-fs-report/source"
         archive_path="${env.WORKSPACE}/trivy-fs-report/source.tar"
         cleanup() {
             rm -rf "\$scan_dir"
