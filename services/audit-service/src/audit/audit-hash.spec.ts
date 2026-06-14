@@ -580,7 +580,7 @@ describe('AuditService — audit chain epochs', () => {
         typeof value === 'object' &&
         '$exists' in (value as Record<string, unknown>)
       ) {
-        return (key in event) === Boolean((value as any).$exists);
+        return key in event === Boolean((value as any).$exists);
       }
 
       return event[key] === value;

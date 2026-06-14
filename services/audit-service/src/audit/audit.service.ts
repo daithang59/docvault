@@ -17,10 +17,7 @@ import {
 } from '../mongo/audit-chain-incident.schema';
 import { AuditEvent, AuditEventDocument } from '../mongo/audit-event.schema';
 import { CreateAuditEventDto } from './dto/create-audit-event.dto';
-import {
-  QueryAuditDto,
-  type AuditActionGroup,
-} from './dto/query-audit.dto';
+import { QueryAuditDto, type AuditActionGroup } from './dto/query-audit.dto';
 import {
   SECURITY_RECOMMENDATION_WORKFLOW_STATUSES,
   SecurityRecommendationWorkflowDto,
@@ -45,13 +42,11 @@ const DESTRUCTIVE_ACTIVITY_ACTIONS = [
   'DOCUMENT_AUTO_ARCHIVED',
 ] as const;
 
-const AUDIT_ACTION_GROUP_ACTIONS: Record<
-  AuditActionGroup,
-  readonly string[]
-> = {
-  AUTHORIZED_CONTENT_ACCESS: AUTHORIZED_CONTENT_ACTIONS,
-  DESTRUCTIVE_ACTIVITY: DESTRUCTIVE_ACTIVITY_ACTIONS,
-};
+const AUDIT_ACTION_GROUP_ACTIONS: Record<AuditActionGroup, readonly string[]> =
+  {
+    AUTHORIZED_CONTENT_ACCESS: AUTHORIZED_CONTENT_ACTIONS,
+    DESTRUCTIVE_ACTIVITY: DESTRUCTIVE_ACTIVITY_ACTIONS,
+  };
 
 const BEHAVIOR_SIGNAL_ACTIONS = [
   ...AUTHORIZED_CONTENT_ACTIONS,
@@ -498,6 +493,10 @@ export class AuditService {
       filter.timestamp = {};
       if (dto.from) filter.timestamp.$gte = new Date(dto.from);
       if (dto.to) filter.timestamp.$lte = new Date(dto.to);
+    }
+
+    if (dto.excludeActions?.length) {
+      addAuditScope(filter, { action: { $nin: dto.excludeActions } });
     }
 
     const page = dto.page ?? 1;
@@ -1242,6 +1241,25 @@ export class AuditService {
   ): Promise<void> {
     if (!viewer?.actorId) return;
 
+    // Deduplicate: check if the same actor viewed recommendations in the last 15 minutes
+    const fifteenMinutesAgo = new Date(Date.now() - 15 * 60 * 1000);
+    const query = this.auditEvent.findOne({
+      actorId: viewer.actorId,
+      action: 'SECURITY_RECOMMENDATIONS_VIEWED',
+      timestamp: { $gte: fifteenMinutesAgo },
+    });
+    const existingLog =
+      query && typeof query.lean === 'function'
+        ? await query.lean()
+        : await query;
+
+    if (
+      existingLog &&
+      (existingLog as any).action === 'SECURITY_RECOMMENDATIONS_VIEWED'
+    ) {
+      return;
+    }
+
     const recommendationIds = recommendations.map(
       (recommendation) => recommendation.id,
     );
@@ -1579,8 +1597,7 @@ export class AuditService {
       firstBrokenIndex: verification.firstBrokenIndex ?? 0,
       firstBrokenEventId: verification.firstBrokenEventId,
       lastTrustedHash: verification.lastTrustedHash,
-      verifyMessage:
-        verification.message ?? 'Audit chain verification failed.',
+      verifyMessage: verification.message ?? 'Audit chain verification failed.',
       status: 'OPEN',
       resolution: 'NEW_EPOCH_STARTED',
       reason: dto.reason,

@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
   IsIn,
   IsInt,
@@ -80,4 +81,9 @@ export class QueryAuditDto {
   @Min(1)
   @Max(200)
   limit?: number;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeActions?: string[];
 }

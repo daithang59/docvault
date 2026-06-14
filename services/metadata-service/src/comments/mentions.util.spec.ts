@@ -6,7 +6,10 @@ describe('parseMentions', () => {
   });
 
   it('extracts multiple mentions in order without duplicates', () => {
-    expect(parseMentions('@bob and @alice and @bob again')).toEqual(['bob', 'alice']);
+    expect(parseMentions('@bob and @alice and @bob again')).toEqual([
+      'bob',
+      'alice',
+    ]);
   });
 
   it('matches a mention at the start of the text', () => {
@@ -18,7 +21,10 @@ describe('parseMentions', () => {
   });
 
   it('supports dotted and dashed usernames and trims trailing punctuation', () => {
-    expect(parseMentions('ping @first.last, and @user-99.')).toEqual(['first.last', 'user-99']);
+    expect(parseMentions('ping @first.last, and @user-99.')).toEqual([
+      'first.last',
+      'user-99',
+    ]);
   });
 
   it('returns empty for no mentions or empty input', () => {
