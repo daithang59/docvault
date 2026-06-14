@@ -8,6 +8,9 @@
     "lint": "turbo run lint",
     "test": "turbo run test",
     "test:e2e": "node scripts/e2e-check.mjs",
+    "seed:metadata": "pnpm --filter metadata-service db:seed",
+    "seed:demo": "node scripts/seed-demo-flow.mjs",
+    "seed:local": "pnpm run seed:metadata && pnpm run seed:demo",
     "start:sequential": "node scripts/start-sequential.mjs",
     "format": "prettier -w ."
   },

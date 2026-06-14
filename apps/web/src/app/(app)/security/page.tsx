@@ -170,6 +170,7 @@ export default function SecurityPage() {
     queryKey: auditKeys.securitySummary(),
     queryFn: getSecuritySummary,
     enabled: hasAccess,
+    staleTime: 5 * 60 * 1000,
   });
   const deniedQuery = useQuery({
     queryKey: auditKeys.query({ result: 'DENY', page: 1, pageSize: 6 }),

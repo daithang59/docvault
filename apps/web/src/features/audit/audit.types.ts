@@ -47,6 +47,7 @@ export interface AuditQueryFilters extends PaginationParams {
   limit?: number;
   targetId?: string;
   targetType?: string;
+  excludeActions?: string[];
 }
 
 export interface AuditChainStatus {
