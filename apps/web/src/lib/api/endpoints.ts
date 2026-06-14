@@ -17,6 +17,7 @@ export const apiEndpoints = {
       list: '/metadata/documents',
       trash: '/metadata/documents/trash',
       restore: (docId: string) => `/metadata/documents/${docId}/restore`,
+      approvers: (docId: string) => `/metadata/documents/${docId}/approvers`,
       approvalChain: (docId: string) => `/metadata/documents/${docId}/approval-chain`,
       create: '/metadata/documents',
       detail: (docId: string) => `/metadata/documents/${docId}`,
@@ -71,6 +72,7 @@ export const apiEndpoints = {
   audit: {
     query: '/audit/query',
     verifyChain: '/audit/verify-chain',
+    sealChainAndStartEpoch: '/audit/chain/seal-and-start-epoch',
     securitySummary: '/audit/security-summary',
     securityRecommendationWorkflow: (id: string) =>
       `/audit/security-recommendations/${encodeURIComponent(id)}/workflow`,

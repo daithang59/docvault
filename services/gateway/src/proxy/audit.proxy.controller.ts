@@ -116,6 +116,27 @@ export class AuditProxyController {
     return response.data;
   }
 
+  /** Seal an unrecoverably compromised chain and start a fresh active epoch. */
+  @Post('chain/seal-and-start-epoch')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('compliance_officer', 'admin')
+  @ApiOperation({
+    summary: 'Seal compromised audit epoch and start a new one',
+    description:
+      'Production-safe recovery path for tamper evidence: preserves the compromised epoch and starts a new active audit chain instead of recomputing old hashes.',
+  })
+  async sealCompromisedChainAndStartEpoch(
+    @Req() req: any,
+    @Body() body: any,
+  ) {
+    const response = await this.proxyService.forward(req, {
+      method: 'POST',
+      url: `${process.env.AUDIT_SERVICE_URL}/audit/chain/seal-and-start-epoch`,
+      data: body,
+    });
+    return response.data;
+  }
+
   /** Summarize security audit evidence for dashboard cards. */
   @Get('security-summary')
   @UseGuards(AuthGuard('jwt'), RolesGuard)

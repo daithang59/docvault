@@ -77,7 +77,7 @@ function buildDocuments(): MockDocument[] {
       dlpFindings: [{ type: 'PII', count: 3 }],
       dlpDetectedAt: hoursAgo(20),
       retentionClass: 'SECRET_90D',
-      retentionUntil: hoursFromNow(90 * 24),
+      retentionUntil: hoursFromNow(14 * 24),
       retentionReason: 'Security investigation package.',
       ownerId: 'editor1',
       ownerDisplay: 'Editor One',
@@ -108,7 +108,7 @@ function buildDocuments(): MockDocument[] {
       classification: 'CONFIDENTIAL',
       dlpStatus: 'CLEAR',
       retentionClass: 'CONFIDENTIAL_180D',
-      retentionUntil: hoursFromNow(180 * 24),
+      retentionUntil: hoursFromNow(20 * 24),
       retentionReason: 'Board reporting archive.',
       ownerId: 'editor1',
       ownerDisplay: 'Editor One',
@@ -203,6 +203,104 @@ function buildVersionsFor(docId: string) {
       uploadedById: 'editor1',
     },
   ];
+}
+
+function buildSecuritySummary() {
+  return {
+    chain: {
+      valid: true,
+      checked: 42,
+      epochId: 'epoch-active',
+      historicalCompromisedCount: 0,
+      compromisedEpochs: [],
+    },
+    totals: {
+      deniedEvents: 7,
+      malwareBlocked: 1,
+      dlpDetections: 2,
+      downloadDenied: 3,
+    },
+    repeatedDenyActors: [{ actorId: 'viewer1', denyCount: 4 }],
+    riskyDocuments: [
+      {
+        documentId: 'doc-secret-overdue',
+        classification: 'SECRET',
+        accessCount: 5,
+        actorCount: 3,
+        latestAccessAt: hoursAgo(2),
+        riskScore: 95,
+        reasons: ['SECRET classification', '5 content access grants'],
+      },
+      {
+        documentId: 'doc-confidential-due-soon',
+        classification: 'CONFIDENTIAL',
+        accessCount: 3,
+        actorCount: 2,
+        latestAccessAt: hoursAgo(4),
+        riskScore: 64,
+        reasons: ['CONFIDENTIAL classification', '2 distinct actors'],
+      },
+    ],
+    behaviorSignals: [
+      {
+        signalId: 'MASS_CONTENT_ACCESS:editor1',
+        type: 'MASS_CONTENT_ACCESS',
+        severity: 'critical',
+        actorId: 'editor1',
+        actionCount: 5,
+        documentCount: 5,
+        windowStartedAt: hoursAgo(3),
+        windowEndedAt: hoursAgo(2),
+        riskScore: 100,
+        reasons: ['5 successful content grants'],
+      },
+      {
+        signalId: 'DENY_BURST:viewer1',
+        type: 'DENY_BURST',
+        severity: 'warning',
+        actorId: 'viewer1',
+        actionCount: 4,
+        documentCount: 2,
+        windowStartedAt: hoursAgo(8),
+        windowEndedAt: hoursAgo(7),
+        riskScore: 58,
+        reasons: ['4 denied security events'],
+      },
+    ],
+    recommendations: [
+      {
+        id: 'document-access-review:doc-secret-overdue',
+        type: 'DOCUMENT_ACCESS_REVIEW',
+        severity: 'critical',
+        title: 'Tighten access for high-risk SECRET document',
+        reason: 'Document reached critical risk score.',
+        recommendedAction: 'Review ACLs and recent grants.',
+        evidence: ['SECRET classification'],
+        affectedDocumentIds: ['doc-secret-overdue'],
+        affectedActorIds: [],
+        auditFilters: { documentId: 'doc-secret-overdue' },
+        workflow: {
+          status: 'INVESTIGATING',
+          updatedAt: hoursAgo(30),
+        },
+      },
+      {
+        id: 'actor-access-review:DENY_BURST:viewer1',
+        type: 'ACTOR_ACCESS_REVIEW',
+        severity: 'warning',
+        title: 'Investigate denied access burst',
+        reason: 'Actor crossed repeated deny threshold.',
+        recommendedAction: 'Inspect role and group membership.',
+        evidence: ['4 denied security events'],
+        affectedDocumentIds: [],
+        affectedActorIds: ['viewer1'],
+        auditFilters: { actorId: 'viewer1' },
+        workflow: {
+          status: 'OPEN',
+        },
+      },
+    ],
+  };
 }
 
 async function mockRuntimeApi(page: Page) {
@@ -311,6 +409,7 @@ async function fulfillApi(route: Route) {
         checkedAt: new Date().toISOString(),
         summary: {
           tracked: 1,
+          active: 0,
           dueSoon: 1,
           overdue: 0,
           archived: 0,
@@ -481,20 +580,33 @@ async function fulfillApi(route: Route) {
   }
 
   if (pathname === '/api/audit/query') {
+    const action = url.searchParams.get('action');
     await route.fulfill({
       status: 200,
       json: {
         data: [
-          {
-            eventId: 'evt-share-1',
-            action: 'DOCUMENT_SHARE_LINK_CREATED',
-            actorId: 'admin1',
-            actorRoles: ['admin'],
-            result: 'SUCCESS',
-            resourceType: 'DOCUMENT',
-            resourceId: 'doc-published-library',
-            timestamp: hoursAgo(4),
-          },
+          action === 'DLP_PATTERN_DETECTED'
+            ? {
+                eventId: 'evt-dlp-1',
+                action: 'DLP_PATTERN_DETECTED',
+                actorId: 'editor1',
+                actorRoles: ['editor'],
+                result: 'SUCCESS',
+                resourceType: 'DOCUMENT',
+                resourceId: 'doc-secret-overdue',
+                timestamp: hoursAgo(3),
+                reason: 'PII pattern detected',
+              }
+            : {
+                eventId: 'evt-share-1',
+                action: 'DOCUMENT_SHARE_LINK_CREATED',
+                actorId: 'admin1',
+                actorRoles: ['admin'],
+                result: 'SUCCESS',
+                resourceType: 'DOCUMENT',
+                resourceId: 'doc-published-library',
+                timestamp: hoursAgo(4),
+              },
         ],
         total: 1,
         page: 1,
@@ -502,6 +614,11 @@ async function fulfillApi(route: Route) {
         totalPages: 1,
       },
     });
+    return;
+  }
+
+  if (pathname === '/api/audit/security-summary') {
+    await route.fulfill({ status: 200, json: buildSecuritySummary() });
     return;
   }
 
@@ -611,18 +728,19 @@ test('documents page supports built-in and custom saved views', async ({ page },
   await page.goto('/documents');
 
   await expect(page.getByRole('heading', { name: 'Documents' })).toBeVisible();
-  await expect(page.getByText('Saved views')).toBeVisible();
-  await expect(page.getByText('Query chips')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'tag:security' })).toBeVisible();
-  await expect(page.getByText('Smart folders')).toBeVisible();
-  await expect(page.getByRole('button', { name: /Folder: security/ })).toBeVisible();
+  await expect(page.getByText('Control queue clear')).toBeVisible();
+  await expect(page.getByText('Classification mix')).toBeVisible();
+  await expect(page.getByText('Saved view load')).toBeVisible();
   await expect(page.getByRole('button', { name: /Sensitive attention/ })).toBeVisible();
   await expect(page.getByText('Incident Export')).toBeVisible();
 
+  await page.getByRole('button', { name: /Filter/ }).click();
+  await expect(page.getByRole('button', { name: 'tag:security' })).toBeVisible();
   await page.getByRole('button', { name: 'tag:security' }).click();
   await expect(page).toHaveURL(/q=tag%3Asecurity/);
   await expect(page.getByText('Incident Export')).toBeVisible();
   await expect(page.getByText('Board Report')).not.toBeVisible();
+  await page.keyboard.press('Escape');
 
   await page.getByLabel('Search documents').fill('status:pending tag:security incident');
   await expect(page).toHaveURL(/q=status%3Apending\+tag%3Asecurity\+incident/);
@@ -630,15 +748,17 @@ test('documents page supports built-in and custom saved views', async ({ page },
   await expect(page.getByText('Board Report')).not.toBeVisible();
 
   await page.getByLabel('Search documents').fill('');
-  await page.getByRole('button', { name: /Folder: security/ }).click();
-  await expect(page).toHaveURL(/folder=security/);
-  await expect(page.getByText('Incident Export')).toBeVisible();
-  await expect(page.getByText('Board Report')).not.toBeVisible();
+  await page.getByRole('button', { name: /^finance\s+1$/i }).click();
+  await expect(page).toHaveURL(/folder=finance/);
+  await expect(page.getByText('Board Report')).toBeVisible();
+  await expect(page.getByText('Incident Export')).not.toBeVisible();
 
-  await page.getByRole('button', { name: /Folder: security/ }).click();
+  await page.getByRole('button', { name: /Folder: Finance/ }).click();
   await page.getByRole('button', { name: /Sensitive attention/ }).click();
   await expect(page).toHaveURL(/view=sensitive/);
-  await expect(page.getByText('View: Sensitive')).toBeVisible();
+  await expect(page.getByText('Incident Export')).toBeVisible();
+  await expect(page.getByText('Board Report')).toBeVisible();
+  await expect(page.getByText('Draft Policy')).not.toBeVisible();
   await expect(page.getByLabel('Sort documents')).toBeVisible();
 
   const sortBox = await page.getByLabel('Sort documents').boundingBox();
@@ -655,8 +775,9 @@ test('documents page supports built-in and custom saved views', async ({ page },
     )
     .toBe(true);
 
+  await page.getByRole('button', { name: 'Save view' }).click();
   await page.getByLabel('Saved view name').fill('Security triage');
-  await page.getByRole('button', { name: 'Save' }).click();
+  await page.getByRole('button', { name: 'Save', exact: true }).click();
 
   await expect(page.getByRole('button', { name: 'Security triage 2' })).toBeVisible();
   await expect
@@ -668,40 +789,35 @@ test('documents page supports built-in and custom saved views', async ({ page },
   await screenshot(page, testInfo.file, 'documents-saved-views-playwright.png');
 });
 
-test('dashboard shows business demo readiness without horizontal overflow', async ({
+test('dashboard shows operational command center without demo readiness surfaces', async ({
   page,
-}) => {
+}, testInfo) => {
   await page.goto('/dashboard');
 
   await expect(page.getByRole('heading', { name: 'Dashboard' })).toBeVisible();
-  await expect(page.getByText('Business Demo Readiness')).toBeVisible();
-  await expect(page.getByText('Demo ready')).toBeVisible();
-  await expect(page.getByText('Lifecycle coverage')).toBeVisible();
-  await expect(page.getByText('Approval workflow')).toBeVisible();
-  await expect(page.getByText('Evidence export')).toBeVisible();
-  await expect(page.getByText('Security posture')).toBeVisible();
+  await expect(page.getByText('Lifecycle pipeline')).toBeVisible();
+  await expect(page.getByText('Attention by priority')).toBeVisible();
+  await expect(page.getByText('DLP triage')).not.toBeVisible();
+  await expect(page.getByText('Operational Work Queue')).toBeVisible();
+  await expect(page.getByText('Pending approvals')).toBeVisible();
+  await expect(page.getByText('DLP detected')).toBeVisible();
+  await expect(page.getByText('Demo story coverage')).toHaveCount(0);
+  await expect(page.getByText('Business readiness')).toHaveCount(0);
+  await expect(page.getByTestId('business-demo-readiness')).toHaveCount(0);
+
+  await screenshot(page, testInfo.file, 'dashboard-command-center-playwright.png');
 
   await page.setViewportSize({ width: 390, height: 844 });
   await page.goto('/dashboard');
-  const readinessPanel = page.getByTestId('business-demo-readiness');
-  await expect(readinessPanel.getByText('Business Demo Readiness')).toBeVisible();
-  const readinessBox = await readinessPanel.boundingBox();
-  expect(readinessBox).not.toBeNull();
-  if (!readinessBox) throw new Error('Business Demo Readiness panel was not measurable.');
-
-  const viewportWidth = await page.evaluate(() => window.innerWidth);
-  expect(readinessBox.x).toBeGreaterThanOrEqual(0);
-  expect(readinessBox.x + readinessBox.width).toBeLessThanOrEqual(viewportWidth + 1);
+  await expect(page.getByText('Operational Work Queue')).toBeVisible();
+  await expect(page.getByText('Demo story coverage')).toHaveCount(0);
+  await expect(page.getByText('Business readiness')).toHaveCount(0);
+  await expect(page.getByTestId('business-demo-readiness')).toHaveCount(0);
   await expect
     .poll(async () =>
       page.evaluate(
         () => document.documentElement.scrollWidth <= window.innerWidth + 1,
       ),
-    )
-    .toBe(true);
-  await expect
-    .poll(async () =>
-      readinessPanel.evaluate((element) => element.scrollWidth <= element.clientWidth + 1),
     )
     .toBe(true);
 });
@@ -743,7 +859,8 @@ test('documents filters stay usable on a mobile viewport', async ({ page }, test
   await expect(page.getByRole('button', { name: 'Open navigation' })).toBeVisible();
   const roleBadge = page.locator('header').getByText('Admin', { exact: true });
   await expect(roleBadge).toBeVisible();
-  await expect(page.getByText('Saved views')).toBeVisible();
+  await expect(page.getByText('Control queue clear')).toBeVisible();
+  await expect(page.getByText('Classification mix')).toBeVisible();
   await expect(page.getByLabel('Sort documents')).toBeVisible();
 
   const navButtonBox = await page
@@ -766,6 +883,213 @@ test('documents filters stay usable on a mobile viewport', async ({ page }, test
     .toBe(true);
 
   await screenshot(page, testInfo.file, 'documents-mobile-filters-playwright.png');
+});
+
+test('audit page renders command center and keeps filters usable', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/audit');
+
+  await expect(
+    page.getByRole('heading', { name: 'Audit', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Security posture')).toBeVisible();
+  await expect(page.getByText('Alert distribution')).toBeVisible();
+  await expect(page.getByText('Audit event distribution')).toBeVisible();
+  await expect(page.getByText('Document risk bands')).toBeVisible();
+  await expect(page.getByText('Behavior anomaly bands')).toBeVisible();
+  await expect(page.getByText('Recommendation SLA')).toBeVisible();
+  await expect(page.getByText('Quick investigations')).toBeVisible();
+
+  await screenshot(page, testInfo.file, 'audit-command-center-playwright.png');
+
+  await page.getByRole('button', { name: 'DLP DETECTED' }).click();
+  await expect(page.getByLabel('Action')).toHaveValue('DLP_PATTERN_DETECTED');
+  await expect(page.getByText('DLP_PATTERN_DETECTED')).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/audit');
+  await expect(page.getByText('Security posture')).toBeVisible();
+  await expect(page.getByText('Alert distribution')).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+});
+
+test('security page scopes recommendation queue by workflow status', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/security');
+
+  await expect(
+    page.getByRole('heading', { name: 'Security', exact: true }),
+  ).toBeVisible();
+  await expect(page.getByText('Evidence-backed findings')).toBeVisible();
+  await expect(page.getByText('Cases', { exact: true })).toBeVisible();
+  await expect(page.getByText('Reviews', { exact: true })).toBeVisible();
+  await expect(page.getByText('Signals', { exact: true })).toBeVisible();
+  await expect(page.getByText('Case workflow required', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Lightweight review', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText('Case workflow', { exact: true })).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
+
+  await page
+    .getByRole('button', { name: /Start case|Continue case/ })
+    .first()
+    .click();
+  await expect(page.getByRole('heading', { name: 'Finding details' })).toBeVisible();
+  await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Resolved 0' }).click();
+  await expect(page.getByText('No resolved recommendations are available.')).toBeVisible();
+  await page.getByRole('button', { name: 'All 2' }).click();
+  await expect(page.getByText('Tighten access for high-risk SECRET document')).toBeVisible();
+  await expect(page.getByText('Investigate denied access burst')).toBeVisible();
+
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+
+  await screenshot(page, testInfo.file, 'security-recommendation-queue-playwright.png');
+});
+
+test('security case workflow requires evidence before resolving a case', async ({
+  page,
+}) => {
+  await page.route(
+    /\/api\/audit\/security-recommendations\/.+\/workflow$/,
+    async (route) => {
+      const payload = route.request().postDataJSON();
+      await route.fulfill({
+        status: 200,
+        json: {
+          eventId: 'evt-case-workflow-resolved',
+          action: 'SECURITY_RECOMMENDATION_STATUS_UPDATED',
+          actorId: 'admin1',
+          actorRoles: ['admin'],
+          resourceType: 'SECURITY_RECOMMENDATION',
+          resourceId: 'document-access-review:doc-secret-overdue',
+          result: 'SUCCESS',
+          reason: payload.note,
+          metadata: payload,
+          timestamp: new Date().toISOString(),
+        },
+      });
+    },
+  );
+
+  await page.goto('/security');
+
+  await expect(page.getByText('Case workflow', { exact: true })).toHaveCount(0);
+  await page
+    .getByRole('button', { name: /Start case|Continue case/ })
+    .first()
+    .click();
+  await expect(page.getByText('Case workflow', { exact: true })).toBeVisible();
+
+  const resolveButton = page.getByRole('button', { name: 'Resolve case' });
+  await expect(resolveButton).toBeDisabled();
+  await expect(page.getByText('Missing before resolve')).toBeVisible();
+  await expect(
+    page.getByText(
+      'Investigation note · Remediation or accepted-risk decision · Remediation or accepted-risk evidence · Verification confirmation',
+      { exact: true },
+    ),
+  ).toBeVisible();
+
+  await page
+    .getByLabel('Investigation')
+    .fill('Confirmed SECRET document exposes DOWNLOAD to Everyone.');
+  await page.getByLabel('Remediated').check();
+  await page
+    .getByLabel('Remediation or accepted-risk evidence')
+    .fill('Removed Everyone DOWNLOAD grant and kept owner READ only.');
+  await page.getByLabel(/Verification confirmed/).check();
+
+  await expect(resolveButton).toBeEnabled();
+
+  const requestPromise = page.waitForRequest(
+    (request) =>
+      request.method() === 'PATCH' &&
+      request
+        .url()
+        .includes(
+          '/api/audit/security-recommendations/document-access-review%3Adoc-secret-overdue/workflow',
+        ),
+  );
+  await resolveButton.click();
+
+  const request = await requestPromise;
+  const payload = request.postDataJSON() as { status?: string; note?: string };
+  expect(payload.status).toBe('RESOLVED');
+  expect(payload.note).toContain('Case workflow');
+  expect(payload.note).toContain(
+    'Investigation: Confirmed SECRET document exposes DOWNLOAD to Everyone.',
+  );
+  expect(payload.note).toContain('Decision: Remediated');
+  expect(payload.note).toContain(
+    'Resolution evidence: Removed Everyone DOWNLOAD grant and kept owner READ only.',
+  );
+  expect(payload.note).toContain('Verification: Confirmed');
+});
+
+test('evidence center renders readiness visuals and packet builder', async ({
+  page,
+}, testInfo) => {
+  await page.goto('/evidence');
+
+  await expect(
+    page.getByRole('heading', { name: 'Evidence Center' }),
+  ).toBeVisible();
+  await expect(page.getByText('Evidence readiness')).toBeVisible();
+  await expect(page.getByText('Evidence source states')).toBeVisible();
+  await expect(page.getByText('Export packet targets')).toBeVisible();
+  await expect(page.getByText('Retention posture')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Recommendation packet queue' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Active 2' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Resolved 0' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'All 2' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Document evidence packets' })).toBeVisible();
+
+  await screenshot(page, testInfo.file, 'evidence-command-center-playwright.png');
+
+  await page.getByRole('button', { name: 'Resolved 0' }).click();
+  await expect(page.getByText('No resolved recommendation packets are available.')).toBeVisible();
+  await page.getByRole('button', { name: 'Active 2' }).click();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
+
+  await page.getByRole('button', { name: 'Presentation' }).click();
+  await expect(page.getByText(/Evidence packet sections/i)).toBeVisible();
+  await expect
+    .poll(async () =>
+      page.evaluate(
+        () => document.documentElement.scrollWidth <= window.innerWidth + 1,
+      ),
+    )
+    .toBe(true);
 });
 
 test('settings page summarizes product readiness and role capabilities', async ({ page }) => {

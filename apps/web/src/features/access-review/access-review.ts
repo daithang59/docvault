@@ -20,6 +20,8 @@ export interface AccessReviewItem {
   classification: ClassificationLevel;
   status: DocumentDetail['status'];
   severity: AccessReviewSeverity;
+  subjectType: DocumentAclEntryDto['subjectType'];
+  subjectId?: string | null;
   subject: string;
   permission: DocumentAclEntryDto['permission'];
   reason: string;
@@ -50,6 +52,11 @@ export interface AccessReviewModelOptions {
   now?: string | Date;
   staleAfterDays?: number;
 }
+
+export type AccessReviewUserDisplayMap = Record<
+  string,
+  { displayName?: string | null; username?: string | null }
+>;
 
 const DEFAULT_STALE_AFTER_DAYS = 365;
 
@@ -188,6 +195,8 @@ function toReviewItem({
     classification: document.classification,
     status: document.status,
     severity,
+    subjectType: grant.subjectType,
+    subjectId: grant.subjectId,
     subject: formatSubject(grant),
     permission: grant.permission,
     reason,
@@ -195,8 +204,58 @@ function toReviewItem({
     evidence,
     nextActionLabel: 'Review ACL',
     href: ROUTES.DOCUMENT_DETAIL(document.id),
-    auditHref: `${ROUTES.AUDIT}?documentId=${encodeURIComponent(document.id)}`,
+    auditHref: `${ROUTES.AUDIT}?documentId=${encodeURIComponent(document.id)}&aclId=${encodeURIComponent(grant.id)}`,
   };
+}
+
+export function getAccessReviewUserSubjectIds(
+  reviews: AccessReviewItem[],
+): string[] {
+  return [
+    ...new Set(
+      reviews
+        .filter(
+          (review) => review.subjectType === 'USER' && Boolean(review.subjectId),
+        )
+        .map((review) => review.subjectId as string),
+    ),
+  ];
+}
+
+export function getResolvedAccessReviewSubject(
+  review: AccessReviewItem,
+  displayNames?: AccessReviewUserDisplayMap,
+): string {
+  if (review.subjectType !== 'USER' || !review.subjectId) {
+    return review.subject;
+  }
+
+  const display = displayNames?.[review.subjectId];
+  const username = display?.username?.trim();
+  if (username) {
+    return username;
+  }
+
+  const displayName = display?.displayName?.trim();
+  if (displayName && displayName !== 'Unknown User') {
+    return displayName;
+  }
+
+  return review.subject;
+}
+
+export function getResolvedAccessReviewEvidence(
+  review: AccessReviewItem,
+  displayNames?: AccessReviewUserDisplayMap,
+): string[] {
+  const resolvedSubject = getResolvedAccessReviewSubject(review, displayNames);
+  if (resolvedSubject === review.subject) {
+    return review.evidence;
+  }
+
+  return review.evidence.map((item) =>
+    item.replace(` for ${review.subject}`, ` for ${resolvedSubject}`),
+  );
 }
 
 function getBroadAccessAllows(

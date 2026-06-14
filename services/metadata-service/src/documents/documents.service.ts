@@ -5,19 +5,19 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { PrismaService } from '../prisma/prisma.service';
 import { Document, Prisma } from '../../generated/prisma';
-import { AuditClient } from '../audit/audit.client';
-import { OrgService } from '../org/org.service';
 import { ApproverDirectoryService } from '../approvers/approver-directory.service';
-import { CreateDocumentDto } from './dto/create-document.dto';
-import { UpdateDocumentDto } from './dto/update-document.dto';
+import { AuditClient } from '../audit/audit.client';
 import {
   RequestContext,
   ServiceUser,
   buildActorId,
   normalizeGroups,
 } from '../common/request-context';
+import { OrgService } from '../org/org.service';
+import { PrismaService } from '../prisma/prisma.service';
+import { CreateDocumentDto } from './dto/create-document.dto';
+import { UpdateDocumentDto } from './dto/update-document.dto';
 
 @Injectable()
 export class DocumentsService {
@@ -760,6 +760,17 @@ export class DocumentsService {
     if (!isAdmin && !isOwnerEditor) {
       throw new ForbiddenException(
         'Only the owner editor or an admin can configure the approval chain',
+      );
+    }
+    const approvalStep = (document as any).approvalStep ?? 0;
+
+    const canConfigureApprovalChain =
+      document.status === 'DRAFT' ||
+      (document.status === 'PENDING' && approvalStep === 0);
+
+    if (!canConfigureApprovalChain) {
+      throw new BadRequestException(
+        'Approval chain can only be configured while the document is draft or pending before any approval',
       );
     }
 

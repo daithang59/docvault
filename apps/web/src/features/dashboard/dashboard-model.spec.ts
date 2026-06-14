@@ -1,8 +1,21 @@
 import { describe, expect, it } from 'vitest';
 import { buildDashboardModel } from './dashboard-model';
 import type { DocumentListItem } from '@/features/documents/documents.types';
+import type { AnalyticsVisibility } from '@/lib/auth/permissions';
 
 const now = new Date('2026-06-04T09:00:00.000Z');
+const elevatedAnalytics: AnalyticsVisibility = {
+  canViewApprovalAggregates: true,
+  canViewRetentionAggregates: true,
+  canViewSecurityAggregates: true,
+  canViewSensitiveDocumentAggregates: true,
+};
+const viewerAnalytics: AnalyticsVisibility = {
+  canViewApprovalAggregates: false,
+  canViewRetentionAggregates: false,
+  canViewSecurityAggregates: false,
+  canViewSensitiveDocumentAggregates: false,
+};
 
 const documents: DocumentListItem[] = [
   {
@@ -67,6 +80,7 @@ describe('buildDashboardModel', () => {
     const model = buildDashboardModel(documents, {
       unreadNotifications: 3,
       now,
+      analyticsVisibility: elevatedAnalytics,
     });
 
     expect(model.stats).toEqual({
@@ -130,6 +144,10 @@ describe('buildDashboardModel', () => {
     const approverModel = buildDashboardModel(documents, {
       now,
       actor: { id: 'approver-1', roles: ['approver'] },
+      analyticsVisibility: {
+        ...viewerAnalytics,
+        canViewApprovalAggregates: true,
+      },
     });
 
     expect(approverModel.workQueue).toEqual([
@@ -144,6 +162,7 @@ describe('buildDashboardModel', () => {
     const editorModel = buildDashboardModel(documents, {
       now,
       actor: { id: 'editor-2', roles: ['editor'] },
+      analyticsVisibility: viewerAnalytics,
     });
 
     expect(editorModel.workQueue).toEqual([
@@ -158,6 +177,12 @@ describe('buildDashboardModel', () => {
     const complianceModel = buildDashboardModel(documents, {
       now,
       actor: { id: 'co-1', roles: ['compliance_officer'] },
+      analyticsVisibility: {
+        ...viewerAnalytics,
+        canViewRetentionAggregates: true,
+        canViewSecurityAggregates: true,
+        canViewSensitiveDocumentAggregates: true,
+      },
     });
 
     expect(complianceModel.workQueue).toEqual([
@@ -170,73 +195,114 @@ describe('buildDashboardModel', () => {
     ]);
   });
 
-  it('summarizes business demo readiness from lifecycle, approval, evidence, and security signals', () => {
+  it('keeps demo readiness out of the customer-facing dashboard model', () => {
     const model = buildDashboardModel(documents, {
       now,
       actor: { id: 'admin-1', roles: ['admin'] },
+      analyticsVisibility: elevatedAnalytics,
     });
 
-    expect(model.demoReadiness).toEqual({
-      score: 100,
-      label: 'Demo ready',
-      description: 'Lifecycle, approval, evidence, and security stories are available.',
-      signals: [
-        expect.objectContaining({
-          key: 'lifecycle-coverage',
-          label: 'Lifecycle coverage',
-          value: '3 governed',
-          tone: 'success',
-        }),
-        expect.objectContaining({
-          key: 'approval-workflow',
-          label: 'Approval workflow',
-          value: '1 pending',
-          tone: 'warning',
-        }),
-        expect.objectContaining({
-          key: 'evidence-export',
-          label: 'Evidence export',
-          value: 'Enabled',
-          tone: 'success',
-        }),
-        expect.objectContaining({
-          key: 'security-posture',
-          label: 'Security posture',
-          value: '1 finding',
-          tone: 'critical',
-        }),
-      ],
-    });
+    expect(model).not.toHaveProperty('demoReadiness');
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
   });
 
-  it('does not mark the business demo ready when seeded demo data is missing', () => {
+  it('prepares command-center visual summaries from real dashboard data', () => {
+    const model = buildDashboardModel(documents, {
+      unreadNotifications: 3,
+      now,
+      actor: { id: 'admin-1', roles: ['admin'] },
+      analyticsVisibility: elevatedAnalytics,
+    });
+
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
+    expect(model.commandCenter.lifecycleSegments).toEqual([
+      expect.objectContaining({
+        key: 'DRAFT',
+        label: 'Draft',
+        value: 1,
+        percentage: 25,
+        href: '/documents',
+        tone: 'info',
+      }),
+      expect.objectContaining({
+        key: 'PENDING',
+        label: 'Pending',
+        value: 1,
+        percentage: 25,
+        href: '/approvals',
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'PUBLISHED',
+        label: 'Published',
+        value: 1,
+        percentage: 25,
+        href: '/documents',
+        tone: 'success',
+      }),
+      expect.objectContaining({
+        key: 'ARCHIVED',
+        label: 'Archived',
+        value: 1,
+        percentage: 25,
+        href: '/retention',
+        tone: 'info',
+      }),
+    ]);
+    expect(model.commandCenter.attentionSegments).toEqual([
+      expect.objectContaining({
+        key: 'critical',
+        label: 'Critical',
+        value: 1,
+        percentage: 50,
+        tone: 'critical',
+      }),
+      expect.objectContaining({
+        key: 'warning',
+        label: 'Warning',
+        value: 0,
+        percentage: 0,
+        tone: 'warning',
+      }),
+      expect.objectContaining({
+        key: 'info',
+        label: 'Info',
+        value: 1,
+        percentage: 50,
+        tone: 'info',
+      }),
+    ]);
+    expect(model.commandCenter).not.toHaveProperty('riskSpotlight');
+  });
+
+  it('builds an empty dashboard without demo readiness setup prompts', () => {
     const model = buildDashboardModel([], {
       now,
       actor: { id: 'admin-1', roles: ['admin'] },
+      analyticsVisibility: elevatedAnalytics,
     });
 
-    expect(model.demoReadiness.score).toBe(25);
-    expect(model.demoReadiness.label).toBe('Needs setup');
-    expect(model.demoReadiness.description).toBe(
-      'Some commercial demo stories need role access or seeded data.',
-    );
-    expect(model.demoReadiness.signals).toEqual([
-      expect.objectContaining({
-        key: 'lifecycle-coverage',
-        value: '0 governed',
-      }),
-      expect.objectContaining({
-        key: 'approval-workflow',
-        value: '0 pending',
-      }),
-      expect.objectContaining({
-        key: 'evidence-export',
-        value: 'Enabled',
-      }),
-      expect.objectContaining({
-        key: 'security-posture',
-        value: '0 findings',
-      }),
+    expect(model).not.toHaveProperty('demoReadiness');
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
+    expect(model.commandCenter.lifecycleSegments).toHaveLength(4);
+    expect(model.commandCenter.attentionSegments).toEqual([
+      expect.objectContaining({ key: 'critical', value: 0 }),
+      expect.objectContaining({ key: 'warning', value: 0 }),
+      expect.objectContaining({ key: 'info', value: 0 }),
     ]);
+  });
+
+  it('does not expose security or retention aggregates to baseline dashboard roles', () => {
+    const model = buildDashboardModel(documents, {
+      unreadNotifications: 3,
+      now,
+      actor: { id: 'viewer-1', roles: ['viewer'] },
+      analyticsVisibility: viewerAnalytics,
+    });
+
+    expect(model.operationalWidgets.map((widget) => widget.key)).not.toContain('dlp-detected');
+    expect(model.operationalWidgets.map((widget) => widget.key)).not.toContain('retention-due-soon');
+    expect(model.commandCenter.attentionSegments.map((segment) => segment.key)).not.toContain('critical');
+    expect(model).not.toHaveProperty('demoReadiness');
   });
 });

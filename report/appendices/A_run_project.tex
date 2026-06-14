@@ -1,0 +1,102 @@
+\chapter{Hướng dẫn chạy hệ thống}
+
+\section{Yêu cầu môi trường}
+
+Môi trường phát triển DocVault cần các công cụ sau:
+
+\begin{itemize}
+  \item Node.js 20 trở lên.
+  \item pnpm 9 trở lên.
+  \item Docker Desktop hoặc Docker Engine kèm Docker Compose.
+  \item Git.
+  \item Các port local trống cho gateway, microservices, frontend, Keycloak, PostgreSQL, MongoDB và MinIO.
+\end{itemize}
+
+\section{Cài đặt phụ thuộc}
+
+Từ thư mục gốc repository, chạy:
+
+\begin{lstlisting}[language=bash]
+pnpm install
+\end{lstlisting}
+
+\section{Khởi động hạ tầng local}
+
+Hạ tầng local nằm trong \code{infra/docker-compose.dev.yml}. Lệnh chạy:
+
+\begin{lstlisting}[language=bash]
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
+\end{lstlisting}
+
+Các thành phần được khởi động gồm PostgreSQL, MongoDB, MongoDB Express, MinIO, MinIO init job và Keycloak.
+
+\section{Chạy migration}
+
+Sau khi PostgreSQL đã sẵn sàng:
+
+\begin{lstlisting}[language=bash]
+pnpm --filter metadata-service prisma:deploy
+pnpm --filter audit-service prisma:deploy
+\end{lstlisting}
+
+\section{Khởi động backend}
+
+Khuyến nghị chạy từng service ở terminal riêng theo thứ tự:
+
+\begin{lstlisting}[language=bash]
+pnpm --filter metadata-service start:dev
+pnpm --filter audit-service start:dev
+pnpm --filter document-service start:dev
+pnpm --filter notification-service start:dev
+pnpm --filter workflow-service start:dev
+pnpm --filter gateway start:dev
+\end{lstlisting}
+
+Các service mặc định:
+
+\begin{itemize}
+  \item Gateway: \code{http://localhost:3000}
+  \item Metadata-service: \code{http://localhost:3001}
+  \item Document-service: \code{http://localhost:3002}
+  \item Workflow-service: \code{http://localhost:3003}
+  \item Audit-service: \code{http://localhost:3004}
+  \item Notification-service: \code{http://localhost:3005}
+\end{itemize}
+
+\section{Khởi động frontend}
+
+Frontend nên chạy trên port \code{3100} để tránh xung đột với gateway:
+
+\begin{lstlisting}[language=bash]
+pnpm --filter web dev -- --port 3100
+\end{lstlisting}
+
+Truy cập:
+
+\begin{lstlisting}
+http://localhost:3100
+\end{lstlisting}
+
+\section{Tài khoản demo}
+
+Các tài khoản demo thường dùng:
+
+\begin{itemize}
+  \item \code{viewer1}
+  \item \code{editor1}
+  \item \code{approver1}
+  \item \code{co1}
+  \item \code{admin1}
+\end{itemize}
+
+Mật khẩu demo nằm trong tài liệu hướng dẫn chạy nội bộ của repository và cần được thay đổi nếu triển khai ngoài môi trường dev.
+
+\section{Kiểm thử nhanh}
+
+Sau khi backend hoạt động:
+
+\begin{lstlisting}[language=bash]
+pnpm test:e2e
+\end{lstlisting}
+
+Lệnh này kiểm tra các luồng chính: auth boundary, deny viewer, create/upload/submit của editor, approve của approver, download published document, audit của compliance và deny download của compliance.

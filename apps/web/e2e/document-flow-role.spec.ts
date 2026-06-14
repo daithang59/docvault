@@ -698,7 +698,7 @@ test('admin can bulk-apply eligible document actions from the document table', a
   ).toBeVisible();
 });
 
-test('viewer only sees readable published documents and cannot open restricted files', async ({ page }) => {
+test('viewer sees published internal metadata but cannot open restricted file content', async ({ page }) => {
   await mockDocumentFlowApi(page, sessionFor('viewer'));
 
   await page.goto('/documents');
@@ -712,9 +712,19 @@ test('viewer only sees readable published documents and cannot open restricted f
 
   await page.goto('/documents/doc-published-viewable');
   await expect(page.getByText('Published Handbook')).toBeVisible();
-  await expect(
-    page.getByRole('button', { name: 'Download', exact: true }),
-  ).toBeVisible();
+  const previewUnavailable = page.getByRole('button', {
+    name: /Preview unavailable: INTERNAL documents require at least the editor role\./,
+  });
+  const downloadUnavailable = page.getByRole('button', {
+    name: /Download unavailable: INTERNAL documents require at least the editor role\./,
+  });
+
+  await expect(previewUnavailable).toHaveCount(2);
+  await expect(downloadUnavailable).toHaveCount(2);
+  await expect(previewUnavailable.first()).toBeDisabled();
+  await expect(previewUnavailable.last()).toBeDisabled();
+  await expect(downloadUnavailable.first()).toBeDisabled();
+  await expect(downloadUnavailable.last()).toBeDisabled();
 });
 
 test('viewer sees lifecycle guidance without restricted next-action links', async ({

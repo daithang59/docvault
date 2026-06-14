@@ -8,6 +8,7 @@ export const documentsKeys = {
   savedViews: () => [...documentsKeys.all, 'saved-views'] as const,
   details: () => [...documentsKeys.all, 'detail'] as const,
   detail: (id: string) => [...documentsKeys.details(), id] as const,
+  approvers: (id: string) => [...documentsKeys.detail(id), 'approvers'] as const,
   workflowHistory: (id: string) => [...documentsKeys.detail(id), 'workflow-history'] as const,
   acl: (id: string) => [...documentsKeys.detail(id), 'acl'] as const,
   complianceEvidencePacket: (id: string) => [...documentsKeys.detail(id), 'evidence-packet'] as const,

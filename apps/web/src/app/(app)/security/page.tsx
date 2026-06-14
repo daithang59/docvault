@@ -25,6 +25,13 @@ import { PageHeader } from '@/components/common/page-header';
 import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
+import {
+  ColumnBarChart,
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { useAuth } from '@/lib/auth/auth-context';
 import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
@@ -51,8 +58,19 @@ import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  buildSecurityCaseWorkflowNote,
+  filterSecurityRecommendationRows,
+  getAuditEventDocumentHref,
+  getSecurityRecommendationQueueCounts,
+  getSecurityRouteCounts,
+  SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  validateSecurityCaseWorkflowDraft,
+  type SecurityAlertRoute,
+  type SecurityAlertRouting,
+  type SecurityCaseResolutionKind,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
+  type SecurityRecommendationQueueView,
   type SecurityRecommendationSlaState,
 } from '@/features/audit/security-dashboard';
 
@@ -99,6 +117,12 @@ function humanizeActorText(text: string, names: ActorNameMap): string {
 }
 
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
+const SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT = 5;
+const SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT = 4;
+const SECURITY_PANEL_TARGET_CLASS =
+  'scroll-mt-24 transition target:ring-2 target:ring-[var(--color-primary)] target:ring-offset-2';
+const SECURITY_SECONDARY_ACTION_CLASS =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]';
 const recommendationWorkflowOptions: Array<{
   value: SecurityRecommendationWorkflowStatus;
   label: string;
@@ -136,6 +160,11 @@ export default function SecurityPage() {
     useState<RecommendationHistoryState>({});
   const [historyLoadingId, setHistoryLoadingId] = useState<string | null>(null);
   const [historyErrors, setHistoryErrors] = useState<RecommendationHistoryErrors>({});
+  const [recommendationQueueView, setRecommendationQueueView] =
+    useState<SecurityRecommendationQueueView>('active');
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
+  const [selectedRecommendationId, setSelectedRecommendationId] =
+    useState<string | null>(null);
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -371,6 +400,10 @@ export default function SecurityPage() {
   }
 
   const auditChain = summaryQuery.data?.chain ?? { valid: false, checked: 0 };
+  const routeCounts = getSecurityRouteCounts(
+    model.alerts,
+    model.recommendations.items,
+  );
 
   return (
     <ActorNamesContext.Provider value={actorNameMap}>
@@ -401,7 +434,55 @@ export default function SecurityPage() {
         }
       />
 
-      <section className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+      <section className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]">
+        <ScoreGauge
+          className="min-h-[180px]"
+          description={model.commandCenter.postureGauge.description}
+          href={model.commandCenter.postureGauge.href}
+          label={model.commandCenter.postureGauge.label}
+          tone={model.commandCenter.postureGauge.tone}
+          value={model.commandCenter.postureGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {model.metrics.map((metric) => {
+            const Icon = metricIcons[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                description={metric.description}
+                href={buildMetricAuditHref(metric.key)}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.value > 0 ? 'warning' : 'success'}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-2 xl:grid-cols-4">
+        <SegmentDonut
+          label="Alert distribution"
+          segments={model.commandCenter.alertSegments}
+        />
+        <ColumnBarChart
+          label="Document risk bands"
+          segments={model.commandCenter.riskBandSegments}
+        />
+        <PriorityBarList
+          label="Behavior anomaly bands"
+          segments={model.commandCenter.anomalyBandSegments}
+        />
+        <PriorityBarList
+          label="Recommendation SLA"
+          segments={model.commandCenter.recommendationSlaSegments}
+        />
+      </section>
+
+      <AlertRoutingSummary counts={routeCounts} />
+
+      <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <PosturePanel
           level={model.posture.level}
           label={model.posture.label}
@@ -411,34 +492,13 @@ export default function SecurityPage() {
           isVerifying={isVerifyingChain}
           verifyError={verifyChainError}
         />
-        <QuickFilters filters={model.quickFilters} />
-      </section>
-
-      <section className="mt-4 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-        {model.metrics.map((metric) => {
-          const Icon = metricIcons[metric.key];
-          return (
-            <div
-              key={metric.key}
-              className="rounded-lg border p-4"
-              style={{
-                background: 'var(--bg-card)',
-                borderColor: 'var(--border-soft)',
-              }}
-            >
-              <div className="flex items-center justify-between gap-3">
-                <p className="text-sm font-medium text-[var(--text-muted)]">{metric.label}</p>
-                <Icon className="h-4 w-4 text-[var(--text-faint)]" />
-              </div>
-              <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
-                {metric.value}
-              </p>
-              <p className="mt-1 text-xs leading-snug text-[var(--text-faint)]">
-                {metric.description}
-              </p>
-            </div>
-          );
-        })}
+        <div className="grid gap-4 lg:grid-cols-2 xl:grid-cols-1">
+          <PriorityBarList
+            label="Content access signals"
+            segments={model.commandCenter.accessSegments}
+          />
+          <QuickFilters filters={model.quickFilters} />
+        </div>
       </section>
 
       <section className="mt-4 grid gap-4 xl:grid-cols-[0.95fr_1.05fr]">
@@ -454,6 +514,18 @@ export default function SecurityPage() {
         <RecommendationsPanel
           recommendations={model.recommendations}
           auditChain={auditChain}
+          queueView={recommendationQueueView}
+          showAll={showAllRecommendations}
+          onQueueViewChange={(view) => {
+            setRecommendationQueueView(view);
+            setShowAllRecommendations(false);
+            setSelectedRecommendationId(null);
+          }}
+          onToggleShowAll={() =>
+            setShowAllRecommendations((current) => !current)
+          }
+          selectedRecommendationId={selectedRecommendationId}
+          onSelectRecommendation={setSelectedRecommendationId}
           pendingRecommendationId={pendingRecommendationId}
           workflowError={workflowError}
           expandedHistoryIds={expandedHistoryIds}
@@ -484,9 +556,56 @@ export default function SecurityPage() {
   );
 }
 
+function AlertRoutingSummary({
+  counts,
+}: {
+  counts: Record<SecurityAlertRoute, number>;
+}) {
+  const routes: SecurityAlertRoute[] = ['CASE', 'REVIEW', 'SIGNAL'];
+
+  return (
+    <section className="mt-4 grid gap-3 md:grid-cols-3">
+      {routes.map((route) => {
+        const tone = getSecurityRouteTone(route);
+
+        return (
+          <div
+            key={route}
+            className={`rounded-lg border px-4 py-3 ${tone.container}`}
+          >
+            <div className="flex items-center justify-between gap-3">
+              <p className="text-xs font-semibold uppercase text-[var(--text-faint)]">
+                {getSecurityRouteShortLabel(route)}
+              </p>
+              <SecurityRouteBadge
+                routing={{
+                  route,
+                  routeLabel: getSecurityRouteBadgeLabel(route),
+                }}
+              />
+            </div>
+            <p className="mt-2 text-2xl font-semibold text-[var(--text-strong)]">
+              {counts[route]}
+            </p>
+            <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+              {getSecurityRouteDescription(route)}
+            </p>
+          </div>
+        );
+      })}
+    </section>
+  );
+}
+
 function RecommendationsPanel({
   recommendations,
   auditChain,
+  queueView,
+  showAll,
+  onQueueViewChange,
+  onToggleShowAll,
+  selectedRecommendationId,
+  onSelectRecommendation,
   pendingRecommendationId,
   workflowError,
   expandedHistoryIds,
@@ -499,6 +618,12 @@ function RecommendationsPanel({
 }: {
   recommendations: ReturnType<typeof buildSecurityDashboardModel>['recommendations'];
   auditChain: AuditChainStatus;
+  queueView: SecurityRecommendationQueueView;
+  showAll: boolean;
+  onQueueViewChange: (view: SecurityRecommendationQueueView) => void;
+  onToggleShowAll: () => void;
+  selectedRecommendationId: string | null;
+  onSelectRecommendation: (id: string | null) => void;
   pendingRecommendationId: string | null;
   workflowError: { id: string; message: string } | null;
   expandedHistoryIds: string[];
@@ -514,12 +639,27 @@ function RecommendationsPanel({
     item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
   ) => Promise<void>;
 }) {
-  const items = recommendations.items;
+  const counts = getSecurityRecommendationQueueCounts(recommendations.items);
+  const filteredItems = filterSecurityRecommendationRows(
+    recommendations.items,
+    queueView,
+  );
+  const hiddenCount = Math.max(
+    0,
+    filteredItems.length - SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  );
+  const items = showAll
+    ? filteredItems
+    : filteredItems.slice(0, SECURITY_RECOMMENDATION_PREVIEW_LIMIT);
   const actorNames = useActorNames();
+  const selectedItem = selectedRecommendationId
+    ? filteredItems.find((item) => item.id === selectedRecommendationId) ?? null
+    : null;
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-recommendations"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -530,12 +670,12 @@ function RecommendationsPanel({
           <div className="flex items-center gap-2">
             <Lightbulb className="h-4 w-4 text-[var(--text-faint)]" />
             <p className="text-sm font-semibold text-[var(--text-strong)]">
-              Security recommendations
+              Evidence-backed findings
             </p>
           </div>
           <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-            Deterministic actions from audit-chain, DLP, malware, risk scoring,
-            and behavior anomaly evidence.
+            Security warnings grouped by risk category with affected scope,
+            rationale, next action, and metadata-only evidence.
           </p>
         </div>
         <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
@@ -543,118 +683,422 @@ function RecommendationsPanel({
         </span>
       </div>
 
-      {items.length === 0 ? (
+      <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <div className="inline-flex w-fit rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+          {(['active', 'resolved', 'all'] as SecurityRecommendationQueueView[]).map(
+            (view) => (
+              <button
+                key={view}
+                type="button"
+                aria-pressed={queueView === view}
+                onClick={() => onQueueViewChange(view)}
+                className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                  queueView === view
+                    ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                    : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                }`}
+              >
+                {getRecommendationQueueViewLabel(view)} {counts[view]}
+              </button>
+            ),
+          )}
+        </div>
+        <p className="text-xs text-[var(--text-muted)]">
+          Active hides resolved recommendations without deleting audit evidence.
+        </p>
+      </div>
+
+      {filteredItems.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--text-muted)]">
-          No recommendation is raised by the current security summary.
+          {queueView === 'active'
+            ? 'No active recommendations need review.'
+            : queueView === 'resolved'
+              ? 'No resolved recommendations are available.'
+              : 'No recommendation is raised by the current security summary.'}
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {items.map((item) => {
-            const tone = getRecommendationTone(item.severity);
-            return (
-              <div
-                key={item.id}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
+        <>
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(380px,1.18fr)]">
+            <div className="space-y-2">
+            {items.map((item) => {
+              const tone = getRecommendationTone(item.severity);
+              const isSelected = selectedRecommendationId === item.id;
+              const isCase = item.finding.routing.route === 'CASE';
+              const firstDocument = item.affectedDocuments[0] ?? null;
+              const primaryActionLabel = isSelected
+                ? 'Hide details'
+                : isCase
+                  ? item.workflow.status === 'OPEN'
+                    ? 'Start case'
+                    : 'Continue case'
+                  : 'Review finding';
+
+              return (
+                <div
+                  key={item.id}
+                  className="rounded-lg border border-l-4 px-4 py-3 transition"
+                  style={{
+                    borderColor: isSelected
+                      ? 'var(--color-primary)'
+                      : 'var(--border-soft)',
+                    borderLeftColor: tone.border,
+                    background: isSelected
+                      ? 'var(--bg-subtle)'
+                      : 'var(--bg-card)',
+                  }}
+                >
+                  <div className="flex flex-col gap-3">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {item.severityLabel}
+                        </span>
+                        <SecurityRouteCodeBadge route={item.finding.routing.route} />
+                        <span className="text-[11px] font-medium text-[var(--text-faint)]">
+                          {item.finding.categoryLabel} · {item.typeLabel}
+                        </span>
+                      </div>
+                      <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
+                        {humanizeActorText(item.title, actorNames)}
+                      </h3>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.finding.summary}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectRecommendation(isSelected ? null : item.id)
+                        }
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-white transition hover:brightness-110"
+                        style={{ background: 'var(--color-primary)' }}
                       >
-                        {item.severityLabel}
+                        {primaryActionLabel}
+                      </button>
+                      {firstDocument ? (
+                        <Link
+                          href={firstDocument.href}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                        >
+                          Open document
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      ) : null}
+                      <Link
+                        href={buildRecommendationAuditHref(item.auditFilters)}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                      >
+                        Open audit
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </div>
+                  </div>
+
+                  <div className="mt-3 grid gap-3">
+                    <div>
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Affected scope
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {item.finding.affectedScopeLabel}
+                      </p>
+                    </div>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex h-7 items-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-card)] px-2.5 text-xs font-medium text-[var(--text-main)]">
+                        {getRecommendationWorkflowLabel(item.workflow.status)}
                       </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {item.typeLabel}
+                      <span
+                        className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getRecommendationSlaTone(
+                          item.playbook.slaState,
+                        )}`}
+                      >
+                        {getRecommendationSlaLabel(item.playbook.slaState)}
                       </span>
                     </div>
-                    <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
-                      {humanizeActorText(item.title, actorNames)}
-                    </h3>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.reason, actorNames)}
-                    </p>
-                  </div>
-                  <Link
-                    href={buildRecommendationAuditHref(item.auditFilters)}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
-                </div>
-
-                <div className="mt-3 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Recommended action
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {humanizeActorText(item.recommendedAction, actorNames)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Evidence
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {item.evidence.join(' · ')}
-                    </p>
                   </div>
                 </div>
+              );
+            })}
+            </div>
+            <RecommendationDetailPanel
+              item={selectedItem}
+              auditChain={auditChain}
+              actorNames={actorNames}
+              pendingRecommendationId={pendingRecommendationId}
+              workflowError={workflowError}
+              expandedHistoryIds={expandedHistoryIds}
+              workflowHistoryByRecommendationId={workflowHistoryByRecommendationId}
+              historyLoadingId={historyLoadingId}
+              historyErrors={historyErrors}
+              onSaveWorkflow={onSaveWorkflow}
+              onToggleHistory={onToggleHistory}
+              onDownloadEvidence={onDownloadEvidence}
+            />
+          </div>
+          {filteredItems.length > SECURITY_RECOMMENDATION_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={onToggleShowAll}
+            />
+          ) : null}
+        </>
+      )}
+    </div>
+  );
+}
 
-                {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
-                  <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-                    {item.affectedDocumentIds.map((docId) => (
-                      <span
-                        key={docId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        doc {truncateMiddle(docId, 18)}
-                      </span>
-                    ))}
-                    {item.affectedActorIds.map((actorId) => (
-                      <span
-                        key={actorId}
-                        className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                      >
-                        actor <ActorLabel id={actorId} length={18} />
-                      </span>
-                    ))}
-                  </div>
-                ) : null}
+function RecommendationDetailPanel({
+  item,
+  auditChain,
+  actorNames,
+  pendingRecommendationId,
+  workflowError,
+  expandedHistoryIds,
+  workflowHistoryByRecommendationId,
+  historyLoadingId,
+  historyErrors,
+  onSaveWorkflow,
+  onToggleHistory,
+  onDownloadEvidence,
+}: {
+  item:
+    | ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number]
+    | null;
+  auditChain: AuditChainStatus;
+  actorNames: ActorNameMap;
+  pendingRecommendationId: string | null;
+  workflowError: { id: string; message: string } | null;
+  expandedHistoryIds: string[];
+  workflowHistoryByRecommendationId: RecommendationHistoryState;
+  historyLoadingId: string | null;
+  historyErrors: RecommendationHistoryErrors;
+  onSaveWorkflow: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+  onToggleHistory: (id: string) => Promise<void>;
+  onDownloadEvidence: (
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
+  ) => Promise<void>;
+}) {
+  return (
+    <aside
+      className="rounded-lg border p-4 xl:sticky xl:top-4 xl:self-start"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Recommendation detail
+          </p>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+            Finding details
+          </h3>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          Metadata only
+        </span>
+      </div>
 
-                <RecommendationWorkflowControls
-                  key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
-                  item={item}
-                  isPending={pendingRecommendationId === item.id}
-                  isDisabled={pendingRecommendationId !== null}
-                  error={workflowError?.id === item.id ? workflowError.message : null}
-                  onSave={onSaveWorkflow}
-                />
-
-                <RecommendationPlaybook playbook={item.playbook} />
-
-                <RecommendationHistoryControls
-                  item={item}
-                  auditChain={auditChain}
-                  isExpanded={expandedHistoryIds.includes(item.id)}
-                  isLoading={historyLoadingId === item.id}
-                  error={historyErrors[item.id] ?? null}
-                  history={workflowHistoryByRecommendationId[item.id] ?? []}
-                  onToggleHistory={onToggleHistory}
-                  onDownloadEvidence={onDownloadEvidence}
-                />
+      {!item ? (
+        <div className="mt-4 rounded-lg border border-dashed border-[var(--border-soft)] bg-[var(--bg-subtle)] px-4 py-6">
+          <p className="text-sm font-medium text-[var(--text-main)]">
+            No finding selected
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Case workflow and evidence details stay here while the queue remains compact.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                  style={{
+                    color: getRecommendationTone(item.severity).text,
+                    background: getRecommendationTone(item.severity).badgeBg,
+                  }}
+                >
+                  {item.severityLabel}
+                </span>
+                <SecurityRouteBadge routing={item.finding.routing} />
+                <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
+                  {item.finding.categoryLabel}
+                </span>
               </div>
-            );
-          })}
+              <h4 className="mt-2 text-base font-semibold text-[var(--text-strong)]">
+                {humanizeActorText(item.title, actorNames)}
+              </h4>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                {item.finding.summary}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+                {item.finding.routing.routeDescription}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {item.affectedDocuments[0] ? (
+                <Link
+                  href={item.affectedDocuments[0].href}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                >
+                  Open document
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              ) : null}
+              <Link
+                href={buildRecommendationAuditHref(item.auditFilters)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                Open audit
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Scope
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {item.finding.affectedScopeLabel}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Status
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationWorkflowLabel(item.workflow.status)}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                SLA
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationSlaLabel(item.playbook.slaState)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                {item.finding.evidenceQuestion}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                {humanizeActorText(item.reason, actorNames)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Next action
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text-main)]">
+                  {item.finding.nextStepLabel}
+                </span>
+                {': '}
+                {humanizeActorText(item.recommendedAction, actorNames)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Evidence
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {item.evidence.map((evidence) => (
+                <span
+                  key={evidence}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                >
+                  {humanizeActorText(evidence, actorNames)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {item.affectedDocuments.length || item.affectedActorIds.length ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+              {item.affectedDocuments.map((document) => (
+                <Link
+                  key={document.documentId}
+                  href={document.href}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  doc {truncateMiddle(document.documentId, 18)}
+                </Link>
+              ))}
+              {item.affectedActorIds.map((actorId) => (
+                <span
+                  key={actorId}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono"
+                >
+                  actor <ActorLabel id={actorId} length={18} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <RecommendationWorkflowControls
+            key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
+            item={item}
+            isPending={pendingRecommendationId === item.id}
+            isDisabled={pendingRecommendationId !== null}
+            error={workflowError?.id === item.id ? workflowError.message : null}
+            onSave={onSaveWorkflow}
+          />
+
+          <RecommendationPlaybook playbook={item.playbook} />
+
+          <RecommendationHistoryControls
+            item={item}
+            auditChain={auditChain}
+            isExpanded={expandedHistoryIds.includes(item.id)}
+            isLoading={historyLoadingId === item.id}
+            error={historyErrors[item.id] ?? null}
+            history={workflowHistoryByRecommendationId[item.id] ?? []}
+            onToggleHistory={onToggleHistory}
+            onDownloadEvidence={onDownloadEvidence}
+          />
         </div>
       )}
+    </aside>
+  );
+}
+
+function ShowMoreListToggle({
+  hiddenCount,
+  showAll,
+  onToggle,
+}: {
+  hiddenCount: number;
+  showAll: boolean;
+  onToggle: () => void;
+}) {
+  return (
+    <div className="mt-4 flex justify-center">
+      <button
+        type="button"
+        onClick={onToggle}
+        className="inline-flex items-center rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+      >
+        {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+      </button>
     </div>
   );
 }
@@ -846,6 +1290,265 @@ function RecommendationWorkflowControls({
     payload: SecurityRecommendationWorkflowRequest,
   ) => Promise<void>;
 }) {
+  if (item.finding.routing.route === 'CASE') {
+    return (
+      <RecommendationCaseWorkflowControls
+        item={item}
+        isPending={isPending}
+        isDisabled={isDisabled}
+        error={error}
+        onSave={onSave}
+      />
+    );
+  }
+
+  return (
+    <RecommendationLightweightWorkflowControls
+      item={item}
+      isPending={isPending}
+      isDisabled={isDisabled}
+      error={error}
+      onSave={onSave}
+    />
+  );
+}
+
+function RecommendationCaseWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
+  const [investigationNote, setInvestigationNote] = useState('');
+  const [resolutionKind, setResolutionKind] =
+    useState<SecurityCaseResolutionKind | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [verificationConfirmed, setVerificationConfirmed] = useState(false);
+
+  const draft = {
+    investigationNote,
+    resolutionKind,
+    resolutionNote,
+    verificationConfirmed,
+  };
+  const validation = validateSecurityCaseWorkflowDraft(draft);
+  const note = buildSecurityCaseWorkflowNote(draft);
+  const isResolved = item.workflow.status === 'RESOLVED';
+  const controlsDisabled = isDisabled || isResolved;
+  const canStart = item.workflow.status === 'OPEN' && !controlsDisabled;
+  const canSaveReview =
+    investigationNote.trim().length > 0 && !controlsDisabled;
+  const canResolve = validation.canResolve && !controlsDisabled;
+
+  async function startCase() {
+    if (!canStart) return;
+
+    await onSave(item.id, {
+      status: 'INVESTIGATING',
+      note: `Case workflow started: ${item.finding.categoryLabel}`,
+    });
+  }
+
+  async function saveReviewEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSaveReview) return;
+
+    await onSave(item.id, {
+      status: 'REVIEWED',
+      note,
+    });
+  }
+
+  async function resolveCase() {
+    if (!canResolve) return;
+
+    await onSave(item.id, {
+      status: 'RESOLVED',
+      note,
+    });
+  }
+
+  return (
+    <form
+      onSubmit={saveReviewEvidence}
+      className="mt-3 border-t border-[var(--border-soft)] pt-3"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Case workflow
+            </p>
+            <SecurityRouteBadge routing={item.finding.routing} />
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Current status:{' '}
+            <span className="font-semibold text-[var(--text-main)]">
+              {getRecommendationWorkflowLabel(item.workflow.status)}
+            </span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Resolve is gated by investigation, remediation or accepted risk, and
+            verification evidence.
+          </p>
+          {item.workflow.note ? (
+            <p className="mt-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+              Last note: {item.workflow.note}
+            </p>
+          ) : null}
+        </div>
+        {item.workflow.status === 'OPEN' ? (
+          <button
+            type="button"
+            onClick={startCase}
+            disabled={!canStart}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Clock className="h-4 w-4" />
+            {isPending ? 'Starting' : 'Start case'}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Investigation
+          <textarea
+            value={investigationNote}
+            onChange={(event) => setInvestigationNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Summarize affected scope and why this case is real"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <div>
+          <p className="text-xs font-medium text-[var(--text-main)]">
+            Decision
+          </p>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ['REMEDIATED', 'Remediated'],
+                ['ACCEPTED_RISK', 'Accepted risk'],
+              ] as Array<[SecurityCaseResolutionKind, string]>
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-main)]"
+              >
+                <input
+                  type="radio"
+                  name={`case-decision-${item.id}`}
+                  value={value}
+                  checked={resolutionKind === value}
+                  onChange={() => setResolutionKind(value)}
+                  disabled={controlsDisabled}
+                  className="accent-[var(--color-primary)]"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Remediation or accepted-risk evidence
+          <textarea
+            value={resolutionNote}
+            onChange={(event) => setResolutionNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Describe the fix, owner approval, expiry, or accepted-risk reason"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <label className="flex items-start gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs leading-relaxed text-[var(--text-muted)]">
+          <input
+            type="checkbox"
+            checked={verificationConfirmed}
+            onChange={(event) => setVerificationConfirmed(event.target.checked)}
+            disabled={controlsDisabled}
+            className="mt-0.5 accent-[var(--color-primary)]"
+          />
+          <span>
+            Verification confirmed: audit scope reviewed, decision recorded, and
+            evidence packet is ready for export.
+          </span>
+        </label>
+      </div>
+
+      {!isResolved && !validation.canResolve ? (
+        <div className="mt-3 rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-3 py-2">
+          <p className="text-xs font-semibold text-[var(--status-pending-text)]">
+            Missing before resolve
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {validation.missingRequirements.join(' · ')}
+          </p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-[var(--state-error-text)]">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={!canSaveReview}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {isPending ? 'Saving' : 'Save review evidence'}
+        </button>
+        <button
+          type="button"
+          onClick={resolveCase}
+          disabled={!canResolve}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-3 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {isPending ? 'Resolving' : 'Resolve case'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RecommendationLightweightWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
   const [status, setStatus] = useState<SecurityRecommendationWorkflowStatus>(
     item.workflow.status,
   );
@@ -989,7 +1692,8 @@ function PosturePanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-posture"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1110,13 +1814,28 @@ function AlertsPanel({
                     : 'var(--status-pending-bg)',
               }}
             >
-              <p className="text-sm font-semibold text-[var(--text-strong)]">{alert.title}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <SecurityRouteBadge routing={alert.routing} />
+                <p className="text-sm font-semibold text-[var(--text-strong)]">
+                  {alert.title}
+                </p>
+              </div>
               <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
                 {alert.description}
+              </p>
+              <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
+                {alert.routing.routeDescription}
               </p>
               <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
                 {alert.action}
               </p>
+              <Link
+                href={alert.evidenceTarget.href}
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {alert.evidenceTarget.label}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
             </div>
           ))}
         </div>
@@ -1134,11 +1853,20 @@ function AccessActivityPanel({
   isLoading: boolean;
   isError: boolean;
 }) {
-  const sensitiveEvents = activity.sensitiveAccessEvents.slice(0, 5);
+  const [showAll, setShowAll] = useState(false);
+  const sensitiveAccessEvents = activity.sensitiveAccessEvents;
+  const hiddenCount = Math.max(
+    0,
+    sensitiveAccessEvents.length - SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT,
+  );
+  const sensitiveEvents = showAll
+    ? sensitiveAccessEvents
+    : sensitiveAccessEvents.slice(0, SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT);
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-access-activity"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1179,34 +1907,57 @@ function AccessActivityPanel({
           Failed to load authorized access events.
         </p>
       ) : null}
-      {!isLoading && !isError && sensitiveEvents.length === 0 ? (
+      {!isLoading && !isError && sensitiveAccessEvents.length === 0 ? (
         <p className="mt-4 text-sm text-[var(--text-muted)]">
           No recent sensitive preview or download grants returned by audit query.
         </p>
       ) : null}
-      {!isLoading && !isError && sensitiveEvents.length > 0 ? (
-        <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {sensitiveEvents.map((event) => (
-            <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                  {event.action}
-                </p>
-                <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
-                  {getClassificationLabel(event)}
-                </span>
-              </div>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-faint)]">
-                {event.resourceId
-                  ? `Document ${truncateMiddle(event.resourceId, 20)}`
-                  : event.resourceType}
-              </p>
-            </div>
-          ))}
-        </div>
+      {!isLoading && !isError && sensitiveAccessEvents.length > 0 ? (
+        <>
+          <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
+            {sensitiveEvents.map((event) => {
+              const documentHref = getAuditEventDocumentHref(event);
+
+              return (
+                <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                      {event.action}
+                    </p>
+                    <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
+                      {getClassificationLabel(event)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
+                  </p>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                    <span>
+                      {event.resourceId
+                        ? `Document ${truncateMiddle(event.resourceId, 20)}`
+                        : event.resourceType}
+                    </span>
+                    {documentHref ? (
+                      <Link
+                        href={documentHref}
+                        className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                      >
+                        Open document
+                      </Link>
+                    ) : null}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {sensitiveAccessEvents.length > SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       ) : null}
     </div>
   );
@@ -1223,7 +1974,8 @@ function RecentSecurityEvents({
 }) {
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-recent-events"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1239,24 +1991,36 @@ function RecentSecurityEvents({
       )}
       {!isLoading && !isError && events.length > 0 && (
         <div className="mt-3 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {events.map((event) => (
-            <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                  {event.action}
+          {events.map((event) => {
+            const documentHref = getAuditEventDocumentHref(event);
+
+            return (
+              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                    {event.action}
+                  </p>
+                  <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                    {event.result}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                 </p>
-                <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                  {event.result}
-                </span>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                  <span>{event.reason ?? event.resourceType}</span>
+                  {documentHref ? (
+                    <Link
+                      href={documentHref}
+                      className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                    >
+                      Open document
+                    </Link>
+                  ) : null}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-faint)]">
-                {event.reason ?? event.resourceType}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1268,9 +2032,19 @@ function RepeatedActorsPanel({
 }: {
   actors: ReturnType<typeof buildSecurityDashboardModel>['repeatedDenyActors'];
 }) {
+  const [showAll, setShowAll] = useState(false);
+  const hiddenCount = Math.max(
+    0,
+    actors.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleActors = showAll
+    ? actors
+    : actors.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
+
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-repeated-deny-actors"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1282,21 +2056,30 @@ function RepeatedActorsPanel({
           No actor crossed the repeated-deny threshold.
         </p>
       ) : (
-        <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
-          {actors.map((actor) => (
-            <div
-              key={actor.actorId}
-              className="rounded-lg border border-[var(--border-soft)] p-3"
-            >
-              <p className="text-xs font-medium text-[var(--text-main)]">
-                <ActorLabel id={actor.actorId} length={22} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {actor.denyCount} denied request{actor.denyCount === 1 ? '' : 's'} · {actor.riskLabel}
-              </p>
-            </div>
-          ))}
-        </div>
+        <>
+          <div className="mt-3 grid gap-2 md:grid-cols-2 xl:grid-cols-3">
+            {visibleActors.map((actor) => (
+              <div
+                key={actor.actorId}
+                className="rounded-lg border border-[var(--border-soft)] p-3"
+              >
+                <p className="text-xs font-medium text-[var(--text-main)]">
+                  <ActorLabel id={actor.actorId} length={22} />
+                </p>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {actor.denyCount} denied request{actor.denyCount === 1 ? '' : 's'} · {actor.riskLabel}
+                </p>
+              </div>
+            ))}
+          </div>
+          {actors.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1307,11 +2090,20 @@ function RiskScoringPanel({
 }: {
   riskScoring: ReturnType<typeof buildSecurityDashboardModel>['riskScoring'];
 }) {
+  const [showAll, setShowAll] = useState(false);
   const documents = riskScoring.riskyDocuments;
+  const hiddenCount = Math.max(
+    0,
+    documents.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleDocuments = showAll
+    ? documents
+    : documents.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-risk-scoring"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1337,71 +2129,89 @@ function RiskScoringPanel({
           No elevated document access risk returned by the audit summary.
         </p>
       ) : (
-        <div className="mt-4 grid gap-3 lg:grid-cols-2">
-          {documents.map((document) => {
-            const tone = getRiskTone(document.riskBand);
-            return (
-              <div
-                key={document.documentId}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {document.riskLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {document.classification}
-                      </span>
+        <>
+          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+            {visibleDocuments.map((document) => {
+              const tone = getRiskTone(document.riskBand);
+              return (
+                <div
+                  key={document.documentId}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {document.riskLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {document.classification}
+                        </span>
+                      </div>
+                      <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
+                        {truncateMiddle(document.documentId, 34)}
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {document.accessCount} access grant{document.accessCount === 1 ? '' : 's'} ·{' '}
+                        {document.actorCount} actor{document.actorCount === 1 ? '' : 's'} · latest{' '}
+                        {formatDateTime(document.latestAccessAt)}
+                      </p>
                     </div>
-                    <p className="mt-2 font-mono text-sm text-[var(--text-strong)]">
-                      {truncateMiddle(document.documentId, 34)}
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {document.accessCount} access grant{document.accessCount === 1 ? '' : 's'} ·{' '}
-                      {document.actorCount} actor{document.actorCount === 1 ? '' : 's'} · latest{' '}
-                      {formatDateTime(document.latestAccessAt)}
-                    </p>
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                        {document.riskScore}
+                      </p>
+                      <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                        risk score
+                      </p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
-                      {document.riskScore}
-                    </p>
-                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
-                      risk score
-                    </p>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Reasons
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {document.reasons.join(' · ')}
-                    </p>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Reasons
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {document.reasons.join(' · ')}
+                      </p>
+                    </div>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Link
+                        href={document.documentHref}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open document
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open audit
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
-                  <Link
-                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {documents.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1412,11 +2222,20 @@ function BehaviorAnomaliesPanel({
 }: {
   behaviorAnomalies: ReturnType<typeof buildSecurityDashboardModel>['behaviorAnomalies'];
 }) {
+  const [showAll, setShowAll] = useState(false);
   const signals = behaviorAnomalies.signals;
+  const hiddenCount = Math.max(
+    0,
+    signals.length - SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT,
+  );
+  const visibleSignals = showAll
+    ? signals
+    : signals.slice(0, SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT);
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-behavior-anomalies"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1442,71 +2261,80 @@ function BehaviorAnomaliesPanel({
           No actor crossed the behavior anomaly thresholds.
         </p>
       ) : (
-        <div className="mt-4 space-y-3">
-          {signals.map((signal) => {
-            const tone = getRiskTone(signal.riskBand);
-            return (
-              <div
-                key={signal.signalId}
-                className="rounded-lg border p-4"
-                style={{
-                  borderColor: tone.border,
-                  background: tone.bg,
-                }}
-              >
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
-                        style={{ color: tone.text, background: tone.badgeBg }}
-                      >
-                        {signal.riskLabel}
-                      </span>
-                      <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                        {signal.typeLabel}
-                      </span>
+        <>
+          <div className="mt-4 space-y-3">
+            {visibleSignals.map((signal) => {
+              const tone = getRiskTone(signal.riskBand);
+              return (
+                <div
+                  key={signal.signalId}
+                  className="rounded-lg border p-4"
+                  style={{
+                    borderColor: tone.border,
+                    background: tone.bg,
+                  }}
+                >
+                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span
+                          className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                          style={{ color: tone.text, background: tone.badgeBg }}
+                        >
+                          {signal.riskLabel}
+                        </span>
+                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
+                          {signal.typeLabel}
+                        </span>
+                      </div>
+                      <p className="mt-2 text-sm font-medium text-[var(--text-strong)]">
+                        <ActorLabel id={signal.actorId} length={34} />
+                      </p>
+                      <p className="mt-1 text-xs text-[var(--text-muted)]">
+                        {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}
+                        {signal.documentCount} document{signal.documentCount === 1 ? '' : 's'} ·{' '}
+                        {formatDateTime(signal.windowStartedAt)} - {formatDateTime(signal.windowEndedAt)}
+                      </p>
                     </div>
-                    <p className="mt-2 text-sm font-medium text-[var(--text-strong)]">
-                      <ActorLabel id={signal.actorId} length={34} />
-                    </p>
-                    <p className="mt-1 text-xs text-[var(--text-muted)]">
-                      {signal.actionCount} event{signal.actionCount === 1 ? '' : 's'} ·{' '}
-                      {signal.documentCount} document{signal.documentCount === 1 ? '' : 's'} ·{' '}
-                      {formatDateTime(signal.windowStartedAt)} - {formatDateTime(signal.windowEndedAt)}
-                    </p>
+                    <div className="shrink-0 text-left sm:text-right">
+                      <p className="text-2xl font-semibold text-[var(--text-strong)]">
+                        {signal.riskScore}
+                      </p>
+                      <p className="text-[11px] uppercase text-[var(--text-faint)]">
+                        anomaly score
+                      </p>
+                    </div>
                   </div>
-                  <div className="shrink-0 text-left sm:text-right">
-                    <p className="text-2xl font-semibold text-[var(--text-strong)]">
-                      {signal.riskScore}
-                    </p>
-                    <p className="text-[11px] uppercase text-[var(--text-faint)]">
-                      anomaly score
-                    </p>
-                  </div>
-                </div>
 
-                <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-                  <div className="min-w-0">
-                    <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                      Reasons
-                    </p>
-                    <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                      {signal.reasons.join(' · ')}
-                    </p>
+                  <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="min-w-0">
+                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                        Reasons
+                      </p>
+                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                        {signal.reasons.join(' · ')}
+                      </p>
+                    </div>
+                    <Link
+                      href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
+                      className={SECURITY_SECONDARY_ACTION_CLASS}
+                    >
+                      Open audit
+                      <ExternalLink className="h-4 w-4" />
+                    </Link>
                   </div>
-                  <Link
-                    href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
-                    className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                  >
-                    Open audit
-                    <ExternalLink className="h-4 w-4" />
-                  </Link>
                 </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+          {signals.length > SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT ? (
+            <ShowMoreListToggle
+              hiddenCount={hiddenCount}
+              showAll={showAll}
+              onToggle={() => setShowAll((current) => !current)}
+            />
+          ) : null}
+        </>
       )}
     </div>
   );
@@ -1577,6 +2405,87 @@ function getRecommendationTone(severity: 'critical' | 'warning' | 'info') {
   };
 }
 
+function SecurityRouteBadge({
+  routing,
+}: {
+  routing: Pick<SecurityAlertRouting, 'route' | 'routeLabel'>;
+}) {
+  const tone = getSecurityRouteTone(routing.route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {routing.routeLabel}
+    </span>
+  );
+}
+
+function SecurityRouteCodeBadge({ route }: { route: SecurityAlertRoute }) {
+  const tone = getSecurityRouteTone(route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {route}
+    </span>
+  );
+}
+
+function getSecurityRouteTone(route: SecurityAlertRoute): {
+  badge: string;
+  container: string;
+} {
+  switch (route) {
+    case 'CASE':
+      return {
+        badge:
+          'border border-[var(--state-error-border)] bg-[var(--state-error-bg)] text-[var(--state-error-text)]',
+        container:
+          'border-[var(--state-error-border)] bg-[var(--state-error-bg)]',
+      };
+    case 'REVIEW':
+      return {
+        badge:
+          'border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
+        container:
+          'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)]',
+      };
+    case 'SIGNAL':
+      return {
+        badge:
+          'border border-[var(--state-info-border)] bg-[var(--state-info-bg)] text-[var(--state-info-text)]',
+        container:
+          'border-[var(--state-info-border)] bg-[var(--state-info-bg)]',
+      };
+  }
+}
+
+function getSecurityRouteBadgeLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Case workflow required';
+  if (route === 'REVIEW') return 'Lightweight review';
+  return 'Monitor signal';
+}
+
+function getSecurityRouteShortLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Cases';
+  if (route === 'REVIEW') return 'Reviews';
+  return 'Signals';
+}
+
+function getSecurityRouteDescription(route: SecurityAlertRoute): string {
+  if (route === 'CASE') {
+    return 'Needs owner, SLA, investigation, remediation or accepted risk, verification, and evidence.';
+  }
+
+  if (route === 'REVIEW') {
+    return 'Needs human review, but full case workflow would be too heavy.';
+  }
+
+  return 'Track as a trend or monitoring signal without workflow overhead.';
+}
+
 function getRecommendationWorkflowLabel(
   status: SecurityRecommendationWorkflowStatus,
 ): string {
@@ -1589,6 +2498,19 @@ function getRecommendationWorkflowLabel(
       return 'Reviewed';
     case 'RESOLVED':
       return 'Resolved';
+  }
+}
+
+function getRecommendationQueueViewLabel(
+  view: SecurityRecommendationQueueView,
+): string {
+  switch (view) {
+    case 'active':
+      return 'Active';
+    case 'resolved':
+      return 'Resolved';
+    case 'all':
+      return 'All';
   }
 }
 
@@ -1627,4 +2549,17 @@ function buildRecommendationAuditHref(
 ): string {
   const query = buildAuditFilterQuery(filters);
   return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
+}
+
+function buildMetricAuditHref(key: SecurityDashboardMetric['key']): string {
+  switch (key) {
+    case 'deniedEvents':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ result: 'DENY' })}`;
+    case 'downloadDenied':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`;
+    case 'malwareBlocked':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`;
+    case 'dlpDetections':
+      return `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`;
+  }
 }

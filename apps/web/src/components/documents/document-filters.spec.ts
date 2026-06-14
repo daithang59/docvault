@@ -1,7 +1,7 @@
 import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { describe, expect, it } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
@@ -38,7 +38,7 @@ function renderWithQueryClient(element: ReactElement) {
 }
 
 describe('DocumentFilters', () => {
-  it('renders saved views alongside quick views and save controls', () => {
+  it('renders quick views, saved views, and filter controls', () => {
     const html = renderWithQueryClient(
       createElement(DocumentFilters, {
         filters: DEFAULT_DOCUMENT_FILTERS,
@@ -56,14 +56,19 @@ describe('DocumentFilters', () => {
       }),
     );
 
+    expect(html).toContain('Document views');
+    expect(html).toContain('All');
+    expect(html).toContain('Needs action');
     expect(html).toContain('Pending review');
     expect(html).toContain('Sensitive attention');
     expect(html).toContain('Action queue');
+    expect(html).toContain('Search documents');
+    expect(html).toContain('Filter');
     expect(html).toContain('Save view');
-    expect(html).toContain('Document views');
     expect(html).toContain('Search syntax: status:pending');
     expect(html).toContain('class:confidential');
     expect(html).toContain('file:report.pdf');
     expect(html).toContain('Recently updated');
+    expect(html).toContain('Reset all filters');
   });
 });

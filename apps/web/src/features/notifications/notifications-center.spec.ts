@@ -122,6 +122,14 @@ describe('buildNotificationCenterModel', () => {
         group: 'all',
         readState: 'all',
       },
+      {
+        actorNames: {
+          'approver-1': {
+            displayName: 'Approver One',
+            username: 'carol',
+          },
+        },
+      },
     );
 
     expect(model.items).toEqual([
@@ -132,7 +140,7 @@ describe('buildNotificationCenterModel', () => {
         description: 'Missing retention evidence',
         targetHref: '/documents/doc-5',
         actionLabel: 'Open document',
-        workflowSummary: 'PENDING -> DRAFT by approver-1',
+        workflowSummary: 'PENDING -> DRAFT by carol',
       }),
     ]);
   });

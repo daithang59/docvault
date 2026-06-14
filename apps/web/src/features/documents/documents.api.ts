@@ -217,6 +217,13 @@ export async function setApprovalChain(
   });
 }
 
+export async function getDocumentApprovers(id: string): Promise<string[]> {
+  const res = await apiClient.get<{ userIds: string[] }>(
+    apiEndpoints.metadata.documents.approvers(id),
+  );
+  return unwrap(res).userIds ?? [];
+}
+
 export async function getWorkflowHistory(id: string): Promise<WorkflowHistoryEntry[]> {
   const res = await apiClient.get<WorkflowHistoryEntry[]>(
     apiEndpoints.metadata.documents.workflowHistory(id),

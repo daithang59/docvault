@@ -1,5 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { getComplianceEvidencePacket, getDocument } from './documents.api';
+import {
+  getComplianceEvidencePacket,
+  getDocument,
+  getDocumentApprovers,
+} from './documents.api';
 
 const apiClientMock = vi.hoisted(() => ({
   get: vi.fn(),
@@ -54,5 +58,18 @@ describe('documents API sensitive actions', () => {
       },
     );
     expect(result).toBe(packet);
+  });
+
+  it('loads approver-role user IDs for an approval chain picker', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: { userIds: ['approver-1', 'admin-1'] },
+    });
+
+    const result = await getDocumentApprovers('doc-1');
+
+    expect(apiClientMock.get).toHaveBeenCalledWith(
+      '/metadata/documents/doc-1/approvers',
+    );
+    expect(result).toEqual(['approver-1', 'admin-1']);
   });
 });
