@@ -140,13 +140,9 @@ def call(cfg = [:]) {
     }
 
     if (useNvdKey) {
-        try {
-            withCredentials([string(credentialsId: nvdKeyId, variable: 'NVD_API_KEY')]) {
-                runScan(true)
-            }
-        } catch (Exception e) {
-            echo "WARNING: Credential '${nvdKeyId}' not found or error accessing it. Running scan without API key (rate limits may apply)."
-            runScan(false)
+        echo ">>> Running scan with NVD API Key credential '${nvdKeyId}'..."
+        withCredentials([string(credentialsId: nvdKeyId, variable: 'NVD_API_KEY')]) {
+            runScan(true)
         }
     } else {
         echo ">>> Running scan without NVD API Key..."

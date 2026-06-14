@@ -191,7 +191,7 @@ pipeline {
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
 
-                    cfg.useNvdKey = params.USE_NVD_KEY
+                    cfg.useNvdKey = true
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
                     cfg.dependencyCheckDataDir = params.DEPENDENCY_CHECK_DATA_DIR?.trim()
 
@@ -237,6 +237,7 @@ pipeline {
                     echo ">>> KUBECONFIG_CREDENTIAL_ID=${cfg.kubeconfigCredentialId ?: '(not set)'}"
                     echo ">>> RUN_ZAP=${params.RUN_ZAP}"
                     echo ">>> ZAP_TARGET=${cfg.zapTarget ?: '(not set)'}"
+                    echo ">>> USE_NVD_KEY=${cfg.useNvdKey} (forced)"
                     echo ">>> DEPENDENCY_CHECK_NO_UPDATE=${cfg.dependencyCheckNoUpdate}"
                     echo ">>> DEPENDENCY_CHECK_DATA_DIR=${cfg.dependencyCheckDataDir ?: '(default)'}"
                 }
