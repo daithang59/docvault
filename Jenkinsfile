@@ -112,6 +112,11 @@ pipeline {
             defaultValue: false,
             description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
         )
+        booleanParam(
+            name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
+            defaultValue: true,
+            description: 'Temporarily continue the pipeline when Dependency Check fails. The stage/build will be marked unstable.'
+        )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
             defaultValue: '',
@@ -239,6 +244,7 @@ pipeline {
                     echo ">>> ZAP_TARGET=${cfg.zapTarget ?: '(not set)'}"
                     echo ">>> USE_NVD_KEY=${cfg.useNvdKey} (forced)"
                     echo ">>> DEPENDENCY_CHECK_NO_UPDATE=${cfg.dependencyCheckNoUpdate}"
+                    echo ">>> ALLOW_DEPENDENCY_CHECK_FAILURE=${params.ALLOW_DEPENDENCY_CHECK_FAILURE}"
                     echo ">>> DEPENDENCY_CHECK_DATA_DIR=${cfg.dependencyCheckDataDir ?: '(default)'}"
                 }
             }
@@ -361,7 +367,13 @@ pipeline {
                     }
                     steps {
                         script {
-                            dependencyCheck(cfg)
+                            if (params.ALLOW_DEPENDENCY_CHECK_FAILURE) {
+                                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                                    dependencyCheck(cfg)
+                                }
+                            } else {
+                                dependencyCheck(cfg)
+                            }
                         }
                     }
                 }
