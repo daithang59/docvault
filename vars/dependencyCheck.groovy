@@ -1,6 +1,7 @@
 def call(cfg = [:]) {
     echo '>>> Running SCA Scan...'
     echo '>>> Security gate policy: Dependency Check fails on CVSS >= 7 unless a written exception is created.'
+    echo '>>> Dependency Check helper: forced NVD key, pnpm audit disabled, console log capture enabled.'
 
     // Determine if we should attempt to use a credential
     def useNvdKey = cfg.useNvdKey ?: false
@@ -137,6 +138,7 @@ def call(cfg = [:]) {
                 --log /report/dependency-check.log \
                 --failOnCVSS 7 \
                 --disableKnownExploited \
+                --disablePnpmAudit \
                 $nvd_args \
                 ${DEPENDENCY_CHECK_UPDATE_FLAG:-} > "$dependency_check_console_log" 2>&1
             scan_status=$?
