@@ -25,6 +25,15 @@ export function parseAuditFilterQuery(
   setStringFilter(filters, 'documentId', params.get('documentId'));
   setStringFilter(filters, 'aclId', params.get('aclId'));
   setStringFilter(filters, 'recommendationId', params.get('recommendationId'));
+  setStringArrayFilter(filters, 'actions', params.get('actions'));
+  setStringArrayFilter(filters, 'actorIds', params.get('actorIds'));
+  setStringArrayFilter(filters, 'classifications', params.get('classifications'));
+  setStringArrayFilter(filters, 'documentIds', params.get('documentIds'));
+  setStringArrayFilter(
+    filters,
+    'recommendationIds',
+    params.get('recommendationIds'),
+  );
   setStringFilter(filters, 'from', params.get('from'));
   setStringFilter(filters, 'to', params.get('to'));
 
@@ -38,6 +47,22 @@ function setStringFilter<K extends keyof AuditQueryFilters>(
 ) {
   if (value) {
     filters[key] = value as AuditQueryFilters[K];
+  }
+}
+
+function setStringArrayFilter<K extends keyof AuditQueryFilters>(
+  filters: AuditQueryFilters,
+  key: K,
+  value: string | null,
+) {
+  if (!value) return;
+  const items = value
+    .split(',')
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  if (items.length > 0) {
+    filters[key] = items as AuditQueryFilters[K];
   }
 }
 

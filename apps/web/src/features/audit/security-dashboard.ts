@@ -39,6 +39,11 @@ export interface SecurityEvidenceTarget {
   label: string;
 }
 
+export interface SecurityDocumentTarget {
+  documentId: string;
+  href: string;
+}
+
 export interface SecurityDashboardMetric {
   key: keyof SecuritySummary['totals'];
   label: string;
@@ -53,6 +58,7 @@ export interface SecurityDashboardAlert {
   action: string;
   routing: SecurityAlertRouting;
   evidenceTarget: SecurityEvidenceTarget;
+  documentTargets?: SecurityDocumentTarget[];
 }
 
 export interface SecurityDashboardGaugeSummary {
@@ -128,10 +134,7 @@ export interface SecurityCaseWorkflowValidation {
   missingRequirements: string[];
 }
 
-export interface SecurityRecommendationDocumentRef {
-  documentId: string;
-  href: string;
-}
+export type SecurityRecommendationDocumentRef = SecurityDocumentTarget;
 
 export interface SecurityRecommendationRow
   extends Omit<SecurityRecommendationSummary, 'workflow'> {
@@ -337,6 +340,7 @@ export function buildSecurityDashboardModel(
   activity?: {
     downloadAuthorizedTotal?: number;
     sensitiveAccessEvents?: AuditLogEntry[];
+    recentEvents?: AuditLogEntry[];
   },
   options: SecurityDashboardModelOptions = {},
 ): SecurityDashboardModel {
@@ -351,6 +355,12 @@ export function buildSecurityDashboardModel(
   const sensitiveAccessEvents = (activity?.sensitiveAccessEvents ?? []).filter(
     isSensitiveAccessEvent,
   );
+  const recentEvents = activity?.recentEvents ?? [];
+  const dlpDocumentTargets = getDocumentTargetsFromEvents(
+    recentEvents.filter((event) => event.action === 'DLP_PATTERN_DETECTED'),
+  );
+  const sensitiveAccessDocumentTargets =
+    getDocumentTargetsFromEvents(sensitiveAccessEvents);
   const downloadAuthorizedTotal = activity?.downloadAuthorizedTotal ?? 0;
   const riskyDocuments = buildRiskScoringRows(summary?.riskyDocuments ?? []);
   const behaviorSignals = buildBehaviorSignalRows(
@@ -418,6 +428,7 @@ export function buildSecurityDashboardModel(
         href: '#security-recent-events',
         label: 'View related events',
       },
+      documentTargets: dlpDocumentTargets,
     });
   }
 
@@ -446,6 +457,7 @@ export function buildSecurityDashboardModel(
         href: '#security-access-activity',
         label: 'View access activity',
       },
+      documentTargets: sensitiveAccessDocumentTargets,
     });
   }
 
@@ -460,6 +472,7 @@ export function buildSecurityDashboardModel(
         href: '#security-access-activity',
         label: 'View access activity',
       },
+      documentTargets: sensitiveAccessDocumentTargets,
     });
   }
 
@@ -474,6 +487,10 @@ export function buildSecurityDashboardModel(
         href: '#security-risk-scoring',
         label: 'View document evidence',
       },
+      documentTargets: riskyDocuments.map((document) => ({
+        documentId: document.documentId,
+        href: document.documentHref,
+      })),
     });
   }
 
@@ -598,19 +615,39 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
 
   if (filters.result) params.set('result', filters.result);
   if (filters.action) params.set('action', filters.action);
+  setArrayQueryParam(params, 'actions', filters.actions);
   if (filters.actionGroup) params.set('actionGroup', filters.actionGroup);
   if (filters.actorId) params.set('actorId', filters.actorId);
+  setArrayQueryParam(params, 'actorIds', filters.actorIds);
   if (filters.resourceType) params.set('resourceType', filters.resourceType);
   if (filters.resourceId) params.set('resourceId', filters.resourceId);
   if (filters.documentId) params.set('documentId', filters.documentId);
+  setArrayQueryParam(params, 'documentIds', filters.documentIds);
   if (filters.aclId) params.set('aclId', filters.aclId);
   if (filters.recommendationId) {
     params.set('recommendationId', filters.recommendationId);
   }
+  setArrayQueryParam(params, 'recommendationIds', filters.recommendationIds);
+  setArrayQueryParam(params, 'classifications', filters.classifications);
   if (filters.from) params.set('from', filters.from);
   if (filters.to) params.set('to', filters.to);
 
   return params.toString();
+}
+
+function setArrayQueryParam(
+  params: URLSearchParams,
+  key: string,
+  values?: string[],
+) {
+  if (values && values.length > 0) {
+    params.set(key, values.join(','));
+  }
+}
+
+function buildAuditHref(filters: AuditQueryFilters): string {
+  const query = buildAuditFilterQuery(filters);
+  return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
 }
 
 export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
@@ -626,15 +663,32 @@ export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
 }
 
 export function getAuditEventDocumentHref(event: AuditLogEntry): string | null {
+  const documentId = getAuditEventDocumentId(event);
+  return documentId ? ROUTES.DOCUMENT_DETAIL(documentId) : null;
+}
+
+function getAuditEventDocumentId(event: AuditLogEntry): string | null {
   const metadataDocId = event.metadata?.docId ?? event.metadata?.documentId;
-  const documentId =
+  return (
     typeof metadataDocId === 'string'
       ? metadataDocId
       : event.resourceType === 'DOCUMENT' && event.resourceId
         ? event.resourceId
-        : null;
+        : null
+  );
+}
 
-  return documentId ? ROUTES.DOCUMENT_DETAIL(documentId) : null;
+function getDocumentTargetsFromEvents(
+  events: AuditLogEntry[],
+): SecurityDocumentTarget[] {
+  return uniqueStrings(
+    events
+      .map((event) => getAuditEventDocumentId(event))
+      .filter((documentId): documentId is string => Boolean(documentId)),
+  ).map((documentId) => ({
+    documentId,
+    href: ROUTES.DOCUMENT_DETAIL(documentId),
+  }));
 }
 
 function buildBehaviorSignalRows(
@@ -813,6 +867,11 @@ function buildRiskBandSegments(
 ): SecurityDashboardSegment[] {
   const counts = countRiskBands(rows);
   const total = rows.length;
+  const documentIdsByBand = {
+    critical: getDocumentIdsForRiskBand(rows, 'critical'),
+    warning: getDocumentIdsForRiskBand(rows, 'warning'),
+    watch: getDocumentIdsForRiskBand(rows, 'watch'),
+  };
 
   return [
     {
@@ -821,7 +880,7 @@ function buildRiskBandSegments(
       value: counts.critical,
       percentage: toPercentage(counts.critical, total),
       tone: 'critical',
-      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+      href: buildAuditHref({ documentIds: documentIdsByBand.critical }),
     },
     {
       key: 'warning',
@@ -829,7 +888,7 @@ function buildRiskBandSegments(
       value: counts.warning,
       percentage: toPercentage(counts.warning, total),
       tone: 'warning',
-      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+      href: buildAuditHref({ documentIds: documentIdsByBand.warning }),
     },
     {
       key: 'watch',
@@ -837,7 +896,7 @@ function buildRiskBandSegments(
       value: counts.watch,
       percentage: toPercentage(counts.watch, total),
       tone: 'info',
-      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ resourceType: 'DOCUMENT' })}`,
+      href: buildAuditHref({ documentIds: documentIdsByBand.watch }),
     },
   ];
 }
@@ -847,6 +906,11 @@ function buildAnomalyBandSegments(
 ): SecurityDashboardSegment[] {
   const counts = countRiskBands(rows);
   const total = rows.length;
+  const filtersByBand = {
+    critical: buildBehaviorSignalBandFilters(rows, 'critical'),
+    warning: buildBehaviorSignalBandFilters(rows, 'warning'),
+    watch: buildBehaviorSignalBandFilters(rows, 'watch'),
+  };
 
   return [
     {
@@ -855,7 +919,7 @@ function buildAnomalyBandSegments(
       value: counts.critical,
       percentage: toPercentage(counts.critical, total),
       tone: 'critical',
-      href: ROUTES.AUDIT,
+      href: buildAuditHref(filtersByBand.critical),
     },
     {
       key: 'warning',
@@ -863,7 +927,7 @@ function buildAnomalyBandSegments(
       value: counts.warning,
       percentage: toPercentage(counts.warning, total),
       tone: 'warning',
-      href: ROUTES.AUDIT,
+      href: buildAuditHref(filtersByBand.warning),
     },
     {
       key: 'watch',
@@ -871,7 +935,7 @@ function buildAnomalyBandSegments(
       value: counts.watch,
       percentage: toPercentage(counts.watch, total),
       tone: 'info',
-      href: ROUTES.AUDIT,
+      href: buildAuditHref(filtersByBand.watch),
     },
   ];
 }
@@ -893,6 +957,13 @@ function buildRecommendationSlaSegments(
     },
   );
   const total = rows.length;
+  const recommendationIdsByState = {
+    overdue: getRecommendationIdsForSlaState(rows, 'overdue'),
+    'due-soon': getRecommendationIdsForSlaState(rows, 'due-soon'),
+    'on-track': getRecommendationIdsForSlaState(rows, 'on-track'),
+    'not-started': getRecommendationIdsForSlaState(rows, 'not-started'),
+    closed: getRecommendationIdsForSlaState(rows, 'closed'),
+  };
 
   return [
     {
@@ -901,7 +972,9 @@ function buildRecommendationSlaSegments(
       value: counts.overdue,
       percentage: toPercentage(counts.overdue, total),
       tone: 'critical',
-      href: '#security-recommendations',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState.overdue,
+      }),
     },
     {
       key: 'due-soon',
@@ -909,7 +982,9 @@ function buildRecommendationSlaSegments(
       value: counts['due-soon'],
       percentage: toPercentage(counts['due-soon'], total),
       tone: 'warning',
-      href: '#security-recommendations',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['due-soon'],
+      }),
     },
     {
       key: 'on-track',
@@ -917,7 +992,9 @@ function buildRecommendationSlaSegments(
       value: counts['on-track'],
       percentage: toPercentage(counts['on-track'], total),
       tone: 'info',
-      href: '#security-recommendations',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['on-track'],
+      }),
     },
     {
       key: 'not-started',
@@ -925,7 +1002,9 @@ function buildRecommendationSlaSegments(
       value: counts['not-started'],
       percentage: toPercentage(counts['not-started'], total),
       tone: 'warning',
-      href: '#security-recommendations',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['not-started'],
+      }),
     },
     {
       key: 'closed',
@@ -933,7 +1012,9 @@ function buildRecommendationSlaSegments(
       value: counts.closed,
       percentage: toPercentage(counts.closed, total),
       tone: 'success',
-      href: '#security-recommendations',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState.closed,
+      }),
     },
   ];
 }
@@ -951,7 +1032,7 @@ function buildAccessSegments(
       value: downloadAuthorizedTotal,
       percentage: toPercentage(downloadAuthorizedTotal, baseline),
       tone: downloadAuthorizedTotal >= 10 ? 'warning' : 'info',
-      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_AUTHORIZED' })}`,
+      href: buildAuditHref({ action: 'DOCUMENT_DOWNLOAD_AUTHORIZED' }),
     },
     {
       key: 'sensitive-access',
@@ -959,9 +1040,72 @@ function buildAccessSegments(
       value: sensitiveAccessCount,
       percentage: toPercentage(sensitiveAccessCount, baseline),
       tone: sensitiveAccessCount > 0 ? 'warning' : 'success',
-      href: ROUTES.AUDIT,
+      href: buildAuditHref({
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        classifications: ['SECRET', 'CONFIDENTIAL'],
+      }),
     },
   ];
+}
+
+function getDocumentIdsForRiskBand(
+  rows: SecurityRiskScoringRow[],
+  riskBand: SecurityRiskBand,
+): string[] {
+  return rows
+    .filter((row) => row.riskBand === riskBand)
+    .map((row) => row.documentId);
+}
+
+function buildBehaviorSignalBandFilters(
+  rows: SecurityBehaviorSignalRow[],
+  riskBand: SecurityRiskBand,
+): AuditQueryFilters {
+  const bandRows = rows.filter((row) => row.riskBand === riskBand);
+  const actorIds = uniqueStrings(bandRows.map((row) => row.actorId));
+  const actionGroups = uniqueStrings(
+    bandRows
+      .map((row) => row.auditFilters.actionGroup)
+      .filter((value): value is NonNullable<AuditQueryFilters['actionGroup']> =>
+        Boolean(value),
+      ),
+  );
+  const results = uniqueStrings(
+    bandRows
+      .map((row) => row.auditFilters.result)
+      .filter((value): value is NonNullable<AuditQueryFilters['result']> =>
+        Boolean(value),
+      ),
+  );
+  const starts = bandRows
+    .map((row) => row.auditFilters.from)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+  const ends = bandRows
+    .map((row) => row.auditFilters.to)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  return {
+    ...(results.length === 1 ? { result: results[0] } : {}),
+    ...(actionGroups.length === 1 ? { actionGroup: actionGroups[0] } : {}),
+    actorIds,
+    ...(starts.length > 0 ? { from: starts[0] } : {}),
+    ...(ends.length > 0 ? { to: ends[ends.length - 1] } : {}),
+  };
+}
+
+function getRecommendationIdsForSlaState(
+  rows: SecurityRecommendationRow[],
+  slaState: SecurityRecommendationSlaState,
+): string[] {
+  return rows
+    .filter((row) => row.playbook.slaState === slaState)
+    .map((row) => row.id);
+}
+
+function uniqueStrings<T extends string>(values: T[]): T[] {
+  return [...new Set(values)];
 }
 
 function countRiskBands<T extends { riskBand: SecurityRiskBand }>(

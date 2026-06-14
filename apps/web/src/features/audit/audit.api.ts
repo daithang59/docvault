@@ -37,19 +37,28 @@ function toAuditQueryParams(
 
   return {
     actorId: filters.actorId,
+    actorIds: toCommaList(filters.actorIds),
     action: filters.action,
+    actions: toCommaList(filters.actions),
     actionGroup: filters.actionGroup,
     resourceType: filters.resourceType ?? filters.targetType,
     resourceId: filters.resourceId ?? filters.targetId,
     documentId: filters.documentId,
+    documentIds: toCommaList(filters.documentIds),
     aclId: filters.aclId,
     recommendationId: filters.recommendationId,
+    recommendationIds: toCommaList(filters.recommendationIds),
+    classifications: toCommaList(filters.classifications),
     result: filters.result,
     from: filters.from ? new Date(filters.from).toISOString() : undefined,
     to: filters.to ? new Date(filters.to).toISOString() : undefined,
     page,
     pageSize,
   };
+}
+
+function toCommaList(values?: string[]): string | undefined {
+  return values && values.length > 0 ? values.join(',') : undefined;
 }
 
 function normalizeAuditLogEntry(entry: AuditLogEntry): AuditLogEntry {
