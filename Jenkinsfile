@@ -336,7 +336,7 @@ pipeline {
         stage('Install') {
             when {
                 expression {
-                    return env.RUN_APP_CI == 'true'
+                    return env.IS_RELEASE_BUILD != 'true' && env.RUN_APP_CI == 'true'
                 }
             }
             steps {
@@ -347,6 +347,11 @@ pipeline {
         }
 
         stage('Secret Scan') {
+            when {
+                expression {
+                    return env.IS_RELEASE_BUILD != 'true'
+                }
+            }
             steps {
                 script {
                     echo '>>> Entering Secret Scan stage...'
@@ -359,7 +364,7 @@ pipeline {
         stage('Pre-build Quality') {
             when {
                 expression {
-                    return env.RUN_APP_CI == 'true'
+                    return env.IS_RELEASE_BUILD != 'true' && env.RUN_APP_CI == 'true'
                 }
             }
             stages {
@@ -396,7 +401,7 @@ pipeline {
         stage('Pre-build Security Gates') {
             when {
                 expression {
-                    return env.RUN_SECURITY_CI == 'true' || env.RUN_IAC_CI == 'true'
+                    return env.IS_RELEASE_BUILD != 'true' && (env.RUN_SECURITY_CI == 'true' || env.RUN_IAC_CI == 'true')
                 }
             }
             parallel {
