@@ -30,6 +30,8 @@ resources:
 env:
   NODE_ENV: production
 
+envValueFrom: []
+
 envFrom: []
 
 migration:
