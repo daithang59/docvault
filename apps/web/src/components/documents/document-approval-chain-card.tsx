@@ -14,6 +14,7 @@ import {
 import type { DocumentDetail } from '@/features/documents/documents.types';
 import {
   buildApprovalChainModel,
+  canEditApprovalChain,
   createApprovalChainDraft,
   hasDuplicateApprovalChainApprovers,
   moveApprovalChainApprover,
@@ -43,10 +44,11 @@ export function DocumentApprovalChainCard({
   const [draftApprovers, setDraftApprovers] = useState(() =>
     createApprovalChainDraft(model.steps.map((s) => s.approverId)),
   );
+  const canEditChain = canEditApprovalChain(document, canManage);
 
   const approverIds = model.steps.map((s) => s.approverId);
   const { data: displayNames } = useOwnerDisplayNames(approverIds);
-  const approverDirectory = useDocumentApprovers(document.id, canManage && editing);
+  const approverDirectory = useDocumentApprovers(document.id, canEditChain && editing);
   const pickerUserIds = useMemo(
     () => (approverDirectory.isError ? undefined : (approverDirectory.data ?? [])),
     [approverDirectory.data, approverDirectory.isError],
@@ -85,7 +87,7 @@ export function DocumentApprovalChainCard({
           <ListOrdered className="h-4 w-4 text-[var(--color-primary)]" />
           Approval chain
         </h2>
-        {canManage && !editing && (
+        {canEditChain && !editing && (
           <button
             type="button"
             onClick={() => {

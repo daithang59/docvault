@@ -15,6 +15,7 @@ import { DocumentFilters } from '@/components/documents/document-filters';
 import { DocumentFolderTree } from '@/components/documents/document-folder-tree';
 import { DocumentPreviewPanel } from '@/components/documents/document-preview-panel';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
@@ -419,7 +420,7 @@ export default function DocumentsPage() {
             segments={commandCenter.classificationSegments}
           />
         ) : null}
-        <PriorityBarList
+        <ColumnBarChart
           className="animate-in delay-3"
           label="Lifecycle pipeline"
           segments={commandCenter.lifecycleSegments}

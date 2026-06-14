@@ -34,6 +34,11 @@ export interface SecurityAlertRouting {
   score: SecurityAlertRoutingScore;
 }
 
+export interface SecurityEvidenceTarget {
+  href: string;
+  label: string;
+}
+
 export interface SecurityDashboardMetric {
   key: keyof SecuritySummary['totals'];
   label: string;
@@ -47,6 +52,7 @@ export interface SecurityDashboardAlert {
   description: string;
   action: string;
   routing: SecurityAlertRouting;
+  evidenceTarget: SecurityEvidenceTarget;
 }
 
 export interface SecurityDashboardGaugeSummary {
@@ -80,6 +86,7 @@ export interface SecurityRiskScoringRow extends RiskyDocumentSummary {
   riskBand: SecurityRiskBand;
   riskLabel: string;
   auditFilters: AuditQueryFilters;
+  documentHref: string;
 }
 
 export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
@@ -121,6 +128,11 @@ export interface SecurityCaseWorkflowValidation {
   missingRequirements: string[];
 }
 
+export interface SecurityRecommendationDocumentRef {
+  documentId: string;
+  href: string;
+}
+
 export interface SecurityRecommendationRow
   extends Omit<SecurityRecommendationSummary, 'workflow'> {
   workflow: SecurityRecommendationWorkflow;
@@ -129,6 +141,7 @@ export interface SecurityRecommendationRow
   typeLabel: string;
   finding: SecurityRecommendationFinding;
   auditFilters: AuditQueryFilters;
+  affectedDocuments: SecurityRecommendationDocumentRef[];
 }
 
 export type SecurityRecommendationQueueView = 'active' | 'resolved' | 'all';
@@ -355,6 +368,10 @@ export function buildSecurityDashboardModel(
       description: summary.chain.message ?? 'Hash-chain verification reported a broken audit chain.',
       action: 'Verify tamper evidence before trusting audit exports.',
       routing: buildDashboardAlertRouting('AUDIT_CHAIN_INVALID'),
+      evidenceTarget: {
+        href: '#security-posture',
+        label: 'View posture evidence',
+      },
     });
   }
 
@@ -369,6 +386,10 @@ export function buildSecurityDashboardModel(
       description: `${compromisedEpochCount} previous audit epoch${compromisedEpochCount === 1 ? ' is' : 's are'} marked compromised.`,
       action: 'Review the incident-linked audit epoch before exporting historical evidence.',
       routing: buildDashboardAlertRouting('HISTORICAL_AUDIT_EPOCH_COMPROMISED'),
+      evidenceTarget: {
+        href: '#security-posture',
+        label: 'View posture evidence',
+      },
     });
   }
 
@@ -379,6 +400,10 @@ export function buildSecurityDashboardModel(
       description: `${totals.malwareBlocked} upload attempt${totals.malwareBlocked === 1 ? '' : 's'} were blocked before storage.`,
       action: 'Review the upload actor, checksum, and source document.',
       routing: buildDashboardAlertRouting('MALWARE_BLOCKED'),
+      evidenceTarget: {
+        href: '#security-recent-events',
+        label: 'View related events',
+      },
     });
   }
 
@@ -389,6 +414,10 @@ export function buildSecurityDashboardModel(
       description: `${totals.dlpDetections} DLP detection${totals.dlpDetections === 1 ? '' : 's'} require classification review.`,
       action: 'Confirm classification escalation and prevent unsafe downgrades.',
       routing: buildDashboardAlertRouting('DLP_DETECTED'),
+      evidenceTarget: {
+        href: '#security-recent-events',
+        label: 'View related events',
+      },
     });
   }
 
@@ -399,6 +428,10 @@ export function buildSecurityDashboardModel(
       description: `${summary?.repeatedDenyActors.length ?? 0} actor${summary?.repeatedDenyActors.length === 1 ? '' : 's'} crossed the deny threshold.`,
       action: 'Review account activity',
       routing: buildDashboardAlertRouting('REPEATED_DENY'),
+      evidenceTarget: {
+        href: '#security-repeated-deny-actors',
+        label: 'View related actors',
+      },
     });
   }
 
@@ -409,6 +442,10 @@ export function buildSecurityDashboardModel(
       description: `${downloadAuthorizedTotal} successful download authorization${downloadAuthorizedTotal === 1 ? '' : 's'} are present in the audit window.`,
       action: 'Review high-volume document access before evidence export.',
       routing: buildDashboardAlertRouting('HIGH_DOWNLOAD_VOLUME'),
+      evidenceTarget: {
+        href: '#security-access-activity',
+        label: 'View access activity',
+      },
     });
   }
 
@@ -419,6 +456,10 @@ export function buildSecurityDashboardModel(
       description: `${sensitiveAccessEvents.length} recent CONFIDENTIAL/SECRET preview or download event${sensitiveAccessEvents.length === 1 ? '' : 's'} need review.`,
       action: 'Confirm access intent, actor role, and document classification.',
       routing: buildDashboardAlertRouting('SENSITIVE_ACCESS'),
+      evidenceTarget: {
+        href: '#security-access-activity',
+        label: 'View access activity',
+      },
     });
   }
 
@@ -429,6 +470,10 @@ export function buildSecurityDashboardModel(
       description: 'One or more sensitive documents have elevated access frequency or actor spread.',
       action: 'Review the risk scoring panel and open document-scoped audit evidence.',
       routing: buildDashboardAlertRouting('HIGH_RISK_DOCUMENT_ACTIVITY'),
+      evidenceTarget: {
+        href: '#security-risk-scoring',
+        label: 'View document evidence',
+      },
     });
   }
 
@@ -446,6 +491,10 @@ export function buildSecurityDashboardModel(
           ? 'CRITICAL_BEHAVIOR_ANOMALY'
           : 'BEHAVIOR_ANOMALY',
       ),
+      evidenceTarget: {
+        href: '#security-behavior-anomalies',
+        label: 'View behavior evidence',
+      },
     });
   }
 
@@ -574,6 +623,18 @@ export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
 
   const classification = String(event.metadata?.classification ?? '').toUpperCase();
   return classification === 'CONFIDENTIAL' || classification === 'SECRET';
+}
+
+export function getAuditEventDocumentHref(event: AuditLogEntry): string | null {
+  const metadataDocId = event.metadata?.docId ?? event.metadata?.documentId;
+  const documentId =
+    typeof metadataDocId === 'string'
+      ? metadataDocId
+      : event.resourceType === 'DOCUMENT' && event.resourceId
+        ? event.resourceId
+        : null;
+
+  return documentId ? ROUTES.DOCUMENT_DETAIL(documentId) : null;
 }
 
 function buildBehaviorSignalRows(
@@ -951,6 +1012,10 @@ function buildRecommendationRows(
         auditFilters: recommendation.auditFilters ?? {},
         workflow,
         playbook: buildRecommendationPlaybook(recommendation, workflow, now),
+        affectedDocuments: recommendation.affectedDocumentIds.map((documentId) => ({
+          documentId,
+          href: ROUTES.DOCUMENT_DETAIL(documentId),
+        })),
       };
     })
     .sort(
@@ -1479,6 +1544,7 @@ function buildRiskScoringRows(
       riskBand,
       riskLabel: getRiskLabel(riskBand),
       auditFilters: { documentId: document.documentId },
+      documentHref: ROUTES.DOCUMENT_DETAIL(document.documentId),
     };
   });
 }

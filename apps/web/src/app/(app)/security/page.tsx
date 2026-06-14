@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
@@ -59,6 +60,7 @@ import {
   buildRecommendationEvidencePacket,
   buildSecurityCaseWorkflowNote,
   filterSecurityRecommendationRows,
+  getAuditEventDocumentHref,
   getSecurityRecommendationQueueCounts,
   getSecurityRouteCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
@@ -117,6 +119,10 @@ function humanizeActorText(text: string, names: ActorNameMap): string {
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
 const SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT = 5;
 const SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT = 4;
+const SECURITY_PANEL_TARGET_CLASS =
+  'scroll-mt-24 transition target:ring-2 target:ring-[var(--color-primary)] target:ring-offset-2';
+const SECURITY_SECONDARY_ACTION_CLASS =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]';
 const recommendationWorkflowOptions: Array<{
   value: SecurityRecommendationWorkflowStatus;
   label: string;
@@ -460,7 +466,7 @@ export default function SecurityPage() {
           label="Alert distribution"
           segments={model.commandCenter.alertSegments}
         />
-        <PriorityBarList
+        <ColumnBarChart
           label="Document risk bands"
           segments={model.commandCenter.riskBandSegments}
         />
@@ -653,7 +659,7 @@ function RecommendationsPanel({
   return (
     <div
       id="security-recommendations"
-      className="rounded-lg border p-5"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -718,6 +724,7 @@ function RecommendationsPanel({
               const tone = getRecommendationTone(item.severity);
               const isSelected = selectedRecommendationId === item.id;
               const isCase = item.finding.routing.route === 'CASE';
+              const firstDocument = item.affectedDocuments[0] ?? null;
               const primaryActionLabel = isSelected
                 ? 'Hide details'
                 : isCase
@@ -772,6 +779,15 @@ function RecommendationsPanel({
                       >
                         {primaryActionLabel}
                       </button>
+                      {firstDocument ? (
+                        <Link
+                          href={firstDocument.href}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                        >
+                          Open document
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      ) : null}
                       <Link
                         href={buildRecommendationAuditHref(item.auditFilters)}
                         className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
@@ -930,13 +946,24 @@ function RecommendationDetailPanel({
                 {item.finding.routing.routeDescription}
               </p>
             </div>
-            <Link
-              href={buildRecommendationAuditHref(item.auditFilters)}
-              className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-            >
-              Open audit
-              <ExternalLink className="h-4 w-4" />
-            </Link>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {item.affectedDocuments[0] ? (
+                <Link
+                  href={item.affectedDocuments[0].href}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                >
+                  Open document
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              ) : null}
+              <Link
+                href={buildRecommendationAuditHref(item.auditFilters)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                Open audit
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -1005,15 +1032,16 @@ function RecommendationDetailPanel({
             </div>
           </div>
 
-          {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
+          {item.affectedDocuments.length || item.affectedActorIds.length ? (
             <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-              {item.affectedDocumentIds.map((docId) => (
-                <span
-                  key={docId}
-                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono"
+              {item.affectedDocuments.map((document) => (
+                <Link
+                  key={document.documentId}
+                  href={document.href}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
                 >
-                  doc {truncateMiddle(docId, 18)}
-                </span>
+                  doc {truncateMiddle(document.documentId, 18)}
+                </Link>
               ))}
               {item.affectedActorIds.map((actorId) => (
                 <span
@@ -1664,7 +1692,8 @@ function PosturePanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-posture"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1800,6 +1829,13 @@ function AlertsPanel({
               <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
                 {alert.action}
               </p>
+              <Link
+                href={alert.evidenceTarget.href}
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {alert.evidenceTarget.label}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
             </div>
           ))}
         </div>
@@ -1829,7 +1865,8 @@ function AccessActivityPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-access-activity"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1878,26 +1915,40 @@ function AccessActivityPanel({
       {!isLoading && !isError && sensitiveAccessEvents.length > 0 ? (
         <>
           <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-            {sensitiveEvents.map((event) => (
-              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                    {event.action}
+            {sensitiveEvents.map((event) => {
+              const documentHref = getAuditEventDocumentHref(event);
+
+              return (
+                <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                      {event.action}
+                    </p>
+                    <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
+                      {getClassificationLabel(event)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                   </p>
-                  <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
-                    {getClassificationLabel(event)}
-                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                    <span>
+                      {event.resourceId
+                        ? `Document ${truncateMiddle(event.resourceId, 20)}`
+                        : event.resourceType}
+                    </span>
+                    {documentHref ? (
+                      <Link
+                        href={documentHref}
+                        className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                      >
+                        Open document
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-faint)]">
-                  {event.resourceId
-                    ? `Document ${truncateMiddle(event.resourceId, 20)}`
-                    : event.resourceType}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {sensitiveAccessEvents.length > SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT ? (
             <ShowMoreListToggle
@@ -1923,7 +1974,8 @@ function RecentSecurityEvents({
 }) {
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-recent-events"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1939,24 +1991,36 @@ function RecentSecurityEvents({
       )}
       {!isLoading && !isError && events.length > 0 && (
         <div className="mt-3 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {events.map((event) => (
-            <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                  {event.action}
+          {events.map((event) => {
+            const documentHref = getAuditEventDocumentHref(event);
+
+            return (
+              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                    {event.action}
+                  </p>
+                  <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                    {event.result}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                 </p>
-                <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                  {event.result}
-                </span>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                  <span>{event.reason ?? event.resourceType}</span>
+                  {documentHref ? (
+                    <Link
+                      href={documentHref}
+                      className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                    >
+                      Open document
+                    </Link>
+                  ) : null}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-faint)]">
-                {event.reason ?? event.resourceType}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1979,7 +2043,8 @@ function RepeatedActorsPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-repeated-deny-actors"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -2037,7 +2102,8 @@ function RiskScoringPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-risk-scoring"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -2117,13 +2183,22 @@ function RiskScoringPanel({
                         {document.reasons.join(' · ')}
                       </p>
                     </div>
-                    <Link
-                      href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                    >
-                      Open audit
-                      <ExternalLink className="h-4 w-4" />
-                    </Link>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Link
+                        href={document.documentHref}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open document
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open audit
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               );
@@ -2159,7 +2234,8 @@ function BehaviorAnomaliesPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-behavior-anomalies"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -2241,7 +2317,7 @@ function BehaviorAnomaliesPanel({
                     </div>
                     <Link
                       href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                      className={SECURITY_SECONDARY_ACTION_CLASS}
                     >
                       Open audit
                       <ExternalLink className="h-4 w-4" />

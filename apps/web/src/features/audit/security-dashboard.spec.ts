@@ -11,6 +11,7 @@ import {
   buildSecurityCaseWorkflowNote,
   buildSecurityDashboardModel,
   filterSecurityRecommendationRows,
+  getAuditEventDocumentHref,
   getSecurityRecommendationQueueCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
   validateSecurityCaseWorkflowDraft,
@@ -155,6 +156,29 @@ describe('buildSecurityDashboardModel', () => {
       'DLP detections recorded',
       'Repeated denied access',
     ]);
+    expect(model.alerts.map((alert) => [alert.title, alert.evidenceTarget])).toEqual([
+      [
+        'Malware upload blocked',
+        {
+          href: '#security-recent-events',
+          label: 'View related events',
+        },
+      ],
+      [
+        'DLP detections recorded',
+        {
+          href: '#security-recent-events',
+          label: 'View related events',
+        },
+      ],
+      [
+        'Repeated denied access',
+        {
+          href: '#security-repeated-deny-actors',
+          label: 'View related actors',
+        },
+      ],
+    ]);
     expect(model.repeatedDenyActors[0]).toEqual({
       actorId: 'viewer-1',
       denyCount: 4,
@@ -181,6 +205,64 @@ describe('buildSecurityDashboardModel', () => {
       'High download volume',
       'Sensitive document access',
     ]);
+  });
+
+  it('exposes direct document targets on document-backed alert cards', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        totals: {
+          deniedEvents: 0,
+          malwareBlocked: 0,
+          dlpDetections: 1,
+          downloadDenied: 0,
+        },
+        riskyDocuments: [
+          {
+            documentId: 'doc-risky',
+            classification: 'SECRET',
+            accessCount: 4,
+            actorCount: 2,
+            latestAccessAt: '2026-05-30T10:15:00.000Z',
+            riskScore: 95,
+            reasons: ['SECRET classification'],
+          },
+        ],
+      }),
+      {
+        downloadAuthorizedTotal: 12,
+        sensitiveAccessEvents: [
+          auditEvent({
+            eventId: 'event-secret',
+            resourceId: 'doc-sensitive',
+            metadata: { classification: 'SECRET' },
+          }),
+        ],
+        recentEvents: [
+          auditEvent({
+            eventId: 'event-dlp',
+            action: 'DLP_PATTERN_DETECTED',
+            resourceId: 'doc-dlp',
+          }),
+        ],
+      },
+    );
+
+    expect(
+      model.alerts.find((alert) => alert.title === 'DLP detections recorded')
+        ?.documentTargets,
+    ).toEqual([{ documentId: 'doc-dlp', href: '/documents/doc-dlp' }]);
+    expect(
+      model.alerts.find((alert) => alert.title === 'High download volume')
+        ?.documentTargets,
+    ).toEqual([{ documentId: 'doc-sensitive', href: '/documents/doc-sensitive' }]);
+    expect(
+      model.alerts.find((alert) => alert.title === 'Sensitive document access')
+        ?.documentTargets,
+    ).toEqual([{ documentId: 'doc-sensitive', href: '/documents/doc-sensitive' }]);
+    expect(
+      model.alerts.find((alert) => alert.title === 'High-risk document activity')
+        ?.documentTargets,
+    ).toEqual([{ documentId: 'doc-risky', href: '/documents/doc-risky' }]);
   });
 
   it('returns healthy posture when no security counters are raised', () => {
@@ -225,6 +307,7 @@ describe('buildSecurityDashboardModel', () => {
       riskScore: 95,
       riskBand: 'critical',
       auditFilters: { documentId: 'doc-secret' },
+      documentHref: '/documents/doc-secret',
     });
     expect(
       buildAuditFilterQuery(model.riskScoring.riskyDocuments[0].auditFilters),
@@ -271,10 +354,45 @@ describe('buildSecurityDashboardModel', () => {
       'Behavior anomaly detected',
     );
     expect(
+      model.alerts.find((alert) => alert.title === 'Behavior anomaly detected')
+        ?.evidenceTarget,
+    ).toEqual({
+      href: '#security-behavior-anomalies',
+      label: 'View behavior evidence',
+    });
+    expect(
       buildAuditFilterQuery(model.behaviorAnomalies.signals[0].auditFilters),
     ).toBe(
       'actionGroup=AUTHORIZED_CONTENT_ACCESS&actorId=editor-1&from=2026-05-30T10%3A00%3A00.000Z&to=2026-05-30T10%3A08%3A00.000Z',
     );
+  });
+
+  it('builds direct document links from document-scoped audit events', () => {
+    expect(
+      getAuditEventDocumentHref(
+        auditEvent({
+          resourceType: 'DOCUMENT',
+          resourceId: 'doc-secret',
+        }),
+      ),
+    ).toBe('/documents/doc-secret');
+    expect(
+      getAuditEventDocumentHref(
+        auditEvent({
+          resourceType: 'USER',
+          resourceId: 'viewer-1',
+          metadata: { docId: 'doc-from-metadata' },
+        }),
+      ),
+    ).toBe('/documents/doc-from-metadata');
+    expect(
+      getAuditEventDocumentHref(
+        auditEvent({
+          resourceType: 'USER',
+          resourceId: 'viewer-1',
+        }),
+      ),
+    ).toBeNull();
   });
 
   it('builds command-center presentation data for security visuals', () => {
@@ -437,21 +555,70 @@ describe('buildSecurityDashboardModel', () => {
       expect.objectContaining({ key: 'dlp-detections', value: 2, percentage: 15 }),
     ]);
     expect(commandCenter.riskBandSegments).toEqual([
-      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
-      expect.objectContaining({ key: 'warning', value: 1, percentage: 33 }),
-      expect.objectContaining({ key: 'watch', value: 1, percentage: 33 }),
+      expect.objectContaining({
+        key: 'critical',
+        value: 1,
+        percentage: 33,
+        href: '/audit?documentIds=doc-critical',
+      }),
+      expect.objectContaining({
+        key: 'warning',
+        value: 1,
+        percentage: 33,
+        href: '/audit?documentIds=doc-warning',
+      }),
+      expect.objectContaining({
+        key: 'watch',
+        value: 1,
+        percentage: 33,
+        href: '/audit?documentIds=doc-watch',
+      }),
     ]);
     expect(commandCenter.anomalyBandSegments).toEqual([
-      expect.objectContaining({ key: 'critical', value: 1, percentage: 33 }),
-      expect.objectContaining({ key: 'warning', value: 1, percentage: 33 }),
-      expect.objectContaining({ key: 'watch', value: 1, percentage: 33 }),
+      expect.objectContaining({
+        key: 'critical',
+        value: 1,
+        percentage: 33,
+        href:
+          '/audit?actionGroup=AUTHORIZED_CONTENT_ACCESS&actorIds=editor-1&from=2026-06-01T10%3A00%3A00.000Z&to=2026-06-01T10%3A08%3A00.000Z',
+      }),
+      expect.objectContaining({
+        key: 'warning',
+        value: 1,
+        percentage: 33,
+        href:
+          '/audit?result=DENY&actorIds=viewer-1&from=2026-06-01T09%3A00%3A00.000Z&to=2026-06-01T09%3A15%3A00.000Z',
+      }),
+      expect.objectContaining({
+        key: 'watch',
+        value: 1,
+        percentage: 33,
+        href:
+          '/audit?actionGroup=DESTRUCTIVE_ACTIVITY&actorIds=editor-2&from=2026-06-01T08%3A00%3A00.000Z&to=2026-06-01T08%3A05%3A00.000Z',
+      }),
     ]);
     expect(commandCenter.recommendationSlaSegments).toEqual([
-      expect.objectContaining({ key: 'overdue', value: 1, percentage: 33 }),
+      expect.objectContaining({
+        key: 'overdue',
+        value: 1,
+        percentage: 33,
+        href: '/audit?recommendationIds=document-access-review%3Adoc-critical',
+      }),
       expect.objectContaining({ key: 'due-soon', value: 0, percentage: 0 }),
-      expect.objectContaining({ key: 'on-track', value: 1, percentage: 33 }),
+      expect.objectContaining({
+        key: 'on-track',
+        value: 1,
+        percentage: 33,
+        href:
+          '/audit?recommendationIds=actor-access-review%3ADENY_BURST%3Aviewer-1',
+      }),
       expect.objectContaining({ key: 'not-started', value: 0, percentage: 0 }),
-      expect.objectContaining({ key: 'closed', value: 1, percentage: 33 }),
+      expect.objectContaining({
+        key: 'closed',
+        value: 1,
+        percentage: 33,
+        href: '/audit?recommendationIds=dlp-classification-review',
+      }),
     ]);
     expect(commandCenter.accessSegments).toEqual([
       expect.objectContaining({
@@ -463,6 +630,8 @@ describe('buildSecurityDashboardModel', () => {
         key: 'sensitive-access',
         value: 2,
         percentage: 25,
+        href:
+          '/audit?actionGroup=AUTHORIZED_CONTENT_ACCESS&classifications=SECRET%2CCONFIDENTIAL',
       }),
     ]);
   });
@@ -534,9 +703,43 @@ describe('buildSecurityDashboardModel', () => {
         workflow: { status: 'OPEN' },
       }),
     ]);
+    expect(model.recommendations.items[0].affectedDocuments).toEqual([
+      {
+        documentId: 'doc-secret',
+        href: '/documents/doc-secret',
+      },
+    ]);
     expect(
       buildAuditFilterQuery(model.recommendations.items[0].auditFilters),
     ).toBe('documentId=doc-secret');
+  });
+
+  it('keeps document trace links on resolved recommendations', () => {
+    const model = buildSecurityDashboardModel(
+      summary({
+        recommendations: [
+          recommendation({
+            id: 'document-access-review:doc-resolved',
+            type: 'DOCUMENT_ACCESS_REVIEW',
+            severity: 'warning',
+            affectedDocumentIds: ['doc-resolved'],
+            auditFilters: { documentId: 'doc-resolved' },
+            workflow: { status: 'RESOLVED' },
+          }),
+        ],
+      }),
+    );
+
+    expect(model.recommendations.items[0]).toMatchObject({
+      id: 'document-access-review:doc-resolved',
+      workflow: { status: 'RESOLVED' },
+      affectedDocuments: [
+        {
+          documentId: 'doc-resolved',
+          href: '/documents/doc-resolved',
+        },
+      ],
+    });
   });
 
   it('returns empty behavior anomaly rows when summary has no behavior signals', () => {
@@ -1040,6 +1243,20 @@ describe('buildSecurityDashboardModel', () => {
       }),
     ).toBe(
       'actionGroup=AUTHORIZED_CONTENT_ACCESS&actorId=editor-1&from=2026-05-30T10%3A00%3A00.000Z&to=2026-05-30T10%3A08%3A00.000Z',
+    );
+    expect(
+      buildAuditFilterQuery({
+        documentIds: ['doc-critical', 'doc-warning'],
+        actorIds: ['editor-1', 'viewer-1'],
+        recommendationIds: ['rec-1', 'rec-2'],
+        actions: [
+          'DOCUMENT_DOWNLOAD_AUTHORIZED',
+          'DOCUMENT_PREVIEW_AUTHORIZED',
+        ],
+        classifications: ['SECRET', 'CONFIDENTIAL'],
+      }),
+    ).toBe(
+      'actions=DOCUMENT_DOWNLOAD_AUTHORIZED%2CDOCUMENT_PREVIEW_AUTHORIZED&actorIds=editor-1%2Cviewer-1&documentIds=doc-critical%2Cdoc-warning&recommendationIds=rec-1%2Crec-2&classifications=SECRET%2CCONFIDENTIAL',
     );
   });
 

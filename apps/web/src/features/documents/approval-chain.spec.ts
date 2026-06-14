@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildApprovalChainModel,
+  canEditApprovalChain,
   createApprovalChainDraft,
   hasDuplicateApprovalChainApprovers,
   moveApprovalChainApprover,
@@ -38,6 +39,16 @@ describe('buildApprovalChainModel', () => {
     expect(m.steps.every((s) => s.state === 'approved')).toBe(true);
     expect(m.currentApproverId).toBeNull();
     expect(m.approvedCount).toBe(2);
+  });
+});
+
+describe('canEditApprovalChain', () => {
+  it('allows approval chain editing only for manageable pending documents', () => {
+    expect(canEditApprovalChain({ status: 'PENDING' }, true)).toBe(true);
+    expect(canEditApprovalChain({ status: 'DRAFT' }, true)).toBe(false);
+    expect(canEditApprovalChain({ status: 'PUBLISHED' }, true)).toBe(false);
+    expect(canEditApprovalChain({ status: 'ARCHIVED' }, true)).toBe(false);
+    expect(canEditApprovalChain({ status: 'PENDING' }, false)).toBe(false);
   });
 });
 

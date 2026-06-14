@@ -47,6 +47,13 @@ export function buildApprovalChainModel(
   };
 }
 
+export function canEditApprovalChain(
+  document: Pick<DocumentDetail, 'status'>,
+  canManage: boolean,
+): boolean {
+  return canManage && document.status === 'PENDING';
+}
+
 export function createApprovalChainDraft(approverIds: string[]): string[] {
   const normalized = normalizeApprovalChainApprovers(approverIds);
   return normalized.length > 0 ? normalized : [''];
