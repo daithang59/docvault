@@ -54,6 +54,7 @@ def call() {
         buildParallelism: 3,
         pushParallelism: 3,
         pnpmStoreVolume: 'docvault-pnpm-store',
+        turboCacheVolume: 'docvault-turbo-cache',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
         webAppName: 'web',
         webImageName: 'docvault',
