@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
   IsArray,
   IsDateString,
@@ -83,6 +83,7 @@ export class QueryAuditDto {
   limit?: number;
 
   @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
   @IsArray()
   @IsString({ each: true })
   excludeActions?: string[];
