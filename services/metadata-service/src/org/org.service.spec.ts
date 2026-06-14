@@ -243,7 +243,12 @@ describe('OrgService member mutations', () => {
 
     it('updates role when target is already a member of this org', async () => {
       findMany.mockResolvedValue([
-        { organizationId: ORG, userId: 'user-2', role: 'MEMBER', createdAt: new Date() },
+        {
+          organizationId: ORG,
+          userId: 'user-2',
+          role: 'MEMBER',
+          createdAt: new Date(),
+        },
       ]);
       update.mockResolvedValue({
         userId: 'user-2',
@@ -304,9 +309,9 @@ describe('OrgService member mutations', () => {
     });
 
     it('rejects an empty identifier', async () => {
-      await expect(service.addMember(adminCtx, '   ', 'MEMBER')).rejects.toThrow(
-        BadRequestException,
-      );
+      await expect(
+        service.addMember(adminCtx, '   ', 'MEMBER'),
+      ).rejects.toThrow(BadRequestException);
     });
   });
 

@@ -15,7 +15,11 @@ export class AuditChainEpoch {
   @Prop({ required: true, unique: true, index: true })
   epochId: string;
 
-  @Prop({ required: true, enum: ['ACTIVE', 'SEALED', 'COMPROMISED'], index: true })
+  @Prop({
+    required: true,
+    enum: ['ACTIVE', 'SEALED', 'COMPROMISED'],
+    index: true,
+  })
   status: AuditChainEpochStatus;
 
   @Prop({ required: true, default: Date.now, index: true })

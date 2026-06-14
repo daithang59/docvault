@@ -125,10 +125,7 @@ export class AuditProxyController {
     description:
       'Production-safe recovery path for tamper evidence: preserves the compromised epoch and starts a new active audit chain instead of recomputing old hashes.',
   })
-  async sealCompromisedChainAndStartEpoch(
-    @Req() req: any,
-    @Body() body: any,
-  ) {
+  async sealCompromisedChainAndStartEpoch(@Req() req: any, @Body() body: any) {
     const response = await this.proxyService.forward(req, {
       method: 'POST',
       url: `${process.env.AUDIT_SERVICE_URL}/audit/chain/seal-and-start-epoch`,

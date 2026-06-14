@@ -87,6 +87,7 @@ export default function EvidenceCenterPage() {
     queryKey: auditKeys.securitySummary(),
     queryFn: getSecuritySummary,
     enabled: hasAccess,
+    staleTime: 5 * 60 * 1000,
   });
   const retentionQuery = useQuery({
     queryKey: retentionKeys.evidence(),

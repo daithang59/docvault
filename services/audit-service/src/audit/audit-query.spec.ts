@@ -176,4 +176,27 @@ describe('AuditService query filters', () => {
     expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
     expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
   });
+
+  it('excludes noisy audit actions from the query result set', async () => {
+    const auditModel = makeAuditModel([], 0);
+    const service = new AuditService(auditModel.model as any);
+
+    await service.query({
+      excludeActions: ['SECURITY_RECOMMENDATIONS_VIEWED'],
+      page: 1,
+      pageSize: 20,
+    } as any);
+
+    const expectedFilter = {
+      $and: [
+        {
+          action: {
+            $nin: ['SECURITY_RECOMMENDATIONS_VIEWED'],
+          },
+        },
+      ],
+    };
+    expect(auditModel.find).toHaveBeenCalledWith(expectedFilter, { _id: 0 });
+    expect(auditModel.countDocuments).toHaveBeenCalledWith(expectedFilter);
+  });
 });
