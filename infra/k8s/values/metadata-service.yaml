@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/metadata-service"
-  tag: "v8-2019b9dcef2e"
-  digest: "sha256:e5b212ad1a1226c0a817a6420d3c5088f55a4dd2bfaa288038b3ce938579101c"
+  tag: "v9-ad76f1e1bd85"
+  digest: "sha256:751d127036d5a5a3dd28149a1759ced981da45b9ed6360962fa0323761f3a2fa"
 
 healthPath: /health
 
@@ -28,6 +28,20 @@ migration:
   enabled: true
   command: "./node_modules/.bin/prisma migrate deploy"
   backoffLimit: 3
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi
+
+seed:
+  enabled: false
+  nameSuffix: seed
+  command: "pnpm db:seed"
+  backoffLimit: 1
+  ttlSecondsAfterFinished: null
   resources:
     limits:
       cpu: 200m

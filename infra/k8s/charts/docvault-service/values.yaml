@@ -39,3 +39,12 @@ migration:
   command: "./node_modules/.bin/prisma migrate deploy"
   backoffLimit: 3
   resources: {}
+
+seed:
+  enabled: false
+  nameSuffix: seed
+  command: "pnpm db:seed"
+  backoffLimit: 1
+  ttlSecondsAfterFinished: null
+  annotations: {}
+  resources: {}
