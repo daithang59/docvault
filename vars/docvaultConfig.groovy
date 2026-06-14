@@ -20,6 +20,15 @@ def call() {
     def pushLatest = env.PUSH_LATEST?.trim()
         ? env.PUSH_LATEST.equalsIgnoreCase('true')
         : false
+    def signImages = env.SIGN_IMAGES?.trim()
+        ? env.SIGN_IMAGES.equalsIgnoreCase('true')
+        : false
+    def cosignKeyCredentialId = env.COSIGN_KEY_CREDENTIAL_ID?.trim() ?: 'cosign-private-key'
+    def cosignPasswordCredentialId = env.COSIGN_PASSWORD_CREDENTIAL_ID?.trim() ?: 'cosign-password'
+    def cosignPublicKeyCredentialId = env.COSIGN_PUBLIC_KEY_CREDENTIAL_ID?.trim() ?: ''
+    def cosignTlogUpload = env.COSIGN_TLOG_UPLOAD?.trim()
+        ? env.COSIGN_TLOG_UPLOAD.equalsIgnoreCase('true')
+        : false
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : false
@@ -33,6 +42,12 @@ def call() {
         registryCredentialType: registryCredentialType,
         registryUsername: registryUsername,
         pushLatest: pushLatest,
+        signImages: signImages,
+        cosignImage: 'ghcr.io/sigstore/cosign/cosign:v2.4.1',
+        cosignKeyCredentialId: cosignKeyCredentialId,
+        cosignPasswordCredentialId: cosignPasswordCredentialId,
+        cosignPublicKeyCredentialId: cosignPublicKeyCredentialId,
+        cosignTlogUpload: cosignTlogUpload,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
         nodeImage: 'node:20-alpine',
