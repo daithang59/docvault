@@ -1,0 +1,80 @@
+{{- if .Values.seed.enabled }}
+{{- $zeroDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000" -}}
+{{- $imageDigest := .Values.image.digest | default "" -}}
+{{- $seedNameSuffix := .Values.seed.nameSuffix | default "seed" -}}
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: {{ .Release.Name }}-{{ $seedNameSuffix }}
+  namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Release.Name }}
+    job: {{ .Release.Name }}-{{ $seedNameSuffix }}
+  annotations:
+    checkov.io/skip1: CKV_K8S_8=Seed is a short-lived Job; liveness probes are for long-running workloads.
+    checkov.io/skip2: CKV_K8S_9=Seed is a short-lived Job; readiness probes are not used for one-shot jobs.
+    {{- with .Values.seed.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  backoffLimit: {{ .Values.seed.backoffLimit | default 1 }}
+  {{- with .Values.seed.ttlSecondsAfterFinished }}
+  ttlSecondsAfterFinished: {{ . }}
+  {{- end }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Release.Name }}
+        job: {{ .Release.Name }}-{{ $seedNameSuffix }}
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: seed
+          image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}{{- if and $imageDigest (ne $imageDigest $zeroDigest) }}@{{ $imageDigest }}{{- end }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
+          command:
+            - sh
+            - -c
+            - {{ .Values.seed.command | quote }}
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+          resources:
+            {{- toYaml (.Values.seed.resources | default .Values.resources) | nindent 12 }}
+          env:
+            {{- range $key, $value := .Values.env }}
+            - name: {{ $key }}
+              value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.envValueFrom }}
+            {{- toYaml . | nindent 12 }}
+            {{- end }}
+          {{- with .Values.envFrom }}
+          envFrom:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+      volumes:
+        - name: tmp
+          emptyDir: {}
+{{- end }}

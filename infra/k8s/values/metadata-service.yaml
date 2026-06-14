@@ -35,3 +35,17 @@ migration:
     requests:
       cpu: 50m
       memory: 128Mi
+
+seed:
+  enabled: false
+  nameSuffix: seed
+  command: "pnpm db:seed"
+  backoffLimit: 1
+  ttlSecondsAfterFinished: null
+  resources:
+    limits:
+      cpu: 200m
+      memory: 256Mi
+    requests:
+      cpu: 50m
+      memory: 128Mi

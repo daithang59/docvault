@@ -58,6 +58,7 @@ ENV SERVICE_NAME=${SERVICE_NAME}
 # Copy built files and necessary node_modules while maintaining structure to preserve pnpm symlinks
 COPY --from=installer --chown=nestjs:nodejs /app/node_modules ./node_modules
 COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/package.json ./services/${SERVICE_NAME}/package.json
+COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/tsconfig*.json ./services/${SERVICE_NAME}/
 COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/dist ./services/${SERVICE_NAME}/dist
 COPY --from=installer --chown=nestjs:nodejs /app/services/${SERVICE_NAME}/node_modules ./services/${SERVICE_NAME}/node_modules
 
