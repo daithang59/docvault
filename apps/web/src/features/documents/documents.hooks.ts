@@ -22,6 +22,7 @@ import {
   listTrash,
   restoreDocumentFromTrash,
   setApprovalChain,
+  getDocumentApprovers,
 } from './documents.api';
 import type { ClassificationLevel } from '@/types/enums';
 import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto, LegalHoldRequest } from './documents.types';
@@ -53,6 +54,15 @@ export function useWorkflowHistory(id: string) {
     queryKey: documentsKeys.workflowHistory(id),
     queryFn: () => getWorkflowHistory(id),
     enabled: Boolean(id),
+  });
+}
+
+export function useDocumentApprovers(id: string, enabled = true) {
+  return useQuery({
+    queryKey: documentsKeys.approvers(id),
+    queryFn: () => getDocumentApprovers(id),
+    enabled: Boolean(id) && enabled,
+    staleTime: 60 * 1000,
   });
 }
 

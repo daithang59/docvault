@@ -46,3 +46,49 @@ export function buildApprovalChainModel(
     approvedCount: published ? chain.length : Math.min(step, chain.length),
   };
 }
+
+export function createApprovalChainDraft(approverIds: string[]): string[] {
+  const normalized = normalizeApprovalChainApprovers(approverIds);
+  return normalized.length > 0 ? normalized : [''];
+}
+
+export function normalizeApprovalChainApprovers(values: string[]): string[] {
+  return values.map((value) => value.trim()).filter(Boolean);
+}
+
+export function hasDuplicateApprovalChainApprovers(values: string[]): boolean {
+  const normalized = normalizeApprovalChainApprovers(values);
+  return new Set(normalized).size !== normalized.length;
+}
+
+export function updateApprovalChainApprover(
+  values: string[],
+  index: number,
+  approverId: string,
+): string[] {
+  return values.map((value, currentIndex) =>
+    currentIndex === index ? approverId : value,
+  );
+}
+
+export function removeApprovalChainApprover(
+  values: string[],
+  index: number,
+): string[] {
+  return values.filter((_, currentIndex) => currentIndex !== index);
+}
+
+export function moveApprovalChainApprover(
+  values: string[],
+  index: number,
+  direction: -1 | 1,
+): string[] {
+  const targetIndex = index + direction;
+  if (index < 0 || index >= values.length || targetIndex < 0 || targetIndex >= values.length) {
+    return values;
+  }
+
+  const next = [...values];
+  [next[index], next[targetIndex]] = [next[targetIndex], next[index]];
+  return next;
+}

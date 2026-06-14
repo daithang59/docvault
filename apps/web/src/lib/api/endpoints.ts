@@ -17,6 +17,7 @@ export const apiEndpoints = {
       list: '/metadata/documents',
       trash: '/metadata/documents/trash',
       restore: (docId: string) => `/metadata/documents/${docId}/restore`,
+      approvers: (docId: string) => `/metadata/documents/${docId}/approvers`,
       approvalChain: (docId: string) => `/metadata/documents/${docId}/approval-chain`,
       create: '/metadata/documents',
       detail: (docId: string) => `/metadata/documents/${docId}`,
