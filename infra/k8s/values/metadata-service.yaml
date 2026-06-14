@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/metadata-service"
-  tag: "v145"
-  digest: "sha256:00e3d17de70829068d004f9a08e34d496ab4584c38aa06756eba45f01f645ca3"
+  tag: "v2-6523a8ac8ef5"
+  digest: "sha256:a9e9b316e2fa6919a5cf21686f7dcbf45124c05564060dd4bd07e8464a4f199e"
 
 healthPath: /health
 
@@ -15,9 +15,7 @@ env:
   NODE_ENV: production
   PORT: "3001"
   KEYCLOAK_BASE_URL: "http://keycloak:8080"
-  # Patched at runtime by scripts/setup-eks-access.ps1 to the public
-  # Keycloak NodePort issuer while JWKS stays on KEYCLOAK_BASE_URL.
-  KEYCLOAK_ISSUER: "http://keycloak:8080/realms/docvault"
+  KEYCLOAK_ISSUER: "https://auth.docvault.id.vn/realms/docvault"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_AUDIENCE: "docvault-gateway"
   AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"

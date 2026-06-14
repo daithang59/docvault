@@ -3,15 +3,14 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/docvault"
-  tag: "v145"
-  digest: "sha256:72074849d58144b35452678e7fd042df617fca778e9a2293d79fba71a65072e8"
+  tag: "v2-6523a8ac8ef5"
+  digest: "sha256:1e8af09637a742f3c9e4940cd2855ef20ad02abb5b9403f77d74b56b0af01f21"
 
 healthPath: /api/health
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 3006
-  nodePort: 30006
 env:
   NODE_ENV: production
   PORT: "3006"
@@ -21,7 +20,5 @@ env:
   KEYCLOAK_INTERNAL_BASE_URL: "http://keycloak:8080"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_CLIENT_ID: "docvault-gateway"
-  # FRONTEND_URL and KEYCLOAK_BROWSER_BASE_URL are patched at runtime
-  # by scripts/setup-eks-access.ps1 with the current node external IP.
-  FRONTEND_URL: "http://localhost:3006"
-  KEYCLOAK_BROWSER_BASE_URL: "http://localhost:8080"
+  FRONTEND_URL: "https://app.docvault.id.vn"
+  KEYCLOAK_BROWSER_BASE_URL: "https://auth.docvault.id.vn"
