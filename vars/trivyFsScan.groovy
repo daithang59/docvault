@@ -16,37 +16,10 @@ def call(cfg) {
         rm -rf "\$scan_dir"
         mkdir -p "\$scan_dir"
 
-        tar \\
-            --exclude='.git' \\
-            --exclude='*/.git' \\
-            --exclude='.trivy-scan-src' \\
-            --exclude='node_modules' \\
-            --exclude='*/node_modules' \\
-            --exclude='*/node_modules/*' \\
-            --exclude='.pnpm-store' \\
-            --exclude='*/.pnpm-store' \\
-            --exclude='*/.pnpm-store/*' \\
-            --exclude='.turbo' \\
-            --exclude='*/.turbo' \\
-            --exclude='.next' \\
-            --exclude='*/.next' \\
-            --exclude='dist' \\
-            --exclude='*/dist' \\
-            --exclude='coverage' \\
-            --exclude='*/coverage' \\
-            --exclude='.sonar-cache' \\
-            --exclude='*/.sonar-cache' \\
-            --exclude='*/.sonar-cache/*' \\
-            --exclude='.scannerwork' \\
-            --exclude='*/.scannerwork' \\
-            --exclude='*/.scannerwork/*' \\
-            --exclude='dependency-check-report' \\
-            --exclude='trivy-fs-report' \\
-            --exclude='checkov-report' \\
-            --exclude='zap-report' \\
-            --exclude='*/.terraform' \\
-            --exclude='*/.terraform/*' \\
-            -cf "\$archive_path" -C '${env.WORKSPACE}' .
+        git -C '${env.WORKSPACE}' archive \\
+            --format=tar \\
+            --output="\$archive_path" \\
+            HEAD
 
         tar -xf "\$archive_path" -C "\$scan_dir"
         rm -f "\$archive_path"
