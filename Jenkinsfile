@@ -1,4 +1,4 @@
-@Library('docvault@feat/devsecops-main-intergation') _
+@Library('docvault@feat/web-deployment') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -51,6 +51,31 @@ pipeline {
             name: 'PUSH_LATEST',
             defaultValue: false,
             description: 'Also push the mutable latest tag. Keep false when Harbor tag immutability is enabled.'
+        )
+        booleanParam(
+            name: 'SIGN_IMAGES',
+            defaultValue: false,
+            description: 'Sign pushed image digests with cosign. Requires cosign-private-key and cosign-password credentials.'
+        )
+        string(
+            name: 'COSIGN_KEY_CREDENTIAL_ID',
+            defaultValue: 'cosign-private-key',
+            description: 'Jenkins Secret text credential containing the encrypted cosign private key.'
+        )
+        string(
+            name: 'COSIGN_PASSWORD_CREDENTIAL_ID',
+            defaultValue: 'cosign-password',
+            description: 'Jenkins Secret text credential containing the cosign private key password.'
+        )
+        string(
+            name: 'COSIGN_PUBLIC_KEY_CREDENTIAL_ID',
+            defaultValue: '',
+            description: 'Optional Jenkins Secret text credential containing the cosign public key for post-sign verification.'
+        )
+        booleanParam(
+            name: 'COSIGN_TLOG_UPLOAD',
+            defaultValue: false,
+            description: 'Upload signatures to the Sigstore transparency log. Keep false for a private lab registry unless you intentionally want public transparency log entries.'
         )
         booleanParam(
             name: 'ENFORCE_SONAR_QG',
@@ -173,6 +198,17 @@ pipeline {
                         : cfg.registryUsername
 
                     cfg.pushLatest = params.PUSH_LATEST
+                    cfg.signImages = params.SIGN_IMAGES
+                    cfg.cosignKeyCredentialId = params.COSIGN_KEY_CREDENTIAL_ID?.trim()
+                        ? params.COSIGN_KEY_CREDENTIAL_ID.trim()
+                        : cfg.cosignKeyCredentialId
+                    cfg.cosignPasswordCredentialId = params.COSIGN_PASSWORD_CREDENTIAL_ID?.trim()
+                        ? params.COSIGN_PASSWORD_CREDENTIAL_ID.trim()
+                        : cfg.cosignPasswordCredentialId
+                    cfg.cosignPublicKeyCredentialId = params.COSIGN_PUBLIC_KEY_CREDENTIAL_ID?.trim()
+                        ? params.COSIGN_PUBLIC_KEY_CREDENTIAL_ID.trim()
+                        : ''
+                    cfg.cosignTlogUpload = params.COSIGN_TLOG_UPLOAD
 
                     cfg.deployTargetUrl = params.DEPLOY_TARGET_URL?.trim()
                         ? params.DEPLOY_TARGET_URL.trim()
@@ -233,6 +269,11 @@ pipeline {
                     echo ">>> Registry credential type: ${cfg.registryCredentialType}"
                     echo ">>> Registry username: ${cfg.registryUsername ?: '(credential-provided)'}"
                     echo ">>> PUSH_LATEST=${params.PUSH_LATEST}"
+                    echo ">>> SIGN_IMAGES=${params.SIGN_IMAGES}"
+                    echo ">>> COSIGN_KEY_CREDENTIAL_ID=${cfg.cosignKeyCredentialId ?: '(not set)'}"
+                    echo ">>> COSIGN_PASSWORD_CREDENTIAL_ID=${cfg.cosignPasswordCredentialId ?: '(not set)'}"
+                    echo ">>> COSIGN_PUBLIC_KEY_CREDENTIAL_ID=${cfg.cosignPublicKeyCredentialId ?: '(not set)'}"
+                    echo ">>> COSIGN_TLOG_UPLOAD=${params.COSIGN_TLOG_UPLOAD}"
                     echo ">>> FORCE_BUILD_ALL=${params.FORCE_BUILD_ALL}"
                     echo ">>> DEPLOY_TARGET_URL=${cfg.deployTargetUrl ?: '(not set)'}"
                     echo ">>> RUN_ARGO_HEALTH_CHECK=${params.RUN_ARGO_HEALTH_CHECK}"
@@ -352,17 +393,17 @@ pipeline {
             }
         }
 
-        stage('Pre-build Security') {
+        stage('Pre-build Security Gates') {
             when {
                 expression {
-                    return env.RUN_SECURITY_CI == 'true'
+                    return env.RUN_SECURITY_CI == 'true' || env.RUN_IAC_CI == 'true'
                 }
             }
             parallel {
                 stage('SCA - Dependency Check') {
                     when {
                         expression {
-                            return env.RUN_APP_CI == 'true'
+                            return env.RUN_SECURITY_CI == 'true' && env.RUN_APP_CI == 'true'
                         }
                     }
                     steps {
@@ -379,6 +420,11 @@ pipeline {
                 }
 
                 stage('Trivy FS Scan') {
+                    when {
+                        expression {
+                            return env.RUN_SECURITY_CI == 'true'
+                        }
+                    }
                     steps {
                         script {
                             trivyFsScan(cfg)
@@ -389,7 +435,7 @@ pipeline {
                 stage('SAST - SonarQube') {
                     when {
                         expression {
-                            return env.RUN_APP_CI == 'true'
+                            return env.RUN_SECURITY_CI == 'true' && env.RUN_APP_CI == 'true'
                         }
                     }
                     steps {
@@ -398,20 +444,20 @@ pipeline {
                         }
                     }
                 }
-            }
-        }
 
-        stage('Pre-build Security - IaC') {
-            when {
-                expression {
-                    return env.RUN_IAC_CI == 'true'
-                }
-            }
-            steps {
-                script {
-                    policyAsCode(cfg)
-                    iacCheckov(cfg)
-                    terraformValidate(cfg)
+                stage('Pre-build Security - IaC') {
+                    when {
+                        expression {
+                            return env.RUN_IAC_CI == 'true'
+                        }
+                    }
+                    steps {
+                        script {
+                            policyAsCode(cfg)
+                            iacCheckov(cfg)
+                            terraformValidate(cfg)
+                        }
+                    }
                 }
             }
         }

@@ -15,26 +15,6 @@ function isSecure(req: NextRequest): boolean {
     req.headers.get('x-forwarded-proto') === 'https';
 }
 
-interface JwtPayload {
-  sub: string;
-  preferred_username?: string;
-  username?: string;
-  email?: string;
-  groups?: string[];
-  realm_access?: { roles?: string[] };
-}
-
-function normalizeGroups(groups?: string[]): string[] {
-  return Array.from(
-    new Set(
-      (groups ?? [])
-        .map((group) => group.trim())
-        .filter(Boolean)
-        .map((group) => group.replace(/^\/+/, '')),
-    ),
-  );
-}
-
 export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url);
   const code = searchParams.get('code');
@@ -78,16 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     const tokens = await tokenRes.json();
-    const { access_token, refresh_token, id_token, expires_in } = tokens;
-
-    const payload = JSON.parse(atob(access_token.split('.')[1])) as JwtPayload;
-    const user = {
-      sub: payload.sub,
-      username: payload.preferred_username ?? payload.username,
-      email: payload.email,
-      roles: payload.realm_access?.roles ?? [],
-      groups: normalizeGroups(payload.groups),
-    };
+    const { access_token, refresh_token, expires_in } = tokens;
 
     const response = NextResponse.redirect(`${frontendUrl}/login?auth=ok`);
 
@@ -110,24 +81,6 @@ export async function GET(req: NextRequest) {
         path: '/',
       });
     }
-
-    if (id_token) {
-      response.cookies.set('dv_id_token', id_token, {
-        httpOnly: true,
-        secure: isSecure(req),
-        sameSite: 'lax',
-        maxAge: 7 * 24 * 60 * 60,
-        path: '/',
-      });
-    }
-
-    response.cookies.set('dv_user', JSON.stringify(user), {
-      httpOnly: false,
-      secure: isSecure(req),
-      sameSite: 'lax',
-      maxAge: 10,
-      path: '/',
-    });
 
     return response;
   } catch (err) {

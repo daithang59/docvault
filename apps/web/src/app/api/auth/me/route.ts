@@ -5,6 +5,7 @@ interface JwtPayload {
   preferred_username?: string;
   username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   exp?: number;
 }
@@ -36,7 +37,19 @@ function userFromToken(accessToken: string) {
     username: payload.preferred_username ?? payload.username ?? 'unknown',
     email: payload.email,
     roles: Array.from(roles),
+    groups: normalizeGroups(payload.groups),
   };
+}
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
 }
 
 export async function GET(req: NextRequest) {

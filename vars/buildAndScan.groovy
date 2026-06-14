@@ -59,7 +59,9 @@ def call(cfg) {
     }
 
     def trivyDbReady = buildTargets ? warmTrivyCache(cfg) : false
-    def builtList = buildTargets ? runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady) : []
+    def builtList = buildTargets ? withRegistryLogin(cfg) {
+        runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady)
+    } : []
 
     return builtList.join(',')
 }
@@ -155,6 +157,55 @@ boolean warmTrivyCache(cfg) {
     }
 
     return true
+}
+
+def withRegistryLogin(cfg, Closure body) {
+    if (!cfg.registryHost?.trim()) {
+        return body()
+    }
+
+    echo ">>> Logging into registry ${cfg.registryHost} for build cache imports..."
+
+    def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
+    def registryArg = shellQuote(cfg.registryHost.trim())
+    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
+    def result = null
+
+    try {
+        withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
+            if (credentialType == 'secretText') {
+                def registryUsername = cfg.registryUsername?.trim()
+                if (!registryUsername) {
+                    error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
+                }
+
+                withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
+                    try {
+                        result = body()
+                    } finally {
+                        sh "docker logout ${registryArg} || true"
+                    }
+                }
+            } else if (credentialType == 'usernamePassword') {
+                withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
+                    try {
+                        result = body()
+                    } finally {
+                        sh "docker logout ${registryArg} || true"
+                    }
+                }
+            } else {
+                error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
+            }
+        }
+    } finally {
+        sh "rm -rf '${dockerConfigDir}'"
+    }
+
+    return result
 }
 
 List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady) {

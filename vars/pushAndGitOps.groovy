@@ -48,7 +48,7 @@ def pushImages(cfg, builtList, tag) {
     def imageDigests = [:]
     def registryArg = cfg.registryHost?.trim() ? shellQuote(cfg.registryHost.trim()) : ''
     def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
-    def credentialType = cfg.registryCredentialType ?: 'usernamePassword'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
@@ -86,7 +86,12 @@ def pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests) {
     builtList.each { service ->
         def imageName = imageNameForService(cfg, service)
         def repository = resolveRepository(cfg, imageName)
-        imageDigests[service] = resolveImageDigest(repository, tag)
+        def digest = resolveImageDigest(repository, tag)
+        imageDigests[service] = digest
+
+        if (digest && shouldSignImages(cfg)) {
+            signImageDigest(cfg, service, "${repository}@${digest}")
+        }
     }
 }
 
@@ -167,6 +172,66 @@ def resolveImageDigest(repository, tag) {
 
     echo ">>> Resolved ${imageRef} digest: ${digest}"
     return digest
+}
+
+boolean shouldSignImages(cfg) {
+    return cfg.signImages != null && cfg.signImages.toString().equalsIgnoreCase('true')
+}
+
+void signImageDigest(cfg, String service, String imageRef) {
+    def cosignImage = cfg.cosignImage ?: 'ghcr.io/sigstore/cosign/cosign:v2.4.1'
+    def keyCredentialId = cfg.cosignKeyCredentialId?.trim() ?: 'cosign-private-key'
+    def passwordCredentialId = cfg.cosignPasswordCredentialId?.trim() ?: 'cosign-password'
+    def publicKeyCredentialId = cfg.cosignPublicKeyCredentialId?.trim()
+    def tlogUpload = cfg.cosignTlogUpload != null && cfg.cosignTlogUpload.toString().equalsIgnoreCase('true')
+    def signTlogFlag = tlogUpload ? '--tlog-upload=true' : '--tlog-upload=false'
+    def verifyTlogFlag = tlogUpload ? '' : '--insecure-ignore-tlog=true'
+
+    echo ">>> Signing ${service} image digest with cosign: ${imageRef}"
+
+    withCredentials([
+        string(credentialsId: keyCredentialId, variable: 'COSIGN_PRIVATE_KEY'),
+        string(credentialsId: passwordCredentialId, variable: 'COSIGN_PASSWORD')
+    ]) {
+        withEnv([
+            "COSIGN_IMAGE=${cosignImage}",
+            "COSIGN_IMAGE_REF=${imageRef}",
+            "COSIGN_TLOG_FLAG=${signTlogFlag}"
+        ]) {
+            sh '''
+                set -eu
+                docker run --rm \
+                    -e COSIGN_PASSWORD \
+                    -e COSIGN_PRIVATE_KEY \
+                    -e DOCKER_CONFIG=/docker-config \
+                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
+                    "${COSIGN_IMAGE}" sign --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY "${COSIGN_IMAGE_REF}"
+            '''
+        }
+    }
+
+    if (!publicKeyCredentialId) {
+        echo '>>> COSIGN_PUBLIC_KEY_CREDENTIAL_ID is not set; skipping post-sign verification.'
+        return
+    }
+
+    echo ">>> Verifying cosign signature for ${service}: ${imageRef}"
+    withCredentials([string(credentialsId: publicKeyCredentialId, variable: 'COSIGN_PUBLIC_KEY')]) {
+        withEnv([
+            "COSIGN_IMAGE=${cosignImage}",
+            "COSIGN_IMAGE_REF=${imageRef}",
+            "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
+        ]) {
+            sh '''
+                set -eu
+                docker run --rm \
+                    -e COSIGN_PUBLIC_KEY \
+                    -e DOCKER_CONFIG=/docker-config \
+                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
+                    "${COSIGN_IMAGE}" verify ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY "${COSIGN_IMAGE_REF}"
+            '''
+        }
+    }
 }
 
 def updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged) {
