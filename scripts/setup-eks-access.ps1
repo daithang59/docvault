@@ -3,6 +3,9 @@
   Detect node external IP and patch K8s deployments + Keycloak with the correct URLs.
 
 .DESCRIPTION
+  NodePort fallback helper. For the GitOps ingress deployment, prefer the
+  Argo-managed public ingress and stable DNS values under infra/k8s.
+
   Run this script after scaling EKS nodes back up. It:
     1. Detects available node external IPs
     2. Patches web and gateway deployments with NodePort-based URLs

@@ -186,6 +186,7 @@ error.txt
 !*.tfvars.example
 tfplan
 *.tfplan
+infra/terraform/aws-eks/*-secret.json
 crash.log
 crash.*.log
 
@@ -193,6 +194,8 @@ crash.*.log
 *-secrets.yaml
 !*-secrets.example.yaml
 *.kubeconfig
+jenkins-argocd-reader.kubeconfig
+infra/terraform/aws-eks/nocommit/
 *.pem
 *.key
 *.p12

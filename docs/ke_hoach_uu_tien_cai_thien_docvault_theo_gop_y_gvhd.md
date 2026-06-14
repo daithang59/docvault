@@ -65,7 +65,7 @@ Phần này ưu tiên những việc làm cho DocVault giống một hệ thốn
 
 ## W-P0.1 - Siết secret/key lifecycle, MFA và key rotation
 
-Lý do ưu tiên: thầy nhắc trực tiếp về secret key và key rotation. Hiện `infra/k8s/infra-deps/app-secrets.yaml` chứa demo plaintext secret, Keycloak realm có client secret/user password demo, và `DOWNLOAD_GRANT_SECRET`/`PREVIEW_GRANT_SECRET` còn có fallback mặc định trong code.
+Lý do ưu tiên: thầy nhắc trực tiếp về secret key và key rotation. Hiện `infra/k8s/infra-deps/base/app-secrets.yaml` tham chiếu secret runtime qua External Secrets, Keycloak realm có client secret/user password demo, và `DOWNLOAD_GRANT_SECRET`/`PREVIEW_GRANT_SECRET` còn có fallback mặc định trong code.
 
 Việc nên làm:
 

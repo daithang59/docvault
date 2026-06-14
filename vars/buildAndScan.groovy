@@ -1,10 +1,14 @@
 def call(cfg) {
-    def tag = "v${env.BUILD_NUMBER}"
-    def forceBuildAll = shouldForceBuildAll()
-    def diffRange = resolveDiffRange()
+    def tag = resolveImageTag(cfg)
+    def forceBuildAll = shouldForceBuildAll(cfg)
+    def diffRange = cfg.changeDiffRange?.trim() ? cfg.changeDiffRange.trim() : resolveDiffRange()
     def changedFiles = []
 
-    if (!forceBuildAll && diffRange) {
+    if (!forceBuildAll && cfg.changeDetectionReady) {
+        changedFiles = cfg.changedFiles ?: []
+        echo ">>> Reusing early change detection diff range: ${diffRange ?: '(none)'}"
+        echo ">>> Changed paths available for image selection: ${changedFiles.size()}"
+    } else if (!forceBuildAll && diffRange) {
         changedFiles = getChangedFiles(diffRange)
         echo ">>> Change detection diff range: ${diffRange}"
         echo ">>> Changed paths detected: ${changedFiles.size()}"
@@ -31,7 +35,7 @@ def call(cfg) {
         if (changed) {
             buildTargets << [
                 name: service,
-                repository: "${cfg.dockerOrg}/${service}",
+                repository: resolveRepository(cfg, service),
                 dockerfile: cfg.backendDockerfile,
                 buildArgs: [SERVICE_NAME: service],
             ]
@@ -44,7 +48,7 @@ def call(cfg) {
     if (webChanged) {
         buildTargets << [
             name: cfg.webAppName,
-            repository: "${cfg.dockerOrg}/${cfg.webImageName}",
+            repository: resolveRepository(cfg, cfg.webImageName),
             dockerfile: cfg.webDockerfile,
             buildArgs: [
                 NEXT_PUBLIC_APP_NAME: 'DocVault',
@@ -60,7 +64,21 @@ def call(cfg) {
     return builtList.join(',')
 }
 
-def shouldForceBuildAll() {
+String resolveImageTag(cfg) {
+    if (cfg.imageTag?.trim()) {
+        return cfg.imageTag.trim()
+    }
+    if (env.IMAGE_TAG?.trim()) {
+        return env.IMAGE_TAG.trim()
+    }
+    return "v${env.BUILD_NUMBER}"
+}
+
+def shouldForceBuildAll(cfg = [:]) {
+    if (cfg.forceBuildAll != null) {
+        return cfg.forceBuildAll.toString().equalsIgnoreCase('true')
+    }
+
     if (env.FORCE_BUILD_ALL?.trim()) {
         return env.FORCE_BUILD_ALL.equalsIgnoreCase('true')
     }
@@ -173,7 +191,9 @@ List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady
 void buildTarget(cfg, Map target, String tag) {
     def repository = target.repository
     def dockerfile = target.dockerfile
-    def buildArgs = target.buildArgs ?: [:]
+    def buildArgs = (target.buildArgs ?: [:]) + [
+        ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
+    ]
     def cacheFrom = "${repository}:latest"
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
@@ -183,6 +203,7 @@ void buildTarget(cfg, Map target, String tag) {
         export DOCKER_BUILDKIT=1
         docker pull '${cacheFrom}' >/dev/null 2>&1 || true
         docker build \\
+            --pull \\
             --build-arg BUILDKIT_INLINE_CACHE=1 \\
             --cache-from '${cacheFrom}' \\
             ${buildArgsToFlags(buildArgs)} \\
@@ -250,4 +271,12 @@ boolean isGlobalWebImpact(String path, cfg) {
         path == 'pnpm-lock.yaml' ||
         path == 'pnpm-workspace.yaml' ||
         path == 'turbo.json'
+}
+
+String resolveRepository(cfg, String service) {
+    def namespace = cfg.registryNamespace?.trim() ? cfg.registryNamespace.trim() : cfg.dockerOrg
+    if (cfg.registryHost?.trim()) {
+        return "${cfg.registryHost.trim()}/${namespace}/${service}"
+    }
+    return "${namespace}/${service}"
 }

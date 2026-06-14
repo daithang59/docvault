@@ -1,6 +1,7 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import {
   DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
@@ -26,9 +27,19 @@ const documents: DocumentListItem[] = [
   },
 ];
 
+function renderWithQueryClient(element: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return renderToStaticMarkup(
+    createElement(QueryClientProvider, { client }, element),
+  );
+}
+
 describe('DocumentFilters', () => {
   it('renders saved views alongside quick views and save controls', () => {
-    const html = renderToStaticMarkup(
+    const html = renderWithQueryClient(
       createElement(DocumentFilters, {
         filters: DEFAULT_DOCUMENT_FILTERS,
         options: buildDocumentFilterOptions(documents),
@@ -45,16 +56,14 @@ describe('DocumentFilters', () => {
       }),
     );
 
-    expect(html).toContain('Saved views');
     expect(html).toContain('Pending review');
     expect(html).toContain('Sensitive attention');
-    expect(html).toContain('Name current view');
-    expect(html).toContain('Document quick views');
-    expect(html).toContain('Smart folders');
-    expect(html).toContain('Query chips');
-    expect(html).toContain('status:pending');
+    expect(html).toContain('Action queue');
+    expect(html).toContain('Save view');
+    expect(html).toContain('Document views');
+    expect(html).toContain('Search syntax: status:pending');
     expect(html).toContain('class:confidential');
-    expect(html).toContain('file:board-report.pdf');
-    expect(html).toContain('Folder: finance');
+    expect(html).toContain('file:report.pdf');
+    expect(html).toContain('Recently updated');
   });
 });

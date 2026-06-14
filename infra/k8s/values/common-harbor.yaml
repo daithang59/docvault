@@ -1,0 +1,3 @@
+# Shared registry pull settings for DocVault services.
+imagePullSecrets:
+  - name: harbor-docvault-dev-pull

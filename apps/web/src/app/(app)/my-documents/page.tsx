@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useDocuments, useSubmitDocument, useApproveDocument, useRejectDocument, useArchiveDocument, useDeleteDocument } from '@/lib/hooks/use-documents';
 import { useDownloadDocument } from '@/lib/hooks/use-download-document';
 import { submitDocument, approveDocument, archiveDocument, deleteDocument } from '@/lib/api/workflow';
@@ -11,7 +12,6 @@ import { PageHeader } from '@/components/common/page-header';
 import { DocumentsTable } from '@/components/documents/documents-table';
 import { DocumentFilters } from '@/components/documents/document-filters';
 import {
-  DEFAULT_DOCUMENT_FILTERS,
   buildDocumentFilterOptions,
   buildDocumentQuickViewOptions,
   buildDocumentSearchSuggestions,
@@ -55,12 +55,16 @@ export default function MyDocumentsPage() {
   const { session } = useAuth();
   const qc = useQueryClient();
   const { data: docs, isLoading, isError, refetch } = useDocuments();
+  const searchParams = useSearchParams();
 
-  const [filters, setFilters] = useState<DocumentFiltersState>(DEFAULT_DOCUMENT_FILTERS);
+  const [filters, setFilters] = useState<DocumentFiltersState>(() =>
+    parseDocumentFiltersFromSearchParams(
+      new URLSearchParams(searchParams.toString()),
+    ),
+  );
   const [localSavedViews, setLocalSavedViews] = useState<DocumentSavedView[]>(
     () => loadCustomDocumentSavedViews(),
   );
-  const [filtersHydrated, setFiltersHydrated] = useState(false);
   const [targetDoc, setTargetDoc] = useState<DocumentListItem | null>(null);
   const [actionType, setActionType] = useState<'submit' | 'approve' | 'reject' | 'archive' | 'delete' | null>(null);
   const [rejectReason, setRejectReason] = useState('');
@@ -85,14 +89,6 @@ export default function MyDocumentsPage() {
   const currentUserId = session?.user?.sub ?? '';
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    setFilters(parseDocumentFiltersFromSearchParams(params));
-    setFiltersHydrated(true);
-  }, []);
-
-  useEffect(() => {
-    if (!filtersHydrated) return;
-
     const params = serializeDocumentFiltersToSearchParams(filters);
     const query = params.toString();
     const nextUrl = query
@@ -103,7 +99,7 @@ export default function MyDocumentsPage() {
     if (currentUrl !== nextUrl) {
       window.history.replaceState(null, '', nextUrl);
     }
-  }, [filters, filtersHydrated]);
+  }, [filters]);
 
   const ownedDocuments = useMemo(
     () => docs?.data.filter((document) => document.ownerId === currentUserId) ?? [],

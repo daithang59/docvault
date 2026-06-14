@@ -1,6 +1,7 @@
-@Library('docvault@devsecops-pipeline') _
+@Library('docvault@feat/devsecops-main-intergation') _
 
 def cfg = [:]
+def changeSet = [:]
 def builtServicesCsv = ''
 
 pipeline {
@@ -15,6 +16,46 @@ pipeline {
             name: 'FORCE_BUILD_ALL',
             defaultValue: false,
             description: 'Rebuild and rescan all images regardless of detected file changes.'
+        )
+        string(
+            name: 'RELEASE_BRANCH',
+            defaultValue: 'main',
+            description: 'Trusted branch that is allowed to publish images and update GitOps.'
+        )
+        string(
+            name: 'REGISTRY_HOST',
+            defaultValue: 'harbor.docvault.id.vn',
+            description: 'Container registry host without protocol. Use harbor.docvault.id.vn for the DocVault Harbor registry.'
+        )
+        string(
+            name: 'REGISTRY_NAMESPACE',
+            defaultValue: 'docvault-dev',
+            description: 'Registry namespace/project. For Harbor dev pushes use docvault-dev; for Docker Hub use the Docker Hub username/org.'
+        )
+        string(
+            name: 'REGISTRY_CREDENTIAL_ID',
+            defaultValue: 'harbor-docvault-dev-robot-token',
+            description: 'Jenkins credential ID for docker login. Harbor AWS Secrets Manager credential uses Secret Text.'
+        )
+        choice(
+            name: 'REGISTRY_CREDENTIAL_TYPE',
+            choices: ['secretText', 'usernamePassword'],
+            description: 'Credential binding type. Use secretText for Harbor robot token from AWS Secrets Manager; usernamePassword for Docker Hub.'
+        )
+        string(
+            name: 'REGISTRY_USERNAME',
+            defaultValue: 'robot$docvault-dev+jenkins-push',
+            description: 'Registry username used when REGISTRY_CREDENTIAL_TYPE=secretText. For Harbor robot accounts this includes robot$.'
+        )
+        booleanParam(
+            name: 'PUSH_LATEST',
+            defaultValue: false,
+            description: 'Also push the mutable latest tag. Keep false when Harbor tag immutability is enabled.'
+        )
+        booleanParam(
+            name: 'ENFORCE_SONAR_QG',
+            defaultValue: true,
+            description: 'Fail the pipeline when the SonarQube Quality Gate fails or times out.'
         )
         string(
             name: 'GITOPS_BRANCH',
@@ -61,6 +102,26 @@ pipeline {
             defaultValue: '',
             description: 'Reachable web base URL for ZAP baseline scan, for example http://<node-ip>:30006. Required only when RUN_ZAP=true.'
         )
+        booleanParam(
+            name: 'USE_NVD_KEY',
+            defaultValue: true,
+            description: 'Use NVD API key for Dependency Check to bypass rate limits (requires "nvd-api-key" credential).'
+        )
+        booleanParam(
+            name: 'DEPENDENCY_CHECK_NO_UPDATE',
+            defaultValue: false,
+            description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
+        )
+        booleanParam(
+            name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
+            defaultValue: true,
+            description: 'Temporarily continue the pipeline when Dependency Check fails. The stage/build will be marked unstable.'
+        )
+        string(
+            name: 'DEPENDENCY_CHECK_DATA_DIR',
+            defaultValue: '',
+            description: 'Optional host cache directory for Dependency Check data. Leave blank to use Docker volume docvault-dependency-check-data.'
+        )
     }
 
     environment {
@@ -87,6 +148,32 @@ pipeline {
                         ? params.GITOPS_BRANCH.trim()
                         : cfg.gitOpsBranch
 
+                    cfg.releaseBranch = params.RELEASE_BRANCH?.trim()
+                        ? params.RELEASE_BRANCH.trim()
+                        : cfg.releaseBranch
+
+                    cfg.registryHost = params.REGISTRY_HOST?.trim()
+                        ? params.REGISTRY_HOST.trim()
+                        : cfg.registryHost
+
+                    cfg.registryNamespace = params.REGISTRY_NAMESPACE?.trim()
+                        ? params.REGISTRY_NAMESPACE.trim()
+                        : cfg.registryNamespace
+
+                    cfg.registryCredentialId = params.REGISTRY_CREDENTIAL_ID?.trim()
+                        ? params.REGISTRY_CREDENTIAL_ID.trim()
+                        : cfg.registryCredentialId
+
+                    cfg.registryCredentialType = params.REGISTRY_CREDENTIAL_TYPE?.trim()
+                        ? params.REGISTRY_CREDENTIAL_TYPE.trim()
+                        : cfg.registryCredentialType
+
+                    cfg.registryUsername = params.REGISTRY_USERNAME?.trim()
+                        ? params.REGISTRY_USERNAME.trim()
+                        : cfg.registryUsername
+
+                    cfg.pushLatest = params.PUSH_LATEST
+
                     cfg.deployTargetUrl = params.DEPLOY_TARGET_URL?.trim()
                         ? params.DEPLOY_TARGET_URL.trim()
                         : cfg.deployTargetUrl
@@ -109,7 +196,43 @@ pipeline {
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
 
+                    cfg.useNvdKey = true
+                    cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
+                    cfg.dependencyCheckDataDir = params.DEPENDENCY_CHECK_DATA_DIR?.trim()
+
+                    def resolvedBranchName = env.BRANCH_NAME?.trim()
+                    if (!resolvedBranchName && env.GIT_BRANCH?.trim()) {
+                        resolvedBranchName = env.GIT_BRANCH.trim().replaceFirst(/^origin\//, '')
+                    }
+                    if (!resolvedBranchName) {
+                        resolvedBranchName = sh(
+                            script: 'git branch --show-current || true',
+                            returnStdout: true
+                        ).trim()
+                    }
+
+                    cfg.branchName = resolvedBranchName ?: '(unknown)'
+                    cfg.isPullRequest = env.CHANGE_ID?.trim() ? true : false
+                    cfg.isReleaseBuild = !cfg.isPullRequest && cfg.branchName == cfg.releaseBranch
+                    cfg.imageTag = "v${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
+
+                    env.IS_PULL_REQUEST = cfg.isPullRequest ? 'true' : 'false'
+                    env.IS_RELEASE_BUILD = cfg.isReleaseBuild ? 'true' : 'false'
+                    env.IMAGE_TAG = cfg.imageTag
+
+                    echo ">>> Branch name: ${cfg.branchName}"
+                    echo ">>> Change request: ${env.CHANGE_ID ?: '(none)'}"
+                    echo ">>> Change target: ${env.CHANGE_TARGET ?: '(none)'}"
+                    echo ">>> Release branch: ${cfg.releaseBranch}"
+                    echo ">>> Pipeline mode: ${cfg.isReleaseBuild ? 'CD release' : 'CI validation'}"
+                    echo ">>> Image tag: ${cfg.imageTag}"
                     echo ">>> Effective GitOps branch: ${cfg.gitOpsBranch}"
+                    echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
+                    echo ">>> Registry namespace/project: ${cfg.registryNamespace}"
+                    echo ">>> Registry credential ID: ${cfg.registryCredentialId}"
+                    echo ">>> Registry credential type: ${cfg.registryCredentialType}"
+                    echo ">>> Registry username: ${cfg.registryUsername ?: '(credential-provided)'}"
+                    echo ">>> PUSH_LATEST=${params.PUSH_LATEST}"
                     echo ">>> FORCE_BUILD_ALL=${params.FORCE_BUILD_ALL}"
                     echo ">>> DEPLOY_TARGET_URL=${cfg.deployTargetUrl ?: '(not set)'}"
                     echo ">>> RUN_ARGO_HEALTH_CHECK=${params.RUN_ARGO_HEALTH_CHECK}"
@@ -119,6 +242,10 @@ pipeline {
                     echo ">>> KUBECONFIG_CREDENTIAL_ID=${cfg.kubeconfigCredentialId ?: '(not set)'}"
                     echo ">>> RUN_ZAP=${params.RUN_ZAP}"
                     echo ">>> ZAP_TARGET=${cfg.zapTarget ?: '(not set)'}"
+                    echo ">>> USE_NVD_KEY=${cfg.useNvdKey} (forced)"
+                    echo ">>> DEPENDENCY_CHECK_NO_UPDATE=${cfg.dependencyCheckNoUpdate}"
+                    echo ">>> ALLOW_DEPENDENCY_CHECK_FAILURE=${params.ALLOW_DEPENDENCY_CHECK_FAILURE}"
+                    echo ">>> DEPENDENCY_CHECK_DATA_DIR=${cfg.dependencyCheckDataDir ?: '(default)'}"
                 }
             }
         }
@@ -127,6 +254,32 @@ pipeline {
             steps {
                 script {
                     preventLoop()
+                }
+            }
+        }
+
+        stage('Detect Changes') {
+            steps {
+                script {
+                    changeSet = detectChanges(cfg)
+
+                    cfg.changeDetectionReady = true
+                    cfg.changeDiffRange = changeSet.diffRange ?: ''
+                    cfg.changedFiles = changeSet.changedFiles ?: []
+                    cfg.forceBuildAll = changeSet.forceBuildAll
+
+                    env.FORCE_BUILD_ALL_EFFECTIVE = changeSet.forceBuildAll ? 'true' : 'false'
+                    env.DOCS_ONLY = changeSet.docsOnly ? 'true' : 'false'
+                    env.APP_CHANGED = changeSet.appChanged ? 'true' : 'false'
+                    env.IAC_CHANGED = changeSet.infraChanged ? 'true' : 'false'
+                    env.INFRA_CHANGED = changeSet.gitOpsInfraChanged ? 'true' : 'false'
+                    env.PIPELINE_CHANGED = changeSet.pipelineChanged ? 'true' : 'false'
+                    env.UNKNOWN_CHANGED = changeSet.unknownChanged ? 'true' : 'false'
+                    env.RUN_APP_CI = changeSet.runAppCi ? 'true' : 'false'
+                    env.RUN_SECURITY_CI = changeSet.runSecurityCi ? 'true' : 'false'
+                    env.RUN_IAC_CI = changeSet.runIacCi ? 'true' : 'false'
+                    env.RUN_IMAGE_BUILD = changeSet.runImageBuild ? 'true' : 'false'
+                    env.CHANGED_FILES_COUNT = "${changeSet.changedFiles?.size() ?: 0}"
                 }
             }
         }
@@ -140,6 +293,11 @@ pipeline {
         }
 
         stage('Install') {
+            when {
+                expression {
+                    return env.RUN_APP_CI == 'true'
+                }
+            }
             steps {
                 script {
                     installStep(cfg)
@@ -147,12 +305,75 @@ pipeline {
             }
         }
 
-        stage('Pre-build Security') {
-            parallel {
-                stage('SCA - Dependency Check') {
+        stage('Secret Scan') {
+            steps {
+                script {
+                    echo '>>> Entering Secret Scan stage...'
+                    secretScan()
+                    echo '>>> Secret Scan stage completed.'
+                }
+            }
+        }
+
+        stage('Pre-build Quality') {
+            when {
+                expression {
+                    return env.RUN_APP_CI == 'true'
+                }
+            }
+            stages {
+                stage('Lint & Unit Tests') {
+                    parallel {
+                        stage('Unit Tests') {
+                            steps {
+                                script {
+                                    unitTests(cfg)
+                                }
+                            }
+                        }
+
+                        stage('Lint') {
+                            steps {
+                                script {
+                                    runPnpmTask(cfg, 'lint')
+                                }
+                            }
+                        }
+                    }
+                }
+
+                stage('Workspace Build') {
                     steps {
                         script {
-                            dependencyCheck()
+                            runPnpmTask(cfg, 'build')
+                        }
+                    }
+                }
+            }
+        }
+
+        stage('Pre-build Security') {
+            when {
+                expression {
+                    return env.RUN_SECURITY_CI == 'true'
+                }
+            }
+            parallel {
+                stage('SCA - Dependency Check') {
+                    when {
+                        expression {
+                            return env.RUN_APP_CI == 'true'
+                        }
+                    }
+                    steps {
+                        script {
+                            if (params.ALLOW_DEPENDENCY_CHECK_FAILURE) {
+                                catchError(buildResult: 'UNSTABLE', stageResult: 'UNSTABLE') {
+                                    dependencyCheck(cfg)
+                                }
+                            } else {
+                                dependencyCheck(cfg)
+                            }
                         }
                     }
                 }
@@ -165,41 +386,42 @@ pipeline {
                     }
                 }
 
-                stage('Unit Tests') {
-                    steps {
-                        script {
-                            unitTests(cfg)
-                        }
-                    }
-                }
-
                 stage('SAST - SonarQube') {
-                    steps {
-                        script {
-                            sonarSast(cfg)
+                    when {
+                        expression {
+                            return env.RUN_APP_CI == 'true'
                         }
                     }
-                }
-
-                stage('IaC - Checkov Scan') {
                     steps {
                         script {
-                            iacCheckov(cfg)
-                        }
-                    }
-                }
-
-                stage('IaC - Terraform Validate') {
-                    steps {
-                        script {
-                            terraformValidate(cfg)
+                            sonarSast(cfg + [enforceQualityGate: params.ENFORCE_SONAR_QG])
                         }
                     }
                 }
             }
         }
 
+        stage('Pre-build Security - IaC') {
+            when {
+                expression {
+                    return env.RUN_IAC_CI == 'true'
+                }
+            }
+            steps {
+                script {
+                    policyAsCode(cfg)
+                    iacCheckov(cfg)
+                    terraformValidate(cfg)
+                }
+            }
+        }
+
         stage('Build & Scan Services') {
+            when {
+                expression {
+                    return env.RUN_IMAGE_BUILD == 'true'
+                }
+            }
             steps {
                 script {
                     def built = buildAndScan(cfg)
@@ -233,7 +455,7 @@ pipeline {
         stage('Push & GitOps') {
             when {
                 expression {
-                    return builtServicesCsv?.trim() || env.INFRA_CHANGED == 'true'
+                    return env.IS_RELEASE_BUILD == 'true' && (builtServicesCsv?.trim() || env.INFRA_CHANGED == 'true')
                 }
             }
             steps {
@@ -247,7 +469,7 @@ pipeline {
         stage('Argo CD Health Check') {
             when {
                 expression {
-                    return params.RUN_ARGO_HEALTH_CHECK
+                    return env.IS_RELEASE_BUILD == 'true' && params.RUN_ARGO_HEALTH_CHECK
                 }
             }
             steps {
@@ -260,7 +482,7 @@ pipeline {
         stage('Post-deploy Smoke Test') {
             when {
                 expression {
-                    return cfg.deployTargetUrl?.trim() ? true : false
+                    return env.IS_RELEASE_BUILD == 'true' && (cfg.deployTargetUrl?.trim() ? true : false)
                 }
             }
             steps {
@@ -273,7 +495,7 @@ pipeline {
         stage('DAST - OWASP ZAP') {
             when {
                 expression {
-                    return params.RUN_ZAP
+                    return env.IS_RELEASE_BUILD == 'true' && params.RUN_ZAP
                 }
             }
             steps {
@@ -292,4 +514,26 @@ pipeline {
             }
         }
     }
+}
+
+def runPnpmTask(cfg, String taskName) {
+    def allowedTasks = ['lint', 'build']
+    if (!allowedTasks.contains(taskName)) {
+        error("Unsupported pnpm task '${taskName}'. Allowed tasks: ${allowedTasks.join(', ')}")
+    }
+
+    echo ">>> Running pnpm ${taskName}..."
+    def pnpmStoreVolume = cfg.pnpmStoreVolume ?: 'docvault-pnpm-store'
+
+    sh """
+        set -eu
+        docker volume create '${pnpmStoreVolume}' >/dev/null
+        docker run --rm \\
+            --network host \\
+            -v ${env.WORKSPACE}:/app \\
+            -v ${pnpmStoreVolume}:/pnpm/store \\
+            -w /app \\
+            ${cfg.nodeImage} \\
+            sh -c "corepack enable && pnpm config set store-dir /pnpm/store && pnpm ${taskName}"
+    """
 }

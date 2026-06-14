@@ -5,7 +5,7 @@
 
 # Default: team lead reviews everything not otherwise matched
 *                             @daithang59
-
+*                             @duyimew
 # Infrastructure & CI/CD
 infra/                        @daithang59
 .github/                      @daithang59

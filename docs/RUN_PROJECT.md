@@ -111,7 +111,7 @@ View 4 tables: `documents`, `document_versions`, `document_acl`, `document_workf
 
 Open: http://localhost:8081
 
-Login: `mongoadmin` / `mongoadminpw`
+Login with `MONGO_EXPRESS_USER` / `MONGO_EXPRESS_PASSWORD` from `infra/.env`.
 
 ## 6. Start Backend
 

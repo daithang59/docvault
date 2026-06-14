@@ -1,0 +1,11 @@
+misconfigurations:
+  - id: KSV-0014
+    paths:
+      - "infra/k8s/infra-deps/base/keycloak.yaml"
+      - "infra/k8s/public-ingress/overlays/testing/keycloak-client-public-url-job.yaml"
+    statement: "Keycloak 26 start-dev and kcadm need writable image paths in the current testing deployment; setting readOnlyRootFilesystem=true broke the auth service. Revisit when Keycloak is moved to a hardened production start mode."
+  - id: AVD-KSV-0014
+    paths:
+      - "infra/k8s/infra-deps/base/keycloak.yaml"
+      - "infra/k8s/public-ingress/overlays/testing/keycloak-client-public-url-job.yaml"
+    statement: "Same exception as KSV-0014; included for Trivy versions that report the AVD-prefixed Kubernetes check ID."

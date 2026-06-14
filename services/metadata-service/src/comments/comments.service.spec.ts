@@ -135,7 +135,6 @@ describe('CommentsService document comment pairing', () => {
   });
 });
 
-
 describe('CommentsService mentions', () => {
   const context = {
     traceId: 'trace-1',
@@ -167,7 +166,12 @@ describe('CommentsService mentions', () => {
   });
 
   it('notifies mentioned users when a comment includes @mentions', async () => {
-    await service.create('doc-1', 'cc @bob and @carol please look', author as any, context as any);
+    await service.create(
+      'doc-1',
+      'cc @bob and @carol please look',
+      author as any,
+      context as any,
+    );
 
     expect(mockNotify).toHaveBeenCalledWith(
       context,
@@ -180,7 +184,12 @@ describe('CommentsService mentions', () => {
   });
 
   it('does not notify the author when they mention themselves', async () => {
-    await service.create('doc-1', 'note to self @author-1', author as any, context as any);
+    await service.create(
+      'doc-1',
+      'note to self @author-1',
+      author as any,
+      context as any,
+    );
 
     const mentionCall = mockNotify.mock.calls.find(
       ([, payload]) => payload.type === 'MENTIONED',
@@ -189,7 +198,12 @@ describe('CommentsService mentions', () => {
   });
 
   it('does not call notify when there are no mentions', async () => {
-    await service.create('doc-1', 'plain comment', author as any, context as any);
+    await service.create(
+      'doc-1',
+      'plain comment',
+      author as any,
+      context as any,
+    );
 
     const mentionCall = mockNotify.mock.calls.find(
       ([, payload]) => payload.type === 'MENTIONED',
@@ -202,7 +216,12 @@ describe('CommentsService mentions', () => {
       { documentComment: { create: mockCreate } } as any,
       { emitEvent: mockEmitEvent } as any,
     );
-    const result = await service2.create('doc-1', 'hi @bob', author as any, context as any);
+    const result = await service2.create(
+      'doc-1',
+      'hi @bob',
+      author as any,
+      context as any,
+    );
     expect(result.id).toBe('comment-9');
   });
 });

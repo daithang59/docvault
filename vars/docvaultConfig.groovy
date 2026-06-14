@@ -1,13 +1,44 @@
 def call() {
     def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'gitops-testing'
-    def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'http://sonarqube:9000'
+    def releaseBranch = env.RELEASE_BRANCH?.trim() ? env.RELEASE_BRANCH.trim() : 'main'
+    def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'https://sonarqube.docvault.id.vn'
     def deployTargetUrl = env.DEPLOY_TARGET_URL?.trim() ? env.DEPLOY_TARGET_URL.trim() : ''
     def zapTarget = env.ZAP_TARGET?.trim() ? env.ZAP_TARGET.trim() : ''
+    def registryHost = env.REGISTRY_HOST?.trim() ? env.REGISTRY_HOST.trim() : 'harbor.docvault.id.vn'
+    def registryNamespace = env.REGISTRY_NAMESPACE?.trim()
+        ? env.REGISTRY_NAMESPACE.trim()
+        : 'docvault-dev'
+    def registryCredentialId = env.REGISTRY_CREDENTIAL_ID?.trim()
+        ? env.REGISTRY_CREDENTIAL_ID.trim()
+        : 'harbor-docvault-dev-robot-token'
+    def registryCredentialType = env.REGISTRY_CREDENTIAL_TYPE?.trim()
+        ? env.REGISTRY_CREDENTIAL_TYPE.trim()
+        : 'secretText'
+    def registryUsername = env.REGISTRY_USERNAME?.trim()
+        ? env.REGISTRY_USERNAME.trim()
+        : 'robot$docvault-dev+jenkins-push'
+    def pushLatest = env.PUSH_LATEST?.trim()
+        ? env.PUSH_LATEST.equalsIgnoreCase('true')
+        : false
+    def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
+        ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
+        : false
+    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
+        registryHost: registryHost,
+        registryNamespace: registryNamespace,
+        registryCredentialId: registryCredentialId,
+        registryCredentialType: registryCredentialType,
+        registryUsername: registryUsername,
+        pushLatest: pushLatest,
+        dependencyCheckNoUpdate: dependencyCheckNoUpdate,
+        dependencyCheckDataDir: dependencyCheckDataDir,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
+        kyvernoImage: 'ghcr.io/kyverno/kyverno-cli:v1.12.0',
+        helmImage: 'alpine/helm:3.16.4',
         sonarScannerImage: 'sonarsource/sonar-scanner-cli:latest',
         sonarQubeInstallation: 'sqdocvault',
         sonarProjectKey: 'docvault',
@@ -23,6 +54,7 @@ def call() {
         buildParallelism: 3,
         pushParallelism: 3,
         pnpmStoreVolume: 'docvault-pnpm-store',
+        turboCacheVolume: 'docvault-turbo-cache',
         services: ['gateway', 'metadata-service', 'document-service', 'notification-service', 'workflow-service', 'audit-service'],
         webAppName: 'web',
         webImageName: 'docvault',
@@ -30,6 +62,7 @@ def call() {
         backendDockerfile: 'Dockerfile.backend',
         helmValuesDir: 'infra/k8s/values',
         gitOpsBranch: gitOpsBranch,
+        releaseBranch: releaseBranch,
         gitOpsRepoUrl: 'https://github.com/daithang59/docvault.git',
         deployTargetUrl: deployTargetUrl,
         argocdNamespace: 'argocd',

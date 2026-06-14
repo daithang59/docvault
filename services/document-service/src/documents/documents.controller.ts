@@ -180,7 +180,6 @@ export class DocumentsController {
       return;
     }
 
-
     const sdkResponse = result.object as any;
 
     if (range && sdkResponse.ContentRange) {

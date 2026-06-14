@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   AclEffect,
@@ -730,8 +730,6 @@ describe('PolicyService', () => {
   });
 
   describe('share link grants', () => {
-    const { createHash } = require('crypto');
-
     function activeShareLink(overrides = {}) {
       return {
         id: 'link-1',

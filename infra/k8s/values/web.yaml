@@ -9,9 +9,8 @@ image:
 healthPath: /api/health
 
 service:
-  type: NodePort
+  type: ClusterIP
   port: 3006
-  nodePort: 30006
 env:
   NODE_ENV: production
   PORT: "3006"
@@ -21,7 +20,5 @@ env:
   KEYCLOAK_INTERNAL_BASE_URL: "http://keycloak:8080"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_CLIENT_ID: "docvault-gateway"
-  # FRONTEND_URL and KEYCLOAK_BROWSER_BASE_URL are patched at runtime
-  # by scripts/setup-eks-access.ps1 with the current node external IP.
-  FRONTEND_URL: "http://localhost:3006"
-  KEYCLOAK_BROWSER_BASE_URL: "http://localhost:8080"
+  FRONTEND_URL: "https://app.docvault.id.vn"
+  KEYCLOAK_BROWSER_BASE_URL: "https://auth.docvault.id.vn"

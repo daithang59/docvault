@@ -284,13 +284,10 @@ Mở: `https://localhost:18081`
 
 Nếu repo private, thêm repository credential vào Argo CD trước khi apply apps.
 
-Apply GitOps applications:
+Apply the GitOps root application:
 
 ```powershell
-kubectl apply -f infra\argocd-apps\docvault-infra.yaml
-kubectl apply -f infra\argocd-apps\docvault-apps.yaml
-kubectl apply -f infra\argocd-apps\monitoring.yaml
-kubectl apply -f infra\argocd-apps\loki.yaml
+kubectl apply -f infra\argocd-bootstrap\docvault-root.yaml
 ```
 
 Kiểm tra:

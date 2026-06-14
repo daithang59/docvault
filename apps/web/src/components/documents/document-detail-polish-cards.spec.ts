@@ -1,7 +1,8 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { describe, expect, it } from 'vitest';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { AuthProvider } from '@/lib/auth/auth-context';
 import type { DocumentDetail } from '@/features/documents/documents.types';
 import { DocumentEvidenceLinksCard } from './document-evidence-links-card';
 import { DocumentMetadataSummaryCard } from './document-metadata-summary-card';
@@ -38,9 +39,22 @@ const document: DocumentDetail = {
   aclEntries: [],
 };
 
+function renderWithQueryClient(element: ReactElement, includeAuth = false) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+  const child = includeAuth
+    ? createElement(AuthProvider, null, element)
+    : element;
+
+  return renderToStaticMarkup(
+    createElement(QueryClientProvider, { client }, child),
+  );
+}
+
 describe('DocumentMetadataSummaryCard', () => {
   it('renders compact metadata for inspection without object keys', () => {
-    const html = renderToStaticMarkup(
+    const html = renderWithQueryClient(
       createElement(DocumentMetadataSummaryCard, { document }),
     );
 
@@ -68,39 +82,33 @@ describe('DocumentEvidenceLinksCard', () => {
 
 describe('DocumentVersionsCard', () => {
   it('renders version rows with labeled preview, download, compare, and restore controls', () => {
-    const client = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const html = renderToStaticMarkup(
-      createElement(
-        QueryClientProvider,
-        { client },
-        createElement(DocumentVersionsCard, {
-          docId: 'doc-1',
-          versions: [
-            {
-              ...document.versions[0],
-              id: 'version-1',
-              version: 1,
-              versionNumber: 1,
-              filename: 'board-report-v1.pdf',
-            },
-            {
-              ...document.versions[0],
-              id: 'version-2',
-              version: 2,
-              versionNumber: 2,
-              filename: 'board-report-v2.pdf',
-            },
-          ],
-          onDownload: () => undefined,
-          onPreview: () => undefined,
-          canDownload: true,
-          canPreview: true,
-          canRestore: true,
-          currentVersion: 2,
-        }),
-      ),
+    const html = renderWithQueryClient(
+      createElement(DocumentVersionsCard, {
+        docId: 'doc-1',
+        versions: [
+          {
+            ...document.versions[0],
+            id: 'version-1',
+            version: 1,
+            versionNumber: 1,
+            filename: 'board-report-v1.pdf',
+          },
+          {
+            ...document.versions[0],
+            id: 'version-2',
+            version: 2,
+            versionNumber: 2,
+            filename: 'board-report-v2.pdf',
+          },
+        ],
+        onDownload: () => undefined,
+        onPreview: () => undefined,
+        canDownload: true,
+        canPreview: true,
+        canRestore: true,
+        currentVersion: 2,
+      }),
+      true,
     );
 
     expect(html).toContain('board-report-v1.pdf');

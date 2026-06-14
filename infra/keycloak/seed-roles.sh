@@ -11,7 +11,8 @@ set -e
 
 KC_URL="${KEYCLOAK_URL:-http://keycloak:8080}"
 KC_ADMIN="${KEYCLOAK_ADMIN:-admin}"
-KC_ADMIN_PW="${KEYCLOAK_ADMIN_PASSWORD:-adminpw}"
+: "${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}"
+KC_ADMIN_PW="${KEYCLOAK_ADMIN_PASSWORD}"
 REALM="${KEYCLOAK_REALM:-docvault}"
 
 READY_URL="${KC_URL}/realms/${REALM}/.well-known/openid-configuration"

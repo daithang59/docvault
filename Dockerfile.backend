@@ -1,8 +1,12 @@
 # Use node 20 alpine as base
 FROM node:20-alpine AS base
+ARG ALPINE_SECURITY_REFRESH=manual
 ENV PNPM_HOME="/pnpm"
 ENV PATH="$PNPM_HOME:$PATH"
-RUN corepack enable pnpm
+RUN echo "alpine-security-refresh=${ALPINE_SECURITY_REFRESH}" && \
+    apk add --no-cache --upgrade libcrypto3 libssl3 && \
+    corepack enable pnpm && \
+    corepack prepare pnpm@9.15.0 --activate
 
 # Stage 1: Prune the monorepo to only what's needed for the specific service
 FROM base AS builder

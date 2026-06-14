@@ -1,7 +1,7 @@
-import 'dotenv/config';
+import { config } from 'dotenv';
 import * as path from 'path';
 // Load root .env (three levels up: src → metadata-service → services → root).
-require('dotenv').config({
+config({
   path: path.join(__dirname, '..', '..', '..', '.env'),
 });
 
