@@ -6,6 +6,7 @@ metadata:
   annotations:
     argocd.argoproj.io/hook: PostSync
     argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    checkov.io/skip1: CKV_K8S_22=Keycloak CLI needs write access to write temporary configuration files.
 spec:
   backoffLimit: 3
   template:
@@ -17,20 +18,23 @@ spec:
       automountServiceAccountToken: false
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
-        fsGroup: 1000
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
         seccompProfile:
           type: RuntimeDefault
       containers:
         - name: configure
           image: quay.io/keycloak/keycloak:26.0
-          imagePullPolicy: IfNotPresent
+          imagePullPolicy: Always
           command:
             - /bin/sh
             - -ec
           args:
             - |
+              KEYCLOAK_ADMIN="$(cat /secrets/keycloak/KEYCLOAK_ADMIN)"
+              KEYCLOAK_ADMIN_PASSWORD="$(cat /secrets/keycloak/KEYCLOAK_ADMIN_PASSWORD)"
+
               /opt/keycloak/bin/kcadm.sh config credentials \
                 --server http://keycloak:8080 \
                 --realm master \
@@ -56,20 +60,10 @@ spec:
           env:
             - name: HOME
               value: /tmp
-            - name: KEYCLOAK_ADMIN
-              valueFrom:
-                secretKeyRef:
-                  name: keycloak-secret
-                  key: KEYCLOAK_ADMIN
-            - name: KEYCLOAK_ADMIN_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: keycloak-secret
-                  key: KEYCLOAK_ADMIN_PASSWORD
           securityContext:
             runAsNonRoot: true
-            runAsUser: 1000
-            runAsGroup: 1000
+            runAsUser: 10001
+            runAsGroup: 10001
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: false
             capabilities:
@@ -78,6 +72,9 @@ spec:
           volumeMounts:
             - name: tmp
               mountPath: /tmp
+            - name: keycloak-secret-vol
+              mountPath: /secrets/keycloak
+              readOnly: true
           resources:
             limits:
               cpu: 300m
@@ -88,3 +85,6 @@ spec:
       volumes:
         - name: tmp
           emptyDir: {}
+        - name: keycloak-secret-vol
+          secret:
+            secretName: keycloak-secret
