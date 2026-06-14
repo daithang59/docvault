@@ -16,12 +16,12 @@ import {
 import { PrismaPg } from '@prisma/adapter-pg';
 import { Pool } from 'pg';
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
   throw new Error('Missing DATABASE_URL.');
 }
 
-const pool = new Pool({ connectionString: DATABASE_URL });
+const pool = new Pool({ connectionString: databaseUrl });
 const adapter = new PrismaPg(pool as any);
 const prisma = new PrismaClient({ adapter });
 
@@ -157,7 +157,7 @@ async function resolveDemoUsers(): Promise<DemoUsers> {
 }
 
 async function resetMetadata(): Promise<void> {
-  assertLocalDatabase(DATABASE_URL);
+  assertLocalDatabase(databaseUrl);
 
   await prisma.documentWorkflowHistory.deleteMany();
   await prisma.documentAcl.deleteMany();
