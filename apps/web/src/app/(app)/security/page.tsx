@@ -26,6 +26,7 @@ import { EmptyState } from '@/components/common/empty-state';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import {
+  ColumnBarChart,
   MetricTile,
   PriorityBarList,
   ScoreGauge,
@@ -57,12 +58,16 @@ import {
   buildSecurityDashboardModel,
   buildAuditFilterQuery,
   buildRecommendationEvidencePacket,
+  buildSecurityCaseWorkflowNote,
   filterSecurityRecommendationRows,
+  getAuditEventDocumentHref,
   getSecurityRecommendationQueueCounts,
   getSecurityRouteCounts,
   SECURITY_RECOMMENDATION_PREVIEW_LIMIT,
+  validateSecurityCaseWorkflowDraft,
   type SecurityAlertRoute,
   type SecurityAlertRouting,
+  type SecurityCaseResolutionKind,
   type SecurityDashboardMetric,
   type SecurityRecommendationPlaybook,
   type SecurityRecommendationQueueView,
@@ -114,6 +119,10 @@ function humanizeActorText(text: string, names: ActorNameMap): string {
 const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
 const SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT = 5;
 const SECURITY_SUPPORTING_LIST_PREVIEW_LIMIT = 4;
+const SECURITY_PANEL_TARGET_CLASS =
+  'scroll-mt-24 transition target:ring-2 target:ring-[var(--color-primary)] target:ring-offset-2';
+const SECURITY_SECONDARY_ACTION_CLASS =
+  'inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]';
 const recommendationWorkflowOptions: Array<{
   value: SecurityRecommendationWorkflowStatus;
   label: string;
@@ -154,6 +163,8 @@ export default function SecurityPage() {
   const [recommendationQueueView, setRecommendationQueueView] =
     useState<SecurityRecommendationQueueView>('active');
   const [showAllRecommendations, setShowAllRecommendations] = useState(false);
+  const [selectedRecommendationId, setSelectedRecommendationId] =
+    useState<string | null>(null);
 
   const summaryQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -455,7 +466,7 @@ export default function SecurityPage() {
           label="Alert distribution"
           segments={model.commandCenter.alertSegments}
         />
-        <PriorityBarList
+        <ColumnBarChart
           label="Document risk bands"
           segments={model.commandCenter.riskBandSegments}
         />
@@ -508,10 +519,13 @@ export default function SecurityPage() {
           onQueueViewChange={(view) => {
             setRecommendationQueueView(view);
             setShowAllRecommendations(false);
+            setSelectedRecommendationId(null);
           }}
           onToggleShowAll={() =>
             setShowAllRecommendations((current) => !current)
           }
+          selectedRecommendationId={selectedRecommendationId}
+          onSelectRecommendation={setSelectedRecommendationId}
           pendingRecommendationId={pendingRecommendationId}
           workflowError={workflowError}
           expandedHistoryIds={expandedHistoryIds}
@@ -590,6 +604,8 @@ function RecommendationsPanel({
   showAll,
   onQueueViewChange,
   onToggleShowAll,
+  selectedRecommendationId,
+  onSelectRecommendation,
   pendingRecommendationId,
   workflowError,
   expandedHistoryIds,
@@ -606,6 +622,8 @@ function RecommendationsPanel({
   showAll: boolean;
   onQueueViewChange: (view: SecurityRecommendationQueueView) => void;
   onToggleShowAll: () => void;
+  selectedRecommendationId: string | null;
+  onSelectRecommendation: (id: string | null) => void;
   pendingRecommendationId: string | null;
   workflowError: { id: string; message: string } | null;
   expandedHistoryIds: string[];
@@ -634,11 +652,14 @@ function RecommendationsPanel({
     ? filteredItems
     : filteredItems.slice(0, SECURITY_RECOMMENDATION_PREVIEW_LIMIT);
   const actorNames = useActorNames();
+  const selectedItem = selectedRecommendationId
+    ? filteredItems.find((item) => item.id === selectedRecommendationId) ?? null
+    : null;
 
   return (
     <div
       id="security-recommendations"
-      className="rounded-lg border p-5"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -697,19 +718,36 @@ function RecommendationsPanel({
         </p>
       ) : (
         <>
-          <div className="mt-4 grid gap-3 lg:grid-cols-2">
+          <div className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,0.82fr)_minmax(380px,1.18fr)]">
+            <div className="space-y-2">
             {items.map((item) => {
               const tone = getRecommendationTone(item.severity);
+              const isSelected = selectedRecommendationId === item.id;
+              const isCase = item.finding.routing.route === 'CASE';
+              const firstDocument = item.affectedDocuments[0] ?? null;
+              const primaryActionLabel = isSelected
+                ? 'Hide details'
+                : isCase
+                  ? item.workflow.status === 'OPEN'
+                    ? 'Start case'
+                    : 'Continue case'
+                  : 'Review finding';
+
               return (
                 <div
                   key={item.id}
-                  className="rounded-lg border p-4"
+                  className="rounded-lg border border-l-4 px-4 py-3 transition"
                   style={{
-                    borderColor: tone.border,
-                    background: tone.bg,
+                    borderColor: isSelected
+                      ? 'var(--color-primary)'
+                      : 'var(--border-soft)',
+                    borderLeftColor: tone.border,
+                    background: isSelected
+                      ? 'var(--bg-subtle)'
+                      : 'var(--bg-card)',
                   }}
                 >
-                  <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                  <div className="flex flex-col gap-3">
                     <div className="min-w-0">
                       <div className="flex flex-wrap items-center gap-2">
                         <span
@@ -718,12 +756,9 @@ function RecommendationsPanel({
                         >
                           {item.severityLabel}
                         </span>
-                        <SecurityRouteBadge routing={item.finding.routing} />
-                        <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
-                          {item.finding.categoryLabel}
-                        </span>
-                        <span className="rounded bg-[var(--bg-card)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-muted)]">
-                          {item.typeLabel}
+                        <SecurityRouteCodeBadge route={item.finding.routing.route} />
+                        <span className="text-[11px] font-medium text-[var(--text-faint)]">
+                          {item.finding.categoryLabel} · {item.typeLabel}
                         </span>
                       </div>
                       <h3 className="mt-2 text-sm font-semibold text-[var(--text-strong)]">
@@ -732,20 +767,38 @@ function RecommendationsPanel({
                       <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
                         {item.finding.summary}
                       </p>
-                      <p className="mt-1 text-[11px] leading-relaxed text-[var(--text-faint)]">
-                        {item.finding.routing.routeDescription}
-                      </p>
                     </div>
-                    <Link
-                      href={buildRecommendationAuditHref(item.auditFilters)}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                    >
-                      Open audit
-                      <ExternalLink className="h-4 w-4" />
-                    </Link>
+                    <div className="flex flex-wrap gap-2">
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onSelectRecommendation(isSelected ? null : item.id)
+                        }
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg px-3 text-sm font-semibold text-white transition hover:brightness-110"
+                        style={{ background: 'var(--color-primary)' }}
+                      >
+                        {primaryActionLabel}
+                      </button>
+                      {firstDocument ? (
+                        <Link
+                          href={firstDocument.href}
+                          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                        >
+                          Open document
+                          <ExternalLink className="h-4 w-4" />
+                        </Link>
+                      ) : null}
+                      <Link
+                        href={buildRecommendationAuditHref(item.auditFilters)}
+                        className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                      >
+                        Open audit
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
 
-                  <div className="mt-3 grid gap-3 md:grid-cols-2">
+                  <div className="mt-3 grid gap-3">
                     <div>
                       <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
                         Affected scope
@@ -754,81 +807,37 @@ function RecommendationsPanel({
                         {item.finding.affectedScopeLabel}
                       </p>
                     </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                        {item.finding.evidenceQuestion}
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                        {humanizeActorText(item.reason, actorNames)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                        Next action
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                        <span className="font-medium text-[var(--text-main)]">
-                          {item.finding.nextStepLabel}
-                        </span>
-                        {': '}
-                        {humanizeActorText(item.recommendedAction, actorNames)}
-                      </p>
-                    </div>
-                    <div>
-                      <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
-                        Evidence
-                      </p>
-                      <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
-                        {item.evidence.join(' · ')}
-                      </p>
+                    <div className="flex flex-wrap gap-2">
+                      <span className="inline-flex h-7 items-center rounded-full border border-[var(--border-soft)] bg-[var(--bg-card)] px-2.5 text-xs font-medium text-[var(--text-main)]">
+                        {getRecommendationWorkflowLabel(item.workflow.status)}
+                      </span>
+                      <span
+                        className={`inline-flex h-7 items-center rounded-full border px-2.5 text-xs font-medium ${getRecommendationSlaTone(
+                          item.playbook.slaState,
+                        )}`}
+                      >
+                        {getRecommendationSlaLabel(item.playbook.slaState)}
+                      </span>
                     </div>
                   </div>
-
-                  {item.affectedDocumentIds.length || item.affectedActorIds.length ? (
-                    <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
-                      {item.affectedDocumentIds.map((docId) => (
-                        <span
-                          key={docId}
-                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                        >
-                          doc {truncateMiddle(docId, 18)}
-                        </span>
-                      ))}
-                      {item.affectedActorIds.map((actorId) => (
-                        <span
-                          key={actorId}
-                          className="rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1 font-mono"
-                        >
-                          actor <ActorLabel id={actorId} length={18} />
-                        </span>
-                      ))}
-                    </div>
-                  ) : null}
-
-                  <RecommendationWorkflowControls
-                    key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
-                    item={item}
-                    isPending={pendingRecommendationId === item.id}
-                    isDisabled={pendingRecommendationId !== null}
-                    error={workflowError?.id === item.id ? workflowError.message : null}
-                    onSave={onSaveWorkflow}
-                  />
-
-                  <RecommendationPlaybook playbook={item.playbook} />
-
-                  <RecommendationHistoryControls
-                    item={item}
-                    auditChain={auditChain}
-                    isExpanded={expandedHistoryIds.includes(item.id)}
-                    isLoading={historyLoadingId === item.id}
-                    error={historyErrors[item.id] ?? null}
-                    history={workflowHistoryByRecommendationId[item.id] ?? []}
-                    onToggleHistory={onToggleHistory}
-                    onDownloadEvidence={onDownloadEvidence}
-                  />
                 </div>
               );
             })}
+            </div>
+            <RecommendationDetailPanel
+              item={selectedItem}
+              auditChain={auditChain}
+              actorNames={actorNames}
+              pendingRecommendationId={pendingRecommendationId}
+              workflowError={workflowError}
+              expandedHistoryIds={expandedHistoryIds}
+              workflowHistoryByRecommendationId={workflowHistoryByRecommendationId}
+              historyLoadingId={historyLoadingId}
+              historyErrors={historyErrors}
+              onSaveWorkflow={onSaveWorkflow}
+              onToggleHistory={onToggleHistory}
+              onDownloadEvidence={onDownloadEvidence}
+            />
           </div>
           {filteredItems.length > SECURITY_RECOMMENDATION_PREVIEW_LIMIT ? (
             <ShowMoreListToggle
@@ -840,6 +849,235 @@ function RecommendationsPanel({
         </>
       )}
     </div>
+  );
+}
+
+function RecommendationDetailPanel({
+  item,
+  auditChain,
+  actorNames,
+  pendingRecommendationId,
+  workflowError,
+  expandedHistoryIds,
+  workflowHistoryByRecommendationId,
+  historyLoadingId,
+  historyErrors,
+  onSaveWorkflow,
+  onToggleHistory,
+  onDownloadEvidence,
+}: {
+  item:
+    | ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number]
+    | null;
+  auditChain: AuditChainStatus;
+  actorNames: ActorNameMap;
+  pendingRecommendationId: string | null;
+  workflowError: { id: string; message: string } | null;
+  expandedHistoryIds: string[];
+  workflowHistoryByRecommendationId: RecommendationHistoryState;
+  historyLoadingId: string | null;
+  historyErrors: RecommendationHistoryErrors;
+  onSaveWorkflow: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+  onToggleHistory: (id: string) => Promise<void>;
+  onDownloadEvidence: (
+    item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number],
+  ) => Promise<void>;
+}) {
+  return (
+    <aside
+      className="rounded-lg border p-4 xl:sticky xl:top-4 xl:self-start"
+      style={{
+        background: 'var(--bg-card)',
+        borderColor: 'var(--border-soft)',
+      }}
+    >
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+            Recommendation detail
+          </p>
+          <h3 className="mt-1 text-sm font-semibold text-[var(--text-strong)]">
+            Finding details
+          </h3>
+        </div>
+        <span className="inline-flex w-fit items-center rounded border border-[var(--border-soft)] px-2 py-1 text-xs font-medium text-[var(--text-muted)]">
+          Metadata only
+        </span>
+      </div>
+
+      {!item ? (
+        <div className="mt-4 rounded-lg border border-dashed border-[var(--border-soft)] bg-[var(--bg-subtle)] px-4 py-6">
+          <p className="text-sm font-medium text-[var(--text-main)]">
+            No finding selected
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Case workflow and evidence details stay here while the queue remains compact.
+          </p>
+        </div>
+      ) : (
+        <div className="mt-4">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+            <div className="min-w-0">
+              <div className="flex flex-wrap items-center gap-2">
+                <span
+                  className="rounded px-2 py-0.5 text-[10px] font-semibold uppercase"
+                  style={{
+                    color: getRecommendationTone(item.severity).text,
+                    background: getRecommendationTone(item.severity).badgeBg,
+                  }}
+                >
+                  {item.severityLabel}
+                </span>
+                <SecurityRouteBadge routing={item.finding.routing} />
+                <span className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-0.5 text-[10px] font-semibold uppercase text-[var(--text-main)]">
+                  {item.finding.categoryLabel}
+                </span>
+              </div>
+              <h4 className="mt-2 text-base font-semibold text-[var(--text-strong)]">
+                {humanizeActorText(item.title, actorNames)}
+              </h4>
+              <p className="mt-1 text-sm leading-relaxed text-[var(--text-muted)]">
+                {item.finding.summary}
+              </p>
+              <p className="mt-2 text-xs leading-relaxed text-[var(--text-faint)]">
+                {item.finding.routing.routeDescription}
+              </p>
+            </div>
+            <div className="flex shrink-0 flex-wrap gap-2">
+              {item.affectedDocuments[0] ? (
+                <Link
+                  href={item.affectedDocuments[0].href}
+                  className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                >
+                  Open document
+                  <ExternalLink className="h-4 w-4" />
+                </Link>
+              ) : null}
+              <Link
+                href={buildRecommendationAuditHref(item.auditFilters)}
+                className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                Open audit
+                <ExternalLink className="h-4 w-4" />
+              </Link>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 sm:grid-cols-3">
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Scope
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {item.finding.affectedScopeLabel}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Status
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationWorkflowLabel(item.workflow.status)}
+              </p>
+            </div>
+            <div className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-3 py-2">
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                SLA
+              </p>
+              <p className="mt-1 text-xs text-[var(--text-main)]">
+                {getRecommendationSlaLabel(item.playbook.slaState)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4 grid gap-3 md:grid-cols-2">
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                {item.finding.evidenceQuestion}
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                {humanizeActorText(item.reason, actorNames)}
+              </p>
+            </div>
+            <div>
+              <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+                Next action
+              </p>
+              <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+                <span className="font-medium text-[var(--text-main)]">
+                  {item.finding.nextStepLabel}
+                </span>
+                {': '}
+                {humanizeActorText(item.recommendedAction, actorNames)}
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-4">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Evidence
+            </p>
+            <div className="mt-2 flex flex-wrap gap-2">
+              {item.evidence.map((evidence) => (
+                <span
+                  key={evidence}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 text-[11px] text-[var(--text-muted)]"
+                >
+                  {humanizeActorText(evidence, actorNames)}
+                </span>
+              ))}
+            </div>
+          </div>
+
+          {item.affectedDocuments.length || item.affectedActorIds.length ? (
+            <div className="mt-3 flex flex-wrap gap-2 text-[11px] text-[var(--text-faint)]">
+              {item.affectedDocuments.map((document) => (
+                <Link
+                  key={document.documentId}
+                  href={document.href}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono transition hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                >
+                  doc {truncateMiddle(document.documentId, 18)}
+                </Link>
+              ))}
+              {item.affectedActorIds.map((actorId) => (
+                <span
+                  key={actorId}
+                  className="rounded border border-[var(--border-soft)] bg-[var(--bg-subtle)] px-2 py-1 font-mono"
+                >
+                  actor <ActorLabel id={actorId} length={18} />
+                </span>
+              ))}
+            </div>
+          ) : null}
+
+          <RecommendationWorkflowControls
+            key={`${item.id}:${item.workflow.status}:${item.workflow.note ?? ''}`}
+            item={item}
+            isPending={pendingRecommendationId === item.id}
+            isDisabled={pendingRecommendationId !== null}
+            error={workflowError?.id === item.id ? workflowError.message : null}
+            onSave={onSaveWorkflow}
+          />
+
+          <RecommendationPlaybook playbook={item.playbook} />
+
+          <RecommendationHistoryControls
+            item={item}
+            auditChain={auditChain}
+            isExpanded={expandedHistoryIds.includes(item.id)}
+            isLoading={historyLoadingId === item.id}
+            error={historyErrors[item.id] ?? null}
+            history={workflowHistoryByRecommendationId[item.id] ?? []}
+            onToggleHistory={onToggleHistory}
+            onDownloadEvidence={onDownloadEvidence}
+          />
+        </div>
+      )}
+    </aside>
   );
 }
 
@@ -1052,6 +1290,265 @@ function RecommendationWorkflowControls({
     payload: SecurityRecommendationWorkflowRequest,
   ) => Promise<void>;
 }) {
+  if (item.finding.routing.route === 'CASE') {
+    return (
+      <RecommendationCaseWorkflowControls
+        item={item}
+        isPending={isPending}
+        isDisabled={isDisabled}
+        error={error}
+        onSave={onSave}
+      />
+    );
+  }
+
+  return (
+    <RecommendationLightweightWorkflowControls
+      item={item}
+      isPending={isPending}
+      isDisabled={isDisabled}
+      error={error}
+      onSave={onSave}
+    />
+  );
+}
+
+function RecommendationCaseWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
+  const [investigationNote, setInvestigationNote] = useState('');
+  const [resolutionKind, setResolutionKind] =
+    useState<SecurityCaseResolutionKind | null>(null);
+  const [resolutionNote, setResolutionNote] = useState('');
+  const [verificationConfirmed, setVerificationConfirmed] = useState(false);
+
+  const draft = {
+    investigationNote,
+    resolutionKind,
+    resolutionNote,
+    verificationConfirmed,
+  };
+  const validation = validateSecurityCaseWorkflowDraft(draft);
+  const note = buildSecurityCaseWorkflowNote(draft);
+  const isResolved = item.workflow.status === 'RESOLVED';
+  const controlsDisabled = isDisabled || isResolved;
+  const canStart = item.workflow.status === 'OPEN' && !controlsDisabled;
+  const canSaveReview =
+    investigationNote.trim().length > 0 && !controlsDisabled;
+  const canResolve = validation.canResolve && !controlsDisabled;
+
+  async function startCase() {
+    if (!canStart) return;
+
+    await onSave(item.id, {
+      status: 'INVESTIGATING',
+      note: `Case workflow started: ${item.finding.categoryLabel}`,
+    });
+  }
+
+  async function saveReviewEvidence(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+
+    if (!canSaveReview) return;
+
+    await onSave(item.id, {
+      status: 'REVIEWED',
+      note,
+    });
+  }
+
+  async function resolveCase() {
+    if (!canResolve) return;
+
+    await onSave(item.id, {
+      status: 'RESOLVED',
+      note,
+    });
+  }
+
+  return (
+    <form
+      onSubmit={saveReviewEvidence}
+      className="mt-3 border-t border-[var(--border-soft)] pt-3"
+    >
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-[11px] font-semibold uppercase text-[var(--text-faint)]">
+              Case workflow
+            </p>
+            <SecurityRouteBadge routing={item.finding.routing} />
+          </div>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            Current status:{' '}
+            <span className="font-semibold text-[var(--text-main)]">
+              {getRecommendationWorkflowLabel(item.workflow.status)}
+            </span>
+          </p>
+          <p className="mt-1 text-xs leading-relaxed text-[var(--text-muted)]">
+            Resolve is gated by investigation, remediation or accepted risk, and
+            verification evidence.
+          </p>
+          {item.workflow.note ? (
+            <p className="mt-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-[11px] leading-relaxed text-[var(--text-faint)]">
+              Last note: {item.workflow.note}
+            </p>
+          ) : null}
+        </div>
+        {item.workflow.status === 'OPEN' ? (
+          <button
+            type="button"
+            onClick={startCase}
+            disabled={!canStart}
+            className="inline-flex h-9 shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Clock className="h-4 w-4" />
+            {isPending ? 'Starting' : 'Start case'}
+          </button>
+        ) : null}
+      </div>
+
+      <div className="mt-3 grid gap-3">
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Investigation
+          <textarea
+            value={investigationNote}
+            onChange={(event) => setInvestigationNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Summarize affected scope and why this case is real"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <div>
+          <p className="text-xs font-medium text-[var(--text-main)]">
+            Decision
+          </p>
+          <div className="mt-1 grid gap-2 sm:grid-cols-2">
+            {(
+              [
+                ['REMEDIATED', 'Remediated'],
+                ['ACCEPTED_RISK', 'Accepted risk'],
+              ] as Array<[SecurityCaseResolutionKind, string]>
+            ).map(([value, label]) => (
+              <label
+                key={value}
+                className="flex items-center gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm text-[var(--text-main)]"
+              >
+                <input
+                  type="radio"
+                  name={`case-decision-${item.id}`}
+                  value={value}
+                  checked={resolutionKind === value}
+                  onChange={() => setResolutionKind(value)}
+                  disabled={controlsDisabled}
+                  className="accent-[var(--color-primary)]"
+                />
+                {label}
+              </label>
+            ))}
+          </div>
+        </div>
+
+        <label className="block text-xs font-medium text-[var(--text-main)]">
+          Remediation or accepted-risk evidence
+          <textarea
+            value={resolutionNote}
+            onChange={(event) => setResolutionNote(event.target.value)}
+            disabled={controlsDisabled}
+            maxLength={180}
+            rows={2}
+            placeholder="Describe the fix, owner approval, expiry, or accepted-risk reason"
+            className="mt-1 min-h-[3rem] w-full resize-y rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-2 py-1.5 text-sm text-[var(--text-main)] outline-none transition placeholder:text-[var(--text-faint)] focus:border-[var(--color-primary)] disabled:cursor-not-allowed disabled:opacity-60"
+          />
+        </label>
+
+        <label className="flex items-start gap-2 rounded border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs leading-relaxed text-[var(--text-muted)]">
+          <input
+            type="checkbox"
+            checked={verificationConfirmed}
+            onChange={(event) => setVerificationConfirmed(event.target.checked)}
+            disabled={controlsDisabled}
+            className="mt-0.5 accent-[var(--color-primary)]"
+          />
+          <span>
+            Verification confirmed: audit scope reviewed, decision recorded, and
+            evidence packet is ready for export.
+          </span>
+        </label>
+      </div>
+
+      {!isResolved && !validation.canResolve ? (
+        <div className="mt-3 rounded border border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] px-3 py-2">
+          <p className="text-xs font-semibold text-[var(--status-pending-text)]">
+            Missing before resolve
+          </p>
+          <p className="mt-1 text-xs text-[var(--text-muted)]">
+            {validation.missingRequirements.join(' · ')}
+          </p>
+        </div>
+      ) : null}
+
+      {error ? (
+        <p className="mt-2 text-xs font-medium text-[var(--state-error-text)]">
+          {error}
+        </p>
+      ) : null}
+
+      <div className="mt-3 flex flex-wrap gap-2">
+        <button
+          type="submit"
+          disabled={!canSaveReview}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)] disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <Save className="h-4 w-4" />
+          {isPending ? 'Saving' : 'Save review evidence'}
+        </button>
+        <button
+          type="button"
+          onClick={resolveCase}
+          disabled={!canResolve}
+          className="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-[var(--state-error-border)] bg-[var(--state-error-bg)] px-3 text-sm font-medium text-[var(--state-error-text)] transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          <CheckCircle2 className="h-4 w-4" />
+          {isPending ? 'Resolving' : 'Resolve case'}
+        </button>
+      </div>
+    </form>
+  );
+}
+
+function RecommendationLightweightWorkflowControls({
+  item,
+  isPending,
+  isDisabled,
+  error,
+  onSave,
+}: {
+  item: ReturnType<typeof buildSecurityDashboardModel>['recommendations']['items'][number];
+  isPending: boolean;
+  isDisabled: boolean;
+  error: string | null;
+  onSave: (
+    id: string,
+    payload: SecurityRecommendationWorkflowRequest,
+  ) => Promise<void>;
+}) {
   const [status, setStatus] = useState<SecurityRecommendationWorkflowStatus>(
     item.workflow.status,
   );
@@ -1195,7 +1692,8 @@ function PosturePanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-posture"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1331,6 +1829,13 @@ function AlertsPanel({
               <p className="mt-2 text-xs font-medium text-[var(--text-main)]">
                 {alert.action}
               </p>
+              <Link
+                href={alert.evidenceTarget.href}
+                className="mt-3 inline-flex items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-xs font-semibold text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {alert.evidenceTarget.label}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </Link>
             </div>
           ))}
         </div>
@@ -1360,7 +1865,8 @@ function AccessActivityPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-access-activity"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1409,26 +1915,40 @@ function AccessActivityPanel({
       {!isLoading && !isError && sensitiveAccessEvents.length > 0 ? (
         <>
           <div className="mt-4 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-            {sensitiveEvents.map((event) => (
-              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                    {event.action}
+            {sensitiveEvents.map((event) => {
+              const documentHref = getAuditEventDocumentHref(event);
+
+              return (
+                <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                      {event.action}
+                    </p>
+                    <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
+                      {getClassificationLabel(event)}
+                    </span>
+                  </div>
+                  <p className="mt-1 text-xs text-[var(--text-muted)]">
+                    {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                   </p>
-                  <span className="rounded bg-[var(--status-pending-bg)] px-2 py-0.5 text-[10px] font-semibold text-[var(--status-pending-text)]">
-                    {getClassificationLabel(event)}
-                  </span>
+                  <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                    <span>
+                      {event.resourceId
+                        ? `Document ${truncateMiddle(event.resourceId, 20)}`
+                        : event.resourceType}
+                    </span>
+                    {documentHref ? (
+                      <Link
+                        href={documentHref}
+                        className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                      >
+                        Open document
+                      </Link>
+                    ) : null}
+                  </div>
                 </div>
-                <p className="mt-1 text-xs text-[var(--text-muted)]">
-                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-                </p>
-                <p className="mt-1 text-xs text-[var(--text-faint)]">
-                  {event.resourceId
-                    ? `Document ${truncateMiddle(event.resourceId, 20)}`
-                    : event.resourceType}
-                </p>
-              </div>
-            ))}
+              );
+            })}
           </div>
           {sensitiveAccessEvents.length > SECURITY_ACCESS_ACTIVITY_PREVIEW_LIMIT ? (
             <ShowMoreListToggle
@@ -1454,7 +1974,8 @@ function RecentSecurityEvents({
 }) {
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-recent-events"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1470,24 +1991,36 @@ function RecentSecurityEvents({
       )}
       {!isLoading && !isError && events.length > 0 && (
         <div className="mt-3 divide-y" style={{ borderColor: 'var(--border-soft)' }}>
-          {events.map((event) => (
-            <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
-                  {event.action}
+          {events.map((event) => {
+            const documentHref = getAuditEventDocumentHref(event);
+
+            return (
+              <div key={event.eventId} className="py-3 first:pt-0 last:pb-0">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <p className="text-xs font-semibold uppercase text-[var(--text-main)]">
+                    {event.action}
+                  </p>
+                  <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
+                    {event.result}
+                  </span>
+                </div>
+                <p className="mt-1 text-xs text-[var(--text-muted)]">
+                  {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
                 </p>
-                <span className="rounded bg-[var(--bg-muted)] px-2 py-0.5 text-[10px] font-semibold text-[var(--text-muted)]">
-                  {event.result}
-                </span>
+                <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-[var(--text-faint)]">
+                  <span>{event.reason ?? event.resourceType}</span>
+                  {documentHref ? (
+                    <Link
+                      href={documentHref}
+                      className="font-semibold text-[var(--color-primary)] transition hover:underline"
+                    >
+                      Open document
+                    </Link>
+                  ) : null}
+                </div>
               </div>
-              <p className="mt-1 text-xs text-[var(--text-muted)]">
-                {formatDateTime(event.timestamp)} · actor <ActorLabel id={event.actorId} length={16} />
-              </p>
-              <p className="mt-1 text-xs text-[var(--text-faint)]">
-                {event.reason ?? event.resourceType}
-              </p>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
@@ -1510,7 +2043,8 @@ function RepeatedActorsPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-repeated-deny-actors"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1568,7 +2102,8 @@ function RiskScoringPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-risk-scoring"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1648,13 +2183,22 @@ function RiskScoringPanel({
                         {document.reasons.join(' · ')}
                       </p>
                     </div>
-                    <Link
-                      href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
-                    >
-                      Open audit
-                      <ExternalLink className="h-4 w-4" />
-                    </Link>
+                    <div className="flex shrink-0 flex-wrap gap-2">
+                      <Link
+                        href={document.documentHref}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open document
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                      <Link
+                        href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(document.auditFilters)}`}
+                        className={SECURITY_SECONDARY_ACTION_CLASS}
+                      >
+                        Open audit
+                        <ExternalLink className="h-4 w-4" />
+                      </Link>
+                    </div>
                   </div>
                 </div>
               );
@@ -1690,7 +2234,8 @@ function BehaviorAnomaliesPanel({
 
   return (
     <div
-      className="rounded-lg border p-5"
+      id="security-behavior-anomalies"
+      className={`${SECURITY_PANEL_TARGET_CLASS} rounded-lg border p-5`}
       style={{
         background: 'var(--bg-card)',
         borderColor: 'var(--border-soft)',
@@ -1772,7 +2317,7 @@ function BehaviorAnomaliesPanel({
                     </div>
                     <Link
                       href={`${ROUTES.AUDIT}?${buildAuditFilterQuery(signal.auditFilters)}`}
-                      className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg border border-[var(--border-soft)] bg-[var(--bg-card)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+                      className={SECURITY_SECONDARY_ACTION_CLASS}
                     >
                       Open audit
                       <ExternalLink className="h-4 w-4" />
@@ -1872,6 +2417,18 @@ function SecurityRouteBadge({
       className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
     >
       {routing.routeLabel}
+    </span>
+  );
+}
+
+function SecurityRouteCodeBadge({ route }: { route: SecurityAlertRoute }) {
+  const tone = getSecurityRouteTone(route);
+
+  return (
+    <span
+      className={`inline-flex w-fit items-center rounded px-2 py-0.5 text-[10px] font-semibold uppercase ${tone.badge}`}
+    >
+      {route}
     </span>
   );
 }

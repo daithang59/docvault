@@ -15,6 +15,9 @@ interface UserComboboxProps {
   allowClear?: boolean;
   /** Placeholder for the manual-entry fallback when the directory is unavailable. */
   fallbackPlaceholder?: string;
+  /** Optional source of user ids. When omitted, the picker uses organization members. */
+  userIds?: string[];
+  usersLoading?: boolean;
 }
 
 /**
@@ -30,23 +33,29 @@ export function UserCombobox({
   searchPlaceholder = 'Search name or username…',
   allowClear = false,
   fallbackPlaceholder = 'Keycloak user id (sub)',
+  userIds,
+  usersLoading = false,
 }: UserComboboxProps) {
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
-  const membersQuery = useOrgMembersForPicker(true);
-  const memberIds = useMemo(
-    () => (membersQuery.data ?? []).map((m) => m.userId),
-    [membersQuery.data],
-  );
+  const usesCustomUserIds = userIds !== undefined;
+  const membersQuery = useOrgMembersForPicker(!usesCustomUserIds);
+  const memberIds = useMemo(() => {
+    if (usesCustomUserIds) {
+      return userIds;
+    }
+
+    return (membersQuery.data ?? []).map((m) => m.userId);
+  }, [membersQuery.data, userIds, usesCustomUserIds]);
   const { data: displayNames } = useOwnerDisplayNames(memberIds);
 
   const options = useMemo(() => {
-    const rows = (membersQuery.data ?? []).map((m) => {
-      const info = displayNames?.[m.userId];
+    const rows = memberIds.map((userId) => {
+      const info = displayNames?.[userId];
       return {
-        userId: m.userId,
-        displayName: info?.displayName ?? m.userId,
-        username: info?.username ?? m.userId,
+        userId,
+        displayName: info?.displayName ?? userId,
+        username: info?.username ?? userId,
       };
     });
     const q = query.trim().toLowerCase();
@@ -57,7 +66,7 @@ export function UserCombobox({
         r.username.toLowerCase().includes(q) ||
         r.userId.toLowerCase().includes(q),
     );
-  }, [membersQuery.data, displayNames, query]);
+  }, [displayNames, memberIds, query]);
 
   const selected = useMemo(
     () =>
@@ -72,7 +81,8 @@ export function UserCombobox({
     [options, value, displayNames],
   );
 
-  const unavailable = !membersQuery.isLoading && (membersQuery.data?.length ?? 0) === 0;
+  const loading = usesCustomUserIds ? usersLoading : membersQuery.isLoading;
+  const unavailable = !loading && memberIds.length === 0;
 
   if (unavailable) {
     return (
@@ -128,7 +138,7 @@ export function UserCombobox({
             />
           </div>
           <div className="max-h-48 overflow-auto py-1">
-            {membersQuery.isLoading ? (
+            {loading ? (
               <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-faint)' }}>Loading users…</p>
             ) : options.length === 0 ? (
               <p className="px-3 py-2 text-xs" style={{ color: 'var(--text-faint)' }}>No matching users.</p>

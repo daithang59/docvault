@@ -1,0 +1,152 @@
+\chapter{Kiểm thử, đánh giá và bằng chứng}
+
+\section{Chiến lược kiểm thử}
+
+Kiểm thử DocVault được tổ chức theo nhiều lớp. Ở lớp code, các service backend có unit test cho policy, controller, security guard và các helper quan trọng. Frontend có test cho permission helper, form, component và một số behavior UI. Ở lớp runtime, script E2E kiểm tra các luồng nghiệp vụ và bảo mật qua API thật. Ở lớp pipeline, Jenkins chạy các bước test/scan/build/deploy/smoke/DAST để kiểm tra toàn bộ vòng đời phát hành.
+
+Chiến lược này phù hợp với đặc thù của hệ thống bảo mật. Một unit test có thể kiểm tra một rule policy cụ thể, nhưng không chứng minh được toàn bộ luồng từ frontend đến gateway, metadata-service, document-service và audit-service. Ngược lại, E2E runtime có thể chứng minh luồng chính hoạt động, nhưng khó bao phủ mọi nhánh policy nhỏ. Vì vậy, hệ thống cần kết hợp nhiều loại kiểm thử.
+
+\section{Kiểm thử runtime}
+
+Theo \code{docs/verification-report.md}, lệnh E2E runtime chính là:
+
+\begin{lstlisting}[language=bash,caption={Lệnh kiểm thử E2E runtime}]
+pnpm test:e2e
+\end{lstlisting}
+
+Kết quả gần nhất được ghi nhận trong tài liệu là \code{All required E2E checks passed}. Các nhóm kiểm thử runtime gồm:
+
+\begin{itemize}
+  \item Auth boundary: request thiếu token và token hết hạn bị từ chối.
+  \item Create policy: viewer không được tạo tài liệu, editor được tạo.
+  \item Metadata policy: truy cập trái phép vào confidential document bị từ chối ở detail, history, comments và ACL.
+  \item GROUP ACL: group \code{finance-team} được normalize và kiểm tra đúng.
+  \item Confidential download posture: viewer bị deny, editor nhận stream-only response.
+  \item Malware scan: EICAR upload bị chặn.
+  \item DLP: upload có dữ liệu nhạy cảm bị phát hiện và nâng classification.
+  \item Workflow: submit, approve và duplicate approve conflict.
+  \item Retention: approval stamp retention, retention job archive due record.
+  \item Compliance Officer: được phép xem metadata, audit, retention; bị chặn preview, presign, stream và download.
+  \item Audit: query, verify-chain, security summary và audit ingest boundary.
+\end{itemize}
+
+\begin{longtable}{p{0.24\textwidth}p{0.44\textwidth}p{0.18\textwidth}}
+\caption{Tóm tắt bằng chứng kiểm thử runtime}
+\label{tab:runtime-evidence} \\
+\toprule
+\textbf{Khu vực} & \textbf{Bằng chứng} & \textbf{Kết quả} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Khu vực} & \textbf{Bằng chứng} & \textbf{Kết quả} \\
+\midrule
+\endhead
+Authentication & Missing/expired token rejected & PASS \\
+Authorization & Viewer create denied, editor create allowed & PASS \\
+Metadata policy & Viewer guessed confidential access denied & PASS \\
+ACL & GROUP READ ACL metadata access & PASS \\
+Download posture & Confidential presign withheld direct URL & PASS \\
+Malware & EICAR upload blocked before object/version creation & PASS \\
+DLP & Sensitive upload escalated classification & PASS \\
+Workflow & Submit/approve/duplicate approve conflict & PASS \\
+Retention & Auto-archive due record and workflow history & PASS \\
+Compliance boundary & Compliance file content access denied & PASS \\
+Audit & Verify-chain and security summary available & PASS \\
+Audit ingest & Viewer cannot ingest fake audit event & PASS \\
+\bottomrule
+\end{longtable}
+
+\section{Kiểm thử frontend và UI evidence}
+
+Frontend được kiểm tra bằng lint, build, typecheck và test component/helper. Ngoài ra, thư mục \code{docs/evidence/screenshots} có các screenshot Playwright cho nhiều màn hình trọng yếu như Dashboard, Documents, Approvals, Audit, Security và Evidence. Các screenshot này không chỉ dùng để minh họa UI, mà còn là bằng chứng rằng các màn hình chính render được và có trạng thái nội dung phù hợp.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{dashboard-command-center-playwright.png}
+\caption{Bằng chứng Playwright cho dashboard command center}
+\label{fig:evidence-dashboard}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{approvals-sla-readiness-playwright.png}
+\caption{Bằng chứng Playwright cho approvals SLA readiness}
+\label{fig:evidence-approvals}
+\end{figure}
+
+\section{Security evidence}
+
+Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát bảo mật runtime. Các điểm nổi bật gồm:
+
+\begin{itemize}
+  \item Compliance Officer bị chặn preview, stream, presign và download file content.
+  \item Metadata access boundary được áp dụng cho detail, workflow history, comments và ACL list.
+  \item Frontend permission helper được align với backend policy ở mức UI hint.
+  \item Grant token cho download/preview có TTL 300 giây và hỗ trợ rotation bằng \code{kid}.
+  \item MinIO bucket local bật SSE-S3 trong init script.
+  \item Malware scanning chặn EICAR trước khi ghi object.
+  \item DLP phát hiện pattern nhạy cảm và nâng classification.
+  \item Audit ingest cần service token.
+  \item Audit verify-chain và security summary được expose qua gateway.
+  \item Evidence packet không chứa file content, presigned URL, grant token hoặc object key.
+\end{itemize}
+
+\section{Pipeline evidence}
+
+Pipeline evidence gồm log và artifact từ Jenkins. Theo tài liệu hardening summary của pipeline, build \#61 trên branch \code{devsecops-pipeline} đã pass các stage chính: Pre-build Security, Build \& Scan Services, Push \& GitOps, Argo CD Health Check, Post-deploy Smoke Test và DAST OWASP ZAP.
+
+Các bằng chứng nên được đưa vào phụ lục hoặc slide bảo vệ:
+
+\begin{itemize}
+  \item Screenshot Jenkins build xanh và stage view.
+  \item SonarQube report hoặc quality gate.
+  \item Dependency Check report.
+  \item Trivy filesystem/image scan log.
+  \item Checkov/Terraform validate log.
+  \item Docker image tags được push.
+  \item GitOps commit cập nhật Helm values.
+  \item Argo CD application \code{Synced/Healthy}.
+  \item Smoke test log cho web root và \code{/api/health}.
+  \item ZAP HTML/JSON report.
+  \item Grafana/Loki screenshot cho observability.
+\end{itemize}
+
+\section{Đánh giá theo yêu cầu}
+
+\begin{longtable}{p{0.28\textwidth}p{0.36\textwidth}p{0.22\textwidth}}
+\caption{Mapping yêu cầu với hiện thực và bằng chứng}
+\label{tab:req-impl-evidence} \\
+\toprule
+\textbf{Yêu cầu} & \textbf{Hiện thực} & \textbf{Bằng chứng} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Yêu cầu} & \textbf{Hiện thực} & \textbf{Bằng chứng} \\
+\midrule
+\endhead
+Đăng nhập và phân quyền & Keycloak, JWT, gateway role guard, frontend permission helper & README, API contract, E2E auth checks \\
+Quản lý vòng đời tài liệu & Documents, versions, workflow history, workflow-service transitions & Project status, E2E workflow checks \\
+Kiểm soát download & Metadata authorization, grant token, document-service presign/stream & web-security-evidence, E2E confidential posture \\
+Compliance boundary & Compliance metadata/audit/evidence allowed, file content denied & web-security-evidence, E2E compliance checks \\
+Audit tamper-evident & audit-service hash-chain, verify-chain endpoint & verification report, audit docs \\
+Malware/DLP & Malware scanner, DLP scanner, classification escalation & E2E malware/DLP checks \\
+Retention evidence & Retention fields, retention run, audit event & E2E retention checks \\
+DevSecOps pipeline & Jenkins stages, security scans, GitOps, Argo CD, smoke, ZAP & pipeline-hardening-summary, Jenkinsfile \\
+\bottomrule
+\end{longtable}
+
+\section{Hạn chế hiện tại}
+
+Mặc dù hệ thống đã có nhiều bằng chứng runtime, vẫn còn một số hạn chế:
+
+\begin{itemize}
+  \item Notification-service hiện vẫn là dev sink, chưa phải hệ thống email/webhook/push hoàn chỉnh.
+  \item Browser-level E2E chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phần mạnh nhất hiện là API/runtime E2E.
+  \item Shared auth/contracts còn có thể tiếp tục consolidate để giảm trùng lặp giữa service.
+  \item Pipeline đã có nhiều stage, nhưng cần bổ sung SBOM, artifact signing, provenance và policy-as-code để tiến gần production-grade DevSecOps.
+  \item Secret/KMS/network policy và backup/restore cần được hardening thêm nếu triển khai production thật.
+\end{itemize}
+
+\section{Nhận xét chung}
+
+DocVault đã đạt được mục tiêu của một hệ thống quản lý tài liệu bảo mật ở mức đồ án chuyên ngành: có kiến trúc rõ, có luồng nghiệp vụ hoàn chỉnh, có kiểm soát bảo mật backend, có audit/evidence và có pipeline DevSecOps với nhiều bước kiểm tra tự động. Điểm quan trọng là báo cáo không chỉ mô tả ý tưởng mà có thể đối chiếu với mã nguồn, tài liệu evidence và pipeline hiện có trong repository.

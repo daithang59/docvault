@@ -647,7 +647,7 @@ describe('DocumentsService approval chain', () => {
     mockFindUnique.mockResolvedValueOnce({
       id: 'doc-1',
       ownerId: 'editor-1',
-      status: 'DRAFT',
+      status: 'PENDING',
     });
     mockUpdate.mockResolvedValueOnce({
       id: 'doc-1',
@@ -675,7 +675,7 @@ describe('DocumentsService approval chain', () => {
     mockFindUnique.mockResolvedValueOnce({
       id: 'doc-1',
       ownerId: 'editor-1',
-      status: 'DRAFT',
+      status: 'PENDING',
     });
     await expect(
       service.setApprovalChain('doc-1', { approvers: [] }, ownerContext as any),
@@ -687,7 +687,7 @@ describe('DocumentsService approval chain', () => {
     mockFindUnique.mockResolvedValueOnce({
       id: 'doc-1',
       ownerId: 'editor-1',
-      status: 'DRAFT',
+      status: 'PENDING',
     });
     await expect(
       service.setApprovalChain(
@@ -702,7 +702,7 @@ describe('DocumentsService approval chain', () => {
     mockFindUnique.mockResolvedValueOnce({
       id: 'doc-1',
       ownerId: 'someone-else',
-      status: 'DRAFT',
+      status: 'PENDING',
     });
     await expect(
       service.setApprovalChain(
@@ -711,6 +711,23 @@ describe('DocumentsService approval chain', () => {
         ownerContext as any,
       ),
     ).rejects.toThrow();
+  });
+
+  it('rejects approval chain changes unless the document is pending', async () => {
+    mockFindUnique.mockResolvedValueOnce({
+      id: 'doc-1',
+      ownerId: 'editor-1',
+      status: 'DRAFT',
+    });
+
+    await expect(
+      service.setApprovalChain(
+        'doc-1',
+        { approvers: ['app-1'] },
+        ownerContext as any,
+      ),
+    ).rejects.toThrow(BadRequestException);
+    expect(mockUpdate).not.toHaveBeenCalled();
   });
 
   it('advances the approval step', async () => {

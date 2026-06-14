@@ -156,6 +156,57 @@ describe('queryAuditLog', () => {
       },
     });
   });
+
+  it('serializes multi-value chart drilldown filters for the audit query endpoint', async () => {
+    apiClientMock.get.mockResolvedValue({
+      data: {
+        data: [],
+        total: 0,
+        page: 1,
+        pageSize: 20,
+        totalPages: 0,
+      },
+    });
+
+    await queryAuditLog(
+      {
+        documentIds: ['doc-critical', 'doc-warning'],
+        actorIds: ['editor-1', 'viewer-1'],
+        recommendationIds: ['rec-1', 'rec-2'],
+        actions: [
+          'DOCUMENT_DOWNLOAD_AUTHORIZED',
+          'DOCUMENT_PREVIEW_AUTHORIZED',
+        ],
+        classifications: ['SECRET', 'CONFIDENTIAL'],
+      },
+      1,
+      20,
+    );
+
+    expect(apiClientMock.get).toHaveBeenCalledWith('/audit/query', {
+      params: {
+        actorId: undefined,
+        actorIds: 'editor-1,viewer-1',
+        action: undefined,
+        actions:
+          'DOCUMENT_DOWNLOAD_AUTHORIZED,DOCUMENT_PREVIEW_AUTHORIZED',
+        actionGroup: undefined,
+        resourceType: undefined,
+        resourceId: undefined,
+        documentId: undefined,
+        documentIds: 'doc-critical,doc-warning',
+        aclId: undefined,
+        recommendationId: undefined,
+        recommendationIds: 'rec-1,rec-2',
+        classifications: 'SECRET,CONFIDENTIAL',
+        result: undefined,
+        from: undefined,
+        to: undefined,
+        page: 1,
+        pageSize: 20,
+      },
+    });
+  });
 });
 
 describe('queryAuditLogWindow', () => {

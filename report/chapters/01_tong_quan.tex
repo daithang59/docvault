@@ -1,0 +1,75 @@
+\chapter{Tổng quan đề tài}
+
+\section{Bối cảnh}
+
+Trong các tổ chức hiện đại, tài liệu không chỉ là dữ liệu văn phòng thông thường mà còn là tài sản thông tin có giá trị. Một tài liệu có thể chứa hợp đồng, báo cáo tài chính, hồ sơ nhân sự, thông tin khách hàng, biên bản phê duyệt hoặc dữ liệu có yêu cầu bảo mật cao. Khi số lượng tài liệu tăng, nhu cầu quản lý vòng đời tài liệu, phân quyền truy cập, kiểm soát tải xuống và truy vết hoạt động trở thành một yêu cầu thiết yếu.
+
+Các hệ thống quản lý tài liệu truyền thống thường tập trung vào việc lưu trữ và tìm kiếm. Tuy nhiên, trong bối cảnh an toàn thông tin, hệ thống quản lý tài liệu cần trả lời thêm nhiều câu hỏi: ai được xem metadata, ai được tải file, tài liệu nào được xem là nhạy cảm, ai đã phê duyệt tài liệu, thao tác nào bị từ chối, file tải lên có chứa mã độc hay dữ liệu nhạy cảm không, và bằng chứng nào có thể cung cấp cho quá trình kiểm tra tuân thủ. Những yêu cầu này khiến bài toán quản lý tài liệu trở thành bài toán kết hợp giữa nghiệp vụ, bảo mật và vận hành.
+
+Đồng thời, quy trình phát triển phần mềm hiện đại không còn xem bảo mật là một bước kiểm tra cuối cùng. DevSecOps khuyến khích đưa các kiểm soát bảo mật vào sớm và xuyên suốt vòng đời phát triển: từ mã nguồn, thư viện phụ thuộc, cấu hình hạ tầng, Docker image cho đến ứng dụng sau khi triển khai. Theo khuyến nghị của NIST SSDF và các hướng dẫn DevSecOps của OWASP, việc tự động hóa kiểm thử và thu thập bằng chứng bảo mật giúp giảm rủi ro và tăng tính lặp lại của quy trình phát hành \cite{nist_ssdf,owasp_devsecops}.
+
+Từ bối cảnh trên, đề tài DocVault được xây dựng với mục tiêu triển khai một hệ thống quản lý tài liệu bảo mật, đồng thời thiết kế quy trình DevSecOps phục vụ kiểm thử, đóng gói và triển khai hệ thống.
+
+\section{Vấn đề cần giải quyết}
+
+Đề tài tập trung vào hai nhóm vấn đề chính. Nhóm thứ nhất là vấn đề ứng dụng: xây dựng hệ thống quản lý tài liệu có phân quyền rõ ràng, có quy trình phê duyệt, có lưu trữ file an toàn và có audit trail đủ để phục vụ truy vết. Nhóm thứ hai là vấn đề quy trình: đưa các kiểm soát bảo mật vào pipeline để mỗi lần thay đổi mã nguồn đều có thể được kiểm tra bằng các bước tự động.
+
+Các yêu cầu tiêu biểu có thể tóm tắt như sau:
+
+\begin{itemize}
+  \item Người dùng thuộc các vai trò khác nhau phải nhìn thấy và thao tác trên tài liệu theo đúng phạm vi quyền hạn.
+  \item Tài liệu hỗ trợ bốn mức phân loại: public, internal, confidential và secret.
+  \item Luồng nghiệp vụ phải hỗ trợ tạo bản nháp, tải file, gửi duyệt, phê duyệt, từ chối và lưu trữ.
+  \item File nhạy cảm không nên được cấp URL tải trực tiếp nếu cần đi qua đường stream có kiểm soát.
+  \item Compliance Officer được xem metadata, audit và bằng chứng tuân thủ, nhưng không được truy cập nội dung file.
+  \item Các thao tác quan trọng phải được audit và có khả năng kiểm tra tính toàn vẹn.
+  \item Pipeline phải có các bước kiểm thử và quét bảo mật trước, trong và sau khi build/deploy.
+\end{itemize}
+
+\section{Mục tiêu đề tài}
+
+Mục tiêu tổng quát của đề tài là xây dựng và trình bày một hệ thống quản lý tài liệu bảo mật tên DocVault theo hướng microservices, có tích hợp các kiểm soát bảo mật ở cả runtime và quy trình DevSecOps.
+
+Các mục tiêu cụ thể gồm:
+
+\begin{enumerate}
+  \item Thiết kế kiến trúc tổng thể cho hệ thống quản lý tài liệu bảo mật, gồm frontend, API Gateway, các microservice nghiệp vụ và các thành phần hạ tầng.
+  \item Xây dựng các chức năng chính của hệ thống: đăng nhập, quản lý tài liệu, version file, workflow phê duyệt, phân quyền, preview/download, audit, security dashboard, evidence và retention.
+  \item Thiết kế mô hình phân quyền dựa trên RBAC, ACL, trạng thái tài liệu, phân loại bảo mật và quy tắc deny-overrides.
+  \item Xây dựng cơ chế audit hash-chain và các bằng chứng phục vụ compliance.
+  \item Tích hợp các kiểm soát bảo mật như malware scanning, DLP, grant token ngắn hạn và kiểm soát truy cập nội dung file.
+  \item Xây dựng pipeline DevSecOps với Jenkins, SonarQube, Dependency Check, Trivy, Checkov, Terraform validation, Docker build/scan, GitOps, Argo CD, smoke test và OWASP ZAP.
+  \item Kiểm thử và đánh giá hệ thống dựa trên các kịch bản runtime, security evidence và pipeline evidence.
+\end{enumerate}
+
+\section{Phạm vi thực hiện}
+
+Phạm vi đề tài được chia thành hai phần. Phần ứng dụng DocVault là trọng tâm hiện tại và đã được triển khai gần hoàn thiện. Phần này bao gồm giao diện web, backend microservices, các luồng nghiệp vụ, kiểm soát truy cập, audit, DLP, malware scanning, retention và evidence center.
+
+Phần DevSecOps pipeline đang trong quá trình hoàn thiện. Pipeline đã có cấu trúc và các stage quan trọng như SAST, SCA, Trivy, Checkov, Terraform validation, build/scan image, push image, GitOps update, Argo CD health check, smoke test và DAST bằng OWASP ZAP. Tuy nhiên, trong phạm vi báo cáo, phần pipeline được trình bày trung thực theo trạng thái hiện có: đã có thiết kế và bằng chứng chạy, nhưng vẫn còn các hướng cải tiến về production hardening, artifact signing, SBOM, policy-as-code và độ đầy đủ của bằng chứng triển khai.
+
+\begin{table}[H]
+\centering
+\caption{Phạm vi và trạng thái thực hiện của đề tài}
+\label{tab:scope-status}
+\begin{tabularx}{\textwidth}{p{0.28\textwidth}Yp{0.22\textwidth}}
+\toprule
+\textbf{Nhóm nội dung} & \textbf{Mô tả} & \textbf{Trạng thái} \\
+\midrule
+Ứng dụng web & Frontend Next.js, các màn hình dashboard, documents, approvals, audit, security, evidence, retention. & \statusdone \\
+Backend microservices & Gateway, metadata-service, document-service, workflow-service, audit-service, notification-service. & \statusdone \\
+Bảo mật runtime & RBAC, ACL, grant token, compliance boundary, DLP, malware scanning, audit hash-chain. & \statusdone \\
+Local infrastructure & Postgres, MongoDB, MinIO, Keycloak qua Docker Compose. & \statusdone \\
+DevSecOps pipeline & Jenkins pipeline với các stage kiểm thử, scan, build, GitOps, Argo CD, smoke test, DAST. & \statusprogress \\
+Production hardening & SBOM, signing, policy-as-code, secret rotation/KMS, advanced observability. & \statusgap \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Đóng góp của đề tài}
+
+Đề tài có bốn đóng góp chính. Thứ nhất, đề tài xây dựng một hệ thống quản lý tài liệu có đầy đủ luồng nghiệp vụ từ tạo tài liệu đến phê duyệt và lưu trữ. Thứ hai, hệ thống thể hiện rõ cách kết hợp các mô hình kiểm soát truy cập ở nhiều tầng: role, ACL, classification, status và ownership. Thứ ba, đề tài đưa các yêu cầu compliance vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Thứ tư, đề tài xây dựng pipeline DevSecOps nhằm tự động hóa kiểm thử và quét bảo mật, qua đó tạo nền tảng cho quá trình phát hành an toàn hơn.
+
+\section{Cấu trúc báo cáo}
+
+Báo cáo gồm tám chương chính. Chương 1 trình bày bối cảnh, mục tiêu và phạm vi đề tài. Chương 2 trình bày cơ sở lý thuyết và công nghệ nền tảng. Chương 3 phân tích yêu cầu và thiết kế tổng thể. Chương 4 mô tả thiết kế dữ liệu, API và chính sách bảo mật. Chương 5 trình bày quá trình triển khai ứng dụng DocVault. Chương 6 trình bày quy trình DevSecOps và hạ tầng triển khai. Chương 7 mô tả kiểm thử, đánh giá và bằng chứng. Chương 8 tổng kết kết quả đạt được, hạn chế và hướng phát triển.

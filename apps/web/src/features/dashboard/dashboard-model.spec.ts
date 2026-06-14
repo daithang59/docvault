@@ -195,44 +195,15 @@ describe('buildDashboardModel', () => {
     ]);
   });
 
-  it('summarizes business demo readiness from lifecycle, approval, evidence, and security signals', () => {
+  it('keeps demo readiness out of the customer-facing dashboard model', () => {
     const model = buildDashboardModel(documents, {
       now,
       actor: { id: 'admin-1', roles: ['admin'] },
       analyticsVisibility: elevatedAnalytics,
     });
 
-    expect(model.demoReadiness).toEqual({
-      score: 100,
-      label: 'Demo ready',
-      description: 'Lifecycle, approval, evidence, and security stories are available.',
-      signals: [
-        expect.objectContaining({
-          key: 'lifecycle-coverage',
-          label: 'Lifecycle coverage',
-          value: '3 governed',
-          tone: 'success',
-        }),
-        expect.objectContaining({
-          key: 'approval-workflow',
-          label: 'Approval workflow',
-          value: '1 pending',
-          tone: 'warning',
-        }),
-        expect.objectContaining({
-          key: 'evidence-export',
-          label: 'Evidence export',
-          value: 'Enabled',
-          tone: 'success',
-        }),
-        expect.objectContaining({
-          key: 'security-posture',
-          label: 'Security posture',
-          value: '1 finding',
-          tone: 'critical',
-        }),
-      ],
-    });
+    expect(model).not.toHaveProperty('demoReadiness');
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
   });
 
   it('prepares command-center visual summaries from real dashboard data', () => {
@@ -243,13 +214,7 @@ describe('buildDashboardModel', () => {
       analyticsVisibility: elevatedAnalytics,
     });
 
-    expect(model.commandCenter.readinessGauge).toEqual({
-      label: 'Business readiness',
-      value: 100,
-      tone: 'success',
-      description: 'Lifecycle, approval, evidence, and security stories are available.',
-      href: '/demo-kit',
-    });
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
     expect(model.commandCenter.lifecycleSegments).toEqual([
       expect.objectContaining({
         key: 'DRAFT',
@@ -310,35 +275,20 @@ describe('buildDashboardModel', () => {
     expect(model.commandCenter).not.toHaveProperty('riskSpotlight');
   });
 
-  it('does not mark the business demo ready when seeded demo data is missing', () => {
+  it('builds an empty dashboard without demo readiness setup prompts', () => {
     const model = buildDashboardModel([], {
       now,
       actor: { id: 'admin-1', roles: ['admin'] },
       analyticsVisibility: elevatedAnalytics,
     });
 
-    expect(model.demoReadiness.score).toBe(25);
-    expect(model.demoReadiness.label).toBe('Needs setup');
-    expect(model.demoReadiness.description).toBe(
-      'Some commercial demo stories need role access or seeded data.',
-    );
-    expect(model.demoReadiness.signals).toEqual([
-      expect.objectContaining({
-        key: 'lifecycle-coverage',
-        value: '0 governed',
-      }),
-      expect.objectContaining({
-        key: 'approval-workflow',
-        value: '0 pending',
-      }),
-      expect.objectContaining({
-        key: 'evidence-export',
-        value: 'Enabled',
-      }),
-      expect.objectContaining({
-        key: 'security-posture',
-        value: '0 findings',
-      }),
+    expect(model).not.toHaveProperty('demoReadiness');
+    expect(model.commandCenter).not.toHaveProperty('readinessGauge');
+    expect(model.commandCenter.lifecycleSegments).toHaveLength(4);
+    expect(model.commandCenter.attentionSegments).toEqual([
+      expect.objectContaining({ key: 'critical', value: 0 }),
+      expect.objectContaining({ key: 'warning', value: 0 }),
+      expect.objectContaining({ key: 'info', value: 0 }),
     ]);
   });
 
@@ -353,13 +303,6 @@ describe('buildDashboardModel', () => {
     expect(model.operationalWidgets.map((widget) => widget.key)).not.toContain('dlp-detected');
     expect(model.operationalWidgets.map((widget) => widget.key)).not.toContain('retention-due-soon');
     expect(model.commandCenter.attentionSegments.map((segment) => segment.key)).not.toContain('critical');
-    expect(
-      model.demoReadiness.signals.find((signal) => signal.key === 'security-posture'),
-    ).toEqual(
-      expect.objectContaining({
-        value: 'Role gated',
-        tone: 'info',
-      }),
-    );
+    expect(model).not.toHaveProperty('demoReadiness');
   });
 });

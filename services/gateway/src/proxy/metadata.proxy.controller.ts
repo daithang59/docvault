@@ -644,6 +644,22 @@ export class MetadataProxyController {
     return response.data;
   }
 
+  @Get('documents/:docId/approvers')
+  @UseGuards(AuthGuard('jwt'), RolesGuard)
+  @Roles('editor', 'admin')
+  @ApiOperation({
+    summary: 'Get approver-role user IDs for approval chain setup',
+    description:
+      'Returns user IDs for users with approver or admin role so editors can configure an ordered approval chain from known approvers.',
+  })
+  async getDocumentApprovers(@Param('docId') docId: string, @Req() req: any) {
+    const response = await this.proxyService.forward(req, {
+      method: 'GET',
+      url: `${process.env.METADATA_SERVICE_URL}/documents/${docId}/approvers`,
+    });
+    return response.data;
+  }
+
   @Post('documents/:docId/legal-hold')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
   @Roles('admin')

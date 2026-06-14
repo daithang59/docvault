@@ -36,4 +36,21 @@ describe('parseAuditFilterQuery', () => {
       to: '2026-05-30T10:08:00.000Z',
     });
   });
+
+  it('parses multi-value audit drilldown filters from chart segments', () => {
+    expect(
+      parseAuditFilterQuery(
+        'documentIds=doc-critical%2Cdoc-warning&actorIds=editor-1%2Cviewer-1&recommendationIds=rec-1%2Crec-2&actions=DOCUMENT_DOWNLOAD_AUTHORIZED%2CDOCUMENT_PREVIEW_AUTHORIZED&classifications=SECRET%2CCONFIDENTIAL',
+      ),
+    ).toEqual({
+      documentIds: ['doc-critical', 'doc-warning'],
+      actorIds: ['editor-1', 'viewer-1'],
+      recommendationIds: ['rec-1', 'rec-2'],
+      actions: [
+        'DOCUMENT_DOWNLOAD_AUTHORIZED',
+        'DOCUMENT_PREVIEW_AUTHORIZED',
+      ],
+      classifications: ['SECRET', 'CONFIDENTIAL'],
+    });
+  });
 });

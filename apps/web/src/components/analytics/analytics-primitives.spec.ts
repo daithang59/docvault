@@ -31,18 +31,18 @@ describe('analytics primitives', () => {
   it('renders an accessible score gauge with visible value and label', () => {
     const markup = renderToStaticMarkup(
       React.createElement(ScoreGauge, {
-        label: 'Business readiness',
+        label: 'Evidence readiness',
         value: 75,
         tone: 'success',
-        description: 'Demo stories are nearly ready.',
-        href: '/demo-kit',
+        description: 'Evidence sources are mostly linked.',
+        href: '/evidence',
       }),
     );
 
-    expect(markup).toContain('Business readiness');
+    expect(markup).toContain('Evidence readiness');
     expect(markup).toContain('75%');
-    expect(markup).toContain('aria-label="Business readiness score 75 percent"');
-    expect(markup).toContain('href="/demo-kit"');
+    expect(markup).toContain('aria-label="Evidence readiness score 75 percent"');
+    expect(markup).toContain('href="/evidence"');
   });
 
   it('renders a labelled segmented donut from segment data', () => {

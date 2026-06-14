@@ -10,7 +10,6 @@ import {
   Shield,
   KeyRound,
   Archive,
-  ClipboardCheck,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -31,12 +30,6 @@ export const NAV_ITEMS: NavItem[] = [
     href: ROUTES.DASHBOARD,
     icon: LayoutDashboard,
     roles: ['viewer', 'editor', 'approver', 'compliance_officer', 'admin'],
-  },
-  {
-    label: 'Demo Kit',
-    href: ROUTES.DEMO_KIT,
-    icon: ClipboardCheck,
-    roles: ['compliance_officer', 'admin'],
   },
   {
     label: 'Documents',
