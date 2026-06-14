@@ -48,7 +48,7 @@ def pushImages(cfg, builtList, tag) {
     def imageDigests = [:]
     def registryArg = cfg.registryHost?.trim() ? shellQuote(cfg.registryHost.trim()) : ''
     def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
-    def credentialType = cfg.registryCredentialType ?: 'usernamePassword'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {

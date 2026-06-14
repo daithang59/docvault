@@ -169,10 +169,11 @@ def withRegistryLogin(cfg, Closure body) {
     def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
     def registryArg = shellQuote(cfg.registryHost.trim())
     def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
-    def credentialType = cfg.registryCredentialType ?: 'usernamePassword'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
+    def result = null
 
     try {
-        return withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
+        withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
             if (credentialType == 'secretText') {
                 def registryUsername = cfg.registryUsername?.trim()
                 if (!registryUsername) {
@@ -182,29 +183,29 @@ def withRegistryLogin(cfg, Closure body) {
                 withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
                     sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
                     try {
-                        return body()
+                        result = body()
                     } finally {
                         sh "docker logout ${registryArg} || true"
                     }
                 }
-            }
-
-            if (credentialType == 'usernamePassword') {
+            } else if (credentialType == 'usernamePassword') {
                 withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                     sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
                     try {
-                        return body()
+                        result = body()
                     } finally {
                         sh "docker logout ${registryArg} || true"
                     }
                 }
+            } else {
+                error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
             }
-
-            error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
         }
     } finally {
         sh "rm -rf '${dockerConfigDir}'"
     }
+
+    return result
 }
 
 List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady) {
