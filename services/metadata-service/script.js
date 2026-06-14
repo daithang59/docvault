@@ -6,6 +6,20 @@ async function main() {
   console.log(JSON.stringify(orgs, null, 2));
 }
 
-main()
-  .catch(console.error)
-  .finally(() => prisma.$disconnect());
+async function run() {
+  try {
+    await main();
+  } catch (error) {
+    console.error(error);
+    process.exitCode = 1;
+  } finally {
+    try {
+      await prisma.$disconnect();
+    } catch (error) {
+      console.error(error);
+      process.exitCode = 1;
+    }
+  }
+}
+
+void run();

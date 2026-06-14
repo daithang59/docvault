@@ -1249,9 +1249,7 @@ export class AuditService {
       timestamp: { $gte: fifteenMinutesAgo },
     });
     const existingLog =
-      query && typeof query.lean === 'function'
-        ? await query.lean()
-        : await query;
+      typeof query?.lean === 'function' ? await query.lean() : await query;
 
     if (
       existingLog &&
