@@ -1,4 +1,4 @@
-@Library('docvault@feat/devsecops-main-intergation') _
+@Library('docvault@feat/web-deployment') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -352,17 +352,17 @@ pipeline {
             }
         }
 
-        stage('Pre-build Security') {
+        stage('Pre-build Security Gates') {
             when {
                 expression {
-                    return env.RUN_SECURITY_CI == 'true'
+                    return env.RUN_SECURITY_CI == 'true' || env.RUN_IAC_CI == 'true'
                 }
             }
             parallel {
                 stage('SCA - Dependency Check') {
                     when {
                         expression {
-                            return env.RUN_APP_CI == 'true'
+                            return env.RUN_SECURITY_CI == 'true' && env.RUN_APP_CI == 'true'
                         }
                     }
                     steps {
@@ -379,6 +379,11 @@ pipeline {
                 }
 
                 stage('Trivy FS Scan') {
+                    when {
+                        expression {
+                            return env.RUN_SECURITY_CI == 'true'
+                        }
+                    }
                     steps {
                         script {
                             trivyFsScan(cfg)
@@ -389,7 +394,7 @@ pipeline {
                 stage('SAST - SonarQube') {
                     when {
                         expression {
-                            return env.RUN_APP_CI == 'true'
+                            return env.RUN_SECURITY_CI == 'true' && env.RUN_APP_CI == 'true'
                         }
                     }
                     steps {
@@ -398,20 +403,20 @@ pipeline {
                         }
                     }
                 }
-            }
-        }
 
-        stage('Pre-build Security - IaC') {
-            when {
-                expression {
-                    return env.RUN_IAC_CI == 'true'
-                }
-            }
-            steps {
-                script {
-                    policyAsCode(cfg)
-                    iacCheckov(cfg)
-                    terraformValidate(cfg)
+                stage('Pre-build Security - IaC') {
+                    when {
+                        expression {
+                            return env.RUN_IAC_CI == 'true'
+                        }
+                    }
+                    steps {
+                        script {
+                            policyAsCode(cfg)
+                            iacCheckov(cfg)
+                            terraformValidate(cfg)
+                        }
+                    }
                 }
             }
         }
