@@ -104,7 +104,7 @@ pipeline {
         )
         booleanParam(
             name: 'USE_NVD_KEY',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Use NVD API key for Dependency Check to bypass rate limits (requires "nvd-api-key" credential).'
         )
         booleanParam(

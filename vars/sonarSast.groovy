@@ -10,7 +10,7 @@ def call(Map cfg = [:]) {
     String projectVersion   = cfg.sonarProjectVersion ?: (env.BUILD_NUMBER ?: 'local')
     String sources          = cfg.sonarSources ?: 'apps,services,libs'
     String exclusions       = cfg.sonarExclusions ?: '**/node_modules/**,**/.pnpm-store/**,**/dist/**,**/.next/**,**/coverage/**,infra/**,charts/**,checkov-report/**,dependency-check-report/**,Dockerfile.jenkins,**/.scannerwork/**'
-    String hostOverride     = cfg.sonarHostUrl ?: 'http://sonarqube:9000'
+    String hostOverride     = cfg.sonarHostUrl ?: 'https://sonarqube.docvault.id.vn'
     String hostCandidates   = sonarHostCandidates(cfg, hostOverride).join(' ')
     String dockerRunArgs    = cfg.sonarDockerRunArgs ?: '--network host --add-host=host.docker.internal:host-gateway'
     String extraArgs        = cfg.extraArgs ?: ''
@@ -35,7 +35,7 @@ def call(Map cfg = [:]) {
             echo ">>> Sonar sources          : ${sources}"
             echo ">>> Sonar docker args      : ${dockerRunArgs}"
 
-            for candidate in "\${SONAR_HOST_URL:-}" "\${CONFIGURED_SONAR_HOST}" ${hostCandidates}; do
+            for candidate in "\${CONFIGURED_SONAR_HOST}" "\${SONAR_HOST_URL:-}" ${hostCandidates}; do
                 if [ -z "\${candidate}" ]; then
                     continue
                 fi
