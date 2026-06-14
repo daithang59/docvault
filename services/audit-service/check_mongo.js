@@ -1,7 +1,10 @@
 const { MongoClient } = require('mongodb');
 
 async function main() {
-  const uri = "mongodb://root:rootpw@localhost:27017/docvault_audit?authSource=admin&directConnection=true";
+  const uri =
+    process.env.AUDIT_MONGO_URI ||
+    process.env.MONGODB_URI ||
+    'mongodb://localhost:27017/docvault_audit?directConnection=true';
   const client = new MongoClient(uri);
   try {
     await client.connect();
