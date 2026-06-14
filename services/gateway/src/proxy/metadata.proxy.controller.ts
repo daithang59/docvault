@@ -82,7 +82,7 @@ export class MetadataProxyController {
   @ApiOperation({
     summary: 'List soft-deleted documents (trash)',
     description:
-      'Returns the current user\'s deleted documents (admins see all) with recovery deadlines.',
+      "Returns the current user's deleted documents (admins see all) with recovery deadlines.",
   })
   async listTrash(@Req() req: any) {
     const response = await this.proxyService.forward(req, {
@@ -272,7 +272,9 @@ export class MetadataProxyController {
   private async emitSensitiveActionUseAudit(
     req: any,
     event: {
-      action: 'SENSITIVE_ACTION_PROOF_USED' | 'SENSITIVE_ACTION_PROOF_USE_DENIED';
+      action:
+        | 'SENSITIVE_ACTION_PROOF_USED'
+        | 'SENSITIVE_ACTION_PROOF_USE_DENIED';
       resourceId?: string;
       result: 'SUCCESS' | 'DENY';
       reason?: string;

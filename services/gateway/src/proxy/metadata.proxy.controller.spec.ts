@@ -802,7 +802,11 @@ describe('MetadataProxyController share links', () => {
     const req = { user: { sub: 'owner-1', roles: ['editor'] }, headers: {} };
     const body = { permission: 'VIEW', expiresInHours: 24 };
 
-    const result = await (controller as any).createShareLink('doc-1', req, body);
+    const result = await (controller as any).createShareLink(
+      'doc-1',
+      req,
+      body,
+    );
 
     expect(result).toBe(created);
     expect(proxyService.forward).toHaveBeenCalledWith(req, {
@@ -837,7 +841,11 @@ describe('MetadataProxyController share links', () => {
     const controller = makeController(proxyService);
     const req = { user: { sub: 'owner-1', roles: ['editor'] }, headers: {} };
 
-    const result = await (controller as any).revokeShareLink('doc-1', 'link-1', req);
+    const result = await (controller as any).revokeShareLink(
+      'doc-1',
+      'link-1',
+      req,
+    );
 
     expect(result).toBe(revoked);
     expect(proxyService.forward).toHaveBeenCalledWith(req, {
@@ -966,7 +974,11 @@ describe('MetadataProxyController approval chain', () => {
     const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
     const body = { approvers: ['a', 'b'] };
 
-    const result = await (controller as any).setApprovalChain('doc-1', req, body);
+    const result = await (controller as any).setApprovalChain(
+      'doc-1',
+      req,
+      body,
+    );
 
     expect(result).toBe(updated);
     expect(proxyService.forward).toHaveBeenCalledWith(req, {

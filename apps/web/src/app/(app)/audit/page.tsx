@@ -53,9 +53,10 @@ import {
 export default function AuditPage() {
   const { session } = useAuth();
   const searchParams = useSearchParams();
-  const [filters, setFilters] = useState<AuditQueryFilters>(() =>
-    parseAuditFilterQuery(searchParams),
-  );
+  const [filters, setFilters] = useState<AuditQueryFilters>(() => ({
+    excludeActions: ['SECURITY_RECOMMENDATIONS_VIEWED'],
+    ...parseAuditFilterQuery(searchParams),
+  }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [chainStatus, setChainStatus] = useState<AuditChainStatus | null>(null);
@@ -82,6 +83,7 @@ export default function AuditPage() {
     queryKey: auditKeys.securitySummary(),
     queryFn: getSecuritySummary,
     enabled: hasAccess,
+    staleTime: 5 * 60 * 1000,
   });
 
   const total = logs?.total ?? 0;
