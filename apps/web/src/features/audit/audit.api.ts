@@ -6,6 +6,8 @@ import type {
   AuditChainStatus,
   AuditLogEntry,
   AuditQueryFilters,
+  SealAuditChainRequest,
+  SealAuditChainResponse,
   SecurityRecommendationWorkflowHistoryEntry,
   SecuritySummary,
   UpdateSecurityRecommendationWorkflowRequest,
@@ -35,16 +37,28 @@ function toAuditQueryParams(
 
   return {
     actorId: filters.actorId,
+    actorIds: toCommaList(filters.actorIds),
     action: filters.action,
+    actions: toCommaList(filters.actions),
+    actionGroup: filters.actionGroup,
     resourceType: filters.resourceType ?? filters.targetType,
     resourceId: filters.resourceId ?? filters.targetId,
     documentId: filters.documentId,
+    documentIds: toCommaList(filters.documentIds),
+    aclId: filters.aclId,
+    recommendationId: filters.recommendationId,
+    recommendationIds: toCommaList(filters.recommendationIds),
+    classifications: toCommaList(filters.classifications),
     result: filters.result,
     from: filters.from ? new Date(filters.from).toISOString() : undefined,
     to: filters.to ? new Date(filters.to).toISOString() : undefined,
     page,
     pageSize,
   };
+}
+
+function toCommaList(values?: string[]): string | undefined {
+  return values && values.length > 0 ? values.join(',') : undefined;
 }
 
 function normalizeAuditLogEntry(entry: AuditLogEntry): AuditLogEntry {
@@ -109,6 +123,13 @@ export async function queryAuditLogWindow(
 export async function verifyAuditChain(): Promise<AuditChainStatus> {
   const res = await apiClient.get(apiEndpoints.audit.verifyChain);
   return unwrap(res) as AuditChainStatus;
+}
+
+export async function sealAuditChainAndStartEpoch(
+  dto: SealAuditChainRequest,
+): Promise<SealAuditChainResponse> {
+  const res = await apiClient.post(apiEndpoints.audit.sealChainAndStartEpoch, dto);
+  return unwrap(res) as SealAuditChainResponse;
 }
 
 export async function getSecuritySummary(): Promise<SecuritySummary> {

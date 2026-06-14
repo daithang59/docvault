@@ -1,0 +1,52 @@
+\chapter{Pipeline evidence}
+
+\section{Tham số Jenkins khuyến nghị}
+
+Khi ứng dụng đã deploy lên EKS và web URL reachable, pipeline có thể chạy với các tham số:
+
+\begin{lstlisting}
+RUN_ZAP=true
+DEPLOY_TARGET_URL=http://<node-external-ip>:30006
+ZAP_TARGET=http://<node-external-ip>:30006
+RUN_ARGO_HEALTH_CHECK=true
+KUBECONFIG_CREDENTIAL_ID=jenkins-argocd-kubeconfig
+GITOPS_BRANCH=gitops-testing
+\end{lstlisting}
+
+\section{Bằng chứng cần chụp}
+
+\begin{longtable}{p{0.28\textwidth}p{0.58\textwidth}}
+\caption{Danh sách pipeline evidence cần đưa vào khi nộp} \\
+\toprule
+\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\midrule
+\endhead
+Jenkins build & Build number, branch, stage view xanh, timestamp. \\
+Pre-build Security & Các stage SCA, Trivy FS, Unit Tests, SAST, Checkov, Terraform Validate pass. \\
+Build \& Scan & Service image được build và scan image. \\
+Push \& GitOps & Image tag được push, GitOps branch được cập nhật. \\
+Argo CD & Các application chính Synced/Healthy. \\
+Smoke test & \code{GET /} và \code{GET /api/health} pass. \\
+ZAP report & \code{zap\_report.html} và \code{zap\_report.json} được archive. \\
+Grafana & Pod health, CPU/RAM hoặc workload status. \\
+Loki & Query log namespace \code{docvault}. \\
+\bottomrule
+\end{longtable}
+
+\section{Diễn giải khi bảo vệ}
+
+Khi trình bày pipeline, không nên chỉ nói ``pipeline chạy xanh''. Cần giải thích pipeline chứng minh điều gì:
+
+\begin{itemize}
+  \item SAST/SCA giúp phát hiện lỗi mã nguồn và dependency trước khi build image.
+  \item Trivy/Checkov/Terraform validate giúp kiểm tra artifact và hạ tầng.
+  \item Docker build và image scan giúp đảm bảo image tạo ra có thể triển khai và đã được quét.
+  \item GitOps update giúp trạng thái deploy có lịch sử trong Git.
+  \item Argo CD health chứng minh cluster đã reconcile về trạng thái mong muốn.
+  \item Smoke test chứng minh app sau deploy reachable.
+  \item ZAP DAST kiểm tra ứng dụng đang chạy và tạo report bảo mật động.
+\end{itemize}

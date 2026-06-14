@@ -39,22 +39,23 @@ const document: DocumentDetail = {
   aclEntries: [],
 };
 
-function renderWithQueryClient(element: ReactElement, includeAuth = false) {
+function renderWithProviders(element: ReactElement): string {
   const client = new QueryClient({
     defaultOptions: { queries: { retry: false } },
   });
-  const child = includeAuth
-    ? createElement(AuthProvider, null, element)
-    : element;
 
   return renderToStaticMarkup(
-    createElement(QueryClientProvider, { client }, child),
+    createElement(
+      QueryClientProvider,
+      { client },
+      createElement(AuthProvider, null, element),
+    ),
   );
 }
 
 describe('DocumentMetadataSummaryCard', () => {
   it('renders compact metadata for inspection without object keys', () => {
-    const html = renderWithQueryClient(
+    const html = renderWithProviders(
       createElement(DocumentMetadataSummaryCard, { document }),
     );
 
@@ -82,7 +83,7 @@ describe('DocumentEvidenceLinksCard', () => {
 
 describe('DocumentVersionsCard', () => {
   it('renders version rows with labeled preview, download, compare, and restore controls', () => {
-    const html = renderWithQueryClient(
+    const html = renderWithProviders(
       createElement(DocumentVersionsCard, {
         docId: 'doc-1',
         versions: [
@@ -108,7 +109,6 @@ describe('DocumentVersionsCard', () => {
         canRestore: true,
         currentVersion: 2,
       }),
-      true,
     );
 
     expect(html).toContain('board-report-v1.pdf');
@@ -120,4 +120,3 @@ describe('DocumentVersionsCard', () => {
     expect(html).not.toContain('Restore version 2');
   });
 });
-

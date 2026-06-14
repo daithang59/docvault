@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildAccessReviewModel } from './access-review';
+import {
+  buildAccessReviewModel,
+  getAccessReviewUserSubjectIds,
+  getResolvedAccessReviewEvidence,
+  getResolvedAccessReviewSubject,
+} from './access-review';
 import type { DocumentDetail } from '@/features/documents/documents.types';
 
 const baseDocument: DocumentDetail = {
@@ -112,7 +117,7 @@ describe('buildAccessReviewModel', () => {
       permission: 'DOWNLOAD',
       nextActionLabel: 'Review ACL',
       href: '/documents/doc-secret-board',
-      auditHref: '/audit?documentId=doc-secret-board',
+      auditHref: '/audit?documentId=doc-secret-board&aclId=acl-all-download',
     });
     expect(model.reviews[0].evidence).toEqual([
       'SECRET document',
@@ -181,5 +186,51 @@ describe('buildAccessReviewModel', () => {
     expect(model.summary.broadAccessGrants).toBe(0);
     expect(model.summary.openReviews).toBe(0);
     expect(model.posture.level).toBe('healthy');
+  });
+
+  it('resolves user subject ids to usernames for review display text', () => {
+    const model = buildAccessReviewModel(
+      [
+        document({
+          id: 'doc-confidential-download',
+          title: 'Confidential Download',
+          classification: 'CONFIDENTIAL',
+          aclEntries: [
+            {
+              id: 'acl-user-download',
+              docId: 'doc-confidential-download',
+              subjectType: 'USER',
+              subjectId: '45199353-ae24-4eb4-b408-0d4aea57f886',
+              permission: 'DOWNLOAD',
+              effect: 'ALLOW',
+              createdAt: '2026-06-01T00:00:00.000Z',
+            },
+          ],
+        }),
+      ],
+      { now: '2026-06-05T00:00:00.000Z' },
+    );
+
+    const review = model.reviews[0];
+
+    expect(getAccessReviewUserSubjectIds(model.reviews)).toEqual([
+      '45199353-ae24-4eb4-b408-0d4aea57f886',
+    ]);
+    expect(
+      getResolvedAccessReviewSubject(review, {
+        '45199353-ae24-4eb4-b408-0d4aea57f886': {
+          displayName: 'Viewer One',
+          username: 'viewer1',
+        },
+      }),
+    ).toBe('viewer1');
+    expect(
+      getResolvedAccessReviewEvidence(review, {
+        '45199353-ae24-4eb4-b408-0d4aea57f886': {
+          displayName: 'Viewer One',
+          username: 'viewer1',
+        },
+      }),
+    ).toContain('ALLOW DOWNLOAD for viewer1');
   });
 });

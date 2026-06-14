@@ -1,0 +1,177 @@
+\chapter{Triển khai ứng dụng DocVault}
+
+\section{Cấu trúc monorepo}
+
+DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo. Cách tổ chức này giúp quản lý frontend, backend services, shared libraries, infrastructure và tài liệu trong cùng một repository. Các thư mục chính gồm:
+
+\begin{itemize}
+  \item \code{apps/web}: ứng dụng frontend Next.js.
+  \item \code{services/gateway}: API Gateway.
+  \item \code{services/metadata-service}: service quản lý metadata, ACL, policy và retention.
+  \item \code{services/document-service}: service xử lý upload/download file và MinIO/S3.
+  \item \code{services/workflow-service}: service xử lý state machine tài liệu.
+  \item \code{services/audit-service}: service ghi/truy vấn audit log và verify hash-chain.
+  \item \code{services/notification-service}: notification sink cho môi trường demo/dev.
+  \item \code{libs/auth}, \code{libs/contracts}, \code{libs/throttler}: các thư viện dùng chung.
+  \item \code{infra}: Docker Compose, Kubernetes, Helm, Argo CD, Terraform và các cấu hình hạ tầng.
+  \item \code{docs}: tài liệu thiết kế, hướng dẫn chạy, evidence và screenshot.
+\end{itemize}
+
+Monorepo giúp báo cáo, code, pipeline và evidence nằm chung một vòng đời. Khi một thay đổi ảnh hưởng đến API contract hoặc security policy, nhóm phát triển có thể cập nhật code, test và tài liệu trong cùng một pull request.
+
+\section{Frontend Next.js}
+
+Frontend được xây dựng bằng Next.js, React, TanStack Query, React Hook Form, Zod, Tailwind CSS và Radix UI. Ứng dụng sử dụng App Router và tổ chức theo các nhóm route đã đăng nhập hoặc chưa đăng nhập. Frontend gọi gateway qua biến môi trường \code{NEXT\_PUBLIC\_API\_BASE\_URL}, mặc định trỏ đến \code{http://localhost:3000/api} trong môi trường local.
+
+Frontend không chỉ là lớp hiển thị danh sách tài liệu. Ứng dụng đã bao phủ nhiều luồng vận hành quan trọng:
+
+\begin{itemize}
+  \item Đăng nhập SSO qua Keycloak và quản lý phiên.
+  \item Dashboard tổng quan tài liệu, pending approval, DLP, retention và readiness.
+  \item Documents và My Documents với lọc nâng cao, quick views, saved views, folder tree và phân trang.
+  \item New Document và Edit Document cho tạo/chỉnh metadata và upload file.
+  \item Document Detail với preview/download, version history, workflow timeline, ACL, comments, activity, share link, legal hold, DLP findings, AI guardrails và evidence links.
+  \item Approvals với SLA summary, review drawer, approve/reject và reason preset.
+  \item Audit, Security, Evidence Center, Retention và Access Review cho compliance/admin.
+  \item Notifications, Trash, Members, Profile, Settings và Demo Kit.
+\end{itemize}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{dashboard.png}
+\caption{Màn hình dashboard của DocVault}
+\label{fig:web-dashboard}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{documents.png}
+\caption{Màn hình danh sách tài liệu}
+\label{fig:web-documents}
+\end{figure}
+
+\subsection{Permission-aware UI}
+
+Frontend có helper phân quyền để xác định action nào nên hiển thị, action nào nên bị disable và lý do deny là gì. Ví dụ, Compliance Officer có thể thấy lý do bị chặn download thay vì chỉ không thấy nút. Tuy nhiên, helper frontend không được xem là boundary bảo mật cuối cùng. Backend vẫn là nơi quyết định policy. Điều này tránh tình trạng người dùng tự gọi API để vượt qua UI.
+
+\section{Gateway}
+
+Gateway là entry point của hệ thống. Service này xác thực JWT từ Keycloak, kiểm tra role ở mức route, expose health endpoint, proxy request xuống service phía sau và truyền các header ngữ cảnh. Các header quan trọng gồm:
+
+\begin{itemize}
+  \item \code{authorization}
+  \item \code{x-request-id}
+  \item \code{x-user-id}
+  \item \code{x-roles}
+  \item \code{x-groups}
+\end{itemize}
+
+Gateway proxy các nhóm route chính như \code{/metadata}, \code{/documents}, \code{/workflow}, \code{/audit} và \code{/notify}. Nhờ đó frontend chỉ cần biết một API base URL, trong khi bên trong hệ thống vẫn tách service theo bounded context.
+
+\section{Metadata-service}
+
+Metadata-service là nguồn sự thật cho tài liệu logic và policy. Service này sở hữu các dữ liệu và nghiệp vụ:
+
+\begin{itemize}
+  \item document record;
+  \item classification và tags;
+  \item current version pointer;
+  \item ACL entries;
+  \item workflow history;
+  \item download/preview authorization;
+  \item retention evidence;
+  \item access impact simulation;
+  \item AI guardrails metadata-only.
+\end{itemize}
+
+Metadata-service là nơi quan trọng nhất để enforce policy liên quan đến metadata và grant token. Khi document-service cần đăng ký version mới hoặc khi workflow-service cần cập nhật trạng thái, các service này gọi metadata-service thay vì ghi trực tiếp vào database.
+
+\section{Document-service}
+
+Document-service xử lý phần blob file. Service này nhận upload multipart, tính checksum SHA-256, scan malware/DLP, sinh object key và upload file lên MinIO/S3. Sau khi upload thành công, service gọi metadata-service để đăng ký version mới.
+
+Đối với download, document-service không cấp file một cách độc lập. Service xác minh grant token hoặc tái authorize thông qua metadata-service trước khi trả presigned URL hoặc stream endpoint. Với tài liệu nhạy cảm, service trả về stream endpoint để áp dụng posture kiểm soát tốt hơn.
+
+\section{Workflow-service}
+
+Workflow-service sở hữu logic chuyển trạng thái. Service đọc trạng thái hiện tại từ metadata-service, kiểm tra transition hợp lệ rồi yêu cầu metadata-service cập nhật trạng thái. Các transition chính:
+
+\begin{itemize}
+  \item \code{SUBMIT}: \code{DRAFT -> PENDING}
+  \item \code{APPROVE}: \code{PENDING -> PUBLISHED}
+  \item \code{REJECT}: \code{PENDING -> DRAFT}
+  \item \code{ARCHIVE}: \code{PUBLISHED -> ARCHIVED}
+\end{itemize}
+
+Sau mỗi transition, workflow-service phát audit event và gọi notification-service. Cách này giúp workflow vẫn là nơi điều phối nghiệp vụ, nhưng metadata-service vẫn là owner dữ liệu trạng thái.
+
+\section{Audit-service}
+
+Audit-service ghi và truy vấn audit log. Service hỗ trợ append audit event từ các service tin cậy, query theo actor/action/resource/result/time, verify hash-chain và security summary. Endpoint audit query chỉ dành cho Compliance Officer hoặc Admin.
+
+Hash-chain giúp phát hiện sửa đổi audit event ngoài luồng. Nếu một event cũ bị chỉnh trực tiếp trong database, verify-chain trả về trạng thái không hợp lệ. Trong phạm vi đồ án, đây là cơ chế tamper-evident phù hợp để chứng minh ý tưởng kiểm soát audit.
+
+\section{Notification-service}
+
+Notification-service hiện là notification sink cho môi trường dev/demo. Service nhận payload từ workflow hoặc các sự kiện liên quan và lưu/log để frontend hiển thị notification center. Đây chưa phải hệ thống email, SMS hoặc push notification hoàn chỉnh, nhưng đủ để mô phỏng luồng thông báo trong sản phẩm.
+
+\section{Hạ tầng local}
+
+Môi trường local sử dụng Docker Compose để chạy các dependency:
+
+\begin{itemize}
+  \item PostgreSQL cho metadata.
+  \item MongoDB cho audit.
+  \item MongoDB Express để quan sát dữ liệu audit trong dev.
+  \item MinIO cho object storage.
+  \item MinIO init job để tạo bucket và bật cấu hình cần thiết.
+  \item Keycloak cho identity, realm, roles và demo users.
+\end{itemize}
+
+Các service backend chạy trên các port \code{3000} đến \code{3005}, frontend thường chạy trên \code{3100} để tránh xung đột với gateway.
+
+\section{Các màn hình minh họa}
+
+Các hình dưới đây thể hiện một số giao diện chính đã triển khai trong frontend.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{login.png}
+\caption{Màn hình đăng nhập DocVault}
+\label{fig:web-login}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{approvals.png}
+\caption{Màn hình phê duyệt tài liệu}
+\label{fig:web-approvals}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{audit.png}
+\caption{Màn hình audit log}
+\label{fig:web-audit}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{security.png}
+\caption{Màn hình security posture}
+\label{fig:web-security}
+\end{figure}
+
+\section{Luồng demo ứng dụng}
+
+Luồng demo chính được thiết kế để chứng minh cả nghiệp vụ và bảo mật:
+
+\begin{enumerate}
+  \item Editor đăng nhập, tạo tài liệu và upload file.
+  \item Editor submit tài liệu để chuyển từ Draft sang Pending.
+  \item Approver đăng nhập, mở hàng đợi Approvals và approve tài liệu.
+  \item Viewer đăng nhập, xem tài liệu đã Published và download nếu policy cho phép.
+  \item Compliance Officer đăng nhập, mở Audit/Security/Evidence nhưng bị deny preview/download file content.
+\end{enumerate}
+
+Luồng này thể hiện đủ các thành phần chính của hệ thống: identity, gateway, metadata, document storage, workflow, audit, notification và frontend.

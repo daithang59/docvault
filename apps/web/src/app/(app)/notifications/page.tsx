@@ -29,6 +29,7 @@ import {
 } from '@/features/notifications/notifications.api';
 import {
   buildNotificationCenterModel,
+  getNotificationWorkflowActorIds,
   type NotificationCenterFilter,
   type NotificationCenterItem,
   type NotificationGroupKey,
@@ -36,6 +37,7 @@ import {
   type NotificationReadState,
   type NotificationSeverity,
 } from '@/features/notifications/notifications-center';
+import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { cn } from '@/lib/utils/cn';
 import { formatDateTime, formatRelative } from '@/lib/utils/date';
 
@@ -103,9 +105,14 @@ export default function NotificationsPage() {
     () => notificationsQuery.data?.records ?? [],
     [notificationsQuery.data?.records],
   );
+  const actorIds = useMemo(
+    () => getNotificationWorkflowActorIds(records),
+    [records],
+  );
+  const { data: actorNames } = useOwnerDisplayNames(actorIds);
   const model = useMemo(
-    () => buildNotificationCenterModel(records, filter),
-    [filter, records],
+    () => buildNotificationCenterModel(records, filter, { actorNames }),
+    [actorNames, filter, records],
   );
 
   const markReadMutation = useMutation({

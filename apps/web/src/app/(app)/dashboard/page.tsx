@@ -4,15 +4,20 @@ import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useDocuments } from '@/lib/hooks/use-documents';
 import { useAuth } from '@/lib/auth/auth-context';
+import { getAnalyticsVisibility } from '@/lib/auth/permissions';
 import { PageHeader } from '@/components/common/page-header';
 import { StatusBadge } from '@/components/badges/status-badge';
 import { LoadingState } from '@/components/common/loading-state';
 import { ErrorState } from '@/components/common/error-state';
 import { ProtectedAction } from '@/components/common/protected-action';
+import {
+  ColumnBarChart,
+  MetricTile,
+  PriorityBarList,
+} from '@/components/analytics/analytics-primitives';
 import { fetchUnreadCount } from '@/features/notifications/notifications.api';
 import {
   buildDashboardModel,
-  type DashboardDemoReadinessSignal,
   type DashboardOperationalWidget,
   type DashboardWidgetTone,
 } from '@/features/dashboard/dashboard-model';
@@ -24,11 +29,8 @@ import {
   FilePlus,
   CheckSquare,
   Shield,
-  ShieldAlert,
-  ShieldCheck,
   ArrowRight,
   type LucideIcon,
-  TrendingUp,
 } from 'lucide-react';
 import Link from 'next/link';
 import { ROUTES } from '@/lib/constants/routes';
@@ -48,117 +50,63 @@ export default function DashboardPage() {
     retry: false,
   });
   const unreadCount = unreadQuery.data?.count ?? 0;
+  const analyticsVisibility = useMemo(
+    () => getAnalyticsVisibility(session),
+    [session],
+  );
 
   const dashboard = useMemo(
     () =>
       buildDashboardModel(documents ?? [], {
         unreadNotifications: unreadCount,
+        analyticsVisibility,
         actor: userId && userRoles
           ? { id: userId, roles: userRoles }
           : undefined,
       }),
-    [documents, unreadCount, userId, userRoles],
+    [analyticsVisibility, documents, unreadCount, userId, userRoles],
   );
 
   if (isLoading) return <LoadingState label="Loading dashboard..." />;
   if (isError) return <ErrorState message="Failed to load dashboard data." onRetry={refetch} />;
 
-  const STAT_CARDS = [
-    { label: 'Total Documents', value: dashboard.stats.total, icon: FileText, statKey: 'total' },
-    { label: 'Draft',           value: dashboard.stats.DRAFT,    icon: FileText,   statKey: 'draft'    },
-    { label: 'Pending Approval',value: dashboard.stats.PENDING,  icon: TrendingUp, statKey: 'pending' },
-    { label: 'Published',       value: dashboard.stats.PUBLISHED, icon: Shield,    statKey: 'published'},
-  ];
-
   return (
     <div>
       <PageHeader
         title="Dashboard"
-        subtitle="System overview and quick access to your documents."
+        subtitle="Command center for document lifecycle, approvals, security, and evidence readiness."
       />
 
-      {/* Stat cards */}
-      <div className="mb-6 grid grid-cols-2 gap-4 lg:grid-cols-4">
-        {STAT_CARDS.map((card, idx) => {
-          const Icon = card.icon;
+      <section className="mb-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
+        {dashboard.operationalWidgets.map((widget, index) => {
+          const Icon = WIDGET_ICONS[widget.key];
           return (
-            <div
-              key={card.label}
-              className={`animate-in card-interactive rounded-2xl border p-5 delay-${idx + 1}`}
-              style={{
-                background: 'var(--bg-card)',
-                borderColor: 'var(--border-soft)',
-              }}
-            >
-              <div
-                className="mb-3 inline-flex h-10 w-10 items-center justify-center rounded-xl"
-                style={{
-                  background: `var(--stat-${card.statKey}-bg)`,
-                  color: `var(--stat-${card.statKey}-text)`,
-                }}
-              >
-                <Icon className="h-5 w-5" />
-              </div>
-              <p className="text-2xl font-bold" style={{ color: 'var(--text-strong)' }}>
-                {card.value}
-              </p>
-              <p className="mt-0.5 text-xs" style={{ color: 'var(--text-muted)' }}>
-                {card.label}
-              </p>
-            </div>
+            <MetricTile
+              key={widget.key}
+              className={cn('animate-in', index < 2 ? 'delay-1' : 'delay-2')}
+              description={widget.description}
+              href={widget.href}
+              icon={<Icon className="h-5 w-5" />}
+              label={widget.label}
+              tone={widget.tone}
+              value={widget.value}
+            />
           );
         })}
-      </div>
+      </section>
 
-      <div
-        data-testid="business-demo-readiness"
-        className="mb-6 overflow-hidden rounded-lg border"
-        style={{
-          background: 'var(--bg-card)',
-          borderColor: 'var(--border-soft)',
-        }}
-      >
-        <div className="grid gap-0 xl:grid-cols-[280px_minmax(0,1fr)]">
-          <div
-            className="border-b px-5 py-4 xl:border-b-0 xl:border-r"
-            style={{ borderColor: 'var(--border-soft)' }}
-          >
-            <div className="flex items-center justify-between gap-4">
-              <div className="flex min-w-0 items-center gap-3">
-                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[var(--bg-muted)]">
-                  <ShieldCheck className="h-5 w-5 text-[var(--color-primary)]" />
-                </div>
-                <div className="min-w-0">
-                  <p className="text-sm font-semibold text-[var(--text-strong)]">
-                    Business Demo Readiness
-                  </p>
-                  <p className="mt-0.5 text-xs text-[var(--text-faint)]">
-                    {dashboard.demoReadiness.label}
-                  </p>
-                </div>
-              </div>
-              <span className="shrink-0 text-2xl font-bold text-[var(--text-strong)]">
-                {dashboard.demoReadiness.score}%
-              </span>
-            </div>
-            <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
-              {dashboard.demoReadiness.description}
-            </p>
-          </div>
-
-          <div className="grid gap-px bg-[var(--border-soft)] sm:grid-cols-2 xl:grid-cols-4">
-            {dashboard.demoReadiness.signals.map((signal) => (
-              <DemoReadinessSignalCard key={signal.key} signal={signal} />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="mb-6 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {dashboard.operationalWidgets.map((widget) => (
-          <OperationalWidgetCard key={widget.key} widget={widget} />
-        ))}
-      </div>
+      <section className="mb-5 grid gap-4 lg:grid-cols-2">
+        <ColumnBarChart
+          className="animate-in delay-2"
+          label="Lifecycle pipeline"
+          segments={dashboard.commandCenter.lifecycleSegments}
+        />
+        <PriorityBarList
+          className="animate-in delay-3"
+          label="Attention by priority"
+          segments={dashboard.commandCenter.attentionSegments}
+        />
+      </section>
 
       <div className="grid gap-5 lg:grid-cols-3">
         {/* Recent documents */}
@@ -374,100 +322,13 @@ function QuickAction({ href, icon: Icon, label, description, badge }: {
 
 const WIDGET_ICONS: Record<DashboardOperationalWidget['key'], LucideIcon> = {
   'pending-approvals': CheckSquare,
-  'dlp-detected': ShieldAlert,
+  'total-documents': FileText,
+  'published-documents': FileText,
+  'draft-handoff': FileText,
+  'dlp-detected': Shield,
   'retention-due-soon': Archive,
   'unread-notifications': Bell,
 };
-
-const DEMO_SIGNAL_ICONS: Record<DashboardDemoReadinessSignal['key'], LucideIcon> = {
-  'lifecycle-coverage': FileText,
-  'approval-workflow': CheckSquare,
-  'evidence-export': Archive,
-  'security-posture': ShieldAlert,
-};
-
-function DemoReadinessSignalCard({
-  signal,
-}: {
-  signal: DashboardDemoReadinessSignal;
-}) {
-  const Icon = DEMO_SIGNAL_ICONS[signal.key];
-
-  return (
-    <Link
-      href={signal.href}
-      className="group flex min-h-[132px] min-w-0 flex-col justify-between bg-[var(--bg-card)] p-4 transition hover:bg-[var(--bg-card-hover)]"
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-[11px] font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            {signal.label}
-          </p>
-          <p className="mt-1 truncate text-sm font-semibold text-[var(--text-strong)]">
-            {signal.value}
-          </p>
-        </div>
-        <div
-          className={cn(
-            'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border',
-            toneClass(signal.tone),
-          )}
-        >
-          <Icon className="h-4 w-4" />
-        </div>
-      </div>
-      <div>
-        <p className="mt-3 line-clamp-2 text-xs leading-5 text-[var(--text-muted)]">
-          {signal.description}
-        </p>
-        <p className="mt-2 inline-flex items-center gap-1 text-[11px] font-semibold text-[var(--color-primary)]">
-          Open <ArrowRight className="h-3 w-3 transition group-hover:translate-x-0.5" />
-        </p>
-      </div>
-    </Link>
-  );
-}
-
-function OperationalWidgetCard({
-  widget,
-}: {
-  widget: DashboardOperationalWidget;
-}) {
-  const Icon = WIDGET_ICONS[widget.key];
-
-  return (
-    <Link
-      href={widget.href}
-      className="rounded-2xl border p-4 transition hover:bg-[var(--bg-card-hover)]"
-      style={{
-        background: 'var(--bg-card)',
-        borderColor: 'var(--border-soft)',
-      }}
-    >
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <p className="text-xs font-semibold uppercase tracking-wide text-[var(--text-muted)]">
-            {widget.label}
-          </p>
-          <p className="mt-2 text-2xl font-bold text-[var(--text-strong)]">
-            {widget.value}
-          </p>
-        </div>
-        <div
-          className={cn(
-            'inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border',
-            toneClass(widget.tone),
-          )}
-        >
-          <Icon className="h-5 w-5" />
-        </div>
-      </div>
-      <p className="mt-3 text-xs leading-5 text-[var(--text-muted)]">
-        {widget.description}
-      </p>
-    </Link>
-  );
-}
 
 function toneClass(tone: DashboardWidgetTone): string {
   if (tone === 'critical') {

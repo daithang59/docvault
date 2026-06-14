@@ -13,7 +13,15 @@ import {
   RefreshCw,
   ShieldAlert,
   ShieldCheck,
+  type LucideIcon,
 } from 'lucide-react';
+import {
+  ColumnBarChart,
+  MetricTile,
+  PriorityBarList,
+  ScoreGauge,
+  SegmentDonut,
+} from '@/components/analytics/analytics-primitives';
 import { EmptyState } from '@/components/common/empty-state';
 import { ErrorState } from '@/components/common/error-state';
 import { LoadingState } from '@/components/common/loading-state';
@@ -32,13 +40,17 @@ import {
   buildEvidenceCenterManifest,
   buildEvidenceCenterModel,
   buildEvidenceCenterDocumentPacket,
+  filterEvidenceRecommendationTargets,
+  getEvidenceRecommendationQueueCounts,
   resolveActorIdsInText,
+  EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT,
   type EvidenceBundleManifest,
   type EvidenceCaseNarrative,
   type EvidenceCenterModel,
+  type EvidenceCommandMetric,
   type EvidenceDocumentPacketTarget,
+  type EvidenceRecommendationQueueView,
   type EvidenceRecommendationTarget,
-  type EvidenceSourceState,
   type UserDisplayNameMap,
 } from '@/features/evidence/evidence-center';
 import { buildEvidenceReportHtml } from '@/features/evidence/evidence-report';
@@ -52,15 +64,6 @@ import { canViewAudit } from '@/lib/auth/guards';
 import { ROUTES } from '@/lib/constants/routes';
 import { getErrorMessage } from '@/lib/api/errors';
 import { formatDateTime } from '@/lib/utils/date';
-
-const sourceStateTone: Record<EvidenceSourceState, string> = {
-  ready:
-    'border-[var(--status-published-border)] bg-[var(--status-published-bg)] text-[var(--status-published-text)]',
-  attention:
-    'border-[var(--status-pending-border)] bg-[var(--status-pending-bg)] text-[var(--status-pending-text)]',
-  empty:
-    'border-[var(--border-soft)] bg-[var(--bg-subtle)] text-[var(--text-muted)]',
-};
 
 type EvidenceCenterView = 'builder' | 'presentation';
 
@@ -76,6 +79,9 @@ export default function EvidenceCenterPage() {
   const [selectedRecommendationIds, setSelectedRecommendationIds] = useState<string[]>([]);
   const [selectedDocumentIds, setSelectedDocumentIds] = useState<string[]>([]);
   const [activeView, setActiveView] = useState<EvidenceCenterView>('builder');
+  const [recommendationQueueView, setRecommendationQueueView] =
+    useState<EvidenceRecommendationQueueView>('active');
+  const [showAllRecommendations, setShowAllRecommendations] = useState(false);
 
   const securityQuery = useQuery({
     queryKey: auditKeys.securitySummary(),
@@ -336,36 +342,52 @@ export default function EvidenceCenterPage() {
         </p>
       ) : null}
 
-      <section className="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-        {model.sourceCards.map((card) => (
-          <div
-            key={card.key}
-            className="rounded-lg border p-4"
-            style={{
-              background: 'var(--bg-card)',
-              borderColor: 'var(--border-soft)',
-            }}
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-semibold uppercase text-[var(--text-faint)]">
-                  {card.label}
-                </p>
-                <p className="mt-2 text-2xl font-semibold text-[var(--text-main)]">
-                  {card.value}
-                </p>
-              </div>
-              <span
-                className={`inline-flex rounded-full border px-2.5 py-1 text-xs font-semibold ${sourceStateTone[card.state]}`}
-              >
-                {card.state}
-              </span>
-            </div>
-            <p className="mt-3 text-sm leading-relaxed text-[var(--text-muted)]">
-              {card.description}
-            </p>
-          </div>
-        ))}
+      <section
+        aria-labelledby="evidence-command-center"
+        className="mt-4 grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(360px,0.95fr)]"
+      >
+        <h2 id="evidence-command-center" className="sr-only">
+          Evidence command center
+        </h2>
+        <ScoreGauge
+          className="min-h-[180px]"
+          description={model.commandCenter.readinessGauge.description}
+          href={model.commandCenter.readinessGauge.href}
+          label={model.commandCenter.readinessGauge.label}
+          tone={model.commandCenter.readinessGauge.tone}
+          value={model.commandCenter.readinessGauge.value}
+        />
+        <div className="grid gap-3 sm:grid-cols-2">
+          {model.commandCenter.metrics.map((metric) => {
+            const Icon = EVIDENCE_METRIC_ICONS[metric.key];
+            return (
+              <MetricTile
+                key={metric.key}
+                description={metric.description}
+                href={metric.href}
+                icon={<Icon className="h-5 w-5" />}
+                label={metric.label}
+                tone={metric.tone}
+                value={metric.value}
+              />
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="mt-4 grid gap-4 lg:grid-cols-3">
+        <SegmentDonut
+          label="Evidence source states"
+          segments={model.commandCenter.sourceStateSegments}
+        />
+        <ColumnBarChart
+          label="Export packet targets"
+          segments={model.commandCenter.packetTargetSegments}
+        />
+        <PriorityBarList
+          label="Retention posture"
+          segments={model.commandCenter.retentionSegments}
+        />
       </section>
 
       <div className="mt-4 inline-flex rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
@@ -397,12 +419,24 @@ export default function EvidenceCenterPage() {
 
       {activeView === 'builder' ? (
         <>
-          <section className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
+          <section
+            id="recommendation-packets"
+            className="mt-4 grid gap-4 xl:grid-cols-[1.15fr_0.85fr]"
+          >
             <RecommendationPacketQueue
               items={model.recommendationTargets}
+              queueView={recommendationQueueView}
+              showAll={showAllRecommendations}
               pendingId={pendingRecommendationId}
               selectedIds={selectedRecommendationIdSet}
               actorDisplayNames={actorDisplayNames}
+              onQueueViewChange={(view) => {
+                setRecommendationQueueView(view);
+                setShowAllRecommendations(false);
+              }}
+              onToggleShowAll={() =>
+                setShowAllRecommendations((current) => !current)
+              }
               onToggleSelection={toggleRecommendationSelection}
               onDownload={downloadRecommendationPacket}
             />
@@ -417,7 +451,7 @@ export default function EvidenceCenterPage() {
             />
           </section>
 
-          <section className="mt-4">
+          <section id="document-packets" className="mt-4">
             <DocumentPacketTargets
               items={model.documentPacketTargets}
               pendingId={pendingDocumentId}
@@ -454,6 +488,13 @@ export default function EvidenceCenterPage() {
     </div>
   );
 }
+
+const EVIDENCE_METRIC_ICONS: Record<EvidenceCommandMetric['key'], LucideIcon> = {
+  'recommendation-packets': Clipboard,
+  'document-packets': FileJson,
+  'retention-records': Archive,
+  'audit-events': ShieldCheck,
+};
 
 function EvidenceBundlePanel({
   model,
@@ -986,19 +1027,37 @@ function MiniMetric({ label, value }: { label: string; value: number }) {
 
 function RecommendationPacketQueue({
   items,
+  queueView,
+  showAll,
   pendingId,
   selectedIds,
   actorDisplayNames,
+  onQueueViewChange,
+  onToggleShowAll,
   onToggleSelection,
   onDownload,
 }: {
   items: EvidenceRecommendationTarget[];
+  queueView: EvidenceRecommendationQueueView;
+  showAll: boolean;
   pendingId: string | null;
   selectedIds: Set<string>;
   actorDisplayNames?: UserDisplayNameMap;
+  onQueueViewChange: (view: EvidenceRecommendationQueueView) => void;
+  onToggleShowAll: () => void;
   onToggleSelection: (id: string) => void;
   onDownload: (item: EvidenceRecommendationTarget) => Promise<void>;
 }) {
+  const counts = getEvidenceRecommendationQueueCounts(items);
+  const filteredItems = filterEvidenceRecommendationTargets(items, queueView);
+  const hiddenCount = Math.max(
+    0,
+    filteredItems.length - EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT,
+  );
+  const visibleItems = showAll
+    ? filteredItems
+    : filteredItems.slice(0, EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT);
+
   return (
     <div
       className="rounded-lg border"
@@ -1012,15 +1071,43 @@ function RecommendationPacketQueue({
           Export recommendation packets with audit chain, workflow history, and
           playbook metadata.
         </p>
+        <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="inline-flex w-fit rounded-lg border border-[var(--border-soft)] bg-[var(--bg-subtle)] p-1">
+            {(['active', 'resolved', 'all'] as EvidenceRecommendationQueueView[]).map(
+              (view) => (
+                <button
+                  key={view}
+                  type="button"
+                  aria-pressed={queueView === view}
+                  onClick={() => onQueueViewChange(view)}
+                  className={`rounded-md px-3 py-1.5 text-sm font-medium transition ${
+                    queueView === view
+                      ? 'bg-[var(--bg-card)] text-[var(--text-main)] shadow-sm'
+                      : 'text-[var(--text-muted)] hover:text-[var(--text-main)]'
+                  }`}
+                >
+                  {getEvidenceQueueViewLabel(view)} {counts[view]}
+                </button>
+              ),
+            )}
+          </div>
+          <p className="text-xs text-[var(--text-muted)]">
+            Resolved packets remain exportable from history.
+          </p>
+        </div>
       </div>
 
-      {items.length === 0 ? (
+      {filteredItems.length === 0 ? (
         <p className="p-4 text-sm text-[var(--text-muted)]">
-          No security recommendation packets are waiting.
+          {queueView === 'active'
+            ? 'No active recommendation packets are waiting.'
+            : queueView === 'resolved'
+              ? 'No resolved recommendation packets are available.'
+              : 'No security recommendation packets are waiting.'}
         </p>
       ) : (
         <div className="divide-y divide-[var(--border-soft)]">
-          {items.map((item) => (
+          {visibleItems.map((item) => (
             <div key={item.id} className="p-4">
               <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                 <div>
@@ -1081,6 +1168,17 @@ function RecommendationPacketQueue({
               </div>
             </div>
           ))}
+          {filteredItems.length > EVIDENCE_RECOMMENDATION_PREVIEW_LIMIT ? (
+            <div className="px-4 py-3 text-center">
+              <button
+                type="button"
+                onClick={onToggleShowAll}
+                className="inline-flex items-center rounded-lg border border-[var(--border-soft)] px-3 py-2 text-sm font-medium text-[var(--text-main)] transition hover:bg-[var(--bg-subtle)]"
+              >
+                {showAll ? 'Show fewer' : `Show ${hiddenCount} more`}
+              </button>
+            </div>
+          ) : null}
         </div>
       )}
     </div>
@@ -1247,6 +1345,19 @@ function badgeClass(severity: EvidenceRecommendationTarget['severity']): string 
     return 'rounded bg-[var(--status-pending-bg)] px-2 py-1 text-xs font-semibold text-[var(--status-pending-text)]';
   }
   return 'rounded bg-[var(--bg-subtle)] px-2 py-1 text-xs font-semibold text-[var(--text-muted)]';
+}
+
+function getEvidenceQueueViewLabel(
+  view: EvidenceRecommendationQueueView,
+): string {
+  switch (view) {
+    case 'active':
+      return 'Active';
+    case 'resolved':
+      return 'Resolved';
+    case 'all':
+      return 'All';
+  }
 }
 
 function downloadJson(value: unknown, filename: string) {

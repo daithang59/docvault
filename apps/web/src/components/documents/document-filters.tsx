@@ -540,9 +540,14 @@ function Popover({
       const rect = triggerRef.current?.getBoundingClientRect();
       if (!rect) return;
       const width = panelRef.current?.offsetWidth ?? 288;
+      const height = panelRef.current?.offsetHeight ?? 320;
       const rawLeft = align === 'end' ? rect.right - width : rect.left;
       const left = Math.max(8, Math.min(rawLeft, window.innerWidth - width - 8));
-      setPosition({ top: rect.bottom + 8, left });
+      const top = Math.max(
+        8,
+        Math.min(rect.bottom + 8, window.innerHeight - height - 8),
+      );
+      setPosition({ top, left });
     }
 
     updatePosition();

@@ -1,3 +1,4 @@
+import { ROUTES } from '@/lib/constants/routes';
 import type {
   AuditChainStatus,
   AuditLogEntry,
@@ -13,6 +14,35 @@ import type {
 export type SecurityPostureLevel = 'healthy' | 'warning' | 'critical';
 export type SecurityAlertSeverity = 'info' | 'warning' | 'critical';
 export type SecurityRiskBand = 'critical' | 'warning' | 'watch';
+export type SecurityDashboardTone = 'info' | 'success' | 'warning' | 'critical';
+export type SecurityAlertRoute = 'SIGNAL' | 'REVIEW' | 'CASE';
+
+export interface SecurityAlertRoutingScore {
+  impact: number;
+  confidence: number;
+  actionability: number;
+  exposure: number;
+  evidenceValue: number;
+  total: number;
+}
+
+export interface SecurityAlertRouting {
+  route: SecurityAlertRoute;
+  routeLabel: string;
+  routeDescription: string;
+  rationale: string;
+  score: SecurityAlertRoutingScore;
+}
+
+export interface SecurityEvidenceTarget {
+  href: string;
+  label: string;
+}
+
+export interface SecurityDocumentTarget {
+  documentId: string;
+  href: string;
+}
 
 export interface SecurityDashboardMetric {
   key: keyof SecuritySummary['totals'];
@@ -26,12 +56,43 @@ export interface SecurityDashboardAlert {
   title: string;
   description: string;
   action: string;
+  routing: SecurityAlertRouting;
+  evidenceTarget: SecurityEvidenceTarget;
+  documentTargets?: SecurityDocumentTarget[];
+}
+
+export interface SecurityDashboardGaugeSummary {
+  label: string;
+  value: number;
+  tone: SecurityDashboardTone;
+  description: string;
+  href: string;
+}
+
+export interface SecurityDashboardSegment {
+  key: string;
+  label: string;
+  value: number;
+  percentage: number;
+  tone: SecurityDashboardTone;
+  href?: string;
+}
+
+export interface SecurityCommandCenter {
+  postureGauge: SecurityDashboardGaugeSummary;
+  alertSegments: SecurityDashboardSegment[];
+  eventTypeSegments: SecurityDashboardSegment[];
+  riskBandSegments: SecurityDashboardSegment[];
+  anomalyBandSegments: SecurityDashboardSegment[];
+  recommendationSlaSegments: SecurityDashboardSegment[];
+  accessSegments: SecurityDashboardSegment[];
 }
 
 export interface SecurityRiskScoringRow extends RiskyDocumentSummary {
   riskBand: SecurityRiskBand;
   riskLabel: string;
   auditFilters: AuditQueryFilters;
+  documentHref: string;
 }
 
 export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
@@ -41,13 +102,139 @@ export interface SecurityBehaviorSignalRow extends BehaviorSignalSummary {
   auditFilters: AuditQueryFilters;
 }
 
+export type SecurityFindingCategory =
+  | 'ACCESS_EXPOSURE'
+  | 'SENSITIVE_DATA_CONTROL'
+  | 'SUSPICIOUS_BEHAVIOR'
+  | 'MALWARE_OBJECT_SAFETY'
+  | 'AUDIT_INTEGRITY'
+  | 'GOVERNANCE_SLA';
+
+export interface SecurityRecommendationFinding {
+  category: SecurityFindingCategory;
+  categoryLabel: string;
+  summary: string;
+  affectedScopeLabel: string;
+  evidenceQuestion: string;
+  nextStepLabel: string;
+  routing: SecurityAlertRouting;
+}
+
+export type SecurityCaseResolutionKind = 'REMEDIATED' | 'ACCEPTED_RISK';
+
+export interface SecurityCaseWorkflowDraft {
+  investigationNote: string;
+  resolutionKind: SecurityCaseResolutionKind | null;
+  resolutionNote: string;
+  verificationConfirmed: boolean;
+}
+
+export interface SecurityCaseWorkflowValidation {
+  canResolve: boolean;
+  missingRequirements: string[];
+}
+
+export type SecurityRecommendationDocumentRef = SecurityDocumentTarget;
+
 export interface SecurityRecommendationRow
   extends Omit<SecurityRecommendationSummary, 'workflow'> {
   workflow: SecurityRecommendationWorkflow;
   playbook: SecurityRecommendationPlaybook;
   severityLabel: string;
   typeLabel: string;
+  finding: SecurityRecommendationFinding;
   auditFilters: AuditQueryFilters;
+  affectedDocuments: SecurityRecommendationDocumentRef[];
+}
+
+export type SecurityRecommendationQueueView = 'active' | 'resolved' | 'all';
+
+export const SECURITY_RECOMMENDATION_PREVIEW_LIMIT = 6;
+
+export function filterSecurityRecommendationRows(
+  items: SecurityRecommendationRow[],
+  view: SecurityRecommendationQueueView,
+): SecurityRecommendationRow[] {
+  if (view === 'all') return items;
+  if (view === 'resolved') {
+    return items.filter((item) => item.workflow.status === 'RESOLVED');
+  }
+  return items.filter((item) => item.workflow.status !== 'RESOLVED');
+}
+
+export function validateSecurityCaseWorkflowDraft(
+  draft: SecurityCaseWorkflowDraft,
+): SecurityCaseWorkflowValidation {
+  const missingRequirements: string[] = [];
+
+  if (!draft.investigationNote.trim()) {
+    missingRequirements.push('Investigation note');
+  }
+
+  if (!draft.resolutionKind) {
+    missingRequirements.push('Remediation or accepted-risk decision');
+  }
+
+  if (!draft.resolutionNote.trim()) {
+    missingRequirements.push('Remediation or accepted-risk evidence');
+  }
+
+  if (!draft.verificationConfirmed) {
+    missingRequirements.push('Verification confirmation');
+  }
+
+  return {
+    canResolve: missingRequirements.length === 0,
+    missingRequirements,
+  };
+}
+
+export function buildSecurityCaseWorkflowNote(
+  draft: SecurityCaseWorkflowDraft,
+): string {
+  const decision =
+    draft.resolutionKind === 'REMEDIATED'
+      ? 'Remediated'
+      : draft.resolutionKind === 'ACCEPTED_RISK'
+        ? 'Accepted risk'
+        : 'Pending';
+
+  return [
+    'Case workflow',
+    `Investigation: ${draft.investigationNote.trim() || 'Pending'}`,
+    `Decision: ${decision}`,
+    `Resolution evidence: ${draft.resolutionNote.trim() || 'Pending'}`,
+    `Verification: ${draft.verificationConfirmed ? 'Confirmed' : 'Pending'}`,
+  ].join('\n');
+}
+
+export function getSecurityRecommendationQueueCounts(
+  items: SecurityRecommendationRow[],
+): Record<SecurityRecommendationQueueView, number> {
+  const resolved = items.filter(
+    (item) => item.workflow.status === 'RESOLVED',
+  ).length;
+
+  return {
+    active: items.length - resolved,
+    resolved,
+    all: items.length,
+  };
+}
+
+export function getSecurityRouteCounts(
+  alerts: SecurityDashboardAlert[],
+  recommendations: SecurityRecommendationRow[],
+): Record<SecurityAlertRoute, number> {
+  return [...alerts.map((alert) => alert.routing.route), ...recommendations.map(
+    (recommendation) => recommendation.finding.routing.route,
+  )].reduce<Record<SecurityAlertRoute, number>>(
+    (acc, route) => {
+      acc[route] += 1;
+      return acc;
+    },
+    { SIGNAL: 0, REVIEW: 0, CASE: 0 },
+  );
 }
 
 export type SecurityRecommendationSlaState =
@@ -78,6 +265,7 @@ export interface SecurityDashboardModel {
     label: string;
     description: string;
   };
+  commandCenter: SecurityCommandCenter;
   metrics: SecurityDashboardMetric[];
   alerts: SecurityDashboardAlert[];
   repeatedDenyActors: Array<{
@@ -152,6 +340,7 @@ export function buildSecurityDashboardModel(
   activity?: {
     downloadAuthorizedTotal?: number;
     sensitiveAccessEvents?: AuditLogEntry[];
+    recentEvents?: AuditLogEntry[];
   },
   options: SecurityDashboardModelOptions = {},
 ): SecurityDashboardModel {
@@ -166,6 +355,12 @@ export function buildSecurityDashboardModel(
   const sensitiveAccessEvents = (activity?.sensitiveAccessEvents ?? []).filter(
     isSensitiveAccessEvent,
   );
+  const recentEvents = activity?.recentEvents ?? [];
+  const dlpDocumentTargets = getDocumentTargetsFromEvents(
+    recentEvents.filter((event) => event.action === 'DLP_PATTERN_DETECTED'),
+  );
+  const sensitiveAccessDocumentTargets =
+    getDocumentTargetsFromEvents(sensitiveAccessEvents);
   const downloadAuthorizedTotal = activity?.downloadAuthorizedTotal ?? 0;
   const riskyDocuments = buildRiskScoringRows(summary?.riskyDocuments ?? []);
   const behaviorSignals = buildBehaviorSignalRows(
@@ -182,6 +377,29 @@ export function buildSecurityDashboardModel(
       title: 'Audit chain invalid',
       description: summary.chain.message ?? 'Hash-chain verification reported a broken audit chain.',
       action: 'Verify tamper evidence before trusting audit exports.',
+      routing: buildDashboardAlertRouting('AUDIT_CHAIN_INVALID'),
+      evidenceTarget: {
+        href: '#security-posture',
+        label: 'View posture evidence',
+      },
+    });
+  }
+
+  const compromisedEpochCount =
+    summary?.chain.historicalCompromisedCount ??
+    summary?.chain.compromisedEpochs?.length ??
+    0;
+  if (summary?.chain.valid !== false && compromisedEpochCount > 0) {
+    alerts.push({
+      severity: 'warning',
+      title: 'Historical audit epoch compromised',
+      description: `${compromisedEpochCount} previous audit epoch${compromisedEpochCount === 1 ? ' is' : 's are'} marked compromised.`,
+      action: 'Review the incident-linked audit epoch before exporting historical evidence.',
+      routing: buildDashboardAlertRouting('HISTORICAL_AUDIT_EPOCH_COMPROMISED'),
+      evidenceTarget: {
+        href: '#security-posture',
+        label: 'View posture evidence',
+      },
     });
   }
 
@@ -191,6 +409,11 @@ export function buildSecurityDashboardModel(
       title: 'Malware upload blocked',
       description: `${totals.malwareBlocked} upload attempt${totals.malwareBlocked === 1 ? '' : 's'} were blocked before storage.`,
       action: 'Review the upload actor, checksum, and source document.',
+      routing: buildDashboardAlertRouting('MALWARE_BLOCKED'),
+      evidenceTarget: {
+        href: '#security-recent-events',
+        label: 'View related events',
+      },
     });
   }
 
@@ -200,6 +423,12 @@ export function buildSecurityDashboardModel(
       title: 'DLP detections recorded',
       description: `${totals.dlpDetections} DLP detection${totals.dlpDetections === 1 ? '' : 's'} require classification review.`,
       action: 'Confirm classification escalation and prevent unsafe downgrades.',
+      routing: buildDashboardAlertRouting('DLP_DETECTED'),
+      evidenceTarget: {
+        href: '#security-recent-events',
+        label: 'View related events',
+      },
+      documentTargets: dlpDocumentTargets,
     });
   }
 
@@ -209,6 +438,11 @@ export function buildSecurityDashboardModel(
       title: 'Repeated denied access',
       description: `${summary?.repeatedDenyActors.length ?? 0} actor${summary?.repeatedDenyActors.length === 1 ? '' : 's'} crossed the deny threshold.`,
       action: 'Review account activity',
+      routing: buildDashboardAlertRouting('REPEATED_DENY'),
+      evidenceTarget: {
+        href: '#security-repeated-deny-actors',
+        label: 'View related actors',
+      },
     });
   }
 
@@ -218,6 +452,12 @@ export function buildSecurityDashboardModel(
       title: 'High download volume',
       description: `${downloadAuthorizedTotal} successful download authorization${downloadAuthorizedTotal === 1 ? '' : 's'} are present in the audit window.`,
       action: 'Review high-volume document access before evidence export.',
+      routing: buildDashboardAlertRouting('HIGH_DOWNLOAD_VOLUME'),
+      evidenceTarget: {
+        href: '#security-access-activity',
+        label: 'View access activity',
+      },
+      documentTargets: sensitiveAccessDocumentTargets,
     });
   }
 
@@ -227,6 +467,12 @@ export function buildSecurityDashboardModel(
       title: 'Sensitive document access',
       description: `${sensitiveAccessEvents.length} recent CONFIDENTIAL/SECRET preview or download event${sensitiveAccessEvents.length === 1 ? '' : 's'} need review.`,
       action: 'Confirm access intent, actor role, and document classification.',
+      routing: buildDashboardAlertRouting('SENSITIVE_ACCESS'),
+      evidenceTarget: {
+        href: '#security-access-activity',
+        label: 'View access activity',
+      },
+      documentTargets: sensitiveAccessDocumentTargets,
     });
   }
 
@@ -236,6 +482,15 @@ export function buildSecurityDashboardModel(
       title: 'High-risk document activity',
       description: 'One or more sensitive documents have elevated access frequency or actor spread.',
       action: 'Review the risk scoring panel and open document-scoped audit evidence.',
+      routing: buildDashboardAlertRouting('HIGH_RISK_DOCUMENT_ACTIVITY'),
+      evidenceTarget: {
+        href: '#security-risk-scoring',
+        label: 'View document evidence',
+      },
+      documentTargets: riskyDocuments.map((document) => ({
+        documentId: document.documentId,
+        href: document.documentHref,
+      })),
     });
   }
 
@@ -248,11 +503,33 @@ export function buildSecurityDashboardModel(
       title: 'Behavior anomaly detected',
       description: `${behaviorSignals.length} actor behavior signal${behaviorSignals.length === 1 ? '' : 's'} matched ransomware-oriented audit patterns.`,
       action: 'Review behavior anomalies and actor-scoped audit evidence.',
+      routing: buildDashboardAlertRouting(
+        criticalSignals > 0
+          ? 'CRITICAL_BEHAVIOR_ANOMALY'
+          : 'BEHAVIOR_ANOMALY',
+      ),
+      evidenceTarget: {
+        href: '#security-behavior-anomalies',
+        label: 'View behavior evidence',
+      },
     });
   }
 
+  const posture = buildPosture(summary, alerts);
+
   return {
-    posture: buildPosture(summary, alerts),
+    posture,
+    commandCenter: buildCommandCenter({
+      posture,
+      alerts,
+      riskScoringRows: riskyDocuments,
+      behaviorSignalRows: behaviorSignals,
+      recommendationRows: recommendations,
+      auditChain: summary?.chain,
+      totals,
+      downloadAuthorizedTotal,
+      sensitiveAccessCount: sensitiveAccessEvents.length,
+    }),
     metrics: [
       {
         key: 'deniedEvents',
@@ -338,12 +615,39 @@ export function buildAuditFilterQuery(filters: AuditQueryFilters): string {
 
   if (filters.result) params.set('result', filters.result);
   if (filters.action) params.set('action', filters.action);
+  setArrayQueryParam(params, 'actions', filters.actions);
+  if (filters.actionGroup) params.set('actionGroup', filters.actionGroup);
   if (filters.actorId) params.set('actorId', filters.actorId);
+  setArrayQueryParam(params, 'actorIds', filters.actorIds);
   if (filters.resourceType) params.set('resourceType', filters.resourceType);
   if (filters.resourceId) params.set('resourceId', filters.resourceId);
   if (filters.documentId) params.set('documentId', filters.documentId);
+  setArrayQueryParam(params, 'documentIds', filters.documentIds);
+  if (filters.aclId) params.set('aclId', filters.aclId);
+  if (filters.recommendationId) {
+    params.set('recommendationId', filters.recommendationId);
+  }
+  setArrayQueryParam(params, 'recommendationIds', filters.recommendationIds);
+  setArrayQueryParam(params, 'classifications', filters.classifications);
+  if (filters.from) params.set('from', filters.from);
+  if (filters.to) params.set('to', filters.to);
 
   return params.toString();
+}
+
+function setArrayQueryParam(
+  params: URLSearchParams,
+  key: string,
+  values?: string[],
+) {
+  if (values && values.length > 0) {
+    params.set(key, values.join(','));
+  }
+}
+
+function buildAuditHref(filters: AuditQueryFilters): string {
+  const query = buildAuditFilterQuery(filters);
+  return query ? `${ROUTES.AUDIT}?${query}` : ROUTES.AUDIT;
 }
 
 export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
@@ -358,6 +662,35 @@ export function isSensitiveAccessEvent(event: AuditLogEntry): boolean {
   return classification === 'CONFIDENTIAL' || classification === 'SECRET';
 }
 
+export function getAuditEventDocumentHref(event: AuditLogEntry): string | null {
+  const documentId = getAuditEventDocumentId(event);
+  return documentId ? ROUTES.DOCUMENT_DETAIL(documentId) : null;
+}
+
+function getAuditEventDocumentId(event: AuditLogEntry): string | null {
+  const metadataDocId = event.metadata?.docId ?? event.metadata?.documentId;
+  return (
+    typeof metadataDocId === 'string'
+      ? metadataDocId
+      : event.resourceType === 'DOCUMENT' && event.resourceId
+        ? event.resourceId
+        : null
+  );
+}
+
+function getDocumentTargetsFromEvents(
+  events: AuditLogEntry[],
+): SecurityDocumentTarget[] {
+  return uniqueStrings(
+    events
+      .map((event) => getAuditEventDocumentId(event))
+      .filter((documentId): documentId is string => Boolean(documentId)),
+  ).map((documentId) => ({
+    documentId,
+    href: ROUTES.DOCUMENT_DETAIL(documentId),
+  }));
+}
+
 function buildBehaviorSignalRows(
   signals: BehaviorSignalSummary[],
 ): SecurityBehaviorSignalRow[] {
@@ -369,9 +702,442 @@ function buildBehaviorSignalRows(
       typeLabel: getBehaviorSignalLabel(signal.type),
       riskBand,
       riskLabel: getRiskLabel(riskBand),
-      auditFilters: { actorId: signal.actorId },
+      auditFilters: getBehaviorSignalAuditFilters(signal),
     };
   });
+}
+
+function getBehaviorSignalAuditFilters(
+  signal: BehaviorSignalSummary,
+): AuditQueryFilters {
+  const windowFilters = {
+    actorId: signal.actorId,
+    from: signal.windowStartedAt,
+    to: signal.windowEndedAt,
+  };
+
+  if (signal.type === 'MASS_CONTENT_ACCESS') {
+    return {
+      ...windowFilters,
+      actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+    };
+  }
+
+  if (signal.type === 'DESTRUCTIVE_ACTIVITY') {
+    return {
+      ...windowFilters,
+      actionGroup: 'DESTRUCTIVE_ACTIVITY',
+    };
+  }
+
+  return {
+    ...windowFilters,
+    result: 'DENY',
+  };
+}
+
+function buildCommandCenter({
+  posture,
+  alerts,
+  riskScoringRows,
+  behaviorSignalRows,
+  recommendationRows,
+  auditChain,
+  totals,
+  downloadAuthorizedTotal,
+  sensitiveAccessCount,
+}: {
+  posture: SecurityDashboardModel['posture'];
+  alerts: SecurityDashboardAlert[];
+  riskScoringRows: SecurityRiskScoringRow[];
+  behaviorSignalRows: SecurityBehaviorSignalRow[];
+  recommendationRows: SecurityRecommendationRow[];
+  auditChain?: AuditChainStatus;
+  totals: SecuritySummary['totals'];
+  downloadAuthorizedTotal: number;
+  sensitiveAccessCount: number;
+}): SecurityCommandCenter {
+  return {
+    postureGauge: {
+      label: 'Security posture',
+      value: getPostureScore(posture.level, alerts),
+      tone: getPostureTone(posture.level),
+      description: `${posture.description} Audit chain checked ${auditChain?.checked ?? 0} event${auditChain?.checked === 1 ? '' : 's'}.`,
+      href: ROUTES.AUDIT,
+    },
+    alertSegments: buildAlertSegments(alerts),
+    eventTypeSegments: buildEventTypeSegments(totals),
+    riskBandSegments: buildRiskBandSegments(riskScoringRows),
+    anomalyBandSegments: buildAnomalyBandSegments(behaviorSignalRows),
+    recommendationSlaSegments: buildRecommendationSlaSegments(recommendationRows),
+    accessSegments: buildAccessSegments(
+      downloadAuthorizedTotal,
+      sensitiveAccessCount,
+    ),
+  };
+}
+
+function buildEventTypeSegments(
+  totals: SecuritySummary['totals'],
+): SecurityDashboardSegment[] {
+  const total =
+    totals.deniedEvents +
+    totals.downloadDenied +
+    totals.malwareBlocked +
+    totals.dlpDetections;
+
+  return [
+    {
+      key: 'denied-events',
+      label: 'Denied events',
+      value: totals.deniedEvents,
+      percentage: toPercentage(totals.deniedEvents, total),
+      tone: totals.deniedEvents > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ result: 'DENY' })}`,
+    },
+    {
+      key: 'download-denied',
+      label: 'Download denied',
+      value: totals.downloadDenied,
+      percentage: toPercentage(totals.downloadDenied, total),
+      tone: totals.downloadDenied > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DOCUMENT_DOWNLOAD_DENIED' })}`,
+    },
+    {
+      key: 'malware-blocked',
+      label: 'Malware blocked',
+      value: totals.malwareBlocked,
+      percentage: toPercentage(totals.malwareBlocked, total),
+      tone: totals.malwareBlocked > 0 ? 'critical' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'MALWARE_UPLOAD_BLOCKED' })}`,
+    },
+    {
+      key: 'dlp-detections',
+      label: 'DLP hits',
+      value: totals.dlpDetections,
+      percentage: toPercentage(totals.dlpDetections, total),
+      tone: totals.dlpDetections > 0 ? 'warning' : 'success',
+      href: `${ROUTES.AUDIT}?${buildAuditFilterQuery({ action: 'DLP_PATTERN_DETECTED' })}`,
+    },
+  ];
+}
+
+function buildAlertSegments(
+  alerts: SecurityDashboardAlert[],
+): SecurityDashboardSegment[] {
+  const counts = alerts.reduce<Record<SecurityAlertSeverity, number>>(
+    (acc, alert) => {
+      acc[alert.severity] += 1;
+      return acc;
+    },
+    { critical: 0, warning: 0, info: 0 },
+  );
+  const total = alerts.length;
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'warning',
+      label: 'Warning',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: ROUTES.AUDIT,
+    },
+    {
+      key: 'info',
+      label: 'Info',
+      value: counts.info,
+      percentage: toPercentage(counts.info, total),
+      tone: 'info',
+      href: ROUTES.AUDIT,
+    },
+  ];
+}
+
+function buildRiskBandSegments(
+  rows: SecurityRiskScoringRow[],
+): SecurityDashboardSegment[] {
+  const counts = countRiskBands(rows);
+  const total = rows.length;
+  const documentIdsByBand = {
+    critical: getDocumentIdsForRiskBand(rows, 'critical'),
+    warning: getDocumentIdsForRiskBand(rows, 'warning'),
+    watch: getDocumentIdsForRiskBand(rows, 'watch'),
+  };
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: buildAuditHref({ documentIds: documentIdsByBand.critical }),
+    },
+    {
+      key: 'warning',
+      label: 'Elevated',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: buildAuditHref({ documentIds: documentIdsByBand.warning }),
+    },
+    {
+      key: 'watch',
+      label: 'Watch',
+      value: counts.watch,
+      percentage: toPercentage(counts.watch, total),
+      tone: 'info',
+      href: buildAuditHref({ documentIds: documentIdsByBand.watch }),
+    },
+  ];
+}
+
+function buildAnomalyBandSegments(
+  rows: SecurityBehaviorSignalRow[],
+): SecurityDashboardSegment[] {
+  const counts = countRiskBands(rows);
+  const total = rows.length;
+  const filtersByBand = {
+    critical: buildBehaviorSignalBandFilters(rows, 'critical'),
+    warning: buildBehaviorSignalBandFilters(rows, 'warning'),
+    watch: buildBehaviorSignalBandFilters(rows, 'watch'),
+  };
+
+  return [
+    {
+      key: 'critical',
+      label: 'Critical',
+      value: counts.critical,
+      percentage: toPercentage(counts.critical, total),
+      tone: 'critical',
+      href: buildAuditHref(filtersByBand.critical),
+    },
+    {
+      key: 'warning',
+      label: 'Elevated',
+      value: counts.warning,
+      percentage: toPercentage(counts.warning, total),
+      tone: 'warning',
+      href: buildAuditHref(filtersByBand.warning),
+    },
+    {
+      key: 'watch',
+      label: 'Watch',
+      value: counts.watch,
+      percentage: toPercentage(counts.watch, total),
+      tone: 'info',
+      href: buildAuditHref(filtersByBand.watch),
+    },
+  ];
+}
+
+function buildRecommendationSlaSegments(
+  rows: SecurityRecommendationRow[],
+): SecurityDashboardSegment[] {
+  const counts = rows.reduce<Record<SecurityRecommendationSlaState, number>>(
+    (acc, row) => {
+      acc[row.playbook.slaState] += 1;
+      return acc;
+    },
+    {
+      'not-started': 0,
+      'on-track': 0,
+      'due-soon': 0,
+      overdue: 0,
+      closed: 0,
+    },
+  );
+  const total = rows.length;
+  const recommendationIdsByState = {
+    overdue: getRecommendationIdsForSlaState(rows, 'overdue'),
+    'due-soon': getRecommendationIdsForSlaState(rows, 'due-soon'),
+    'on-track': getRecommendationIdsForSlaState(rows, 'on-track'),
+    'not-started': getRecommendationIdsForSlaState(rows, 'not-started'),
+    closed: getRecommendationIdsForSlaState(rows, 'closed'),
+  };
+
+  return [
+    {
+      key: 'overdue',
+      label: 'Overdue',
+      value: counts.overdue,
+      percentage: toPercentage(counts.overdue, total),
+      tone: 'critical',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState.overdue,
+      }),
+    },
+    {
+      key: 'due-soon',
+      label: 'Due soon',
+      value: counts['due-soon'],
+      percentage: toPercentage(counts['due-soon'], total),
+      tone: 'warning',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['due-soon'],
+      }),
+    },
+    {
+      key: 'on-track',
+      label: 'On track',
+      value: counts['on-track'],
+      percentage: toPercentage(counts['on-track'], total),
+      tone: 'info',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['on-track'],
+      }),
+    },
+    {
+      key: 'not-started',
+      label: 'Not started',
+      value: counts['not-started'],
+      percentage: toPercentage(counts['not-started'], total),
+      tone: 'warning',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState['not-started'],
+      }),
+    },
+    {
+      key: 'closed',
+      label: 'Closed',
+      value: counts.closed,
+      percentage: toPercentage(counts.closed, total),
+      tone: 'success',
+      href: buildAuditHref({
+        recommendationIds: recommendationIdsByState.closed,
+      }),
+    },
+  ];
+}
+
+function buildAccessSegments(
+  downloadAuthorizedTotal: number,
+  sensitiveAccessCount: number,
+): SecurityDashboardSegment[] {
+  const baseline = Math.max(downloadAuthorizedTotal, sensitiveAccessCount);
+
+  return [
+    {
+      key: 'download-authorized',
+      label: 'Download grants',
+      value: downloadAuthorizedTotal,
+      percentage: toPercentage(downloadAuthorizedTotal, baseline),
+      tone: downloadAuthorizedTotal >= 10 ? 'warning' : 'info',
+      href: buildAuditHref({ action: 'DOCUMENT_DOWNLOAD_AUTHORIZED' }),
+    },
+    {
+      key: 'sensitive-access',
+      label: 'Sensitive grants',
+      value: sensitiveAccessCount,
+      percentage: toPercentage(sensitiveAccessCount, baseline),
+      tone: sensitiveAccessCount > 0 ? 'warning' : 'success',
+      href: buildAuditHref({
+        actionGroup: 'AUTHORIZED_CONTENT_ACCESS',
+        classifications: ['SECRET', 'CONFIDENTIAL'],
+      }),
+    },
+  ];
+}
+
+function getDocumentIdsForRiskBand(
+  rows: SecurityRiskScoringRow[],
+  riskBand: SecurityRiskBand,
+): string[] {
+  return rows
+    .filter((row) => row.riskBand === riskBand)
+    .map((row) => row.documentId);
+}
+
+function buildBehaviorSignalBandFilters(
+  rows: SecurityBehaviorSignalRow[],
+  riskBand: SecurityRiskBand,
+): AuditQueryFilters {
+  const bandRows = rows.filter((row) => row.riskBand === riskBand);
+  const actorIds = uniqueStrings(bandRows.map((row) => row.actorId));
+  const actionGroups = uniqueStrings(
+    bandRows
+      .map((row) => row.auditFilters.actionGroup)
+      .filter((value): value is NonNullable<AuditQueryFilters['actionGroup']> =>
+        Boolean(value),
+      ),
+  );
+  const results = uniqueStrings(
+    bandRows
+      .map((row) => row.auditFilters.result)
+      .filter((value): value is NonNullable<AuditQueryFilters['result']> =>
+        Boolean(value),
+      ),
+  );
+  const starts = bandRows
+    .map((row) => row.auditFilters.from)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+  const ends = bandRows
+    .map((row) => row.auditFilters.to)
+    .filter((value): value is string => Boolean(value))
+    .sort();
+
+  return {
+    ...(results.length === 1 ? { result: results[0] } : {}),
+    ...(actionGroups.length === 1 ? { actionGroup: actionGroups[0] } : {}),
+    actorIds,
+    ...(starts.length > 0 ? { from: starts[0] } : {}),
+    ...(ends.length > 0 ? { to: ends[ends.length - 1] } : {}),
+  };
+}
+
+function getRecommendationIdsForSlaState(
+  rows: SecurityRecommendationRow[],
+  slaState: SecurityRecommendationSlaState,
+): string[] {
+  return rows
+    .filter((row) => row.playbook.slaState === slaState)
+    .map((row) => row.id);
+}
+
+function uniqueStrings<T extends string>(values: T[]): T[] {
+  return [...new Set(values)];
+}
+
+function countRiskBands<T extends { riskBand: SecurityRiskBand }>(
+  rows: T[],
+): Record<SecurityRiskBand, number> {
+  return rows.reduce<Record<SecurityRiskBand, number>>(
+    (acc, row) => {
+      acc[row.riskBand] += 1;
+      return acc;
+    },
+    { critical: 0, warning: 0, watch: 0 },
+  );
+}
+
+function getPostureScore(
+  level: SecurityPostureLevel,
+  alerts: SecurityDashboardAlert[],
+): number {
+  const criticalAlerts = alerts.filter((alert) => alert.severity === 'critical').length;
+  const warningAlerts = alerts.filter((alert) => alert.severity === 'warning').length;
+  const infoAlerts = alerts.filter((alert) => alert.severity === 'info').length;
+  const rawScore = 100 - criticalAlerts * 25 - warningAlerts * 8 - infoAlerts * 3;
+
+  if (level === 'critical') return Math.max(0, Math.min(65, rawScore));
+  if (level === 'warning') return Math.max(0, Math.min(84, rawScore));
+  return Math.max(0, Math.min(100, rawScore));
+}
+
+function getPostureTone(level: SecurityPostureLevel): SecurityDashboardTone {
+  if (level === 'critical') return 'critical';
+  if (level === 'warning') return 'warning';
+  return 'success';
 }
 
 function buildRecommendationRows(
@@ -379,7 +1145,6 @@ function buildRecommendationRows(
   now: Date,
 ): SecurityRecommendationRow[] {
   return [...recommendations]
-    .sort((a, b) => getSeverityRank(b.severity) - getSeverityRank(a.severity))
     .map((recommendation) => {
       const workflow = recommendation.workflow ?? { status: 'OPEN' };
 
@@ -387,11 +1152,374 @@ function buildRecommendationRows(
         ...recommendation,
         severityLabel: getRecommendationSeverityLabel(recommendation.severity),
         typeLabel: getRecommendationTypeLabel(recommendation.type),
+        finding: buildRecommendationFinding(recommendation),
         auditFilters: recommendation.auditFilters ?? {},
         workflow,
         playbook: buildRecommendationPlaybook(recommendation, workflow, now),
+        affectedDocuments: recommendation.affectedDocumentIds.map((documentId) => ({
+          documentId,
+          href: ROUTES.DOCUMENT_DETAIL(documentId),
+        })),
       };
-    });
+    })
+    .sort(
+      (a, b) =>
+        getRouteRank(b.finding.routing.route) -
+          getRouteRank(a.finding.routing.route) ||
+        getSeverityRank(b.severity) - getSeverityRank(a.severity),
+    );
+}
+
+function buildRecommendationFinding(
+  recommendation: SecurityRecommendationSummary,
+): SecurityRecommendationFinding {
+  return {
+    ...getRecommendationFindingProfile(recommendation.type),
+    affectedScopeLabel: buildAffectedScopeLabel(recommendation),
+    routing: buildRecommendationRouting(recommendation),
+  };
+}
+
+function getRecommendationFindingProfile(
+  type: SecurityRecommendationSummary['type'],
+): Omit<SecurityRecommendationFinding, 'affectedScopeLabel' | 'routing'> {
+  switch (type) {
+    case 'AUDIT_CHAIN_REVIEW':
+      return {
+        category: 'AUDIT_INTEGRITY',
+        categoryLabel: 'Audit Integrity',
+        summary: 'Audit evidence integrity needs review before export.',
+        evidenceQuestion: 'Why was this raised?',
+        nextStepLabel: 'Verify audit chain integrity',
+      };
+    case 'DLP_CLASSIFICATION_REVIEW':
+      return {
+        category: 'SENSITIVE_DATA_CONTROL',
+        categoryLabel: 'Sensitive Data Control',
+        summary: 'Sensitive data controls need classification review.',
+        evidenceQuestion: 'Why was this raised?',
+        nextStepLabel: 'Review classification controls',
+      };
+    case 'MALWARE_UPLOAD_REVIEW':
+      return {
+        category: 'MALWARE_OBJECT_SAFETY',
+        categoryLabel: 'Malware/Object Safety',
+        summary: 'Blocked upload needs source and object safety review.',
+        evidenceQuestion: 'Why was this raised?',
+        nextStepLabel: 'Review blocked upload context',
+      };
+    case 'DOCUMENT_ACCESS_REVIEW':
+      return {
+        category: 'ACCESS_EXPOSURE',
+        categoryLabel: 'Access Exposure',
+        summary: 'Sensitive document access needs review before evidence export.',
+        evidenceQuestion: 'Why was this raised?',
+        nextStepLabel: 'Review ACL and confirm business need',
+      };
+    case 'ACTOR_ACCESS_REVIEW':
+      return {
+        category: 'SUSPICIOUS_BEHAVIOR',
+        categoryLabel: 'Suspicious Behavior',
+        summary: 'Actor behavior needs investigation against audit evidence.',
+        evidenceQuestion: 'Why was this raised?',
+        nextStepLabel: 'Review actor activity and access path',
+      };
+  }
+}
+
+function buildAffectedScopeLabel(
+  recommendation: SecurityRecommendationSummary,
+): string {
+  const documentCount = recommendation.affectedDocumentIds.length;
+  const actorCount = recommendation.affectedActorIds.length;
+  const parts: string[] = [];
+
+  if (documentCount > 0) {
+    parts.push(`${documentCount} ${pluralize(documentCount, 'document')}`);
+  }
+
+  if (actorCount > 0) {
+    parts.push(`${actorCount} ${pluralize(actorCount, 'actor')}`);
+  }
+
+  if (parts.length > 0) {
+    return parts.join(' · ');
+  }
+
+  const hasAuditFilter = Object.values(recommendation.auditFilters ?? {}).some(
+    (value) => value !== undefined && value !== null && String(value).length > 0,
+  );
+
+  return hasAuditFilter ? 'Audit-filtered scope' : 'System-wide audit scope';
+}
+
+function pluralize(count: number, singular: string): string {
+  return count === 1 ? singular : `${singular}s`;
+}
+
+type DashboardAlertRoutingKind =
+  | 'AUDIT_CHAIN_INVALID'
+  | 'HISTORICAL_AUDIT_EPOCH_COMPROMISED'
+  | 'MALWARE_BLOCKED'
+  | 'DLP_DETECTED'
+  | 'REPEATED_DENY'
+  | 'HIGH_DOWNLOAD_VOLUME'
+  | 'SENSITIVE_ACCESS'
+  | 'HIGH_RISK_DOCUMENT_ACTIVITY'
+  | 'CRITICAL_BEHAVIOR_ANOMALY'
+  | 'BEHAVIOR_ANOMALY';
+
+function buildRecommendationRouting(
+  recommendation: SecurityRecommendationSummary,
+): SecurityAlertRouting {
+  switch (recommendation.type) {
+    case 'AUDIT_CHAIN_REVIEW':
+      return buildSecurityAlertRouting(
+        {
+          impact: 3,
+          confidence: 3,
+          actionability: 3,
+          exposure: 3,
+          evidenceValue: 3,
+        },
+        'Audit-chain integrity affects whether exported evidence can be trusted.',
+      );
+    case 'DOCUMENT_ACCESS_REVIEW':
+      return buildSecurityAlertRouting(
+        {
+          impact: recommendation.severity === 'critical' ? 3 : 2,
+          confidence: 3,
+          actionability: 3,
+          exposure: recommendation.affectedDocumentIds.length > 0 ? 3 : 2,
+          evidenceValue: recommendation.severity === 'critical' ? 3 : 2,
+        },
+        recommendation.severity === 'critical'
+          ? 'Critical sensitive-document exposure has concrete ACL remediation paths.'
+          : 'Sensitive-document exposure needs owner review before heavier workflow.',
+      );
+    case 'ACTOR_ACCESS_REVIEW':
+      return buildSecurityAlertRouting(
+        {
+          impact: recommendation.severity === 'critical' ? 3 : 2,
+          confidence: recommendation.severity === 'critical' ? 2 : 2,
+          actionability: recommendation.affectedActorIds.length > 0 ? 2 : 1,
+          exposure: recommendation.affectedActorIds.length > 0 ? 3 : 1,
+          evidenceValue: recommendation.severity === 'critical' ? 3 : 2,
+        },
+        recommendation.severity === 'critical'
+          ? 'Critical actor behavior has a concrete actor scope and needs case ownership.'
+          : 'Actor behavior needs review before escalating to a full case.',
+      );
+    case 'DLP_CLASSIFICATION_REVIEW':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: recommendation.affectedDocumentIds.length > 0 ? 2 : 1,
+          evidenceValue: 2,
+        },
+        'DLP findings need classification review, but aggregate detections should not force a full case.',
+      );
+    case 'MALWARE_UPLOAD_REVIEW':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 3,
+          actionability: 2,
+          exposure:
+            recommendation.affectedActorIds.length > 0 ||
+            recommendation.affectedDocumentIds.length > 0
+              ? 2
+              : 1,
+          evidenceValue: 2,
+        },
+        'Blocked malware uploads need review of source context before case escalation.',
+      );
+  }
+}
+
+function buildDashboardAlertRouting(
+  kind: DashboardAlertRoutingKind,
+): SecurityAlertRouting {
+  switch (kind) {
+    case 'AUDIT_CHAIN_INVALID':
+      return buildSecurityAlertRouting(
+        {
+          impact: 3,
+          confidence: 3,
+          actionability: 3,
+          exposure: 3,
+          evidenceValue: 3,
+        },
+        'Current audit-chain integrity failure blocks trustworthy evidence export.',
+      );
+    case 'HISTORICAL_AUDIT_EPOCH_COMPROMISED':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 3,
+          actionability: 2,
+          exposure: 2,
+          evidenceValue: 3,
+        },
+        'Historical evidence needs review, but the active chain remains valid.',
+      );
+    case 'MALWARE_BLOCKED':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 3,
+          actionability: 2,
+          exposure: 1,
+          evidenceValue: 2,
+        },
+        'Blocked upload counters need review before a concrete actor or object case exists.',
+      );
+    case 'DLP_DETECTED':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: 1,
+          evidenceValue: 2,
+        },
+        'Aggregate DLP detections need classification review without full case overhead.',
+      );
+    case 'REPEATED_DENY':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: 2,
+          evidenceValue: 2,
+        },
+        'Repeated denies identify actors to review before granting or changing access.',
+      );
+    case 'HIGH_DOWNLOAD_VOLUME':
+      return buildSecurityAlertRouting(
+        {
+          impact: 1,
+          confidence: 2,
+          actionability: 1,
+          exposure: 1,
+          evidenceValue: 1,
+        },
+        'Aggregate download volume is a trend signal until tied to a concrete risky subject.',
+      );
+    case 'SENSITIVE_ACCESS':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: 2,
+          evidenceValue: 2,
+        },
+        'Sensitive access events need review against actor role and classification.',
+      );
+    case 'HIGH_RISK_DOCUMENT_ACTIVITY':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: 2,
+          evidenceValue: 2,
+        },
+        'High-risk document activity needs review before deciding whether a case is required.',
+      );
+    case 'CRITICAL_BEHAVIOR_ANOMALY':
+      return buildSecurityAlertRouting(
+        {
+          impact: 3,
+          confidence: 2,
+          actionability: 2,
+          exposure: 3,
+          evidenceValue: 3,
+        },
+        'Critical actor behavior has enough scope and evidence value for case ownership.',
+      );
+    case 'BEHAVIOR_ANOMALY':
+      return buildSecurityAlertRouting(
+        {
+          impact: 2,
+          confidence: 2,
+          actionability: 2,
+          exposure: 2,
+          evidenceValue: 2,
+        },
+        'Behavior anomalies need review before escalating to a case.',
+      );
+  }
+}
+
+function buildSecurityAlertRouting(
+  input: Omit<SecurityAlertRoutingScore, 'total'>,
+  rationale: string,
+): SecurityAlertRouting {
+  const score: SecurityAlertRoutingScore = {
+    ...input,
+    total:
+      input.impact +
+      input.confidence +
+      input.actionability +
+      input.exposure +
+      input.evidenceValue,
+  };
+  const route = inferSecurityAlertRoute(score);
+
+  return {
+    route,
+    routeLabel: getSecurityAlertRouteLabel(route),
+    routeDescription: getSecurityAlertRouteDescription(route),
+    rationale,
+    score,
+  };
+}
+
+function inferSecurityAlertRoute(score: SecurityAlertRoutingScore): SecurityAlertRoute {
+  if (
+    score.impact >= 3 &&
+    score.confidence >= 2 &&
+    score.actionability >= 2 &&
+    score.exposure >= 2 &&
+    score.evidenceValue >= 3
+  ) {
+    return 'CASE';
+  }
+
+  if (score.total >= 8 || score.impact >= 2 || score.actionability >= 2) {
+    return 'REVIEW';
+  }
+
+  return 'SIGNAL';
+}
+
+function getRouteRank(route: SecurityAlertRoute): number {
+  if (route === 'CASE') return 3;
+  if (route === 'REVIEW') return 2;
+  return 1;
+}
+
+function getSecurityAlertRouteLabel(route: SecurityAlertRoute): string {
+  if (route === 'CASE') return 'Case workflow required';
+  if (route === 'REVIEW') return 'Lightweight review';
+  return 'Monitor signal';
+}
+
+function getSecurityAlertRouteDescription(route: SecurityAlertRoute): string {
+  if (route === 'CASE') {
+    return 'Needs owner, SLA, investigation, remediation or accepted risk, verification, and evidence.';
+  }
+
+  if (route === 'REVIEW') {
+    return 'Needs human review, but full case workflow would be too heavy.';
+  }
+
+  return 'Track as a trend or monitoring signal without workflow overhead.';
 }
 
 function buildRecommendationPlaybook(
@@ -560,6 +1688,7 @@ function buildRiskScoringRows(
       riskBand,
       riskLabel: getRiskLabel(riskBand),
       auditFilters: { documentId: document.documentId },
+      documentHref: ROUTES.DOCUMENT_DETAIL(document.documentId),
     };
   });
 }
@@ -574,6 +1703,11 @@ function getRiskLabel(riskBand: SecurityRiskBand): string {
   if (riskBand === 'critical') return 'Critical risk';
   if (riskBand === 'warning') return 'Elevated risk';
   return 'Watch';
+}
+
+function toPercentage(value: number, total: number): number {
+  if (total <= 0) return 0;
+  return Math.round((value / total) * 100);
 }
 
 function buildPosture(

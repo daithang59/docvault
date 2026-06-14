@@ -940,6 +940,23 @@ describe('MetadataProxyController approval chain', () => {
     process.env.METADATA_SERVICE_URL = metadataUrl;
   });
 
+  it('proxies approver-role user lookup to metadata service', async () => {
+    const approvers = { userIds: ['approver-1', 'admin-1'] };
+    const proxyService = {
+      forward: jest.fn().mockResolvedValue({ data: approvers }),
+    } as unknown as ProxyService;
+    const controller = makeController(proxyService);
+    const req = { user: { sub: 'editor-1', roles: ['editor'] }, headers: {} };
+
+    const result = await (controller as any).getDocumentApprovers('doc-1', req);
+
+    expect(result).toBe(approvers);
+    expect(proxyService.forward).toHaveBeenCalledWith(req, {
+      method: 'GET',
+      url: `${metadataUrl}/documents/doc-1/approvers`,
+    });
+  });
+
   it('proxies approval chain config to metadata service', async () => {
     const updated = { id: 'doc-1', approvalChain: ['a', 'b'], approvalStep: 0 };
     const proxyService = {

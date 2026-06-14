@@ -493,11 +493,51 @@ Sensitive documents do not expose a direct presigned URL; the frontend should us
 {
   "valid": true,
   "checked": 125,
-  "brokenAt": null
+  "epochId": "epoch-active",
+  "activeEpoch": {
+    "epochId": "epoch-active",
+    "status": "ACTIVE",
+    "valid": true,
+    "checked": 125
+  },
+  "historicalCompromisedCount": 1,
+  "compromisedEpochs": [
+    {
+      "epochId": "epoch-old",
+      "status": "COMPROMISED",
+      "incidentId": "AUDIT-INC-...",
+      "firstBrokenIndex": 3,
+      "lastTrustedHash": "hex"
+    }
+  ]
 }
 ```
 
 Hash-chain verification is tamper-evident: if stored audit events are edited directly, verification returns `valid: false` with broken-link details.
+
+---
+
+### POST `/audit/chain/seal-and-start-epoch` — Seal Compromised Audit Epoch
+**Roles:** compliance_officer, admin
+
+Production-safe recovery action for an unrecoverably invalid audit chain. It marks the active epoch as `COMPROMISED`, records an incident, starts a new `ACTIVE` epoch, and appends `AUDIT_CHAIN_EPOCH_STARTED`. It does **not** recompute or rewrite historical hashes.
+
+**Body:**
+```jsonc
+{
+  "reason": "Incident reviewed; trusted restore unavailable."
+}
+```
+
+**Response `200`:**
+```jsonc
+{
+  "incident": { "incidentId": "AUDIT-INC-..." },
+  "previousEpoch": { "epochId": "epoch-old", "status": "COMPROMISED" },
+  "newEpoch": { "epochId": "epoch-new", "status": "ACTIVE" },
+  "event": { "action": "AUDIT_CHAIN_EPOCH_STARTED" }
+}
+```
 
 ---
 

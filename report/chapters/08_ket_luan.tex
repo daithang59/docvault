@@ -1,0 +1,48 @@
+\chapter{Kết luận và hướng phát triển}
+
+\section{Kết quả đạt được}
+
+Đề tài đã xây dựng được hệ thống DocVault theo hướng quản lý tài liệu bảo mật và triển khai DevSecOps. Về mặt ứng dụng, hệ thống đã có frontend Next.js với nhiều màn hình nghiệp vụ, API Gateway, các microservice NestJS và hạ tầng local gồm Keycloak, PostgreSQL, MongoDB và MinIO. Các luồng chính như tạo tài liệu, upload file, gửi duyệt, phê duyệt, xem danh sách, xem chi tiết, preview/download, audit, security dashboard, evidence center và retention đã được triển khai.
+
+Về mặt bảo mật runtime, hệ thống đã thể hiện rõ nhiều kiểm soát quan trọng. RBAC được dùng cho quyền theo vai trò; ACL được dùng cho quyền theo tài liệu; policy backend quyết định truy cập metadata và nội dung file; Compliance Officer bị giới hạn ở metadata/audit/evidence; tài liệu confidential/secret có posture stream-only; audit-service có hash-chain; malware scanner chặn EICAR; DLP phát hiện dữ liệu nhạy cảm và nâng classification; evidence packet không làm lộ nội dung file hoặc token nhạy cảm.
+
+Về mặt DevSecOps, đề tài đã thiết kế và triển khai Jenkins pipeline có các stage kiểm thử và quét bảo mật. Pipeline tích hợp SCA, SAST, Trivy filesystem/image scan, Checkov IaC scan, Terraform validate, unit tests, Docker build, GitOps update, Argo CD health check, smoke test và OWASP ZAP DAST. Đây là nền tảng tốt để tiếp tục hoàn thiện quy trình phát hành an toàn cho DocVault.
+
+\section{Mức độ đáp ứng mục tiêu}
+
+Các mục tiêu chính của đồ án đã được đáp ứng ở mức phù hợp với môn Đồ Án Chuyên Ngành:
+
+\begin{itemize}
+  \item Hệ thống có kiến trúc microservices và service boundary rõ ràng.
+  \item Ứng dụng web đã bao phủ phần lớn user flow quan trọng.
+  \item Chính sách bảo mật được enforce ở backend thay vì chỉ ẩn/hiện ở frontend.
+  \item Có bằng chứng runtime cho các luồng quan trọng: auth, RBAC/ACL, confidential download posture, malware, DLP, retention, audit và compliance deny.
+  \item Pipeline DevSecOps đã có cấu trúc và nhiều security gate quan trọng.
+  \item Tài liệu kỹ thuật, API contract, evidence và hướng dẫn demo được lưu trong repository.
+\end{itemize}
+
+\section{Hạn chế}
+
+Do phạm vi và thời gian của đồ án, hệ thống vẫn còn một số hạn chế. Thứ nhất, notification-service hiện mới ở mức dev sink, chưa tích hợp email, webhook hoặc push notification thật. Thứ hai, pipeline DevSecOps tuy đã có nhiều stage nhưng vẫn cần hardening thêm để đạt mức production-grade, đặc biệt ở SBOM, signing, provenance, policy-as-code và quản lý secret. Thứ ba, browser-level E2E nên được mở rộng để bao phủ nhiều luồng UI hơn. Thứ tư, một số phần shared auth/contracts giữa service có thể tiếp tục được gom lại để giảm trùng lặp và tăng tính nhất quán.
+
+Ngoài ra, nếu triển khai trong môi trường production thật, cần bổ sung thêm yêu cầu về backup/restore, disaster recovery, KMS, network policy, rate limiting nâng cao, logging retention, monitoring alert và quy trình vận hành sự cố.
+
+\section{Hướng phát triển}
+
+Trong các giai đoạn tiếp theo, DocVault có thể được phát triển theo các hướng sau:
+
+\begin{enumerate}
+  \item \textbf{Hoàn thiện DevSecOps supply chain}: sinh SBOM, ký image bằng cosign, lưu provenance và kiểm tra artifact trước deploy.
+  \item \textbf{Policy-as-code}: bổ sung admission control cho Kubernetes để chặn image chưa scan, container chạy privileged hoặc manifest thiếu security context.
+  \item \textbf{Secret management}: tích hợp KMS/External Secrets, rotation runbook và secret scanning gate chặt hơn.
+  \item \textbf{Notification production}: thay notification sink bằng email/webhook/push hoặc message queue.
+  \item \textbf{Event-driven architecture}: bổ sung queue/event bus cho audit, notification và workflow asynchronous.
+  \item \textbf{Browser E2E}: mở rộng Playwright/Cypress để kiểm thử end-to-end ở lớp UI.
+  \item \textbf{Observability nâng cao}: tạo dashboard riêng cho business events, security alerts, latency, error rate và audit ingestion.
+  \item \textbf{Compliance pack}: chuẩn hóa export evidence theo kỳ, theo tài liệu, theo recommendation và theo security incident.
+  \item \textbf{AI governance}: phát triển các tính năng AI summarization/Q\&A dựa trên guardrails metadata-only và content access policy.
+\end{enumerate}
+
+\section{Kết luận chung}
+
+DocVault cho thấy cách tiếp cận xây dựng một hệ thống quản lý tài liệu không chỉ dừng ở chức năng CRUD hoặc lưu file, mà đặt trọng tâm vào bảo mật, kiểm soát truy cập, audit và bằng chứng tuân thủ. Việc kết hợp ứng dụng microservices với quy trình DevSecOps giúp hệ thống có khả năng kiểm thử và triển khai có kiểm soát hơn. Mặc dù vẫn còn các hướng cần hoàn thiện, đề tài đã tạo được nền tảng đầy đủ để tiếp tục phát triển thành một hệ thống quản lý tài liệu bảo mật có tính thực tiễn cao.

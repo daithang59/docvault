@@ -108,11 +108,16 @@ describe('ServiceTokenGuard', () => {
       GUARDS_METADATA,
       AuditController.prototype.securitySummary,
     );
+    const sealChainGuards = Reflect.getMetadata(
+      GUARDS_METADATA,
+      AuditController.prototype.sealCompromisedChainAndStartEpoch,
+    );
 
     expect(createGuards).toContain(ServiceTokenGuard);
     expect(queryGuards).not.toContain(ServiceTokenGuard);
     expect(verifyChainGuards).not.toContain(ServiceTokenGuard);
     expect(securitySummaryGuards).not.toContain(ServiceTokenGuard);
+    expect(sealChainGuards).not.toContain(ServiceTokenGuard);
     expect(
       Reflect.getMetadata(ROLES_KEY, AuditController.prototype.query),
     ).toEqual(['compliance_officer', 'admin']);
@@ -121,6 +126,12 @@ describe('ServiceTokenGuard', () => {
     ).toEqual(['compliance_officer', 'admin']);
     expect(
       Reflect.getMetadata(ROLES_KEY, AuditController.prototype.securitySummary),
+    ).toEqual(['compliance_officer', 'admin']);
+    expect(
+      Reflect.getMetadata(
+        ROLES_KEY,
+        AuditController.prototype.sealCompromisedChainAndStartEpoch,
+      ),
     ).toEqual(['compliance_officer', 'admin']);
   });
 });

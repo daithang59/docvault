@@ -14,6 +14,7 @@
     "migrate:to-mongo": "ts-node -r dotenv/config scripts/migrate-to-mongo.ts",
     "audit:tamper-demo": "ts-node -r dotenv/config scripts/audit-tamper-demo.ts",
     "audit:tamper-demo:test": "ts-node scripts/audit-tamper-demo.test.ts",
+    "audit:repair-chain": "ts-node -r dotenv/config scripts/repair-audit-chain.ts",
     "audit:reseed": "ts-node -r dotenv/config scripts/reseed-audit.ts"
   },
   "dependencies": {
