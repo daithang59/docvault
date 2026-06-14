@@ -104,7 +104,9 @@ def call(cfg = [:]) {
                     echo "NVD API connectivity check passed."
                 '
 
+            dependency_check_console_log="$WORKSPACE/dependency-check-report/dependency-check-console.log"
             scan_status=0
+            set +e
             docker run --rm \
                 -v "$WORKSPACE:/src" \
                 -v "$WORKSPACE/dependency-check-report:/report" \
@@ -136,15 +138,22 @@ def call(cfg = [:]) {
                 --failOnCVSS 7 \
                 --disableKnownExploited \
                 $nvd_args \
-                ${DEPENDENCY_CHECK_UPDATE_FLAG:-} || scan_status=$?
+                ${DEPENDENCY_CHECK_UPDATE_FLAG:-} > "$dependency_check_console_log" 2>&1
+            scan_status=$?
+            set -e
+
+            cat "$dependency_check_console_log"
 
             if [ "$scan_status" -ne 0 ]; then
                 echo "Dependency Check failed with exit code $scan_status."
                 if [ -f "$WORKSPACE/dependency-check-report/dependency-check.log" ]; then
                     echo "Last 200 lines from dependency-check-report/dependency-check.log:"
                     tail -n 200 "$WORKSPACE/dependency-check-report/dependency-check.log"
+                elif [ -f "$dependency_check_console_log" ]; then
+                    echo "Last 200 lines from dependency-check-report/dependency-check-console.log:"
+                    tail -n 200 "$dependency_check_console_log"
                 else
-                    echo "dependency-check-report/dependency-check.log was not created."
+                    echo "Dependency Check did not create a log file."
                 fi
                 exit "$scan_status"
             fi
