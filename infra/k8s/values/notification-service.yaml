@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/notification-service"
-  tag: "v2-6523a8ac8ef5"
-  digest: "sha256:0156c8c1e7e46e07bed865a543e4f536d8a84975417016594ece9444bc7cc9ed"
+  tag: "v6-ba3f0fe16256"
+  digest: "sha256:9d812d7bb8d11b2803e0f2336358d63986bb8b7fad412d40767e94cd7068d110"
 
 healthPath: /health
 
