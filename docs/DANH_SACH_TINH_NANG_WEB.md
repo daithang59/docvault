@@ -54,7 +54,7 @@ DocVault web hiện là một ứng dụng quản lý tài liệu bảo mật v�
 | Members | `/org/members` | Admin | Xem tổ chức, danh sách thành viên, đổi Member/Admin, xóa thành viên, tránh self-action. |
 | Profile | `/profile` | Tất cả vai trò đã đăng nhập | Hồ sơ cá nhân từ Keycloak/session: tên, username, email, user id, roles. |
 | Settings | `/settings` | Tất cả vai trò đã đăng nhập | Thông tin phiên, role, app config, API gateway URL, readiness score và capability list. |
-| Demo Kit | `/demo-kit` | Compliance Officer, Admin | Checklist bằng chứng runtime phục vụ demo/báo cáo. |
+| Demo Kit | `/demo-kit` | Nội bộ/presenter | Checklist bằng chứng runtime phục vụ demo/báo cáo; không còn hiển thị trong sidebar sản phẩm. |
 
 ## Chi tiết nhóm tính năng
 
@@ -68,7 +68,7 @@ DocVault web hiện là một ứng dụng quản lý tài liệu bảo mật v�
 
 ### 2. Điều hướng, layout và tiện ích chung
 
-- Sidebar hiển thị menu theo role, gồm Dashboard, Demo Kit, Documents, My Documents, New Document, Approvals, Notifications, Evidence, Security, Access Review, Audit, Retention, Trash và Members.
+- Sidebar hiển thị menu theo role, gồm Dashboard, Documents, My Documents, New Document, Approvals, Notifications, Evidence, Security, Access Review, Audit, Retention, Trash và Members.
 - Topbar có thông tin tổ chức/người dùng, thông báo và menu tài khoản.
 - Command Palette mở bằng `Ctrl+K` hoặc `Cmd+K`, tìm nhanh trang và action theo role.
 - Có dark/light theme qua theme provider và `ThemeToggle`.
@@ -77,7 +77,7 @@ DocVault web hiện là một ứng dụng quản lý tài liệu bảo mật v�
 ### 3. Dashboard
 
 - Hiển thị tổng số tài liệu và số theo trạng thái `DRAFT`, `PENDING`, `PUBLISHED`.
-- Hiển thị Business Demo Readiness score và các tín hiệu readiness.
+- Hiển thị command center vận hành: lifecycle pipeline, attention priority, work queue và metric theo quyền.
 - Hiển thị operational widgets như pending approvals, DLP detected, retention due soon, unread notifications.
 - Hiển thị work queue và recent documents.
 - Quick actions thay đổi theo role: browse documents, create document, review approvals, audit logs.
@@ -214,11 +214,11 @@ Trang chi tiết tài liệu gom nhiều khối nghiệp vụ:
 - Admin có thể promote/demote Member/Admin và remove member.
 - UI chặn đổi role hoặc xóa chính mình.
 
-### 18. Profile, Settings và Demo Kit
+### 18. Profile và Settings
 
 - Profile hiển thị thông tin tài khoản từ Keycloak/session: display name, username, email, user id, roles và trạng thái active.
 - Settings hiển thị session type, roles, app name, API gateway URL, product readiness score và capability list theo role.
-- Demo Kit hiển thị checklist bằng chứng runtime phục vụ advisor demo và report screenshots.
+- Demo Kit được giữ như route nội bộ/presenter để phục vụ advisor demo và report screenshots, không phải tab điều hướng chính.
 
 ## Phân quyền route/menu hiện tại
 
@@ -230,7 +230,6 @@ Trang chi tiết tài liệu gom nhiều khối nghiệp vụ:
 | New Document | Không | Có | Không | Không | Có |
 | Approvals | Không | Không | Có | Không | Có |
 | Notifications | Có | Có | Có | Có | Có |
-| Demo Kit | Không | Không | Không | Có | Có |
 | Evidence | Không | Không | Không | Có | Có |
 | Security | Không | Không | Không | Có | Có |
 | Access Review | Không | Không | Không | Có | Có |
