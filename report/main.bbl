@@ -1,0 +1,266 @@
+% $ biblatex auxiliary file $
+% $ biblatex bbl format version 3.3 $
+% Do not modify the above lines!
+%
+% This is an auxiliary file used by the 'biblatex' package.
+% This file may safely be deleted. It will be recreated by
+% biber as required.
+%
+\begingroup
+\makeatletter
+\@ifundefined{ver@biblatex.sty}
+  {\@latex@error
+     {Missing 'biblatex' package}
+     {The bibliography requires the 'biblatex' package.}
+      \aftergroup\endinput}
+  {}
+\endgroup
+
+
+\refsection{0}
+  \datalist[entry]{none/global//global/global/global}
+    \entry{nist_ssdf}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=ef9cb61878e61d434507444346b29d1a}{%
+           family={{National Institute of Standards and Technology}},
+           familyi={N\bibinitperiod}}}%
+      }
+      \strng{namehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{fullhash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{fullhashraw}{ef9cb61878e61d434507444346b29d1a}
+      \strng{bibnamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authorbibnamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authornamehash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authorfullhash}{ef9cb61878e61d434507444346b29d1a}
+      \strng{authorfullhashraw}{ef9cb61878e61d434507444346b29d1a}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Secure Software Development Framework (SSDF) Version 1.1: Recommendations for Mitigating the Risk of Software Vulnerabilities}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{year}{2022}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://csrc.nist.gov/pubs/sp/800/218/final
+      \endverb
+      \verb{url}
+      \verb https://csrc.nist.gov/pubs/sp/800/218/final
+      \endverb
+    \endentry
+    \entry{owasp_devsecops}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=b0d7a4bf1a0878d4e92cdd7461e48710}{%
+           family={{OWASP Foundation}},
+           familyi={O\bibinitperiod}}}%
+      }
+      \strng{namehash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{fullhash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{fullhashraw}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{bibnamehash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{authorbibnamehash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{authornamehash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{authorfullhash}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \strng{authorfullhashraw}{b0d7a4bf1a0878d4e92cdd7461e48710}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{OWASP DevSecOps Guideline}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://owasp.org/www-project-devsecops-guideline/
+      \endverb
+      \verb{url}
+      \verb https://owasp.org/www-project-devsecops-guideline/
+      \endverb
+    \endentry
+    \entry{keycloak_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=69b9cd2452d8b95ca6cb79f295cc9468}{%
+           family={{Keycloak}},
+           familyi={K\bibinitperiod}}}%
+      }
+      \strng{namehash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{fullhash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{fullhashraw}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{bibnamehash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{authorbibnamehash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{authornamehash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{authorfullhash}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \strng{authorfullhashraw}{69b9cd2452d8b95ca6cb79f295cc9468}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Keycloak Documentation}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.keycloak.org/documentation
+      \endverb
+      \verb{url}
+      \verb https://www.keycloak.org/documentation
+      \endverb
+    \endentry
+    \entry{argocd_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=947a9822cf08d9bfefb753be86dfc3e2}{%
+           family={{Argo CD Project}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{fullhash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{fullhashraw}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{bibnamehash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{authorbibnamehash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{authornamehash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{authorfullhash}{947a9822cf08d9bfefb753be86dfc3e2}
+      \strng{authorfullhashraw}{947a9822cf08d9bfefb753be86dfc3e2}
+      \field{sortinit}{4}
+      \field{sortinithash}{9381316451d1b9788675a07e972a12a7}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Argo CD: Declarative GitOps CD for Kubernetes}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://argo-cd.readthedocs.io/en/stable/
+      \endverb
+      \verb{url}
+      \verb https://argo-cd.readthedocs.io/en/stable/
+      \endverb
+    \endentry
+    \entry{sonarqube_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=613a509c0f3517ba4012a7935077b773}{%
+           family={{SonarSource}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{613a509c0f3517ba4012a7935077b773}
+      \strng{fullhash}{613a509c0f3517ba4012a7935077b773}
+      \strng{fullhashraw}{613a509c0f3517ba4012a7935077b773}
+      \strng{bibnamehash}{613a509c0f3517ba4012a7935077b773}
+      \strng{authorbibnamehash}{613a509c0f3517ba4012a7935077b773}
+      \strng{authornamehash}{613a509c0f3517ba4012a7935077b773}
+      \strng{authorfullhash}{613a509c0f3517ba4012a7935077b773}
+      \strng{authorfullhashraw}{613a509c0f3517ba4012a7935077b773}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{SonarQube Server Documentation}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.sonarsource.com/sonarqube-server
+      \endverb
+      \verb{url}
+      \verb https://docs.sonarsource.com/sonarqube-server
+      \endverb
+    \endentry
+    \entry{checkov_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=08c92d6085c899aad02358cf78f51038}{%
+           family={{Checkov Project}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{08c92d6085c899aad02358cf78f51038}
+      \strng{fullhash}{08c92d6085c899aad02358cf78f51038}
+      \strng{fullhashraw}{08c92d6085c899aad02358cf78f51038}
+      \strng{bibnamehash}{08c92d6085c899aad02358cf78f51038}
+      \strng{authorbibnamehash}{08c92d6085c899aad02358cf78f51038}
+      \strng{authornamehash}{08c92d6085c899aad02358cf78f51038}
+      \strng{authorfullhash}{08c92d6085c899aad02358cf78f51038}
+      \strng{authorfullhashraw}{08c92d6085c899aad02358cf78f51038}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Checkov Documentation}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.checkov.io/1.Welcome/What%20is%20Checkov.html
+      \endverb
+      \verb{url}
+      \verb https://www.checkov.io/1.Welcome/What%20is%20Checkov.html
+      \endverb
+    \endentry
+    \entry{trivy_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=8f145e9402dcaca0eb525b997bb2550e}{%
+           family={{Aqua Security}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{fullhash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{fullhashraw}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{bibnamehash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{authorbibnamehash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{authornamehash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{authorfullhash}{8f145e9402dcaca0eb525b997bb2550e}
+      \strng{authorfullhashraw}{8f145e9402dcaca0eb525b997bb2550e}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Trivy Documentation}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://trivy.dev/docs/latest/guide/
+      \endverb
+      \verb{url}
+      \verb https://trivy.dev/docs/latest/guide/
+      \endverb
+    \endentry
+    \entry{zap_baseline}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=e28c18aaaf23b76c58b60c4054ca7d1f}{%
+           family={{ZAP by Checkmarx}},
+           familyi={Z\bibinitperiod}}}%
+      }
+      \strng{namehash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{fullhash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{fullhashraw}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{bibnamehash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{authorbibnamehash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{authornamehash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{authorfullhash}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \strng{authorfullhashraw}{e28c18aaaf23b76c58b60c4054ca7d1f}
+      \field{sortinit}{9}
+      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{ZAP Baseline Scan}}
+      \field{urlday}{14}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://www.zaproxy.org/docs/docker/baseline-scan/
+      \endverb
+      \verb{url}
+      \verb https://www.zaproxy.org/docs/docker/baseline-scan/
+      \endverb
+    \endentry
+  \enddatalist
+\endrefsection
+\endinput
+
