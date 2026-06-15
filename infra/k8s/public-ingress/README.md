@@ -1,36 +1,42 @@
-# DocVault Public Ingress
+# `infra/k8s/public-ingress`
 
-This overlay exposes the browser-facing DocVault endpoints through the existing
-ingress-nginx controller:
+Thư mục này chứa Kustomize overlay để mở các endpoint public của DocVault qua ingress-nginx và cert-manager.
+
+## Endpoint public
 
 | Host | Backend |
 | --- | --- |
 | `app.docvault.id.vn` | `docvault-web:3006` |
 | `auth.docvault.id.vn` | `keycloak:8080` |
 
-TLS certificates are requested through the existing
-`letsencrypt-cloudflare` ClusterIssuer.
+TLS certificate được cấp bằng ClusterIssuer `letsencrypt-cloudflare`.
+
+## Thư mục con
+
+- `overlays/`
+  - Chứa overlay theo môi trường.
+  - Hiện có `testing`.
+  - Xem `overlays/README.md`.
 
 ## Cloudflare DNS
 
-Point both records to the ingress-nginx AWS load balancer hostname:
+Trỏ hai record này tới hostname LoadBalancer của ingress-nginx:
 
 ```text
 app.docvault.id.vn   CNAME   <ingress-nginx-controller ELB hostname>   Proxied
 auth.docvault.id.vn  CNAME   <ingress-nginx-controller ELB hostname>   Proxied
 ```
 
-Keep `harbor.docvault.id.vn` DNS-only so Docker registry pushes do not pass
-through the Cloudflare proxy.
+Với Harbor, nên giữ `harbor.docvault.id.vn` ở chế độ DNS-only nếu dùng Docker registry push/pull qua domain đó.
 
-Find the current ingress-nginx load balancer hostname:
+Lấy hostname hiện tại của ingress-nginx:
 
 ```powershell
 kubectl get svc ingress-nginx-controller -n ingress-nginx `
   -o jsonpath="{.status.loadBalancer.ingress[0].hostname}"
 ```
 
-After syncing Argo CD, verify:
+## Kiểm tra sau sync
 
 ```powershell
 kubectl get ingress -n docvault

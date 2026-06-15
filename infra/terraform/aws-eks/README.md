@@ -1,14 +1,71 @@
-# DocVault AWS EKS Terraform
+# `infra/terraform/aws-eks`
 
-This directory creates the MVP AWS foundation for the DocVault GitOps demo:
+Thư mục này chứa Terraform stack tạo nền tảng AWS EKS cho DocVault GitOps demo.
 
-- VPC with public and private subnets across two AZs.
-- EKS cluster with managed node group.
-- EKS core add-ons: CoreDNS, kube-proxy, VPC CNI, and AWS EBS CSI driver.
-- Cluster creator admin access for first-time bootstrap.
-- EKS control plane logs, IMDSv2 on nodes, and encrypted node root volumes.
+## Stack này tạo gì?
 
-## Usage
+- VPC với public/private subnet trên 2 Availability Zone.
+- EKS cluster.
+- EKS managed node group.
+- EKS add-ons: CoreDNS, kube-proxy, VPC CNI, AWS EBS CSI driver.
+- Control plane logs: `api`, `audit`, `authenticator`, `controllerManager`, `scheduler`.
+- Node group dùng IMDSv2 bắt buộc và encrypted gp3 root volume.
+- IAM role cho External Secrets Operator đọc AWS Secrets Manager.
+- Tùy chọn IAM Roles Anywhere cho Jenkins local/controller VM.
+
+## File trong thư mục
+
+- `README.md`
+  - Tài liệu giải thích Terraform stack này.
+
+- `versions.tf`
+  - Yêu cầu Terraform `>= 1.6.0`.
+  - Pin AWS provider `~> 5.0`.
+  - Có cấu hình S3 backend/DynamoDB locking đang comment. MVP hiện dùng local state; production nên chuyển sang remote backend.
+
+- `providers.tf`
+  - Cấu hình AWS provider dùng `var.aws_region`.
+
+- `variables.tf`
+  - Khai báo biến chính cho region, cluster name/version, environment.
+  - Cấu hình CIDR được truy cập public EKS API endpoint.
+  - Cấu hình node instance type, số lượng node, disk size.
+  - `enable_nat_gateway` quyết định node chạy private subnet có NAT hay public subnet để giảm chi phí demo.
+
+- `terraform.tfvars.example`
+  - File mẫu để copy thành `terraform.tfvars`.
+  - Chứa giá trị demo cho môi trường `testing`.
+  - Có block comment cho Jenkins IAM Roles Anywhere.
+  - Không commit `terraform.tfvars` thật vì có thể chứa cấu hình riêng hoặc đường dẫn certificate.
+
+- `main.tf`
+  - Dùng module `terraform-aws-vpc` để tạo VPC/subnet.
+  - Dùng module `terraform-aws-eks` để tạo EKS.
+  - Bật add-ons cần thiết cho cluster.
+  - Tạo managed node group `docvault`.
+  - Gán policy EBS CSI cho node role.
+  - Cấu hình IMDSv2, encrypted gp3 root volume.
+  - Thêm security group rule NodePort cho web `30006` và Keycloak `30080`.
+
+- `external-secrets-irsa.tf`
+  - Tạo IAM role cho External Secrets Operator bằng OIDC/IRSA.
+  - Chỉ cho service account `external-secrets/external-secrets` assume role.
+  - Cấp quyền đọc secret dưới prefix `/docvault/${var.environment}/*` trong AWS Secrets Manager.
+  - Đây là cầu nối bảo mật giữa Kubernetes `ExternalSecret` và AWS Secrets Manager.
+
+- `jenkins-roles-anywhere.tf`
+  - Tùy chọn tạo IAM Roles Anywhere cho Jenkins.
+  - Khi bật `enable_jenkins_roles_anywhere=true`, Terraform tạo trust anchor, profile, IAM role và policy đọc secret.
+  - Giúp Jenkins lấy temporary credentials bằng certificate thay vì hardcode AWS access key dài hạn.
+
+- `outputs.tf`
+  - Xuất cluster name, endpoint, security group, VPC/subnet IDs.
+  - Xuất lệnh `aws eks update-kubeconfig`.
+  - Xuất node group info.
+  - Xuất External Secrets role ARN.
+  - Xuất Jenkins Roles Anywhere ARN nếu tính năng được bật.
+
+## Cách chạy
 
 ```bash
 cd infra/terraform/aws-eks
@@ -20,72 +77,22 @@ terraform plan -out tfplan
 terraform apply tfplan
 ```
 
-Optional local scan:
+Quét cấu hình bằng Checkov nếu có cài:
 
 ```bash
 checkov -d infra/terraform/aws-eks
 ```
 
-Configure kubectl after apply:
+Cấu hình `kubectl` sau khi apply:
 
 ```bash
 aws eks update-kubeconfig --region ap-southeast-1 --name docvault-eks
 kubectl get nodes
 ```
 
-The default profile keeps nodes in public subnets to avoid NAT Gateway cost during the MVP demo. Set `enable_nat_gateway = true` to place nodes in private subnets.
+## Lưu ý bảo mật
 
-Before apply, check the EKS versions available in your region and narrow `cluster_endpoint_public_access_cidrs` in `terraform.tfvars` when possible:
-
-```bash
-aws eks describe-cluster-versions --region ap-southeast-1
-```
-
-Do not commit `terraform.tfvars`, local state, or plan files.
-
-## AWS credentials on Windows
-
-If `terraform plan` fails with:
-
-```text
-Error: No valid credential sources found
-failed to refresh cached credentials, no EC2 IMDS role found
-```
-
-Terraform cannot find AWS credentials in your local shell. The EC2 metadata error is only the provider's final fallback; it does not mean you need EC2.
-
-Use one of these local authentication methods.
-
-### Option A: IAM access key profile
-
-```powershell
-aws configure --profile docvault
-$env:AWS_PROFILE = "docvault"
-$env:AWS_REGION = "ap-southeast-1"
-aws sts get-caller-identity
-terraform plan -out tfplan
-```
-
-### Option B: AWS IAM Identity Center / SSO profile
-
-```powershell
-aws configure sso --profile docvault-sso
-aws sso login --profile docvault-sso
-$env:AWS_PROFILE = "docvault-sso"
-$env:AWS_REGION = "ap-southeast-1"
-aws sts get-caller-identity
-terraform plan -out tfplan
-```
-
-### Option C: temporary session credentials
-
-```powershell
-$env:AWS_ACCESS_KEY_ID = "<access-key-id>"
-$env:AWS_SECRET_ACCESS_KEY = "<secret-access-key>"
-$env:AWS_SESSION_TOKEN = "<session-token-if-any>"
-$env:AWS_REGION = "ap-southeast-1"
-aws sts get-caller-identity
-terraform plan -out tfplan
-```
-
-Never commit credentials or write them into Terraform files. Prefer `AWS_PROFILE` for repeatable local work.
+- Không commit `terraform.tfvars`, state file hoặc plan file.
+- Nên thu hẹp `cluster_endpoint_public_access_cidrs` thay vì để `0.0.0.0/0`.
+- Production nên dùng S3 backend có DynamoDB locking.
+- Không trỏ `jenkins_rolesanywhere_ca_certificate_path` tới private key; biến này chỉ nhận public CA certificate.
