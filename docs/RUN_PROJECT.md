@@ -1,6 +1,6 @@
 # Running the Project Locally
 
-Updated: 2026-03-18
+Updated: 2026-06-14
 
 This document is a guide for running DocVault on a local machine based on the current code state.
 
@@ -90,8 +90,30 @@ After Postgres is up:
 
 ```bash
 pnpm --filter metadata-service prisma:deploy
-pnpm --filter audit-service prisma:deploy
 ```
+
+Audit data is stored in MongoDB, so there is no Prisma migration step for
+`audit-service`.
+
+## 6. Seed Baseline Metadata
+
+Run the baseline metadata seed after migrations and after Keycloak is healthy.
+This creates the demo organization, memberships, baseline documents, ACL
+examples, and workflow history.
+
+```bash
+pnpm run seed:metadata
+```
+
+By default this seed is repeatable and does not wipe all metadata. For a local
+full reset, use the explicit guard:
+
+```powershell
+$env:DOCVAULT_ALLOW_METADATA_RESEED="true"
+pnpm run seed:metadata
+```
+
+Do not run demo/local seed commands against production data.
 
 ### View Data (GUI)
 
@@ -105,7 +127,9 @@ pnpm --filter metadata-service prisma:studio
 
 Open: http://localhost:5555
 
-View 4 tables: `documents`, `document_versions`, `document_acl`, `document_workflow_history`.
+Core tables to inspect: `organizations`, `organization_memberships`,
+`documents`, `document_versions`, `document_acl`, `document_workflow_history`,
+`document_comments`, and `document_saved_views`.
 
 **MongoDB — MongoDB Express**:
 
@@ -113,7 +137,7 @@ Open: http://localhost:8081
 
 Login: `mongoadmin` / `mongoadminpw`
 
-## 6. Start Backend
+## 7. Start Backend
 
 Recommended: run each service in a separate terminal in this order:
 
@@ -144,7 +168,7 @@ Quick health check:
 - `http://localhost:3004/health`
 - `http://localhost:3005/health`
 
-## 7. Start Frontend
+## 8. Start Frontend
 
 The frontend should run separately on port `3100` to avoid conflicts with:
 
@@ -166,7 +190,41 @@ Login page:
 
 - `http://localhost:3100/login`
 
-## 8. Login and Sample Users
+## 9. Seed Demo Business Flows
+
+After all backend services and the gateway are running, create realistic demo
+data through the Gateway API:
+
+```bash
+pnpm run seed:demo
+```
+
+This creates uploaded files, document versions, workflow transitions, comments,
+DLP evidence, ACL denial examples, and audit evidence through the real service
+paths. It uses `DOCVAULT_DEMO_SEED_RUN_ID=local` by default and skips existing
+documents for that run id. Set a different run id to create a fresh demo set:
+
+```powershell
+$env:DOCVAULT_DEMO_SEED_RUN_ID="presentation-1"
+pnpm run seed:demo
+```
+
+Optional malware/EICAR evidence is disabled by default because ClamAV first boot
+can be slow. Enable it only when ClamAV is healthy:
+
+```powershell
+$env:DOCVAULT_SEED_INCLUDE_MALWARE_PROBE="true"
+pnpm run seed:demo
+```
+
+If the backend is already running and you want the baseline metadata seed plus
+API demo seed in one command:
+
+```bash
+pnpm run seed:local
+```
+
+## 10. Login and Sample Users
 
 Password for all seeded users:
 
@@ -191,7 +249,7 @@ Keycloak local:
 
 - `http://localhost:8080`
 
-## 9. Quick Smoke Test
+## 11. Quick Smoke Test
 
 After all backend is running, you can run the E2E smoke test:
 
@@ -208,7 +266,7 @@ This script checks the main flows:
 - viewer can download file after publish
 - compliance officer can query audit but cannot download files
 
-## 10. Quick Run Mode and Notes
+## 12. Quick Run Mode and Notes
 
 Root script currently has:
 
@@ -220,10 +278,10 @@ However, this script runs the entire workspace through Turbo, including `apps/we
 
 Current recommendation:
 
-- run backend services separately as in step 6
-- run frontend separately as in step 7 on port `3100`
+- run backend services separately as in step 7
+- run frontend separately as in step 8 on port `3100`
 
-## 11. Common Errors
+## 13. Common Errors
 
 ### Postgres Migration Error
 
@@ -249,7 +307,17 @@ Check:
 - realm `docvault` has been imported
 - client secret in docs and `.env` matches the current seed
 
-## 12. Related Documents
+### Demo Seed Fails
+
+Check:
+
+- baseline metadata seed has run successfully
+- all backend services and the gateway are running
+- `GATEWAY_URL` points to `http://localhost:3000` unless intentionally changed
+- MinIO is reachable at `http://localhost:9000`
+- for non-local demo targets, set `DOCVAULT_ALLOW_REMOTE_DEMO_SEED=true`
+
+## 14. Related Documents
 
 - `README.md`
 - `docs/demo-flow.md`
