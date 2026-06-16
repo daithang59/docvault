@@ -1,3 +1,5 @@
+{{/*
+
 # `infra/k8s/charts/docvault-service/templates`
 
 Thư mục này chứa template Helm được render thành Kubernetes manifest cho mỗi service.
@@ -24,7 +26,6 @@ Thư mục này chứa template Helm được render thành Kubernetes manifest 
 
 - `migration-job.yaml`
   - Tạo `Job` khi `migration.enabled=true`.
-  - Dùng Argo CD hook `PreSync` và sync wave `-1`.
   - Dùng cho Prisma migration, hiện được bật ở `metadata-service.yaml`.
 
 - `seed-job.yaml`
@@ -36,3 +37,4 @@ Thư mục này chứa template Helm được render thành Kubernetes manifest 
   - Tạo `NetworkPolicy` cho release.
   - Cho pod trong namespace gọi tới port service.
   - Egress hiện đang mở rộng; đây là điểm có thể siết thêm khi hardening production.
+*/}}

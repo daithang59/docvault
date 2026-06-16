@@ -1,6 +1,7 @@
 {{- $zeroDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000" -}}
 {{- $imageDigest := .Values.image.digest | default "" -}}
 {{- $healthPath := .Values.healthPath | default "/health" -}}
+{{- $serviceAccountName := .Values.serviceAccount.name | default .Release.Name -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,7 +19,10 @@ spec:
       labels:
         app: {{ .Release.Name }}
     spec:
-      automountServiceAccountToken: false
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ $serviceAccountName | quote }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken | default false }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
