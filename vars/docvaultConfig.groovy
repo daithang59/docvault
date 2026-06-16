@@ -33,9 +33,11 @@ def call() {
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : false
     def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
+    def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
+        awsRegion: awsRegion,
         registryHost: registryHost,
         registryNamespace: registryNamespace,
         registryCredentialId: registryCredentialId,

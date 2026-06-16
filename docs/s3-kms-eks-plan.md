@@ -731,7 +731,79 @@ Sau khi da chay on dinh:
 - Cap nhat docs demo: "MinIO local/dev, S3 + KMS production AWS".
 - Cap nhat security evidence: S3 SSE-KMS, KMS rotation, IRSA, CloudTrail.
 
-## 14. Checklist Thuc Hien
+## 14. Enterprise-like Automation
+
+Repo co 2 entrypoint cho automation:
+
+```text
+scripts/update-values.ps1
+Jenkinsfile -> stage "Document Storage GitOps"
+vars/documentStorageGitOps.groovy
+```
+
+### 14.1 Local/manual script
+
+Mac dinh script chi tao Terraform plan:
+
+```powershell
+.\scripts\update-values.ps1
+```
+
+Chi khi can apply va cap nhat Helm values moi chay:
+
+```powershell
+.\scripts\update-values.ps1 -Apply
+```
+
+Neu muon tao commit local tren branch rieng:
+
+```powershell
+.\scripts\update-values.ps1 -Apply -Commit
+```
+
+Neu muon push branch de mo PR vao branch Argo CD dang theo doi:
+
+```powershell
+.\scripts\update-values.ps1 -Apply -Commit -Push
+```
+
+Script dung `terraform plan -out tfplan` roi `terraform apply tfplan`, doc outputs, cap nhat `document-service.yaml` bang `yq`, chay `helm lint` va `helm template`, sau do moi commit neu co `-Commit`. Script nay phu hop bootstrap/local manual; Jenkins stage la duong chinh cho pipeline cua repo.
+
+### 14.2 Jenkins pipeline
+
+Jenkinsfile co stage `Document Storage GitOps`, mac dinh tat. Chay bang cac parameters:
+
+```text
+RUN_DOCUMENT_STORAGE_GITOPS=true
+APPLY_DOCUMENT_STORAGE_TERRAFORM=false|true
+DOCUMENT_STORAGE_REQUIRE_APPROVAL=true
+DOCUMENT_STORAGE_VALUES_FILE=infra/k8s/values/document-service.yaml
+AWS_REGION=ap-southeast-1
+```
+
+Luồng Jenkins:
+
+1. Chay `terraform fmt`, `validate`, `plan`.
+2. Neu `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`, Jenkins doi approval bang `input` neu `DOCUMENT_STORAGE_REQUIRE_APPROVAL=true`.
+3. Chay `terraform apply tfplan`.
+4. Doc Terraform outputs.
+5. Clone branch GitOps, mac dinh `gitops-testing`.
+6. Cap nhat `document-service.yaml` bang `yq`.
+7. Chay `helm lint` va `helm template`.
+8. Commit voi `[skip ci]` va push ve branch GitOps.
+9. Argo CD sync theo branch GitOps.
+
+Can cau hinh truoc khi bat `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`:
+
+- Terraform S3 remote backend trong `infra/terraform/aws-eks/versions.tf`.
+- Remote backend nen co S3 versioning va state locking.
+- Jenkins agent co `terraform`, `yq`, `helm`, `git` trong PATH.
+- Jenkins agent co AWS credentials tam thoi. Voi setup hien tai, uu tien IAM Roles Anywhere/credential_process da mo ta trong `docs/jenkins_iam_roles_anywhere.md`.
+- Jenkins credential `github-credentials` co quyen push branch GitOps.
+
+Stage chi chay tren release build (`RELEASE_BRANCH`, mac dinh `main`) va chi khi `RUN_DOCUMENT_STORAGE_GITOPS=true`. Neu `APPLY_DOCUMENT_STORAGE_TERRAFORM=false`, stage chi tao plan va khong sua GitOps values.
+
+## 15. Checklist Thuc Hien
 
 - [ ] Tao S3 bucket bang Terraform.
 - [ ] Tao KMS customer managed key va alias.
@@ -753,8 +825,13 @@ Sau khi da chay on dinh:
 - [ ] Verify object moi co `ServerSideEncryption=aws:kms`.
 - [ ] Smoke test upload/download/preview/watermark/malware block.
 - [ ] Giu MinIO readonly den khi het rollback window.
+- [ ] Cau hinh Terraform S3 remote backend truoc khi dung Jenkins `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`.
+- [ ] Dam bao Jenkins agent co `terraform`, `yq`, `helm`, `git`.
+- [ ] Dam bao Jenkins co AWS temporary credentials va `github-credentials`.
+- [ ] Chay Jenkins voi `RUN_DOCUMENT_STORAGE_GITOPS=true`, `APPLY_DOCUMENT_STORAGE_TERRAFORM=false` de xem plan.
+- [ ] Chay Jenkins voi `RUN_DOCUMENT_STORAGE_GITOPS=true`, `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`, approve input, de push values vao `gitops-testing`.
 
-## 15. Tai Lieu Tham Khao
+## 16. Tai Lieu Tham Khao
 
 - Amazon S3 SSE-KMS: https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
 - AWS KMS automatic key rotation: https://docs.aws.amazon.com/kms/latest/developerguide/rotating-keys-enable.html
