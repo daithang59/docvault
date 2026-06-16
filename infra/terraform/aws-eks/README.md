@@ -12,6 +12,7 @@ Resource implementation được tách thành local modules dưới `infra/terra
 - Node group dùng IMDSv2 bắt buộc và encrypted gp3 root volume.
 - IAM role cho External Secrets Operator đọc AWS Secrets Manager qua module `external-secrets-irsa`.
 - S3 bucket/KMS key và IRSA role cho `document-service` qua module `documents-storage`.
+- S3 hardening cho document storage: access logging bucket, EventBridge notifications và lifecycle rules.
 - Tùy chọn IAM Roles Anywhere cho Jenkins local/controller VM qua module `jenkins-roles-anywhere`.
 
 ## File trong thư mục
@@ -86,6 +87,7 @@ Resource implementation được tách thành local modules dưới `infra/terra
 
 - `../modules/documents-storage`
   - Tạo S3 bucket, KMS key, bucket policy và IAM role/policy cho `docvault/document-service`.
+  - Bật S3 access logging, lifecycle và EventBridge notification. Cross-region replication được skip có chủ đích cho môi trường production-like testing để kiểm soát chi phí.
 
 - `../modules/jenkins-roles-anywhere`
   - Tạo trust anchor, profile, role và policy tùy chọn cho Jenkins IAM Roles Anywhere.
