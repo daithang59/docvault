@@ -1,0 +1,97 @@
+@Library('docvault@feat/web-deployment') _
+
+def cfg = [:]
+
+pipeline {
+    agent { label 'docker-agent-alpine-ubuntu-vm' }
+
+    options {
+        disableConcurrentBuilds()
+    }
+
+    parameters {
+        string(
+            name: 'GITOPS_BRANCH',
+            defaultValue: 'gitops-testing',
+            description: 'GitOps branch updated with document-service S3/KMS values.'
+        )
+        string(
+            name: 'AWS_REGION',
+            defaultValue: 'ap-southeast-1',
+            description: 'AWS region used by Terraform and S3/KMS.'
+        )
+        booleanParam(
+            name: 'APPLY_DOCUMENT_STORAGE_TERRAFORM',
+            defaultValue: false,
+            description: 'Apply the saved Terraform plan and push document-service S3/KMS values to the GitOps branch.'
+        )
+        booleanParam(
+            name: 'DOCUMENT_STORAGE_REQUIRE_APPROVAL',
+            defaultValue: true,
+            description: 'Require Jenkins input approval before applying Terraform document storage changes.'
+        )
+        string(
+            name: 'DOCUMENT_STORAGE_VALUES_FILE',
+            defaultValue: 'infra/k8s/values/document-service.yaml',
+            description: 'GitOps Helm values file updated from Terraform S3/KMS outputs.'
+        )
+    }
+
+    environment {
+        TF_IN_AUTOMATION = 'true'
+        TF_INPUT = 'false'
+    }
+
+    stages {
+        stage('Checkout & Initialize Config') {
+            steps {
+                checkout scm
+
+                script {
+                    cfg = docvaultConfig()
+
+                    if (!cfg) {
+                        error('docvaultConfig() returned null/empty config.')
+                    }
+
+                    cfg.gitOpsBranch = params.GITOPS_BRANCH?.trim()
+                        ? params.GITOPS_BRANCH.trim()
+                        : cfg.gitOpsBranch
+
+                    cfg.awsRegion = params.AWS_REGION?.trim()
+                        ? params.AWS_REGION.trim()
+                        : cfg.awsRegion
+
+                    cfg.applyDocumentStorageTerraform = params.APPLY_DOCUMENT_STORAGE_TERRAFORM
+                    cfg.requireDocumentStorageApproval = params.DOCUMENT_STORAGE_REQUIRE_APPROVAL
+                    cfg.documentStorageValuesFile = params.DOCUMENT_STORAGE_VALUES_FILE?.trim()
+                        ? params.DOCUMENT_STORAGE_VALUES_FILE.trim()
+                        : 'infra/k8s/values/document-service.yaml'
+
+                    echo ">>> Document storage job mode: ${cfg.applyDocumentStorageTerraform ? 'apply + GitOps update' : 'plan only'}"
+                    echo ">>> GitOps branch: ${cfg.gitOpsBranch}"
+                    echo ">>> AWS_REGION=${cfg.awsRegion}"
+                    echo ">>> APPLY_DOCUMENT_STORAGE_TERRAFORM=${cfg.applyDocumentStorageTerraform}"
+                    echo ">>> DOCUMENT_STORAGE_REQUIRE_APPROVAL=${cfg.requireDocumentStorageApproval}"
+                    echo ">>> DOCUMENT_STORAGE_VALUES_FILE=${cfg.documentStorageValuesFile}"
+                }
+            }
+        }
+
+        stage('Document Storage Plan/Apply & GitOps') {
+            steps {
+                script {
+                    documentStorageGitOps(cfg)
+                }
+            }
+        }
+    }
+
+    post {
+        always {
+            script {
+                postCleanup()
+            }
+        }
+    }
+}

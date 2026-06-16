@@ -733,13 +733,17 @@ Sau khi da chay on dinh:
 
 ## 14. Enterprise-like Automation
 
-Repo co 2 entrypoint cho automation:
+Repo co 2 cach chay automation va 1 shared-library step:
 
 ```text
 scripts/update-values.ps1
-Jenkinsfile -> stage "Document Storage GitOps"
+Jenkinsfile.storage
 vars/documentStorageGitOps.groovy
 ```
+
+`vars/documentStorageGitOps.groovy` la shared-library step dung chung cho Jenkins. No khong tu kich hoat pipeline; entrypoint Jenkins chinh la `Jenkinsfile.storage`.
+
+Runbook thao tac cutover chi tiet: `docs/s3-kms-cutover-runbook.md`.
 
 ### 14.1 Local/manual script
 
@@ -767,14 +771,15 @@ Neu muon push branch de mo PR vao branch Argo CD dang theo doi:
 .\scripts\update-values.ps1 -Apply -Commit -Push
 ```
 
-Script dung `terraform plan -out tfplan` roi `terraform apply tfplan`, doc outputs, cap nhat `document-service.yaml` bang `yq`, chay `helm lint` va `helm template`, sau do moi commit neu co `-Commit`. Script nay phu hop bootstrap/local manual; Jenkins stage la duong chinh cho pipeline cua repo.
+Script dung `terraform plan -out tfplan` roi `terraform apply tfplan`, doc outputs, cap nhat `document-service.yaml` bang `yq`, chay `helm lint` va `helm template`, sau do moi commit neu co `-Commit`. Script nay phu hop bootstrap/local manual; Jenkins job rieng la duong chinh cho automation tren CI/CD.
 
-### 14.2 Jenkins pipeline
+### 14.2 Jenkins job rieng
 
-Jenkinsfile co stage `Document Storage GitOps`, mac dinh tat. Chay bang cac parameters:
+Tao mot Jenkins Pipeline job rieng tro den `Jenkinsfile.storage`. Job nay khong nam trong CD app binh thuong; no chi duoc chay khi can provision/update S3, KMS, IAM role, hoac can dong bo lai `document-service.yaml` tu Terraform outputs.
+
+Parameters:
 
 ```text
-RUN_DOCUMENT_STORAGE_GITOPS=true
 APPLY_DOCUMENT_STORAGE_TERRAFORM=false|true
 DOCUMENT_STORAGE_REQUIRE_APPROVAL=true
 DOCUMENT_STORAGE_VALUES_FILE=infra/k8s/values/document-service.yaml
@@ -801,7 +806,14 @@ Can cau hinh truoc khi bat `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`:
 - Jenkins agent co AWS credentials tam thoi. Voi setup hien tai, uu tien IAM Roles Anywhere/credential_process da mo ta trong `docs/jenkins_iam_roles_anywhere.md`.
 - Jenkins credential `github-credentials` co quyen push branch GitOps.
 
-Stage chi chay tren release build (`RELEASE_BRANCH`, mac dinh `main`) va chi khi `RUN_DOCUMENT_STORAGE_GITOPS=true`. Neu `APPLY_DOCUMENT_STORAGE_TERRAFORM=false`, stage chi tao plan va khong sua GitOps values.
+Nen chay theo nhip van hanh sau:
+
+1. Chay job voi `APPLY_DOCUMENT_STORAGE_TERRAFORM=false` de xem plan.
+2. Review Terraform plan.
+3. Chay lai job voi `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`.
+4. Approve Jenkins input neu `DOCUMENT_STORAGE_REQUIRE_APPROVAL=true`.
+
+Neu `APPLY_DOCUMENT_STORAGE_TERRAFORM=false`, job chi tao plan va khong sua GitOps values. Neu `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`, job apply Terraform va push values len branch GitOps de Argo CD sync.
 
 ## 15. Checklist Thuc Hien
 
@@ -828,8 +840,9 @@ Stage chi chay tren release build (`RELEASE_BRANCH`, mac dinh `main`) va chi khi
 - [ ] Cau hinh Terraform S3 remote backend truoc khi dung Jenkins `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`.
 - [ ] Dam bao Jenkins agent co `terraform`, `yq`, `helm`, `git`.
 - [ ] Dam bao Jenkins co AWS temporary credentials va `github-credentials`.
-- [ ] Chay Jenkins voi `RUN_DOCUMENT_STORAGE_GITOPS=true`, `APPLY_DOCUMENT_STORAGE_TERRAFORM=false` de xem plan.
-- [ ] Chay Jenkins voi `RUN_DOCUMENT_STORAGE_GITOPS=true`, `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`, approve input, de push values vao `gitops-testing`.
+- [ ] Tao Jenkins Pipeline job rieng tro den `Jenkinsfile.storage`.
+- [ ] Chay Jenkins storage job voi `APPLY_DOCUMENT_STORAGE_TERRAFORM=false` de xem plan.
+- [ ] Chay Jenkins storage job voi `APPLY_DOCUMENT_STORAGE_TERRAFORM=true`, approve input, de push values vao `gitops-testing`.
 
 ## 16. Tai Lieu Tham Khao
 

@@ -88,31 +88,6 @@ pipeline {
             description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).'
         )
         string(
-            name: 'AWS_REGION',
-            defaultValue: 'ap-southeast-1',
-            description: 'AWS region used by Terraform and document storage automation.'
-        )
-        booleanParam(
-            name: 'RUN_DOCUMENT_STORAGE_GITOPS',
-            defaultValue: false,
-            description: 'Run Terraform plan for S3/KMS document storage. On release builds this can also apply and update GitOps values.'
-        )
-        booleanParam(
-            name: 'APPLY_DOCUMENT_STORAGE_TERRAFORM',
-            defaultValue: false,
-            description: 'Apply the saved Terraform plan and push document-service S3/KMS values to the GitOps branch. Only effective when RUN_DOCUMENT_STORAGE_GITOPS=true on a release build.'
-        )
-        booleanParam(
-            name: 'DOCUMENT_STORAGE_REQUIRE_APPROVAL',
-            defaultValue: true,
-            description: 'Require a Jenkins input approval before applying Terraform document storage changes.'
-        )
-        string(
-            name: 'DOCUMENT_STORAGE_VALUES_FILE',
-            defaultValue: 'infra/k8s/values/document-service.yaml',
-            description: 'GitOps Helm values file updated from Terraform S3/KMS outputs.'
-        )
-        string(
             name: 'DEPLOY_TARGET_URL',
             defaultValue: '',
             description: 'Reachable deployed web base URL for post-deploy smoke tests, for example http://<node-ip>:30006.'
@@ -202,10 +177,6 @@ pipeline {
                         ? params.RELEASE_BRANCH.trim()
                         : cfg.releaseBranch
 
-                    cfg.awsRegion = params.AWS_REGION?.trim()
-                        ? params.AWS_REGION.trim()
-                        : cfg.awsRegion
-
                     cfg.registryHost = params.REGISTRY_HOST?.trim()
                         ? params.REGISTRY_HOST.trim()
                         : cfg.registryHost
@@ -261,12 +232,6 @@ pipeline {
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
 
-                    cfg.applyDocumentStorageTerraform = params.APPLY_DOCUMENT_STORAGE_TERRAFORM
-                    cfg.requireDocumentStorageApproval = params.DOCUMENT_STORAGE_REQUIRE_APPROVAL
-                    cfg.documentStorageValuesFile = params.DOCUMENT_STORAGE_VALUES_FILE?.trim()
-                        ? params.DOCUMENT_STORAGE_VALUES_FILE.trim()
-                        : 'infra/k8s/values/document-service.yaml'
-
                     cfg.useNvdKey = true
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
                     cfg.dependencyCheckDataDir = params.DEPENDENCY_CHECK_DATA_DIR?.trim()
@@ -298,11 +263,6 @@ pipeline {
                     echo ">>> Pipeline mode: ${cfg.isReleaseBuild ? 'CD release' : 'CI validation'}"
                     echo ">>> Image tag: ${cfg.imageTag}"
                     echo ">>> Effective GitOps branch: ${cfg.gitOpsBranch}"
-                    echo ">>> AWS_REGION=${cfg.awsRegion}"
-                    echo ">>> RUN_DOCUMENT_STORAGE_GITOPS=${params.RUN_DOCUMENT_STORAGE_GITOPS}"
-                    echo ">>> APPLY_DOCUMENT_STORAGE_TERRAFORM=${params.APPLY_DOCUMENT_STORAGE_TERRAFORM}"
-                    echo ">>> DOCUMENT_STORAGE_REQUIRE_APPROVAL=${params.DOCUMENT_STORAGE_REQUIRE_APPROVAL}"
-                    echo ">>> DOCUMENT_STORAGE_VALUES_FILE=${cfg.documentStorageValuesFile}"
                     echo ">>> Registry host: ${cfg.registryHost ?: '(Docker Hub default)'}"
                     echo ">>> Registry namespace/project: ${cfg.registryNamespace}"
                     echo ">>> Registry credential ID: ${cfg.registryCredentialId}"
@@ -553,19 +513,6 @@ pipeline {
                 script {
                     echo ">>> Push & GitOps with builtServicesCsv='${builtServicesCsv}', INFRA_CHANGED='${env.INFRA_CHANGED}'"
                     pushAndGitOps(cfg, builtServicesCsv)
-                }
-            }
-        }
-
-        stage('Document Storage GitOps') {
-            when {
-                expression {
-                    return env.IS_RELEASE_BUILD == 'true' && params.RUN_DOCUMENT_STORAGE_GITOPS
-                }
-            }
-            steps {
-                script {
-                    documentStorageGitOps(cfg)
                 }
             }
         }
