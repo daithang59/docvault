@@ -25,6 +25,10 @@ spec:
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -41,6 +45,9 @@ spec:
             - -c
             - {{ .Values.migration.command | quote }}
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
@@ -55,6 +62,9 @@ spec:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.envValueFrom }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- with .Values.envFrom }}
           envFrom:

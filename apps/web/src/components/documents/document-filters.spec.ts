@@ -1,4 +1,4 @@
-import { createElement } from 'react';
+import { createElement, type ReactElement } from 'react';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { describe, expect, it } from 'vitest';
@@ -27,30 +27,33 @@ const documents: DocumentListItem[] = [
   },
 ];
 
+function renderWithQueryClient(element: ReactElement) {
+  const client = new QueryClient({
+    defaultOptions: { queries: { retry: false } },
+  });
+
+  return renderToStaticMarkup(
+    createElement(QueryClientProvider, { client }, element),
+  );
+}
+
 describe('DocumentFilters', () => {
   it('renders quick views, saved views, and filter controls', () => {
-    const queryClient = new QueryClient({
-      defaultOptions: { queries: { retry: false } },
-    });
-    const html = renderToStaticMarkup(
-      createElement(
-        QueryClientProvider,
-        { client: queryClient },
-        createElement(DocumentFilters, {
-          filters: DEFAULT_DOCUMENT_FILTERS,
-          options: buildDocumentFilterOptions(documents),
-          quickViews: buildDocumentQuickViewOptions(documents),
-          searchSuggestions: buildDocumentSearchSuggestions(documents),
-          savedViews: buildDocumentSavedViewOptions(documents),
-          activeSavedViewId: null,
-          resultCount: documents.length,
-          totalCount: documents.length,
-          onChange: () => undefined,
-          onApplySavedView: () => undefined,
-          onSaveCurrentView: () => undefined,
-          onDeleteSavedView: () => undefined,
-        }),
-      ),
+    const html = renderWithQueryClient(
+      createElement(DocumentFilters, {
+        filters: DEFAULT_DOCUMENT_FILTERS,
+        options: buildDocumentFilterOptions(documents),
+        quickViews: buildDocumentQuickViewOptions(documents),
+        searchSuggestions: buildDocumentSearchSuggestions(documents),
+        savedViews: buildDocumentSavedViewOptions(documents),
+        activeSavedViewId: null,
+        resultCount: documents.length,
+        totalCount: documents.length,
+        onChange: () => undefined,
+        onApplySavedView: () => undefined,
+        onSaveCurrentView: () => undefined,
+        onDeleteSavedView: () => undefined,
+      }),
     );
 
     expect(html).toContain('Document views');
@@ -58,10 +61,14 @@ describe('DocumentFilters', () => {
     expect(html).toContain('Needs action');
     expect(html).toContain('Pending review');
     expect(html).toContain('Sensitive attention');
+    expect(html).toContain('Action queue');
     expect(html).toContain('Search documents');
     expect(html).toContain('Filter');
-    expect(html).toContain('Recently updated');
     expect(html).toContain('Save view');
+    expect(html).toContain('Search syntax: status:pending');
+    expect(html).toContain('class:confidential');
+    expect(html).toContain('file:report.pdf');
+    expect(html).toContain('Recently updated');
     expect(html).toContain('Reset all filters');
   });
 });

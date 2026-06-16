@@ -15,9 +15,7 @@ env:
   NODE_ENV: production
   PORT: "3002"
   KEYCLOAK_BASE_URL: "http://keycloak:8080"
-  # Patched at runtime by scripts/setup-eks-access.ps1 to the public
-  # Keycloak NodePort issuer while JWKS stays on KEYCLOAK_BASE_URL.
-  KEYCLOAK_ISSUER: "http://keycloak:8080/realms/docvault"
+  KEYCLOAK_ISSUER: "https://auth.docvault.id.vn/realms/docvault"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_AUDIENCE: "docvault-gateway"
   METADATA_SERVICE_URL: "http://docvault-metadata:3001"
@@ -26,6 +24,18 @@ env:
   S3_BUCKET: "docvault"
   S3_REGION: "us-east-1"
   S3_FORCE_PATH_STYLE: "true"
+
+envValueFrom:
+  - name: S3_ACCESS_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio-secret
+        key: MINIO_ROOT_USER
+  - name: S3_SECRET_KEY
+    valueFrom:
+      secretKeyRef:
+        name: minio-secret
+        key: MINIO_ROOT_PASSWORD
 
 envFrom:
   - secretRef:

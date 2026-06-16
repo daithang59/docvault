@@ -1,8 +1,14 @@
 import { Readable } from 'stream';
-import { createHmac } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { DocumentsService } from './documents.service';
 import { GrantPayload } from './download-grant.util';
+
+function testGrantKey(label: string) {
+  return createHash('sha256')
+    .update(`docvault-test-fixture:${label}`)
+    .digest('base64url');
+}
 
 function sign(payload: GrantPayload, secret: string) {
   const encoded = Buffer.from(JSON.stringify(payload)).toString('base64url');
@@ -24,11 +30,12 @@ describe('DocumentsService stream grants', () => {
     classification: 'PUBLIC',
     watermarkRequired: false,
   };
+  const downloadGrantKey = testGrantKey('download-grant-default');
   let service: DocumentsService;
   let storageService: { getObjectStream: jest.Mock };
 
   beforeEach(() => {
-    process.env.DOWNLOAD_GRANT_SECRET = 'test-download-secret';
+    process.env.DOWNLOAD_GRANT_SECRET = downloadGrantKey;
     storageService = { getObjectStream: jest.fn() };
     service = new DocumentsService(
       {} as any,
@@ -187,7 +194,7 @@ describe('DocumentsService upload security controls', () => {
 });
 
 describe('DocumentsService preview watermark', () => {
-  const PREVIEW_SECRET = 'test-preview-secret';
+  const previewGrantKey = testGrantKey('preview-grant-default');
 
   function previewToken(payload: Record<string, unknown>) {
     const full = {
@@ -202,7 +209,7 @@ describe('DocumentsService preview watermark', () => {
       ...payload,
     };
     const encoded = Buffer.from(JSON.stringify(full)).toString('base64url');
-    const signature = createHmac('sha256', PREVIEW_SECRET)
+    const signature = createHmac('sha256', previewGrantKey)
       .update(encoded)
       .digest('base64url');
     return `${encoded}.${signature}`;
@@ -238,7 +245,7 @@ describe('DocumentsService preview watermark', () => {
   }
 
   beforeEach(() => {
-    process.env.PREVIEW_GRANT_SECRET = PREVIEW_SECRET;
+    process.env.PREVIEW_GRANT_SECRET = previewGrantKey;
   });
   afterEach(() => {
     delete process.env.PREVIEW_GRANT_SECRET;

@@ -19,25 +19,35 @@ export function SearchInput({
   className,
   debounceMs = 300,
 }: SearchInputProps) {
-  const [localValue, setLocalValue] = useState(value);
+  const [draftValue, setDraftValue] = useState(value);
+  const [isEditing, setIsEditing] = useState(false);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const displayedValue = isEditing ? draftValue : value;
 
   useEffect(() => {
-    setLocalValue(value);
-  }, [value]);
+    return () => {
+      if (timerRef.current) clearTimeout(timerRef.current);
+    };
+  }, []);
 
   const handleChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
       const v = e.target.value;
-      setLocalValue(v);
+      setIsEditing(true);
+      setDraftValue(v);
       if (timerRef.current) clearTimeout(timerRef.current);
-      timerRef.current = setTimeout(() => onChange(v), debounceMs);
+      timerRef.current = setTimeout(() => {
+        onChange(v);
+        setIsEditing(false);
+      }, debounceMs);
     },
     [onChange, debounceMs],
   );
 
   const handleClear = useCallback(() => {
-    setLocalValue('');
+    if (timerRef.current) clearTimeout(timerRef.current);
+    setDraftValue('');
+    setIsEditing(false);
     onChange('');
   }, [onChange]);
 
@@ -49,7 +59,7 @@ export function SearchInput({
       />
       <input
         type="text"
-        value={localValue}
+        value={displayedValue}
         onChange={handleChange}
         placeholder={placeholder}
         className={cn(
@@ -61,7 +71,7 @@ export function SearchInput({
         )}
         style={{ backdropFilter: 'blur(8px)' }}
       />
-      {localValue && (
+      {displayedValue && (
         <button
           onClick={handleClear}
           className="absolute right-2.5 flex items-center justify-center p-1 rounded-lg text-[var(--text-muted)] transition-all active:scale-90 hover:bg-[var(--bg-muted)]"

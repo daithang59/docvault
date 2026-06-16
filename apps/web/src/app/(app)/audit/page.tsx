@@ -1,6 +1,7 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/lib/auth/auth-context';
 import { useAuditQuery } from '@/lib/hooks/use-audit';
@@ -51,9 +52,11 @@ import {
 
 export default function AuditPage() {
   const { session } = useAuth();
-  const [filters, setFilters] = useState<AuditQueryFilters>({
+  const searchParams = useSearchParams();
+  const [filters, setFilters] = useState<AuditQueryFilters>(() => ({
     excludeActions: ['SECURITY_RECOMMENDATIONS_VIEWED'],
-  });
+    ...parseAuditFilterQuery(searchParams),
+  }));
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE);
   const [chainStatus, setChainStatus] = useState<AuditChainStatus | null>(null);
@@ -65,15 +68,6 @@ export default function AuditPage() {
   const [recoveryMessage, setRecoveryMessage] = useState<string | null>(null);
 
   const hasAccess = canViewAudit(session);
-
-  useEffect(() => {
-    const nextFilters = parseAuditFilterQuery(window.location.search);
-
-    if (Object.keys(nextFilters).length > 0) {
-      setFilters(nextFilters);
-      setPage(1);
-    }
-  }, []);
 
   const { data: logs, isLoading, isError, refetch } = useAuditQuery(
     filters,

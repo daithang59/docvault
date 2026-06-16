@@ -1,5 +1,5 @@
 def call(cfg, builtServicesCsv) {
-    def tag = "v${env.BUILD_NUMBER}"
+    def tag = resolveImageTag(cfg)
     def builtList = parseBuiltServices(builtServicesCsv)
     def infraChanged = env.INFRA_CHANGED == 'true'
 
@@ -19,6 +19,16 @@ def call(cfg, builtServicesCsv) {
     updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged)
 }
 
+String resolveImageTag(cfg) {
+    if (cfg.imageTag?.trim()) {
+        return cfg.imageTag.trim()
+    }
+    if (env.IMAGE_TAG?.trim()) {
+        return env.IMAGE_TAG.trim()
+    }
+    return "v${env.BUILD_NUMBER}"
+}
+
 def parseBuiltServices(builtServicesCsv) {
     if (!builtServicesCsv?.trim()) {
         return []
@@ -32,25 +42,35 @@ def parseBuiltServices(builtServicesCsv) {
 }
 
 def pushImages(cfg, builtList, tag) {
-    echo '>>> Logging into Docker Hub...'
+    echo ">>> Logging into registry ${cfg.registryHost ?: 'Docker Hub'}..."
 
     def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
     def imageDigests = [:]
+    def registryArg = cfg.registryHost?.trim() ? shellQuote(cfg.registryHost.trim()) : ''
+    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
-            withCredentials([usernamePassword(credentialsId: 'dockerhub-credentials', passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
-                sh 'echo "$DOCKER_PASS" | docker login -u "$DOCKER_USER" --password-stdin'
-
-                runPushesInBatches(cfg, builtList, tag)
-
-                builtList.each { service ->
-                    def imageName = imageNameForService(cfg, service)
-                    def repository = "${cfg.dockerOrg}/${imageName}"
-                    imageDigests[service] = resolveImageDigest(repository, tag)
+            if (credentialType == 'secretText') {
+                def registryUsername = cfg.registryUsername?.trim()
+                if (!registryUsername) {
+                    error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
                 }
 
-                sh 'docker logout || true'
+                withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
+                    pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
+                    sh "docker logout ${registryArg} || true"
+                }
+            } else if (credentialType == 'usernamePassword') {
+                withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
+                    pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
+                    sh "docker logout ${registryArg} || true"
+                }
+            } else {
+                error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
             }
         }
     } finally {
@@ -58,6 +78,21 @@ def pushImages(cfg, builtList, tag) {
     }
 
     return imageDigests
+}
+
+def pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests) {
+    runPushesInBatches(cfg, builtList, tag)
+
+    builtList.each { service ->
+        def imageName = imageNameForService(cfg, service)
+        def repository = resolveRepository(cfg, imageName)
+        def digest = resolveImageDigest(repository, tag)
+        imageDigests[service] = digest
+
+        if (digest && shouldSignImages(cfg)) {
+            signImageDigest(cfg, service, "${repository}@${digest}")
+        }
+    }
 }
 
 def runPushesInBatches(cfg, builtList, tag) {
@@ -84,12 +119,16 @@ def runPushesInBatches(cfg, builtList, tag) {
 
 def pushImage(cfg, service, tag) {
     def imageName = imageNameForService(cfg, service)
-    def repository = "${cfg.dockerOrg}/${imageName}"
+    def repository = resolveRepository(cfg, imageName)
     def taggedImage = "${repository}:${tag}"
 
-    echo ">>> Pushing ${taggedImage} to Docker Hub..."
+    echo ">>> Pushing ${taggedImage} to registry..."
     sh "docker push ${taggedImage}"
-    sh "docker push ${repository}:latest"
+    if (cfg.pushLatest) {
+        sh "docker push ${repository}:latest"
+    } else {
+        echo ">>> Skipping mutable latest push for ${repository}; PUSH_LATEST=false."
+    }
 }
 
 def imageNameForService(cfg, service) {
@@ -98,6 +137,14 @@ def imageNameForService(cfg, service) {
 
 def valuesFileForService(cfg, service) {
     return service == cfg.webAppName ? 'web.yaml' : "${service}.yaml"
+}
+
+String resolveRepository(cfg, String service) {
+    def namespace = cfg.registryNamespace?.trim() ? cfg.registryNamespace.trim() : cfg.dockerOrg
+    if (cfg.registryHost?.trim()) {
+        return "${cfg.registryHost.trim()}/${namespace}/${service}"
+    }
+    return "${namespace}/${service}"
 }
 
 def resolveImageDigest(repository, tag) {
@@ -125,6 +172,66 @@ def resolveImageDigest(repository, tag) {
 
     echo ">>> Resolved ${imageRef} digest: ${digest}"
     return digest
+}
+
+boolean shouldSignImages(cfg) {
+    return cfg.signImages != null && cfg.signImages.toString().equalsIgnoreCase('true')
+}
+
+void signImageDigest(cfg, String service, String imageRef) {
+    def cosignImage = cfg.cosignImage ?: 'ghcr.io/sigstore/cosign/cosign:v2.4.1'
+    def keyCredentialId = cfg.cosignKeyCredentialId?.trim() ?: 'cosign-private-key'
+    def passwordCredentialId = cfg.cosignPasswordCredentialId?.trim() ?: 'cosign-password'
+    def publicKeyCredentialId = cfg.cosignPublicKeyCredentialId?.trim()
+    def tlogUpload = cfg.cosignTlogUpload != null && cfg.cosignTlogUpload.toString().equalsIgnoreCase('true')
+    def signTlogFlag = tlogUpload ? '--tlog-upload=true' : '--tlog-upload=false'
+    def verifyTlogFlag = tlogUpload ? '' : '--insecure-ignore-tlog=true'
+
+    echo ">>> Signing ${service} image digest with cosign: ${imageRef}"
+
+    withCredentials([
+        string(credentialsId: keyCredentialId, variable: 'COSIGN_PRIVATE_KEY'),
+        string(credentialsId: passwordCredentialId, variable: 'COSIGN_PASSWORD')
+    ]) {
+        withEnv([
+            "COSIGN_IMAGE=${cosignImage}",
+            "COSIGN_IMAGE_REF=${imageRef}",
+            "COSIGN_TLOG_FLAG=${signTlogFlag}"
+        ]) {
+            sh '''
+                set -eu
+                docker run --rm \
+                    -e COSIGN_PASSWORD \
+                    -e COSIGN_PRIVATE_KEY \
+                    -e DOCKER_CONFIG=/docker-config \
+                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
+                    "${COSIGN_IMAGE}" sign --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY "${COSIGN_IMAGE_REF}"
+            '''
+        }
+    }
+
+    if (!publicKeyCredentialId) {
+        echo '>>> COSIGN_PUBLIC_KEY_CREDENTIAL_ID is not set; skipping post-sign verification.'
+        return
+    }
+
+    echo ">>> Verifying cosign signature for ${service}: ${imageRef}"
+    withCredentials([string(credentialsId: publicKeyCredentialId, variable: 'COSIGN_PUBLIC_KEY')]) {
+        withEnv([
+            "COSIGN_IMAGE=${cosignImage}",
+            "COSIGN_IMAGE_REF=${imageRef}",
+            "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
+        ]) {
+            sh '''
+                set -eu
+                docker run --rm \
+                    -e COSIGN_PUBLIC_KEY \
+                    -e DOCKER_CONFIG=/docker-config \
+                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
+                    "${COSIGN_IMAGE}" verify ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY "${COSIGN_IMAGE_REF}"
+            '''
+        }
+    }
 }
 
 def updateGitOpsBranch(cfg, builtList, tag, imageDigests, targetBranch, infraChanged) {
@@ -169,10 +276,13 @@ EOF
                     def fileName = valuesFileForService(cfg, service)
                     def valuesFile = "${gitOpsWorktree}/${cfg.helmValuesDir}/${fileName}"
                     def digest = imageDigests[service] ?: ''
+                    def imageName = imageNameForService(cfg, service)
+                    def repository = resolveRepository(cfg, imageName)
 
                     sh """
                         set -eu
                         test -f '${valuesFile}'
+                        sed -i -E 's#^([[:space:]]*)repository:.*#\\1repository: \"${repository}\"#' '${valuesFile}'
                         sed -i -E 's/^([[:space:]]*)tag:.*/\\1tag: \"${tag}\"/' '${valuesFile}'
                         sed -i -E 's/^([[:space:]]*)digest:.*/\\1digest: \"${digest}\"/' '${valuesFile}'
                     """
@@ -217,7 +327,7 @@ EOF
  * Sync infra/k8s files from the source workspace to the GitOps worktree.
  *
  * Strategy:
- *   1. Save existing image tag/digest from every values file on the GitOps branch.
+ *   1. Save existing image repository/tag/digest from every values file on the GitOps branch.
  *   2. Copy the full infra/k8s directory from the workspace (charts, infra-deps, values).
  *   3. Restore the saved tag/digest so existing deployments keep their current image refs.
  *
@@ -252,37 +362,46 @@ def syncInfraFiles(cfg, gitOpsWorktree) {
 
     echo '>>> infra/k8s files synced.'
 
-    // ── Restore saved image refs so we don't accidentally downgrade tags ──
+    // ── Restore saved image refs so we don't accidentally downgrade registry, tags, or digests ──
     savedRefs.each { service, refs ->
-        if (refs.tag || refs.digest) {
+        if (refs.repository || refs.tag || refs.digest) {
             def fileName = valuesFileForService(cfg, service)
             def valuesFile = "${valuesDir}/${fileName}"
 
             if (sh(script: "test -f '${valuesFile}'", returnStatus: true) == 0) {
+                if (refs.repository) {
+                    sh "sed -i -E 's#^([[:space:]]*)repository:.*#\\1repository: \"${refs.repository}\"#' '${valuesFile}'"
+                }
                 if (refs.tag) {
                     sh "sed -i -E 's/^([[:space:]]*)tag:.*/\\1tag: \"${refs.tag}\"/' '${valuesFile}'"
                 }
                 if (refs.digest) {
                     sh "sed -i -E 's/^([[:space:]]*)digest:.*/\\1digest: \"${refs.digest}\"/' '${valuesFile}'"
                 }
-                echo ">>> Restored image refs for ${service}: tag=${refs.tag}, digest=${refs.digest}"
+                echo ">>> Restored image refs for ${service}: repository=${refs.repository}, tag=${refs.tag}, digest=${refs.digest}"
             }
         }
     }
 }
 
 /**
- * Read the current image tag and digest from a Helm values file.
- * Returns a map [tag: '...', digest: '...'] (either may be empty).
+ * Read the current image repository, tag, and digest from a Helm values file.
+ * Returns a map [repository: '...', tag: '...', digest: '...'] (values may be empty).
  */
 def readImageRefs(valuesFile) {
+    def repository = ''
     def tag = ''
     def digest = ''
 
     def exists = sh(script: "test -f '${valuesFile}'", returnStatus: true)
     if (exists != 0) {
-        return [tag: tag, digest: digest]
+        return [repository: repository, tag: tag, digest: digest]
     }
+
+    repository = sh(
+        script: "grep -E '^[[:space:]]*repository:' '${valuesFile}' | head -1 | sed -E 's/^[[:space:]]*repository:[[:space:]]*//' | tr -d '\"' || true",
+        returnStdout: true
+    ).trim()
 
     tag = sh(
         script: "grep -E '^[[:space:]]*tag:' '${valuesFile}' | head -1 | sed -E 's/^[[:space:]]*tag:[[:space:]]*//' | tr -d '\"' || true",
@@ -294,7 +413,7 @@ def readImageRefs(valuesFile) {
         returnStdout: true
     ).trim()
 
-    return [tag: tag, digest: digest]
+    return [repository: repository, tag: tag, digest: digest]
 }
 
 def pushWithRetry(gitOpsWorktree, targetBranch) {
@@ -324,4 +443,8 @@ def pushWithRetry(gitOpsWorktree, targetBranch) {
     if (!pushed) {
         error("Failed to push GitOps update to branch '${targetBranch}' after 3 attempts.")
     }
+}
+
+String shellQuote(String value) {
+    return "'${value.replace("'", "'\"'\"'")}'"
 }

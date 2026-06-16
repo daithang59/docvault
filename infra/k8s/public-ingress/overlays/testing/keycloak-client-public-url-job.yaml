@@ -1,0 +1,90 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: keycloak-client-public-url
+  namespace: docvault
+  annotations:
+    argocd.argoproj.io/hook: PostSync
+    argocd.argoproj.io/hook-delete-policy: BeforeHookCreation,HookSucceeded
+    checkov.io/skip1: CKV_K8S_22=Keycloak CLI needs write access to write temporary configuration files.
+spec:
+  backoffLimit: 3
+  template:
+    metadata:
+      labels:
+        app: keycloak-client-public-url
+    spec:
+      restartPolicy: Never
+      automountServiceAccountToken: false
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: configure
+          image: quay.io/keycloak/keycloak:26.0
+          imagePullPolicy: Always
+          command:
+            - /bin/sh
+            - -ec
+          args:
+            - |
+              KEYCLOAK_ADMIN="$(cat /secrets/keycloak/KEYCLOAK_ADMIN)"
+              KEYCLOAK_ADMIN_PASSWORD="$(cat /secrets/keycloak/KEYCLOAK_ADMIN_PASSWORD)"
+
+              /opt/keycloak/bin/kcadm.sh config credentials \
+                --server http://keycloak:8080 \
+                --realm master \
+                --user "$KEYCLOAK_ADMIN" \
+                --password "$KEYCLOAK_ADMIN_PASSWORD"
+
+              client_uuid="$(/opt/keycloak/bin/kcadm.sh get clients \
+                -r docvault \
+                -q clientId=docvault-gateway \
+                --fields id \
+                --format csv \
+                --noquotes | tail -n 1)"
+
+              if [ -z "$client_uuid" ]; then
+                echo "Keycloak client docvault-gateway was not found"
+                exit 1
+              fi
+
+              /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
+                -r docvault \
+                -s 'redirectUris=["http://localhost:3000/*","http://localhost:3006/*","http://localhost:3006/api/auth/callback","https://app.docvault.id.vn/*","https://app.docvault.id.vn/api/auth/callback"]' \
+                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]'
+          env:
+            - name: HOME
+              value: /tmp
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: false
+            capabilities:
+              drop:
+                - ALL
+          volumeMounts:
+            - name: tmp
+              mountPath: /tmp
+            - name: keycloak-secret-vol
+              mountPath: /secrets/keycloak
+              readOnly: true
+          resources:
+            limits:
+              cpu: 300m
+              memory: 512Mi
+            requests:
+              cpu: 50m
+              memory: 256Mi
+      volumes:
+        - name: tmp
+          emptyDir: {}
+        - name: keycloak-secret-vol
+          secret:
+            secretName: keycloak-secret

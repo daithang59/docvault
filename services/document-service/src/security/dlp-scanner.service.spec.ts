@@ -1,3 +1,4 @@
+import * as JSZip from 'jszip';
 import { PDFDocument, StandardFonts } from 'pdf-lib';
 import { DlpScannerService } from './dlp-scanner.service';
 
@@ -31,7 +32,6 @@ async function buildDocx(paragraphs: string[]): Promise<Buffer> {
     '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">' +
     `<w:body>${body}</w:body></w:document>`;
 
-  const JSZip = require('jszip');
   const zip = new JSZip();
   zip.file(
     '[Content_Types].xml',

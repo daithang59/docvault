@@ -1,8 +1,11 @@
 FROM node:20-alpine AS base                                                                                   
+ARG ALPINE_SECURITY_REFRESH=manual
 ENV PNPM_HOME="/pnpm"                                                                                         
 ENV PATH="$PNPM_HOME:$PATH"                                                                                   
-RUN corepack enable pnpm                                                                                      
-RUN corepack prepare pnpm@9.15.0 --activate
+RUN echo "alpine-security-refresh=${ALPINE_SECURITY_REFRESH}" && \
+    apk add --no-cache --upgrade libcrypto3 libssl3 && \
+    corepack enable pnpm && \
+    corepack prepare pnpm@9.15.0 --activate
                                                                                                               
 FROM base AS builder                                                                                          
 RUN apk update && apk add --no-cache libc6-compat                                                             

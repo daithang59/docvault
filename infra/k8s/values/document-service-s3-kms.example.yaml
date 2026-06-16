@@ -1,0 +1,23 @@
+# Example production override for document-service on AWS S3 + SSE-KMS.
+# Copy the relevant values into the active document-service values file after
+# applying Terraform and reading its outputs.
+
+env:
+  S3_BUCKET: "docvault-documents-testing-<account-id>"
+  S3_REGION: "ap-southeast-1"
+  S3_SERVER_SIDE_ENCRYPTION: "aws:kms"
+  S3_KMS_KEY_ID: "arn:aws:kms:ap-southeast-1:<account-id>:key/<key-id>"
+  S3_BUCKET_KEY_ENABLED: "true"
+  S3_USE_STATIC_CREDENTIALS: "false"
+  # Override the MinIO defaults from document-service.yaml for native AWS S3.
+  S3_ENDPOINT: ""
+  S3_FORCE_PATH_STYLE: "false"
+
+serviceAccount:
+  create: true
+  name: docvault-document-service
+  automountToken: true
+  annotations:
+    eks.amazonaws.com/role-arn: "arn:aws:iam::<account-id>:role/docvault-eks-document-service-s3"
+
+envValueFrom: []

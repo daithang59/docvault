@@ -135,7 +135,7 @@ Core tables to inspect: `organizations`, `organization_memberships`,
 
 Open: http://localhost:8081
 
-Login: `mongoadmin` / `mongoadminpw`
+Login with `MONGO_EXPRESS_USER` / `MONGO_EXPRESS_PASSWORD` from `infra/.env`.
 
 ## 7. Start Backend
 

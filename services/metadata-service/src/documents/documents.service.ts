@@ -588,7 +588,7 @@ export class DocumentsService {
       throw new ForbiddenException('Only admins can change legal hold');
     }
 
-    const document = await this.findInOrgOrThrow(id, context);
+    await this.findInOrgOrThrow(id, context);
 
     const reason = input.reason?.trim();
     if (input.hold && !reason) {
@@ -765,12 +765,11 @@ export class DocumentsService {
     const approvalStep = (document as any).approvalStep ?? 0;
 
     const canConfigureApprovalChain =
-      document.status === 'DRAFT' ||
-      (document.status === 'PENDING' && approvalStep === 0);
+      document.status === 'PENDING' && approvalStep === 0;
 
     if (!canConfigureApprovalChain) {
       throw new BadRequestException(
-        'Approval chain can only be configured while the document is draft or pending before any approval',
+        'Approval chain can only be configured while the document is pending before any approval',
       );
     }
 

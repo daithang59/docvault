@@ -3,12 +3,14 @@ kind: Application
 metadata:
   name: docvault-infra-deps
   namespace: argocd
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
 spec:
   project: default
   source:
     repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: gitops-testing
-    path: infra/k8s/infra-deps
+    path: infra/k8s/infra-deps/overlays/testing
   destination:
     server: 'https://kubernetes.default.svc'
     namespace: docvault

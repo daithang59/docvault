@@ -3,6 +3,7 @@ import {
   GetObjectCommand,
   PutObjectCommand,
   S3Client,
+  type S3ClientConfig,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, NotFoundException } from '@nestjs/common';
@@ -12,26 +13,47 @@ export class StorageService {
   private readonly bucket = process.env.S3_BUCKET!;
   /**
    * Internal endpoint used for SDK operations (server-to-server).
-   * Default: http://localhost:9000
+   * Set for MinIO/S3-compatible storage. Leave unset for native AWS S3.
    */
-  private readonly endpoint =
-    process.env.S3_ENDPOINT ?? 'http://localhost:9000';
+  private readonly endpoint = process.env.S3_ENDPOINT || undefined;
   /**
    * Public-facing URL used when generating presigned URLs.
-   * Set this to your LAN IP or public domain when deploying.
-   * Default: same as endpoint (works for localhost).
+   * Used only for MinIO/S3-compatible endpoints that are not reachable by
+   * clients through the internal endpoint.
    */
-  private readonly publicUrl = process.env.S3_PUBLIC_URL ?? this.endpoint;
+  private readonly publicUrl = this.endpoint
+    ? (process.env.S3_PUBLIC_URL ?? this.endpoint)
+    : undefined;
+  private readonly serverSideEncryption =
+    process.env.S3_SERVER_SIDE_ENCRYPTION === 'aws:kms'
+      ? ('aws:kms' as const)
+      : undefined;
+  private readonly kmsKeyId = process.env.S3_KMS_KEY_ID || undefined;
+  private readonly bucketKeyEnabled =
+    process.env.S3_BUCKET_KEY_ENABLED === 'true' ? true : undefined;
+  private readonly staticCredentialsEnabled =
+    process.env.S3_USE_STATIC_CREDENTIALS !== 'false';
 
-  private readonly client = new S3Client({
-    region: process.env.S3_REGION ?? 'us-east-1',
-    endpoint: this.endpoint,
-    forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
-    credentials: {
-      accessKeyId: process.env.S3_ACCESS_KEY!,
-      secretAccessKey: process.env.S3_SECRET_KEY!,
-    },
-  });
+  private readonly client = new S3Client(this.buildClientConfig());
+
+  private buildClientConfig(): S3ClientConfig {
+    const accessKeyId = process.env.S3_ACCESS_KEY;
+    const secretAccessKey = process.env.S3_SECRET_KEY;
+    const credentials =
+      this.staticCredentialsEnabled && accessKeyId && secretAccessKey
+        ? {
+            accessKeyId,
+            secretAccessKey,
+          }
+        : undefined;
+
+    return {
+      region: process.env.S3_REGION ?? 'us-east-1',
+      ...(this.endpoint ? { endpoint: this.endpoint } : {}),
+      forcePathStyle: process.env.S3_FORCE_PATH_STYLE === 'true',
+      ...(credentials ? { credentials } : {}),
+    };
+  }
 
   buildObjectKey(docId: string, version: number, filename: string) {
     const safeFilename = filename.replace(/[^a-zA-Z0-9._-]/g, '-');
@@ -51,6 +73,9 @@ export class StorageService {
         Body: params.body,
         ContentType: params.contentType,
         Metadata: params.metadata,
+        ServerSideEncryption: this.serverSideEncryption,
+        SSEKMSKeyId: this.kmsKeyId,
+        BucketKeyEnabled: this.bucketKeyEnabled,
       }),
     );
 
@@ -79,7 +104,7 @@ export class StorageService {
 
     // Replace the internal endpoint with the public-facing URL
     // so the presigned URL works from remote clients (LAN / public).
-    if (this.publicUrl !== this.endpoint) {
+    if (this.endpoint && this.publicUrl && this.publicUrl !== this.endpoint) {
       return signedUrl.replace(this.endpoint, this.publicUrl);
     }
 

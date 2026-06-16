@@ -11,6 +11,14 @@ image:
   tag: "0.1.0"
   digest: ""
 
+imagePullSecrets: []
+
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+  automountToken: false
+
 service:
   type: ClusterIP
   port: 3000
@@ -28,10 +36,21 @@ resources:
 env:
   NODE_ENV: production
 
+envValueFrom: []
+
 envFrom: []
 
 migration:
   enabled: false
   command: "./node_modules/.bin/prisma migrate deploy"
   backoffLimit: 3
+  resources: {}
+
+seed:
+  enabled: false
+  nameSuffix: seed
+  command: "pnpm db:seed"
+  backoffLimit: 1
+  ttlSecondsAfterFinished: null
+  annotations: {}
   resources: {}

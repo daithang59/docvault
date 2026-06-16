@@ -1,0 +1,11 @@
+controller:
+  service:
+    type: LoadBalancer
+    annotations:
+      service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+      service.beta.kubernetes.io/aws-load-balancer-scheme: "internet-facing"
+  
+  config:
+    proxy-body-size: "0"
+    proxy-read-timeout: "900"
+    proxy-send-timeout: "900"

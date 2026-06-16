@@ -1,6 +1,7 @@
 {{- $zeroDigest := "sha256:0000000000000000000000000000000000000000000000000000000000000000" -}}
 {{- $imageDigest := .Values.image.digest | default "" -}}
 {{- $healthPath := .Values.healthPath | default "/health" -}}
+{{- $serviceAccountName := .Values.serviceAccount.name | default .Release.Name -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -18,7 +19,14 @@ spec:
       labels:
         app: {{ .Release.Name }}
     spec:
-      automountServiceAccountToken: false
+      {{- if or .Values.serviceAccount.create .Values.serviceAccount.name }}
+      serviceAccountName: {{ $serviceAccountName | quote }}
+      {{- end }}
+      automountServiceAccountToken: {{ .Values.serviceAccount.automountToken | default false }}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
       securityContext:
         runAsNonRoot: true
         runAsUser: 10001
@@ -31,6 +39,9 @@ spec:
           image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}{{- if and $imageDigest (ne $imageDigest $zeroDigest) }}@{{ $imageDigest }}{{- end }}"
           imagePullPolicy: {{ .Values.image.pullPolicy | default "Always" }}
           securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
             capabilities:
@@ -63,6 +74,9 @@ spec:
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}
+            {{- end }}
+            {{- with .Values.envValueFrom }}
+            {{- toYaml . | nindent 12 }}
             {{- end }}
           {{- with .Values.envFrom }}
           envFrom:

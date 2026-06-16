@@ -753,13 +753,6 @@ describe('DocumentsService approval chain', () => {
 });
 
 describe('DocumentsService purge expired trash', () => {
-  const systemContext = {
-    traceId: 'purge-job',
-    actorId: 'system:trash-purge',
-    roles: ['admin'],
-    authorization: '',
-    ip: '127.0.0.1',
-  };
   const mockFindMany = jest.fn();
   const mockDelete = jest.fn();
   const mockEmitEvent = jest.fn().mockResolvedValue(undefined);

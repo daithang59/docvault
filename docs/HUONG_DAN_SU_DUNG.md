@@ -405,7 +405,7 @@ Script tự động kiểm tra các luồng chính: xác thực, tạo tài li�
   Mở: http://localhost:5555
 
 - **MinIO Console** (xem file đã upload):
-  Mở: http://localhost:9001 — đăng nhập: `minioadmin` / `minioadminpw`
+  Mở: http://localhost:9001 — đăng nhập bằng `MINIO_ROOT_USER` / `MINIO_ROOT_PASSWORD` trong `infra/.env`.
 
 - **Keycloak Admin** (quản lý tài khoản):
-  Mở: http://localhost:8080 — đăng nhập: `admin` / `adminpw`
+  Mở: http://localhost:8080 — đăng nhập bằng `KEYCLOAK_ADMIN` / `KEYCLOAK_ADMIN_PASSWORD` trong `infra/.env`.

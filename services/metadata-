@@ -3,7 +3,7 @@ KEYCLOAK_BASE_URL=http://localhost:8080
 KEYCLOAK_REALM=docvault
 KEYCLOAK_AUDIENCE=docvault-gateway
 
-DATABASE_URL="postgresql://docvault:docvaultpw@localhost:5432/docvault_metadata?schema=public"
+DATABASE_URL="<postgres-metadata-connection-url>"
 AUDIT_SERVICE_URL=http://localhost:3004
 AUDIT_INGEST_TOKEN=replace-with-strong-internal-audit-ingest-token
 DOWNLOAD_GRANT_SECRET=replace-with-strong-download-grant-secret
@@ -21,4 +21,4 @@ PREVIEW_GRANT_SECRET=replace-with-strong-preview-grant-secret
 # KEYCLOAK_BASE_URL). The admin account lives in the master realm and has
 # permission to query the docvault realm via admin-cli.
 KEYCLOAK_ADMIN=admin
-KEYCLOAK_ADMIN_PASSWORD=adminpw
+KEYCLOAK_ADMIN_PASSWORD=<keycloak-admin-password>

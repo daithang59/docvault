@@ -1,63 +1,53 @@
 # `infra/keycloak`
 
-Thu muc nay chua du lieu seed cho Keycloak.
+Thư mục này chứa dữ liệu seed cho Keycloak local. Keycloak là identity provider của DocVault, dùng để phát hành token đăng nhập và gán role cho user demo.
 
-## File hien co
+## File trong thư mục
+
+- `README.md`
+  - Tài liệu giải thích thư mục này.
 
 - `realm-docvault.json`
+  - Realm export cho môi trường local.
+  - Tạo realm `docvault`.
+  - Tạo client `docvault-gateway`.
+  - Tạo roles:
+    - `viewer`
+    - `editor`
+    - `approver`
+    - `co`
+    - `compliance_officer`
+    - `admin`
+  - Tạo users demo:
+    - `viewer1`
+    - `editor1`
+    - `approver1`
+    - `co1`
+    - `admin1`
+    - `co-mfa-demo`
+    - `admin-mfa-demo`
+  - Bật password policy, brute-force protection và TOTP policy để mô phỏng yêu cầu bảo mật.
 
-## Noi dung da seed
+- `seed-roles.sh`
+  - Script idempotent gọi Keycloak Admin REST API.
+  - Đợi realm `docvault` sẵn sàng.
+  - Lấy admin token từ realm `master`.
+  - Tìm user theo username.
+  - Gán role cho các user demo.
+  - Cần thiết vì `start-dev --import-realm` chỉ import realm ở lần khởi tạo đầu tiên; restart container có thể không tự gán lại role như mong muốn.
 
-- Realm `docvault`
-- Client `docvault-gateway`
-- Roles:
-  - `viewer`
-  - `editor`
-  - `approver`
-  - `co`
-  - `admin`
-- Users demo:
-  - `viewer1`
-  - `editor1`
-  - `approver1`
-  - `co1`
-  - `admin1`
+## Cách được dùng trong local
 
-## Cach dung
+`docker-compose.dev.yml` mount `realm-docvault.json` vào container Keycloak và chạy:
 
-File nay duoc mount vao container Keycloak trong `docker-compose.dev.yml` va duoc import tu dong khi container khoi dong voi `start-dev --import-realm`.
+```text
+start-dev --import-realm
+```
 
-## Luu y
+Sau khi Keycloak healthy, service `keycloak-init` chạy `seed-roles.sh` để đảm bảo role mapping đúng.
 
-- Password demo cua cac user la `Passw0rd!`
-- Client secret cua `docvault-gateway` la `dev-gateway-secret`
+## Lưu ý bảo mật
 
-## Bao mat (MFA + brute-force)
-
-Realm da bat cac thiet lap bao mat o cap realm:
-
-- `bruteForceProtected: true` — khoa tam thoi sau 5 lan dang nhap sai (toi da 900s)
-- `passwordPolicy` — toi thieu 8 ky tu, co chu hoa/thuong/so/ky tu dac biet, khac username
-- `otpPolicyType: totp` — chuan TOTP (6 chu so, chu ky 30s)
-
-### MFA bat buoc
-
-Cac user co vai tro dac quyen bi bat buoc cau hinh TOTP khi dang nhap lan dau
-(`requiredActions: ["CONFIGURE_TOTP"]`):
-
-- `admin1` (admin)
-- `co1` (compliance_officer)
-- `admin-mfa-demo`, `co-mfa-demo` (tai khoan demo)
-
-Cac user `viewer1`, `editor1`, `approver1` khong bat buoc MFA.
-
-### Cach kiem thu MFA
-
-1. Khoi dong infra: `docker compose -f infra/docker-compose.dev.yml up keycloak`
-   (neu doi realm sau khi da chay, can `--import-realm` lai hoac xoa volume de re-import)
-2. Dang nhap bang `admin1` / `Passw0rd!`
-3. Keycloak se yeu cau quet QR bang app authenticator (Google Authenticator, Authy...)
-4. Nhap ma 6 chu so de hoan tat — cac lan sau se can ma OTP nay
-
-> Thay doi realm chi co hieu luc khi Keycloak re-import. Container chi import realm
-> mot lan luc tao; xoa volume cua Keycloak roi khoi dong lai de ap dung cau hinh moi.
+- User demo local dùng password mẫu trong realm export.
+- Client secret local là giá trị dev, không dùng cho production.
+- Khi chỉnh realm cho Kubernetes testing, kiểm tra thêm file `infra/k8s/infra-deps/overlays/testing/realm-docvault.json` vì file local và file testing không hoàn toàn giống nhau.

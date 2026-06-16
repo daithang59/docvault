@@ -49,9 +49,14 @@ test-results
 .nyc_output
 Jenkinsfile
 .github/workflows
+.sonar-cache
+.scannerwork
 dependency-check-report
 dependency-check-data
+trivy-fs-report
 trivy-cache
+checkov-report
+zap-report
 
 # --- 7. Infrastructure & Local Dev ---
 infra

@@ -1,4 +1,4 @@
-import { createHmac } from 'crypto';
+import { createHash, createHmac } from 'crypto';
 import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import {
   AclEffect,
@@ -31,6 +31,12 @@ const auditClient = {
 };
 
 const mockOrgService = { requireOrgId: jest.fn().mockResolvedValue('org-1') };
+
+function testGrantKey(label: string) {
+  return createHash('sha256')
+    .update(`docvault-test-fixture:${label}`)
+    .digest('base64url');
+}
 
 const baseContext = {
   traceId: 'trace-1',
@@ -67,11 +73,15 @@ function makeVersion(overrides: Record<string, unknown> = {}) {
 
 describe('PolicyService', () => {
   let service: PolicyService;
+  const downloadGrantKey = testGrantKey('download-grant-default');
+  const previewGrantKey = testGrantKey('preview-grant-default');
+  const currentDownloadGrantKey = testGrantKey('download-grant-2026-05');
+  const currentPreviewGrantKey = testGrantKey('preview-grant-2026-05');
 
   beforeEach(() => {
     jest.clearAllMocks();
-    process.env.DOWNLOAD_GRANT_SECRET = 'test-download-secret';
-    process.env.PREVIEW_GRANT_SECRET = 'test-preview-secret';
+    process.env.DOWNLOAD_GRANT_SECRET = downloadGrantKey;
+    process.env.PREVIEW_GRANT_SECRET = previewGrantKey;
     service = new PolicyService(
       mockPrisma as any,
       auditClient as any,
@@ -124,7 +134,7 @@ describe('PolicyService', () => {
   it('signs download grants with the current kid when rotation env is configured', async () => {
     delete process.env.DOWNLOAD_GRANT_SECRET;
     process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
-    process.env.DOWNLOAD_GRANT_SECRET_2026_05 = 'current-download-secret';
+    process.env.DOWNLOAD_GRANT_SECRET_2026_05 = currentDownloadGrantKey;
 
     const result = await service.authorizeDownload(
       'doc-1',
@@ -137,7 +147,7 @@ describe('PolicyService', () => {
     const tokenPayload = JSON.parse(
       Buffer.from(encodedPayload, 'base64url').toString('utf8'),
     );
-    const expectedSignature = createHmac('sha256', 'current-download-secret')
+    const expectedSignature = createHmac('sha256', currentDownloadGrantKey)
       .update(encodedPayload)
       .digest('base64url');
 
@@ -148,7 +158,7 @@ describe('PolicyService', () => {
   it('signs preview grants with the current kid when rotation env is configured', async () => {
     delete process.env.PREVIEW_GRANT_SECRET;
     process.env.GRANT_TOKEN_CURRENT_KID = '2026_05';
-    process.env.PREVIEW_GRANT_SECRET_2026_05 = 'current-preview-secret';
+    process.env.PREVIEW_GRANT_SECRET_2026_05 = currentPreviewGrantKey;
 
     const result = await service.authorizePreview(
       'doc-1',
@@ -161,7 +171,7 @@ describe('PolicyService', () => {
     const tokenPayload = JSON.parse(
       Buffer.from(encodedPayload, 'base64url').toString('utf8'),
     );
-    const expectedSignature = createHmac('sha256', 'current-preview-secret')
+    const expectedSignature = createHmac('sha256', currentPreviewGrantKey)
       .update(encodedPayload)
       .digest('base64url');
 
@@ -730,8 +740,6 @@ describe('PolicyService', () => {
   });
 
   describe('share link grants', () => {
-    const { createHash } = require('crypto');
-
     function activeShareLink(overrides = {}) {
       return {
         id: 'link-1',

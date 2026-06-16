@@ -13,6 +13,9 @@ import {
 
 type TestFn = () => void;
 
+const localAuditMongoUrl =
+  'mongodb://localhost:27017/docvault_audit?authSource=admin';
+
 function test(name: string, fn: TestFn) {
   try {
     fn();
@@ -58,7 +61,6 @@ function makeEvent(
       reason: event.reason,
       ip: event.ip,
       traceId: event.traceId,
-      metadata: undefined,
     }),
   );
 
@@ -75,10 +77,7 @@ test('requires the explicit tamper demo environment flag', () => {
 
 test('allows only local MongoDB URLs unless the second override is explicit', () => {
   assert.equal(
-    assertLocalMongoUrl(
-      'mongodb://root:rootpw@localhost:27017/docvault_audit?authSource=admin',
-      {},
-    ).overrideUsed,
+    assertLocalMongoUrl(localAuditMongoUrl, {}).overrideUsed,
     false,
   );
   assert.equal(

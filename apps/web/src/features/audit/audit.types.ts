@@ -29,14 +29,19 @@ export type AuditActionGroup =
 
 export interface AuditQueryFilters extends PaginationParams {
   actorId?: string;
+  actorIds?: string[];
   action?: string;
+  actions?: string[];
   actionGroup?: AuditActionGroup;
   result?: AuditResult;
   resourceId?: string;
   resourceType?: string;
   documentId?: string;
+  documentIds?: string[];
   aclId?: string;
   recommendationId?: string;
+  recommendationIds?: string[];
+  classifications?: string[];
   from?: string;
   to?: string;
   limit?: number;
