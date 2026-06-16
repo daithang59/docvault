@@ -1,33 +1,37 @@
-# NGINX Ingress Controller for AWS EKS
+# `infra/k8s/ingress-nginx`
 
-This directory contains the configurations and deployment instructions for NGINX Ingress Controller on AWS EKS.
+Thư mục này chứa cấu hình và hướng dẫn cài ingress-nginx controller trên AWS EKS. Controller này nhận traffic public từ AWS Load Balancer rồi route vào các Kubernetes Service.
 
-## Deployment Instructions
+## File trong thư mục
 
-To install or upgrade the NGINX Ingress Controller using Helm:
+- `README.md`
+  - Tài liệu giải thích thư mục này.
+
+- `values-eks.yaml`
+  - Values dùng khi cài Helm chart `ingress-nginx/ingress-nginx`.
+  - Đặt controller service type là `LoadBalancer`.
+  - Dùng AWS Network Load Balancer bằng annotation `service.beta.kubernetes.io/aws-load-balancer-type: nlb`.
+  - Đặt NLB internet-facing.
+  - Cấu hình `proxy-body-size: "0"` để không giới hạn body ở controller level.
+  - Tăng timeout đọc/gửi lên `900` giây cho request dài hoặc upload lớn.
+
+## Cài đặt
 
 ```powershell
-# Add helm repository
 helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
 helm repo update
 
-# Install/upgrade
 helm upgrade --install ingress-nginx ingress-nginx/ingress-nginx `
   --namespace ingress-nginx `
   --create-namespace `
   -f infra/k8s/ingress-nginx/values-eks.yaml
 ```
 
-## Verification
-
-Once installed, check that the controller pods are running and fetch the external AWS Load Balancer (NLB) address:
+## Kiểm tra
 
 ```powershell
-# Check pods
 kubectl get pods -n ingress-nginx
-
-# Get LoadBalancer DNS name
 kubectl get svc ingress-nginx-controller -n ingress-nginx
 ```
 
-Use the output external hostname for mapping DNS (e.g., in Cloudflare) to route traffic to the ingress.
+Hostname LoadBalancer lấy từ service `ingress-nginx-controller` sẽ được dùng để cấu hình DNS ở Cloudflare.

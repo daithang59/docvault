@@ -13,6 +13,12 @@ image:
 
 imagePullSecrets: []
 
+serviceAccount:
+  create: false
+  name: ""
+  annotations: {}
+  automountToken: false
+
 service:
   type: ClusterIP
   port: 3000
