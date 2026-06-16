@@ -1,3 +1,5 @@
+data "aws_caller_identity" "current" {}
+
 locals {
   documents_bucket_name              = "docvault-documents-${var.environment}-${data.aws_caller_identity.current.account_id}"
   document_service_namespace         = "docvault"
@@ -10,7 +12,7 @@ resource "aws_kms_key" "documents_s3" {
   deletion_window_in_days = 30
   enable_key_rotation     = true
 
-  tags = merge(local.tags, {
+  tags = merge(var.tags, {
     Name = "docvault-documents-s3-${var.environment}"
   })
 }
@@ -23,7 +25,7 @@ resource "aws_kms_alias" "documents_s3" {
 resource "aws_s3_bucket" "documents" {
   bucket = local.documents_bucket_name
 
-  tags = merge(local.tags, {
+  tags = merge(var.tags, {
     Name = local.documents_bucket_name
   })
 }
@@ -136,18 +138,18 @@ data "aws_iam_policy_document" "document_service_assume_role" {
 
     principals {
       type        = "Federated"
-      identifiers = [module.eks.oidc_provider_arn]
+      identifiers = [var.oidc_provider_arn]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${module.eks.oidc_provider}:aud"
+      variable = "${var.oidc_provider}:aud"
       values   = ["sts.amazonaws.com"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${module.eks.oidc_provider}:sub"
+      variable = "${var.oidc_provider}:sub"
       values = [
         "system:serviceaccount:${local.document_service_namespace}:${local.document_service_service_account}",
       ]
@@ -156,9 +158,9 @@ data "aws_iam_policy_document" "document_service_assume_role" {
 }
 
 resource "aws_iam_role" "document_service" {
-  name               = "${local.name}-document-service-s3"
+  name               = "${var.name}-document-service-s3"
   assume_role_policy = data.aws_iam_policy_document.document_service_assume_role.json
-  tags               = local.tags
+  tags               = var.tags
 }
 
 data "aws_iam_policy_document" "document_service_s3" {
@@ -232,27 +234,12 @@ data "aws_iam_policy_document" "document_service_s3" {
 }
 
 resource "aws_iam_policy" "document_service_s3" {
-  name   = "${local.name}-document-service-s3"
+  name   = "${var.name}-document-service-s3"
   policy = data.aws_iam_policy_document.document_service_s3.json
-  tags   = local.tags
+  tags   = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "document_service_s3" {
   role       = aws_iam_role.document_service.name
   policy_arn = aws_iam_policy.document_service_s3.arn
-}
-
-output "documents_bucket_name" {
-  description = "S3 bucket used by document-service for document blobs."
-  value       = aws_s3_bucket.documents.bucket
-}
-
-output "documents_kms_key_arn" {
-  description = "KMS key ARN used for S3 SSE-KMS document encryption."
-  value       = aws_kms_key.documents_s3.arn
-}
-
-output "document_service_role_arn" {
-  description = "IAM role ARN for the document-service Kubernetes service account."
-  value       = aws_iam_role.document_service.arn
 }

@@ -7,6 +7,10 @@ environment     = "testing"
 # for example ["203.0.113.10/32"].
 cluster_endpoint_public_access_cidrs = ["0.0.0.0/0"]
 
+# CIDRs allowed to reach NodePort services for web and Keycloak.
+# For a stricter setup, replace this with your workstation public IP CIDR.
+nodeport_access_cidrs = ["0.0.0.0/0"]
+
 node_instance_types = ["t3.large"]
 node_desired_size   = 2
 node_min_size       = 1

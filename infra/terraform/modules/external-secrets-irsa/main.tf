@@ -16,18 +16,18 @@ data "aws_iam_policy_document" "external_secrets_assume_role" {
 
     principals {
       type        = "Federated"
-      identifiers = [module.eks.oidc_provider_arn]
+      identifiers = [var.oidc_provider_arn]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${module.eks.oidc_provider}:aud"
+      variable = "${var.oidc_provider}:aud"
       values   = ["sts.amazonaws.com"]
     }
 
     condition {
       test     = "StringEquals"
-      variable = "${module.eks.oidc_provider}:sub"
+      variable = "${var.oidc_provider}:sub"
       values = [
         "system:serviceaccount:${local.external_secrets_namespace}:${local.external_secrets_service_account}",
       ]
@@ -36,9 +36,9 @@ data "aws_iam_policy_document" "external_secrets_assume_role" {
 }
 
 resource "aws_iam_role" "external_secrets" {
-  name               = "${local.name}-external-secrets"
+  name               = "${var.name}-external-secrets"
   assume_role_policy = data.aws_iam_policy_document.external_secrets_assume_role.json
-  tags               = local.tags
+  tags               = var.tags
 }
 
 data "aws_iam_policy_document" "external_secrets" {
@@ -59,9 +59,9 @@ data "aws_iam_policy_document" "external_secrets" {
 }
 
 resource "aws_iam_policy" "external_secrets" {
-  name   = "${local.name}-external-secrets"
+  name   = "${var.name}-external-secrets"
   policy = data.aws_iam_policy_document.external_secrets.json
-  tags   = local.tags
+  tags   = var.tags
 }
 
 resource "aws_iam_role_policy_attachment" "external_secrets" {

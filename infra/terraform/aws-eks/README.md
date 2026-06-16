@@ -1,17 +1,18 @@
 # `infra/terraform/aws-eks`
 
-Thư mục này chứa Terraform stack tạo nền tảng AWS EKS cho DocVault GitOps demo.
+Thư mục này là root Terraform stack tạo nền tảng AWS EKS cho DocVault GitOps demo.
+Resource implementation được tách thành local modules dưới `infra/terraform/modules`.
 
 ## Stack này tạo gì?
 
-- VPC với public/private subnet trên 2 Availability Zone.
-- EKS cluster.
-- EKS managed node group.
+- VPC với public/private subnet trên 2 Availability Zone qua module `network`.
+- EKS cluster, managed node group, add-ons và NodePort security group rules qua module `eks-cluster`.
 - EKS add-ons: CoreDNS, kube-proxy, VPC CNI, AWS EBS CSI driver.
 - Control plane logs: `api`, `audit`, `authenticator`, `controllerManager`, `scheduler`.
 - Node group dùng IMDSv2 bắt buộc và encrypted gp3 root volume.
-- IAM role cho External Secrets Operator đọc AWS Secrets Manager.
-- Tùy chọn IAM Roles Anywhere cho Jenkins local/controller VM.
+- IAM role cho External Secrets Operator đọc AWS Secrets Manager qua module `external-secrets-irsa`.
+- S3 bucket/KMS key và IRSA role cho `document-service` qua module `documents-storage`.
+- Tùy chọn IAM Roles Anywhere cho Jenkins local/controller VM qua module `jenkins-roles-anywhere`.
 
 ## File trong thư mục
 
@@ -63,7 +64,31 @@ Thư mục này chứa Terraform stack tạo nền tảng AWS EKS cho DocVault G
   - Xuất lệnh `aws eks update-kubeconfig`.
   - Xuất node group info.
   - Xuất External Secrets role ARN.
+  - Xuất document storage bucket/KMS/role ARN.
   - Xuất Jenkins Roles Anywhere ARN nếu tính năng được bật.
+
+- `moved.tf`
+  - Khai báo state moves từ cấu trúc root cũ sang local modules mới.
+  - Giữ lại file này sau lần refactor để các environment/state cũ không bị Terraform hiểu nhầm là xóa/tạo lại resource.
+
+## Local modules
+
+- `../modules/network`
+  - Bọc module upstream `terraform-aws-vpc`.
+  - Tạo VPC, public/private subnets, DNS settings và subnet tags cho Kubernetes load balancer.
+
+- `../modules/eks-cluster`
+  - Bọc module upstream `terraform-aws-eks`.
+  - Tạo EKS control plane, managed node group, add-ons và NodePort ingress rules cho web/Keycloak.
+
+- `../modules/external-secrets-irsa`
+  - Tạo IAM role/policy cho service account `external-secrets/external-secrets`.
+
+- `../modules/documents-storage`
+  - Tạo S3 bucket, KMS key, bucket policy và IAM role/policy cho `docvault/document-service`.
+
+- `../modules/jenkins-roles-anywhere`
+  - Tạo trust anchor, profile, role và policy tùy chọn cho Jenkins IAM Roles Anywhere.
 
 ## Cách chạy
 
@@ -76,6 +101,8 @@ terraform validate
 terraform plan -out tfplan
 terraform apply tfplan
 ```
+
+Sau lần refactor module đầu tiên, đọc kỹ `terraform plan`; kết quả mong muốn là Terraform báo resource đã được moved sang địa chỉ module mới, không recreate EKS, S3, KMS hoặc IAM resources.
 
 Quét cấu hình bằng Checkov nếu có cài:
 
