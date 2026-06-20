@@ -1,4 +1,4 @@
-@Library('docvault@feat/web-deployment') _
+@Library('docvault@fix/web-seed-job-main-sync') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -575,14 +575,18 @@ def runPnpmTask(cfg, String taskName) {
 
     echo ">>> Running pnpm ${taskName}..."
     def pnpmStoreVolume = cfg.pnpmStoreVolume ?: 'docvault-pnpm-store'
+    def turboCacheVolume = cfg.turboCacheVolume ?: 'docvault-turbo-cache'
 
     sh """
         set -eu
         docker volume create '${pnpmStoreVolume}' >/dev/null
+        docker volume create '${turboCacheVolume}' >/dev/null
         docker run --rm \\
             --network host \\
+            -e TURBO_CACHE_DIR=/app/.turbo \\
             -v ${env.WORKSPACE}:/app \\
             -v ${pnpmStoreVolume}:/pnpm/store \\
+            -v ${turboCacheVolume}:/app/.turbo \\
             -w /app \\
             ${cfg.nodeImage} \\
             sh -c "corepack enable && pnpm config set store-dir /pnpm/store && pnpm ${taskName}"
