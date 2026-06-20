@@ -22,3 +22,7 @@ env:
   KEYCLOAK_CLIENT_ID: "docvault-gateway"
   FRONTEND_URL: "https://app.docvault.id.vn"
   KEYCLOAK_BROWSER_BASE_URL: "https://auth.docvault.id.vn"
+
+envFrom:
+  - secretRef:
+      name: docvault-app-secrets

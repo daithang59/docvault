@@ -56,10 +56,16 @@ spec:
               /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
                 -r docvault \
                 -s 'redirectUris=["http://localhost:3000/*","http://localhost:3006/*","http://localhost:3006/api/auth/callback","https://app.docvault.id.vn/*","https://app.docvault.id.vn/api/auth/callback"]' \
-                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]'
+                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]' \
+                -s "secret=$KEYCLOAK_CLIENT_SECRET"
           env:
             - name: HOME
               value: /tmp
+            - name: KEYCLOAK_CLIENT_SECRET
+              valueFrom:
+                secretKeyRef:
+                  name: docvault-app-secrets
+                  key: KEYCLOAK_CLIENT_SECRET
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
