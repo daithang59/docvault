@@ -34,6 +34,7 @@ spec:
             - |
               KEYCLOAK_ADMIN="$(cat /secrets/keycloak/KEYCLOAK_ADMIN)"
               KEYCLOAK_ADMIN_PASSWORD="$(cat /secrets/keycloak/KEYCLOAK_ADMIN_PASSWORD)"
+              CLIENT_SECRET="$(cat /secrets/app/KEYCLOAK_CLIENT_SECRET)"
 
               /opt/keycloak/bin/kcadm.sh config credentials \
                 --server http://keycloak:8080 \
@@ -55,6 +56,7 @@ spec:
 
               /opt/keycloak/bin/kcadm.sh update "clients/$client_uuid" \
                 -r docvault \
+                -s "secret=$CLIENT_SECRET" \
                 -s 'redirectUris=["http://localhost:3000/*","http://localhost:3006/*","http://localhost:3006/api/auth/callback","https://app.docvault.id.vn/*","https://app.docvault.id.vn/api/auth/callback"]' \
                 -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]'
           env:
@@ -75,6 +77,9 @@ spec:
             - name: keycloak-secret-vol
               mountPath: /secrets/keycloak
               readOnly: true
+            - name: app-secret-vol
+              mountPath: /secrets/app
+              readOnly: true
           resources:
             limits:
               cpu: 300m
@@ -88,3 +93,9 @@ spec:
         - name: keycloak-secret-vol
           secret:
             secretName: keycloak-secret
+        - name: app-secret-vol
+          secret:
+            secretName: docvault-app-secrets
+            items:
+              - key: KEYCLOAK_CLIENT_SECRET
+                path: KEYCLOAK_CLIENT_SECRET
