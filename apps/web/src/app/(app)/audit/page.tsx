@@ -7,6 +7,7 @@ import { useAuth } from '@/lib/auth/auth-context';
 import { useAuditQuery } from '@/lib/hooks/use-audit';
 import {
   getSecuritySummary,
+  queryAuditLogWindow,
   sealAuditChainAndStartEpoch,
   verifyAuditChain,
 } from '@/features/audit/audit.api';
@@ -50,6 +51,8 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 
+const AUTHORIZED_ACCESS_PAGE_SIZE = 100;
+
 export default function AuditPage() {
   const { session } = useAuth();
   const searchParams = useSearchParams();
@@ -85,6 +88,32 @@ export default function AuditPage() {
     enabled: hasAccess,
     staleTime: 5 * 60 * 1000,
   });
+  const downloadAuthorizedQuery = useQuery({
+    queryKey: auditKeys.query({
+      action: 'DOCUMENT_DOWNLOAD_AUTHORIZED',
+      page: 1,
+      pageSize: AUTHORIZED_ACCESS_PAGE_SIZE,
+    }),
+    queryFn: () =>
+      queryAuditLogWindow(
+        { action: 'DOCUMENT_DOWNLOAD_AUTHORIZED' },
+        { pageSize: AUTHORIZED_ACCESS_PAGE_SIZE },
+      ),
+    enabled: hasAccess,
+  });
+  const previewAuthorizedQuery = useQuery({
+    queryKey: auditKeys.query({
+      action: 'DOCUMENT_PREVIEW_AUTHORIZED',
+      page: 1,
+      pageSize: AUTHORIZED_ACCESS_PAGE_SIZE,
+    }),
+    queryFn: () =>
+      queryAuditLogWindow(
+        { action: 'DOCUMENT_PREVIEW_AUTHORIZED' },
+        { pageSize: AUTHORIZED_ACCESS_PAGE_SIZE },
+      ),
+    enabled: hasAccess,
+  });
 
   const total = logs?.total ?? 0;
   const totalPages = Math.max(1, Math.ceil(total / pageSize));
@@ -92,8 +121,15 @@ export default function AuditPage() {
   const activeEpoch = displayedChainStatus?.activeEpoch;
   const compromisedEpochs = displayedChainStatus?.compromisedEpochs ?? [];
   const securityDashboardModel = useMemo(
-    () => buildSecurityDashboardModel(securitySummary),
-    [securitySummary],
+    () =>
+      buildSecurityDashboardModel(securitySummary, {
+        downloadAuthorizedTotal: downloadAuthorizedQuery.data?.total ?? 0,
+        sensitiveAccessEvents: [
+          ...(downloadAuthorizedQuery.data?.data ?? []),
+          ...(previewAuthorizedQuery.data?.data ?? []),
+        ],
+      }),
+    [securitySummary, downloadAuthorizedQuery.data, previewAuthorizedQuery.data],
   );
   const repeatedDenyActorIds = useMemo(
     () => (securitySummary?.repeatedDenyActors ?? []).map((a) => a.actorId),
@@ -107,7 +143,11 @@ export default function AuditPage() {
     setRecoveryMessage(null);
     try {
       setChainStatus(await verifyAuditChain());
-      await refetchSummary();
+      await Promise.all([
+        refetchSummary(),
+        downloadAuthorizedQuery.refetch(),
+        previewAuthorizedQuery.refetch(),
+      ]);
     } catch {
       setVerifyChainError('Audit chain verification failed.');
     } finally {
@@ -128,7 +168,12 @@ export default function AuditPage() {
       setRecoveryReason('');
       setRecoveryMessage(`New active epoch ${result.newEpoch.epochId} started.`);
       setChainStatus(await verifyAuditChain());
-      await Promise.all([refetchSummary(), refetch()]);
+      await Promise.all([
+        refetchSummary(),
+        refetch(),
+        downloadAuthorizedQuery.refetch(),
+        previewAuthorizedQuery.refetch(),
+      ]);
     } catch {
       setRecoveryError('Failed to seal audit epoch.');
     } finally {
