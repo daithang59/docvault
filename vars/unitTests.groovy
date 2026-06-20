@@ -9,6 +9,7 @@ def call(cfg) {
         docker volume create '${turboCacheVolume}' >/dev/null
         docker run --rm \\
             --network host \\
+            -e TURBO_CACHE_DIR=/app/.turbo \\
             -v ${env.WORKSPACE}:/app \\
             -v ${pnpmStoreVolume}:/pnpm/store \\
             -v ${turboCacheVolume}:/app/.turbo \\

@@ -2,9 +2,9 @@
 namespace: docvault
 
 image:
-  repository: daithang59/workflow-service
-  tag: "v33"
-  digest: "sha256:e54ad10f7a66aa15e49ff21dce979d4906bf0c6891a8d3ec022ac01b993cc1ed"
+  repository: "harbor.docvault.id.vn/docvault-dev/workflow-service"
+  tag: "v9-ad76f1e1bd85"
+  digest: "sha256:b1f18c80a805cb7264c4ea9a1df54a759eef40640f71bde4230177ea93fef3b9"
 
 healthPath: /health
 

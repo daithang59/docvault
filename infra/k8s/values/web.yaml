@@ -2,9 +2,9 @@
 namespace: docvault
 
 image:
-  repository: daithang59/docvault
-  tag: "v33"
-  digest: "sha256:fab71c1e6717778a8a40cb6817b9bc67f5baafbb488687e153524c2b707970a9"
+  repository: "harbor.docvault.id.vn/docvault-dev/docvault"
+  tag: "v8-2019b9dcef2e"
+  digest: "sha256:eaee67d14cb348e5ca3089ad14d24b75351dce36d2e7944db17cf3b3ad8e4672"
 
 healthPath: /api/health
 
@@ -22,3 +22,7 @@ env:
   KEYCLOAK_CLIENT_ID: "docvault-gateway"
   FRONTEND_URL: "https://app.docvault.id.vn"
   KEYCLOAK_BROWSER_BASE_URL: "https://auth.docvault.id.vn"
+
+envFrom:
+  - secretRef:
+      name: docvault-app-secrets
