@@ -34,6 +34,7 @@ spec:
             - |
               KEYCLOAK_ADMIN="$(cat /secrets/keycloak/KEYCLOAK_ADMIN)"
               KEYCLOAK_ADMIN_PASSWORD="$(cat /secrets/keycloak/KEYCLOAK_ADMIN_PASSWORD)"
+              KEYCLOAK_CLIENT_SECRET="$(cat /secrets/app/KEYCLOAK_CLIENT_SECRET)"
 
               /opt/keycloak/bin/kcadm.sh config credentials \
                 --server http://keycloak:8080 \
@@ -61,11 +62,6 @@ spec:
           env:
             - name: HOME
               value: /tmp
-            - name: KEYCLOAK_CLIENT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: docvault-app-secrets
-                  key: KEYCLOAK_CLIENT_SECRET
           securityContext:
             runAsNonRoot: true
             runAsUser: 10001
@@ -81,6 +77,9 @@ spec:
             - name: keycloak-secret-vol
               mountPath: /secrets/keycloak
               readOnly: true
+            - name: docvault-app-secrets-vol
+              mountPath: /secrets/app
+              readOnly: true
           resources:
             limits:
               cpu: 300m
@@ -94,3 +93,6 @@ spec:
         - name: keycloak-secret-vol
           secret:
             secretName: keycloak-secret
+        - name: docvault-app-secrets-vol
+          secret:
+            secretName: docvault-app-secrets
