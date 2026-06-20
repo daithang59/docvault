@@ -209,6 +209,19 @@
       "requiredActions": ["CONFIGURE_TOTP"],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["admin"]
+    },
+    {
+      "username": "service-account-docvault-gateway",
+      "enabled": true,
+      "serviceAccountClientId": "docvault-gateway",
+      "clientRoles": {
+        "realm-management": [
+          "query-groups",
+          "query-users",
+          "view-realm",
+          "view-users"
+        ]
+      }
     }
   ]
 }
