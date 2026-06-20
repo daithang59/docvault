@@ -1,8 +1,8 @@
-# DocVault S3 + KMS Cutover Runbook
+# DocVault S3 + KMS Local Cutover Runbook
 
 Updated: 2026-06-16
 
-Runbook nay huong dan chuyen `document-service` tu MinIO trong Kubernetes sang Amazon S3 + AWS KMS tren EKS.
+Runbook nay huong dan chuyen `document-service` tu MinIO trong Kubernetes sang Amazon S3 + AWS KMS tren EKS khi operator tu thao tac tren may ca nhan. Khong dung Jenkins pipeline trong quy trinh nay.
 
 Muc tieu cuoi cung:
 
@@ -13,11 +13,16 @@ Muc tieu cuoi cung:
 
 ## 1. Ket Luan Ngan Gon
 
-Jenkins storage job thuong chi can chay 1 lan cho moi environment de bootstrap S3/KMS/IAM role va cap nhat GitOps values. Job co the chay lai neu Terraform storage thay doi, cluster/environment duoc tao lai, hoac can dong bo lai values tu Terraform outputs.
+Voi cach local/manual, ban se lam 4 nhom viec:
 
-Job nay khong tu dong xoa MinIO. MinIO dang chay trong namespace `docvault` se con ton tai cho den khi GitOps infra overlay va Kubernetes resource duoc cleanup rieng.
+1. Tu may ca nhan chay Terraform tao S3/KMS/IAM role.
+2. Neu can giu file cu, mirror object tu MinIO sang S3.
+3. Cap nhat `infra/k8s/values/document-service.yaml` bang Terraform outputs va push vao branch GitOps `gitops-testing`.
+4. De Argo CD sync `docvault-document-service`, sau do verify upload/download va SSE-KMS.
 
-Khong can chay lai job chi de rotate KMS key. KMS automatic rotation do AWS quan ly.
+MinIO dang chay trong namespace `docvault` se khong tu mat di. No van ton tai cho den khi ban cleanup GitOps infra overlay va Kubernetes resource rieng.
+
+Khong can chay lai quy trinh nay chi de rotate KMS key. KMS automatic rotation do AWS quan ly.
 
 ## 2. Hien Trang Cluster Hien Tai
 
@@ -63,11 +68,43 @@ Vi vay sau khi switch app sang S3, MinIO van tiep tuc chay neu GitOps infra over
 
 ## 3. Dieu Kien Truoc Khi Cutover
 
-Kiem tra cac dieu kien nay truoc khi chay apply:
+Tren may ca nhan can co cac tool:
 
-- Branch ma Jenkins doc da co `Jenkinsfile.storage`.
-- Jenkins shared library da co `vars/documentStorageGitOps.groovy`.
-- Terraform `infra/terraform/aws-eks` da expose outputs:
+- `aws`
+- `terraform`
+- `kubectl`
+- `helm`
+- `yq`
+- `git`
+- `mc` neu can migrate object tu MinIO sang S3
+- `argocd` optional, co the sync bang Argo CD UI neu khong cai CLI
+
+Kiem tra nhanh:
+
+```powershell
+aws --version
+terraform version
+kubectl version --client
+helm version
+yq --version
+git --version
+```
+
+Neu can cai `yq` tren Windows:
+
+```powershell
+winget install mikefarah.yq
+```
+
+Neu can cai MinIO client `mc`:
+
+```powershell
+winget install MinIO.Client
+```
+
+Repo/code can co:
+
+- Terraform `infra/terraform/aws-eks` expose outputs:
   - `documents_bucket_name`
   - `documents_kms_key_arn`
   - `document_service_role_arn`
@@ -78,99 +115,126 @@ Kiem tra cac dieu kien nay truoc khi chay apply:
   - `S3_KMS_KEY_ID`
   - `S3_BUCKET_KEY_ENABLED=true`
 - Helm chart da support `serviceAccount` va `automountServiceAccountToken`.
-- Jenkins agent co cac lenh:
-  - `terraform`
-  - `yq`
-  - `helm`
-  - `git`
-- Jenkins co AWS credentials tam thoi de chay Terraform. Voi setup hien tai, uu tien IAM Roles Anywhere theo `docs/jenkins_iam_roles_anywhere.md`.
-- Jenkins credential `github-credentials` co quyen push branch GitOps, vi job se commit values len `gitops-testing`.
-- Terraform remote backend da san sang neu day la environment dung chung. Khong nen de Jenkins apply tren local state.
+- Terraform remote backend da san sang neu environment nay co the duoc thao tac tu nhieu may. Khong nen dung local state cho environment dung chung.
 
-## 4. Tao Jenkins Storage Job
+## 4. Chuan Bi Local Session
 
-Tao mot Jenkins Pipeline job rieng, khong dung job CD app chinh.
+Mo PowerShell tai thu muc goc repo:
 
-1. Vao Jenkins -> New Item.
-2. Dat ten, vi du:
-
-```text
-docvault-document-storage-gitops
+```powershell
+cd C:\Users\THANG\docvault-devsecops
 ```
 
-3. Chon `Pipeline`.
-4. Cau hinh Pipeline:
+Set region:
 
-```text
-Definition: Pipeline script from SCM
-SCM: Git
-Repository URL: https://github.com/daithang59/docvault.git
-Credentials: credential Git cua repo
-Branch Specifier: */main
-Script Path: Jenkinsfile.storage
+```powershell
+$env:AWS_REGION = "ap-southeast-1"
+$env:AWS_DEFAULT_REGION = "ap-southeast-1"
 ```
 
-Neu `Jenkinsfile.storage` chua merge vao `main`, tro `Branch Specifier` den branch dang chua file nay.
+Neu dung AWS profile rieng:
 
-Lan dau bam `Build Now` de Jenkins load parameters. Tu lan sau dung `Build with Parameters`.
-
-## 5. Chay Plan Truoc
-
-Chay job voi:
-
-```text
-GITOPS_BRANCH=gitops-testing
-AWS_REGION=ap-southeast-1
-APPLY_DOCUMENT_STORAGE_TERRAFORM=false
-DOCUMENT_STORAGE_REQUIRE_APPROVAL=true
-DOCUMENT_STORAGE_VALUES_FILE=infra/k8s/values/document-service.yaml
+```powershell
+$env:AWS_PROFILE = "docvault"
 ```
 
-Ket qua mong doi:
+Kiem tra AWS identity:
 
-- Jenkins chay `terraform init`.
-- Jenkins chay `terraform fmt -check -recursive`.
-- Jenkins chay `terraform validate`.
-- Jenkins chay `terraform plan -out=tfplan`.
-- Job dung lai sau plan va khong sua GitOps values.
-
-Neu plan co thay doi ngoai S3/KMS/IAM role document-service, dung lai va review truoc khi apply.
-
-## 6. Neu Khong Can Giu File Cu Trong MinIO
-
-Day la luong nhanh cho lab/demo neu file cu trong MinIO khong quan trong.
-
-1. Chay Jenkins storage job voi:
-
-```text
-APPLY_DOCUMENT_STORAGE_TERRAFORM=true
-DOCUMENT_STORAGE_REQUIRE_APPROVAL=true
+```powershell
+aws sts get-caller-identity
 ```
 
-2. Approve Jenkins input.
-3. Job se:
+Kiem tra kubectl context:
 
-```text
-terraform apply tfplan
-terraform output -raw documents_bucket_name
-terraform output -raw documents_kms_key_arn
-terraform output -raw document_service_role_arn
-clone branch gitops-testing
-cap nhat infra/k8s/values/document-service.yaml
-helm lint
-helm template
-commit va push [skip ci]
+```powershell
+kubectl config current-context
+kubectl get ns
+kubectl -n docvault get svc minio
+kubectl -n docvault get pods
 ```
 
-4. Doi Argo CD sync `docvault-document-service`.
-5. Kiem tra upload/download file moi tren app.
-6. Giu MinIO trong rollback window. Khong xoa MinIO ngay.
+Neu can refresh kubeconfig tu Terraform output:
 
-## 7. Neu Can Giu File Cu Trong MinIO
+```powershell
+terraform -chdir=infra\terraform\aws-eks output -raw configure_kubectl
+```
 
-Neu MinIO dang co file can giu, can migrate object sang S3 truoc khi mo lai traffic binh thuong.
+Lenh output co dang:
 
-### 7.1 Chon thoi diem maintenance
+```text
+aws eks update-kubeconfig --region ap-southeast-1 --name <cluster-name>
+```
+
+Chay lenh do tren may ca nhan neu kubectl chua tro dung cluster.
+
+## 5. Chay Terraform Plan Tren May Ca Nhan
+
+Chay init/fmt/validate/plan:
+
+```powershell
+terraform -chdir=infra\terraform\aws-eks init -input=false
+terraform -chdir=infra\terraform\aws-eks fmt -check -recursive
+terraform -chdir=infra\terraform\aws-eks validate
+terraform -chdir=infra\terraform\aws-eks plan -input=false -out=tfplan
+```
+
+Doc plan truoc khi apply. Ky vong thay doi chinh nam o:
+
+- S3 document bucket
+- S3 access logs bucket
+- KMS key/alias
+- IAM role/policy cho `document-service`
+- S3 bucket policy/lifecycle/logging/notification
+
+Neu plan co thay doi ngoai pham vi storage ma ban khong mong muon, dung lai va review Terraform state/config truoc khi apply.
+
+## 6. Apply Terraform Tren May Ca Nhan
+
+Chi apply sau khi da review plan:
+
+```powershell
+terraform -chdir=infra\terraform\aws-eks apply -input=false tfplan
+```
+
+Lay outputs:
+
+```powershell
+$bucket = terraform -chdir=infra\terraform\aws-eks output -raw documents_bucket_name
+$kmsArn = terraform -chdir=infra\terraform\aws-eks output -raw documents_kms_key_arn
+$roleArn = terraform -chdir=infra\terraform\aws-eks output -raw document_service_role_arn
+
+Write-Host "bucket=$bucket"
+Write-Host "kmsArn=$kmsArn"
+Write-Host "roleArn=$roleArn"
+```
+
+Kiem tra AWS resource co ton tai:
+
+```powershell
+aws s3api head-bucket --bucket $bucket
+aws kms describe-key --key-id $kmsArn
+aws iam get-role --role-name ($roleArn -replace '^.*/', '')
+```
+
+## 7. Neu Khong Can Giu File Cu Trong MinIO
+
+Day la luong nhanh cho lab/demo neu object cu trong MinIO khong quan trong.
+
+Sau khi Terraform apply xong:
+
+1. Cap nhat `document-service.yaml` bang Terraform outputs.
+2. Push thay doi vao branch GitOps `gitops-testing`.
+3. De Argo CD sync `docvault-document-service`.
+4. Smoke test upload/download file moi.
+5. Giu MinIO trong rollback window, khong xoa ngay.
+
+Di tiep den muc 9 de cap nhat values.
+
+## 8. Neu Can Giu File Cu Trong MinIO
+
+Neu MinIO dang co file can giu, mirror object sang S3 truoc khi push/sync values S3 cho `document-service`.
+
+### 8.1 Maintenance Window
 
 Trong maintenance window:
 
@@ -178,9 +242,7 @@ Trong maintenance window:
 - Thong bao team khong tao document moi trong luc migrate.
 - Neu can chat che hon, tam thoi scale `document-service` hoac gateway ve 0, hoac chan route upload o ingress/gateway.
 
-Vi Argo CD app `docvault-document-service` hien co automated sync, nen de kiem soat cutover co the tam thoi tat automated sync truoc khi Jenkins job push values.
-
-PowerShell:
+Vi Argo CD app `docvault-document-service` hien co automated sync, khong push/merge thay doi S3 vao `gitops-testing` truoc khi mirror xong. Neu da lo push, tam thoi tat automated sync:
 
 ```powershell
 kubectl -n argocd patch application docvault-document-service --type merge -p '{"spec":{"syncPolicy":{"syncOptions":["CreateNamespace=true","RespectIgnoreDifferences=true"]}}}'
@@ -192,34 +254,7 @@ Kiem tra:
 kubectl -n argocd get application docvault-document-service -o yaml | Select-String -Pattern "automated|syncOptions" -Context 1,3
 ```
 
-### 7.2 Tao S3/KMS va push values bang Jenkins
-
-Chay Jenkins storage job:
-
-```text
-APPLY_DOCUMENT_STORAGE_TERRAFORM=true
-DOCUMENT_STORAGE_REQUIRE_APPROVAL=true
-```
-
-Approve input. Job se tao S3/KMS/IAM role va push values moi vao `gitops-testing`.
-
-Neu automated sync da tat, Argo CD se thay Git thay doi nhung chua tu sync workload. Day la luc migrate MinIO -> S3.
-
-### 7.3 Lay Terraform outputs
-
-Tren may local co AWS/Terraform access:
-
-```powershell
-$bucket = terraform -chdir=infra\terraform\aws-eks output -raw documents_bucket_name
-$kmsArn = terraform -chdir=infra\terraform\aws-eks output -raw documents_kms_key_arn
-$roleArn = terraform -chdir=infra\terraform\aws-eks output -raw document_service_role_arn
-
-Write-Host "bucket=$bucket"
-Write-Host "kms=$kmsArn"
-Write-Host "role=$roleArn"
-```
-
-### 7.4 Port-forward MinIO
+### 8.2 Port-forward MinIO
 
 Mo terminal rieng:
 
@@ -236,20 +271,19 @@ $minioBucketB64 = kubectl -n docvault get secret minio-secret -o jsonpath='{.dat
 
 $minioUser = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($minioUserB64))
 $minioPass = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($minioPassB64))
-$minioBucket = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($minioBucketB64))
+
+if ($minioBucketB64) {
+  $minioBucket = [Text.Encoding]::UTF8.GetString([Convert]::FromBase64String($minioBucketB64))
+} else {
+  $minioBucket = "docvault"
+}
 
 Write-Host "minioBucket=$minioBucket"
 ```
 
-Neu secret khong co `MINIO_BUCKET`, bucket hien tai trong values la `docvault`:
+### 8.3 Mirror MinIO -> S3 Bang mc
 
-```powershell
-$minioBucket = "docvault"
-```
-
-### 7.5 Mirror MinIO -> S3 bang mc
-
-May chay lenh can co `mc` va AWS credentials ghi duoc vao S3 bucket. Neu dung temporary credentials, dam bao session token duoc cau hinh dung cho tool ban dung.
+May chay lenh can co `mc` va AWS credentials ghi duoc vao S3 bucket.
 
 ```powershell
 mc alias set minio-local http://127.0.0.1:19000 $minioUser $minioPass
@@ -259,7 +293,7 @@ mc ls minio-local/$minioBucket
 mc mirror --overwrite minio-local/$minioBucket aws-s3/$bucket
 ```
 
-Neu bucket policy S3 yeu cau request header SSE-KMS, hay dam bao tool copy gui SSE-KMS headers. Neu `mc mirror` trong setup cua ban khong gui duoc header can thiet, dung Kubernetes migration Job rieng co AWS SDK/CLI hoac tam thoi chay copy bang mot script S3 PutObject co:
+Neu ban dung AWS temporary credentials co session token, dam bao `mc` nhan duoc session token theo cach cau hinh local cua ban. Neu `mc mirror` khong gui duoc request headers SSE-KMS ma bucket policy reject upload, dung AWS CLI/SDK migration script rieng voi cac field:
 
 ```text
 ServerSideEncryption=aws:kms
@@ -267,35 +301,119 @@ SSEKMSKeyId=<documents_kms_key_arn>
 BucketKeyEnabled=true
 ```
 
-Sau khi mirror, kiem tra nhanh object count/sample:
+Sau khi mirror, kiem tra nhanh:
 
 ```powershell
 mc ls --recursive minio-local/$minioBucket | Measure-Object
 aws s3 ls s3://$bucket --recursive | Measure-Object
 ```
 
-So luong co the khong giong 100% neu co hidden/system object hoac file da xoa/versioned object. Voi demo, can it nhat verify sample nhung document quan trong.
-
-### 7.6 Sync document-service sang S3
-
-Neu dung Argo CD CLI:
+Verify sample object quan trong:
 
 ```powershell
-argocd app sync docvault-document-service
-argocd app wait docvault-document-service --sync --health --timeout 300
+aws s3api head-object `
+  --bucket $bucket `
+  --key "doc/<document-id>/v<version>/<filename>" `
+  --query "{SSE:ServerSideEncryption,KMS:SSEKMSKeyId,BucketKey:BucketKeyEnabled}"
 ```
 
-Neu khong dung Argo CD CLI, vao Argo CD UI va sync app `docvault-document-service`.
+## 9. Cap Nhat GitOps Values Tren May Ca Nhan
 
-Bat lai automated sync neu ban da tat:
+Argo CD dang theo doi branch `gitops-testing`. Sau khi Terraform apply xong va migrate xong neu can, cap nhat `infra/k8s/values/document-service.yaml` bang Terraform outputs.
+
+### 9.1 Cach Khuyen Nghi: Dung script local
+
+Script local doc Terraform outputs, cap nhat YAML bang `yq`, roi chay `helm lint` va `helm template`.
+
+Neu ban da apply Terraform o muc 6, chay:
 
 ```powershell
-kubectl -n argocd patch application docvault-document-service --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true},"syncOptions":["CreateNamespace=true","RespectIgnoreDifferences=true"]}}}'
+.\scripts\update-values.ps1 -SkipTerraform
 ```
 
-## 8. Values Mong Doi Sau Jenkins Job
+Neu muon script tu plan/apply luon tu dau:
 
-Sau khi Jenkins push GitOps values, `infra/k8s/values/document-service.yaml` tren branch `gitops-testing` nen co dang:
+```powershell
+.\scripts\update-values.ps1 -Apply
+```
+
+Sau khi script chay xong, review diff:
+
+```powershell
+git diff -- infra\k8s\values\document-service.yaml
+```
+
+### 9.2 Cach Manual Bang yq
+
+Neu khong dung script, chay cac lenh sau:
+
+```powershell
+$valuesPath = "infra\k8s\values\document-service.yaml"
+
+$env:DOCVAULT_S3_BUCKET = $bucket
+$env:DOCVAULT_S3_REGION = terraform -chdir=infra\terraform\aws-eks output -raw region
+$env:DOCVAULT_S3_KMS_KEY_ARN = $kmsArn
+$env:DOCVAULT_DOCUMENT_SERVICE_ROLE_ARN = $roleArn
+
+yq e '.env.S3_BUCKET = strenv(DOCVAULT_S3_BUCKET)' -i $valuesPath
+yq e '.env.S3_REGION = strenv(DOCVAULT_S3_REGION)' -i $valuesPath
+yq e '.env.S3_KMS_KEY_ID = strenv(DOCVAULT_S3_KMS_KEY_ARN)' -i $valuesPath
+yq e '.env.S3_SERVER_SIDE_ENCRYPTION = "aws:kms"' -i $valuesPath
+yq e '.env.S3_BUCKET_KEY_ENABLED = "true"' -i $valuesPath
+yq e '.env.S3_USE_STATIC_CREDENTIALS = "false"' -i $valuesPath
+yq e '.env.S3_ENDPOINT = ""' -i $valuesPath
+yq e '.env.S3_FORCE_PATH_STYLE = "false"' -i $valuesPath
+yq e '.serviceAccount.create = true' -i $valuesPath
+yq e '.serviceAccount.name = "docvault-document-service"' -i $valuesPath
+yq e '.serviceAccount.automountToken = true' -i $valuesPath
+yq e '.serviceAccount.annotations."eks.amazonaws.com/role-arn" = strenv(DOCVAULT_DOCUMENT_SERVICE_ROLE_ARN)' -i $valuesPath
+yq e 'del(.envValueFrom[]? | select(.name == "S3_ACCESS_KEY" or .name == "S3_SECRET_KEY"))' -i $valuesPath
+yq e 'if (.envValueFrom == []) then del(.envValueFrom) else . end' -i $valuesPath
+
+helm lint infra\k8s\charts\docvault-service `
+  -f infra\k8s\values\common-harbor.yaml `
+  -f $valuesPath
+
+helm template docvault-document-service infra\k8s\charts\docvault-service `
+  -f infra\k8s\values\common-harbor.yaml `
+  -f $valuesPath | Out-Null
+```
+
+## 10. Dua Values Vao Branch GitOps
+
+Sau khi `document-service.yaml` da dung S3/KMS, can dua thay doi vao branch Argo CD dang watch: `gitops-testing`.
+
+### 10.1 PR Flow
+
+Dung khi muon review truoc khi Argo CD sync:
+
+```powershell
+git switch -c chore/docvault-s3-kms-values
+git add infra\k8s\values\document-service.yaml
+git commit -m "Feed document-service from Terraform-owned S3/KMS outputs"
+git push -u origin chore/docvault-s3-kms-values
+```
+
+Mo PR vao `gitops-testing`, review, merge. Argo CD se doc commit moi tren `gitops-testing`.
+
+### 10.2 Direct GitOps Flow
+
+Dung khi lab/demo va ban chap nhan push truc tiep:
+
+```powershell
+git fetch origin gitops-testing
+git switch gitops-testing
+.\scripts\update-values.ps1 -SkipTerraform
+git add infra\k8s\values\document-service.yaml
+git commit -m "Feed document-service from Terraform-owned S3/KMS outputs"
+git push origin gitops-testing
+```
+
+Neu `gitops-testing` chua co `scripts/update-values.ps1`, dung cach manual `yq` o muc 9.2 sau khi switch branch.
+
+## 11. Values Mong Doi Sau Khi Cap Nhat
+
+`infra/k8s/values/document-service.yaml` tren branch `gitops-testing` nen co dang:
 
 ```yaml
 env:
@@ -318,14 +436,33 @@ serviceAccount:
 
 `envValueFrom` khong con `S3_ACCESS_KEY` va `S3_SECRET_KEY`.
 
-## 9. Xac Minh Argo CD Va Kubernetes
+## 12. Sync Argo CD
 
-Kiem tra Argo CD application:
+Neu Argo CD automated sync dang bat, app se tu sync sau khi branch `gitops-testing` co commit moi.
+
+Kiem tra:
 
 ```powershell
 kubectl -n argocd get application docvault-document-service
 kubectl -n argocd get application docvault-document-service -o jsonpath='{.status.sync.status}{" "}{.status.health.status}{"`n"}'
 ```
+
+Neu dung Argo CD CLI:
+
+```powershell
+argocd app sync docvault-document-service
+argocd app wait docvault-document-service --sync --health --timeout 300
+```
+
+Neu khong dung CLI, sync bang Argo CD UI.
+
+Neu truoc do da tat automated sync, bat lai sau khi migrate/sync xong:
+
+```powershell
+kubectl -n argocd patch application docvault-document-service --type merge -p '{"spec":{"syncPolicy":{"automated":{"prune":false,"selfHeal":true},"syncOptions":["CreateNamespace=true","RespectIgnoreDifferences=true"]}}}'
+```
+
+## 13. Xac Minh Kubernetes Va IRSA
 
 Kiem tra rollout:
 
@@ -334,7 +471,7 @@ kubectl -n docvault rollout status deploy/docvault-document-service --timeout=30
 kubectl -n docvault get pods -l app=docvault-document-service
 ```
 
-Kiem tra ServiceAccount IRSA:
+Kiem tra ServiceAccount:
 
 ```powershell
 kubectl -n docvault get sa docvault-document-service -o yaml
@@ -375,17 +512,7 @@ S3_ACCESS_KEY=...
 S3_SECRET_KEY=...
 ```
 
-## 10. Xac Minh AWS S3/KMS
-
-Lay outputs:
-
-```powershell
-$bucket = terraform -chdir=infra\terraform\aws-eks output -raw documents_bucket_name
-$kmsArn = terraform -chdir=infra\terraform\aws-eks output -raw documents_kms_key_arn
-
-Write-Host "bucket=$bucket"
-Write-Host "kms=$kmsArn"
-```
+## 14. Xac Minh AWS S3/KMS
 
 Kiem tra S3 bucket encryption:
 
@@ -411,9 +538,13 @@ Kiem tra KMS rotation:
 aws kms get-key-rotation-status --key-id $kmsArn
 ```
 
-Ky vong `KeyRotationEnabled=true`.
+Ky vong:
 
-## 11. Smoke Test App
+```text
+KeyRotationEnabled=true
+```
+
+## 15. Smoke Test App
 
 Chay cac luong sau tren web/gateway:
 
@@ -454,7 +585,7 @@ Neu upload fail voi loi `AccessDenied` hoac KMS, kiem tra:
 - `S3_KMS_KEY_ID` trong values co dung `documents_kms_key_arn` khong.
 - Bucket policy co reject upload neu app khong gui SSE-KMS headers khong.
 
-## 12. MinIO Sau Khi Cutover
+## 16. MinIO Sau Khi Cutover
 
 Ngay sau khi app da sang S3, MinIO van co the tiep tuc chay:
 
@@ -470,7 +601,7 @@ Day la binh thuong. Nen giu MinIO trong rollback window, vi:
 - Rollback ve MinIO nhanh hon neu S3 cutover co loi.
 - PVC MinIO la noi giu data cu, khong nen xoa ngay.
 
-Sau khi S3 smoke test pass, co the chon 1 trong 2 cach:
+Sau khi S3 smoke test pass, co the chon:
 
 - Giu MinIO chay trong vai ngay de rollback nhanh.
 - Scale MinIO ve 0 de giam resource Kubernetes nhung giu PVC.
@@ -483,7 +614,7 @@ kubectl -n docvault scale statefulset/minio --replicas=0
 
 Luu y: neu Argo CD infra app sync lai manifest MinIO, MinIO co the duoc tao/chay lai. Muon cleanup sach can doi GitOps infra overlay truoc.
 
-## 13. Cleanup MinIO Bang GitOps
+## 17. Cleanup MinIO Bang GitOps
 
 Chi lam muc nay sau khi:
 
@@ -541,11 +672,11 @@ kubectl -n docvault delete secret minio-secret --ignore-not-found
 
 Xoa PVC la buoc co kha nang mat data MinIO cu. Khong lam buoc nay neu chua co backup/sign-off.
 
-## 14. Rollback
+## 18. Rollback
 
 Rollback nhanh neu MinIO/PVC van con.
 
-### 14.1 Neu chua co upload moi len S3
+### 18.1 Neu chua co upload moi len S3
 
 1. Revert Git commit da doi `document-service.yaml` sang S3, hoac sua lai values:
 
@@ -579,7 +710,7 @@ kubectl -n docvault rollout status statefulset/minio --timeout=300s
 
 4. Smoke test upload/download tren MinIO.
 
-### 14.2 Neu da co upload moi len S3
+### 18.2 Neu da co upload moi len S3
 
 Can mirror nguoc S3 -> MinIO truoc khi rollback app, neu khong DB se tro den object key co the chua ton tai trong MinIO.
 
@@ -587,13 +718,13 @@ Can mirror nguoc S3 -> MinIO truoc khi rollback app, neu khong DB se tro den obj
 mc mirror --overwrite aws-s3/$bucket minio-local/$minioBucket
 ```
 
-Sau khi mirror nguoc, rollback values va sync app nhu muc 14.1.
+Sau khi mirror nguoc, rollback values va sync app nhu muc 18.1.
 
-## 15. Tieu Chi Hoan Tat
+## 19. Tieu Chi Hoan Tat
 
 Co the coi cutover thanh cong khi tat ca dieu kien sau dat:
 
-- Jenkins storage job apply thanh cong.
+- Terraform local apply thanh cong.
 - Branch `gitops-testing` co commit cap nhat `document-service.yaml`.
 - Argo CD app `docvault-document-service` `Synced/Healthy`.
 - Deployment `docvault-document-service` rollout thanh cong.
@@ -604,9 +735,9 @@ Co the coi cutover thanh cong khi tat ca dieu kien sau dat:
 - `aws kms get-key-rotation-status` tra ve `KeyRotationEnabled=true`.
 - MinIO duoc giu lai hoac cleanup theo quy trinh, khong xoa PVC ngoai y muon.
 
-## 16. Khi Nao Chay Lai Jenkins Storage Job
+## 20. Khi Nao Chay Lai Quy Trinh Local Nay
 
-Chay lai job khi:
+Chay lai cac buoc Terraform/update values khi:
 
 - Tao lai EKS/environment.
 - Terraform document storage module thay doi.
@@ -614,7 +745,7 @@ Chay lai job khi:
 - Can recover drift giua Terraform outputs va GitOps values.
 - Can tao lai bucket/KMS trong account/region moi.
 
-Khong can chay lai job khi:
+Khong can chay lai khi:
 
 - KMS automatic rotation den chu ky.
 - Deploy image moi cua `document-service`.
