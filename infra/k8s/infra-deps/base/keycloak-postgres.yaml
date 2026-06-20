@@ -1,0 +1,16 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: keycloak-postgres
+  namespace: docvault
+spec:
+  instances: 3
+
+  storage:
+    size: 10Gi
+    storageClass: docvault-gp3
+
+  bootstrap:
+    initdb:
+      database: keycloak
+      owner: keycloak
