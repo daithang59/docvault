@@ -2,6 +2,7 @@
 
 import { AuditQueryFilters, AuditResult } from '@/types/audit';
 import { X } from 'lucide-react';
+import { UserCombobox } from '@/components/common/user-combobox';
 
 interface AuditFiltersProps {
   filters: AuditQueryFilters;
@@ -30,33 +31,48 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
         )}
       </div>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div>
+          <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">Actor</label>
+          <UserCombobox
+            value={filters.actorId ?? ''}
+            onChange={(v) => setField('actorId', v)}
+            placeholder="Any user…"
+            allowClear
+            fallbackPlaceholder="User ID..."
+          />
+        </div>
         <FilterInput
-          label="Actor ID"
-          value={filters.actorId ?? ''}
-          onChange={(v) => setField('actorId', v)}
-          placeholder="User ID..."
-        />
-        <FilterInput
+          id="audit-filter-action"
           label="Action"
           value={filters.action ?? ''}
           onChange={(v) => setField('action', v)}
           placeholder="e.g. submit, approve..."
         />
         <FilterInput
+          id="audit-filter-resource-type"
           label="Resource Type"
           value={filters.resourceType ?? ''}
           onChange={(v) => setField('resourceType', v)}
           placeholder="e.g. document..."
         />
         <FilterInput
+          id="audit-filter-resource-id"
           label="Resource ID"
           value={filters.resourceId ?? ''}
           onChange={(v) => setField('resourceId', v)}
           placeholder="Document ID..."
         />
+        <FilterInput
+          id="audit-filter-acl-id"
+          label="ACL ID"
+          value={filters.aclId ?? ''}
+          onChange={(v) => setField('aclId', v)}
+          placeholder="ACL rule ID..."
+        />
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">Result</label>
+          <label htmlFor="audit-filter-result" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">Result</label>
           <select
+            id="audit-filter-result"
             value={filters.result ?? ''}
             onChange={(e) => setField('result', (e.target.value as AuditResult) || undefined)}
             className="w-full rounded-xl border border-[var(--input-border)] bg-[var(--input-bg)] px-3 py-2 text-sm text-[var(--input-text)] outline-none transition focus:ring-2 focus:ring-[var(--focus-ring)] focus:border-[var(--border-focus)]"
@@ -69,6 +85,7 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
           </select>
         </div>
         <FilterInput
+          id="audit-filter-limit"
           label="Limit"
           value={filters.limit?.toString() ?? ''}
           onChange={(v) => setField('limit', v ? parseInt(v) : undefined)}
@@ -76,8 +93,9 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
           type="number"
         />
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">From</label>
+          <label htmlFor="audit-filter-from" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">From</label>
           <input
+            id="audit-filter-from"
             type="datetime-local"
             value={filters.from ?? ''}
             onChange={(e) => setField('from', e.target.value || undefined)}
@@ -85,8 +103,9 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
           />
         </div>
         <div>
-          <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">To</label>
+          <label htmlFor="audit-filter-to" className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">To</label>
           <input
+            id="audit-filter-to"
             type="datetime-local"
             value={filters.to ?? ''}
             onChange={(e) => setField('to', e.target.value || undefined)}
@@ -99,12 +118,14 @@ export function AuditFilters({ filters, onChange }: AuditFiltersProps) {
 }
 
 function FilterInput({
+  id,
   label,
   value,
   onChange,
   placeholder,
   type = 'text',
 }: {
+  id: string;
   label: string;
   value: string;
   onChange: (v: string) => void;
@@ -113,8 +134,9 @@ function FilterInput({
 }) {
   return (
     <div>
-      <label className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{label}</label>
+      <label htmlFor={id} className="mb-1.5 block text-xs font-medium text-[var(--text-muted)]">{label}</label>
       <input
+        id={id}
         type={type}
         value={value}
         onChange={(e) => onChange(e.target.value)}

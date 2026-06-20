@@ -1,13 +1,10 @@
 # document-service values
 namespace: docvault
-
 image:
-  repository: "harbor.docvault.id.vn/docvault-dev/document-service"
-  tag: "v10-572851759122"
-  digest: "sha256:914d68059b43316d25160f1fe1feb0c4615e6160d0ec19f699fa868d9ea71e3e"
-
+  repository: daithang59/document-service
+  tag: "v33"
+  digest: "sha256:629f1a89327f04197b4f01a0a10576e4cc495d99e59c1f12b4824dffed9044ee"
 healthPath: /health
-
 service:
   type: ClusterIP
   port: 3002
@@ -20,27 +17,18 @@ env:
   KEYCLOAK_AUDIENCE: "docvault-gateway"
   METADATA_SERVICE_URL: "http://docvault-metadata:3001"
   AUDIT_SERVICE_URL: "http://docvault-audit-service:3004"
-  S3_ENDPOINT: "http://minio:9000"
-  S3_BUCKET: "docvault"
-  S3_REGION: "us-east-1"
-  S3_FORCE_PATH_STYLE: "true"
-
-envValueFrom:
-  - name: S3_ACCESS_KEY
-    valueFrom:
-      secretKeyRef:
-        name: minio-secret
-        key: MINIO_ROOT_USER
-  - name: S3_SECRET_KEY
-    valueFrom:
-      secretKeyRef:
-        name: minio-secret
-        key: MINIO_ROOT_PASSWORD
-
+  S3_ENDPOINT: ""
+  S3_BUCKET: "docvault-documents-testing-913355241407"
+  S3_REGION: "ap-southeast-1"
+  S3_FORCE_PATH_STYLE: "false"
+  S3_KMS_KEY_ID: arn:aws:kms:ap-southeast-1:913355241407:key/f55ab524-e841-4215-b81b-0e43c24f1f68
+  S3_SERVER_SIDE_ENCRYPTION: aws:kms
+  S3_BUCKET_KEY_ENABLED: "true"
+  S3_USE_STATIC_CREDENTIALS: "false"
+envValueFrom: []
 envFrom:
   - secretRef:
       name: docvault-app-secrets
-
 resources:
   limits:
     cpu: 300m
@@ -48,3 +36,9 @@ resources:
   requests:
     cpu: 100m
     memory: 256Mi
+serviceAccount:
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::913355241407:role/docvault-eks-document-service-s3
+  create: true
+  name: docvault-document-service
+  automountToken: true

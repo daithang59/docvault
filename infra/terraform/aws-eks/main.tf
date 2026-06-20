@@ -1,10 +1,5 @@
-data "aws_availability_zones" "available" {
-  state = "available"
-}
-
 locals {
   name = var.cluster_name
-  azs  = slice(data.aws_availability_zones.available.names, 0, 2)
 
   tags = {
     Project     = "DocVault"
@@ -13,146 +8,67 @@ locals {
   }
 }
 
-module "vpc" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-vpc.git?ref=7c1f791efd61f326ed6102d564d1a65d1eceedf0" # v5.21.0
+module "network" {
+  source = "../modules/network"
 
-  name = "${local.name}-vpc"
-  cidr = "10.20.0.0/16"
-
-  azs             = local.azs
-  public_subnets  = ["10.20.1.0/24", "10.20.2.0/24"]
-  private_subnets = ["10.20.11.0/24", "10.20.12.0/24"]
-
-  enable_nat_gateway      = var.enable_nat_gateway
-  single_nat_gateway      = true
-  map_public_ip_on_launch = true
-
-  enable_dns_hostnames = true
-  enable_dns_support   = true
-
-  manage_default_security_group  = true
-  default_security_group_ingress = []
-  default_security_group_egress  = []
-
-  public_subnet_tags = {
-    "kubernetes.io/role/elb" = 1
-  }
-
-  private_subnet_tags = {
-    "kubernetes.io/role/internal-elb" = 1
-  }
-
-  tags = local.tags
+  name               = local.name
+  enable_nat_gateway = var.enable_nat_gateway
+  tags               = local.tags
 }
 
-module "eks" {
-  source = "git::https://github.com/terraform-aws-modules/terraform-aws-eks.git?ref=608c41a295a415f9aeea5c397a9dc123cee6d4c9" # v20.32.0
+module "eks_cluster" {
+  source = "../modules/eks-cluster"
 
-  cluster_name    = local.name
-  cluster_version = var.cluster_version
-
-  cluster_endpoint_public_access       = true
+  name                                 = local.name
+  cluster_version                      = var.cluster_version
   cluster_endpoint_public_access_cidrs = var.cluster_endpoint_public_access_cidrs
-
-  enable_cluster_creator_admin_permissions = true
-
-  cluster_enabled_log_types = [
-    "api",
-    "audit",
-    "authenticator",
-    "controllerManager",
-    "scheduler",
-  ]
-
-  cluster_addons = {
-    coredns = {
-      most_recent = true
-    }
-    kube-proxy = {
-      most_recent = true
-    }
-    vpc-cni = {
-      most_recent = true
-    }
-    aws-ebs-csi-driver = {
-      most_recent = true
-    }
-  }
-
-  vpc_id     = module.vpc.vpc_id
-  subnet_ids = concat(module.vpc.public_subnets, module.vpc.private_subnets)
-
-  eks_managed_node_groups = {
-    docvault = {
-      name = "docvault-ng"
-
-      subnet_ids     = var.enable_nat_gateway ? module.vpc.private_subnets : module.vpc.public_subnets
-      instance_types = var.node_instance_types
-      capacity_type  = "ON_DEMAND"
-      ami_type       = "AL2023_x86_64_STANDARD"
-
-      min_size     = var.node_min_size
-      max_size     = var.node_max_size
-      desired_size = var.node_desired_size
-
-      use_custom_launch_template = true
-
-      iam_role_additional_policies = {
-        AmazonEBSCSIDriverPolicy = "arn:aws:iam::aws:policy/service-role/AmazonEBSCSIDriverPolicy"
-      }
-
-      metadata_options = {
-        http_endpoint               = "enabled"
-        http_tokens                 = "required"
-        http_put_response_hop_limit = 2
-      }
-
-      block_device_mappings = {
-        xvda = {
-          device_name = "/dev/xvda"
-          ebs = {
-            volume_size           = var.node_disk_size
-            volume_type           = "gp3"
-            encrypted             = true
-            delete_on_termination = true
-          }
-        }
-      }
-
-      labels = {
-        workload = "docvault"
-      }
-    }
-  }
-
-  tags = local.tags
+  enable_nat_gateway                   = var.enable_nat_gateway
+  node_instance_types                  = var.node_instance_types
+  node_desired_size                    = var.node_desired_size
+  node_min_size                        = var.node_min_size
+  node_max_size                        = var.node_max_size
+  node_disk_size                       = var.node_disk_size
+  nodeport_access_cidrs                = var.nodeport_access_cidrs
+  private_subnet_ids                   = module.network.private_subnets
+  public_subnet_ids                    = module.network.public_subnets
+  tags                                 = local.tags
+  vpc_id                               = module.network.vpc_id
 }
 
-# -- NodePort security group rules ------------------------------------
-# Allow external access to web (30006) and keycloak (30080) on worker nodes.
-# Gateway stays ClusterIP (accessed via Next.js server-side rewrites).
+module "external_secrets_irsa" {
+  source = "../modules/external-secrets-irsa"
 
-locals {
-  nodeport_rules = {
-    web      = { port = 30006, desc = "NodePort: docvault-web" }
-    keycloak = { port = 30080, desc = "NodePort: keycloak" }
-  }
+  aws_region        = var.aws_region
+  environment       = var.environment
+  name              = local.name
+  oidc_provider     = module.eks_cluster.oidc_provider
+  oidc_provider_arn = module.eks_cluster.oidc_provider_arn
+  tags              = local.tags
 }
 
-variable "nodeport_access_cidrs" {
-  description = "CIDR blocks allowed to reach NodePort services (web, keycloak). Use 0.0.0.0/0 for open access."
-  type        = list(string)
-  default     = ["0.0.0.0/0"]
+module "documents_storage" {
+  source = "../modules/documents-storage"
+
+  aws_region        = var.aws_region
+  environment       = var.environment
+  name              = local.name
+  oidc_provider     = module.eks_cluster.oidc_provider
+  oidc_provider_arn = module.eks_cluster.oidc_provider_arn
+  tags              = local.tags
 }
 
-resource "aws_security_group_rule" "nodeport" {
-  for_each = local.nodeport_rules
+module "jenkins_roles_anywhere" {
+  source = "../modules/jenkins-roles-anywhere"
 
-  type              = "ingress"
-  from_port         = each.value.port
-  to_port           = each.value.port
-  protocol          = "tcp"
-  cidr_blocks       = var.nodeport_access_cidrs
-  description       = each.value.desc
-  security_group_id = module.eks.node_security_group_id
+  aws_region                                     = var.aws_region
+  enable_jenkins_roles_anywhere                  = var.enable_jenkins_roles_anywhere
+  jenkins_rolesanywhere_ca_certificate_path      = var.jenkins_rolesanywhere_ca_certificate_path
+  jenkins_rolesanywhere_certificate_common_name  = var.jenkins_rolesanywhere_certificate_common_name
+  jenkins_rolesanywhere_profile_name             = var.jenkins_rolesanywhere_profile_name
+  jenkins_rolesanywhere_role_name                = var.jenkins_rolesanywhere_role_name
+  jenkins_rolesanywhere_session_duration_seconds = var.jenkins_rolesanywhere_session_duration_seconds
+  jenkins_rolesanywhere_trust_anchor_name        = var.jenkins_rolesanywhere_trust_anchor_name
+  jenkins_secretsmanager_policy_name             = var.jenkins_secretsmanager_policy_name
+  jenkins_secretsmanager_secret_names            = var.jenkins_secretsmanager_secret_names
+  tags                                           = local.tags
 }

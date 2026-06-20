@@ -3,6 +3,8 @@ import { PrismaService } from './prisma/prisma.service';
 import { DocumentsService } from './documents/documents.service';
 import { StatusService } from './status/status.service';
 import { AclService } from './acl/acl.service';
+import { OrgService } from './org/org.service';
+import { ApproverDirectoryService } from './approvers/approver-directory.service';
 
 async function run() {
   console.log('--- STARTING DOCVAULT ERD MVP INTEGRATION TEST ---');
@@ -19,9 +21,16 @@ async function run() {
     },
   } as any;
 
-  const documentsService = new DocumentsService(prisma, mockAuditClient);
-  const statusService = new StatusService(prisma, mockAuditClient);
-  const aclService = new AclService(prisma, mockAuditClient);
+  const orgService = new OrgService(prisma, mockAuditClient);
+  const approverDirectory = new ApproverDirectoryService();
+  const documentsService = new DocumentsService(
+    prisma,
+    mockAuditClient,
+    orgService,
+    approverDirectory,
+  );
+  const statusService = new StatusService(prisma, mockAuditClient, orgService);
+  const aclService = new AclService(prisma, mockAuditClient, orgService);
 
   const mockUser = {
     sub: 'test-admin-123',

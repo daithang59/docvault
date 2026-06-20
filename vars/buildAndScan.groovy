@@ -1,11 +1,14 @@
 def call(cfg) {
-    def tag = "v${env.BUILD_NUMBER}"
-    def builtList = []
-    def forceBuildAll = shouldForceBuildAll()
-    def diffRange = resolveDiffRange()
+    def tag = resolveImageTag(cfg)
+    def forceBuildAll = shouldForceBuildAll(cfg)
+    def diffRange = cfg.changeDiffRange?.trim() ? cfg.changeDiffRange.trim() : resolveDiffRange()
     def changedFiles = []
 
-    if (!forceBuildAll && diffRange) {
+    if (!forceBuildAll && cfg.changeDetectionReady) {
+        changedFiles = cfg.changedFiles ?: []
+        echo ">>> Reusing early change detection diff range: ${diffRange ?: '(none)'}"
+        echo ">>> Changed paths available for image selection: ${changedFiles.size()}"
+    } else if (!forceBuildAll && diffRange) {
         changedFiles = getChangedFiles(diffRange)
         echo ">>> Change detection diff range: ${diffRange}"
         echo ">>> Changed paths detected: ${changedFiles.size()}"
@@ -24,22 +27,18 @@ def call(cfg) {
     env.INFRA_CHANGED = infraChanged ? 'true' : 'false'
     echo ">>> Infrastructure (infra/k8s/) changes detected: ${infraChanged}"
 
+    def buildTargets = []
+
     cfg.services.each { service ->
         def changed = forceBuildAll || isServiceImpacted(service, changedFiles)
 
         if (changed) {
-            echo ">>> Changes detected for ${service}. Building ${tag}..."
-            sh "docker build -t ${cfg.dockerOrg}/${service}:${tag} -t ${cfg.dockerOrg}/${service}:latest --build-arg SERVICE_NAME=${service} -f ${cfg.backendDockerfile} ."
-
-            echo ">>> Scanning Image ${cfg.dockerOrg}/${service}:${tag}..."
-            sh """
-                set -eu
-                docker run --rm \\
-                    -v /var/run/docker.sock:/var/run/docker.sock \\
-                    ${cfg.trivyImage} \\
-                    image --severity CRITICAL --exit-code 1 --no-progress ${cfg.dockerOrg}/${service}:${tag}
-            """
-            builtList.add(service)
+            buildTargets << [
+                name: service,
+                repository: resolveRepository(cfg, service),
+                dockerfile: cfg.backendDockerfile,
+                buildArgs: [SERVICE_NAME: service],
+            ]
         } else {
             echo ">>> No changes in services/${service}/ or libs/. Skipping build for ${service}."
         }
@@ -47,23 +46,41 @@ def call(cfg) {
 
     def webChanged = forceBuildAll || isWebImpacted(cfg, changedFiles)
     if (webChanged) {
-        echo '>>> Changes detected for web app. Building...'
-        sh "docker build -t ${cfg.dockerOrg}/${cfg.webImageName}:${tag} -t ${cfg.dockerOrg}/${cfg.webImageName}:latest -f ${cfg.webDockerfile} ."
-        echo ">>> Scanning Image ${cfg.dockerOrg}/${cfg.webImageName}:${tag}..."
-        sh """
-            set -eu
-            docker run --rm \\
-                -v /var/run/docker.sock:/var/run/docker.sock \\
-                ${cfg.trivyImage} \\
-                image --severity CRITICAL --exit-code 1 --no-progress ${cfg.dockerOrg}/${cfg.webImageName}:${tag}
-        """
-        builtList.add(cfg.webAppName)
+        buildTargets << [
+            name: cfg.webAppName,
+            repository: resolveRepository(cfg, cfg.webImageName),
+            dockerfile: cfg.webDockerfile,
+            buildArgs: [
+                NEXT_PUBLIC_APP_NAME: 'DocVault',
+                NEXT_PUBLIC_API_BASE_URL: '/api',
+                GATEWAY_URL: 'http://docvault-gateway:3000',
+            ],
+        ]
     }
+
+    def trivyDbReady = buildTargets ? warmTrivyCache(cfg) : false
+    def builtList = buildTargets ? withRegistryLogin(cfg) {
+        runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady)
+    } : []
 
     return builtList.join(',')
 }
 
-def shouldForceBuildAll() {
+String resolveImageTag(cfg) {
+    if (cfg.imageTag?.trim()) {
+        return cfg.imageTag.trim()
+    }
+    if (env.IMAGE_TAG?.trim()) {
+        return env.IMAGE_TAG.trim()
+    }
+    return "v${env.BUILD_NUMBER}"
+}
+
+def shouldForceBuildAll(cfg = [:]) {
+    if (cfg.forceBuildAll != null) {
+        return cfg.forceBuildAll.toString().equalsIgnoreCase('true')
+    }
+
     if (env.FORCE_BUILD_ALL?.trim()) {
         return env.FORCE_BUILD_ALL.equalsIgnoreCase('true')
     }
@@ -120,6 +137,164 @@ def getChangedFiles(String diffRange) {
         .findAll { it }
 }
 
+boolean warmTrivyCache(cfg) {
+    echo '>>> Warming Trivy cache...'
+    def status = sh(
+        script: """
+            set +e
+            docker volume create trivy-cache >/dev/null
+            docker run --rm \\
+                -v trivy-cache:/root/.cache/trivy \\
+                ${cfg.trivyImage} \\
+                image --download-db-only --no-progress
+        """,
+        returnStatus: true
+    )
+
+    if (status != 0) {
+        echo '>>> WARNING: Could not warm Trivy cache. Scans will use per-target caches.'
+        return false
+    }
+
+    return true
+}
+
+def withRegistryLogin(cfg, Closure body) {
+    if (!cfg.registryHost?.trim()) {
+        return body()
+    }
+
+    echo ">>> Logging into registry ${cfg.registryHost} for build cache imports..."
+
+    def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
+    def registryArg = shellQuote(cfg.registryHost.trim())
+    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
+    def result = null
+
+    try {
+        withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
+            if (credentialType == 'secretText') {
+                def registryUsername = cfg.registryUsername?.trim()
+                if (!registryUsername) {
+                    error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
+                }
+
+                withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
+                    try {
+                        result = body()
+                    } finally {
+                        sh "docker logout ${registryArg} || true"
+                    }
+                }
+            } else if (credentialType == 'usernamePassword') {
+                withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
+                    sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
+                    try {
+                        result = body()
+                    } finally {
+                        sh "docker logout ${registryArg} || true"
+                    }
+                }
+            } else {
+                error("Unsupported REGISTRY_CREDENTIAL_TYPE='${credentialType}'. Use secretText or usernamePassword.")
+            }
+        }
+    } finally {
+        sh "rm -rf '${dockerConfigDir}'"
+    }
+
+    return result
+}
+
+List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady) {
+    def builtList = []
+    def batchSize = (cfg.buildParallelism ?: 3) as Integer
+    if (batchSize < 1) {
+        batchSize = 1
+    }
+
+    def batches = buildTargets.collate(batchSize)
+    batches.eachWithIndex { batch, index ->
+        echo ">>> Build batch ${index + 1}/${batches.size()} with ${batch.size()} target(s)"
+
+        def branches = [:]
+        batch.each { target ->
+            def currentTarget = target
+            branches[currentTarget.name] = {
+                buildTarget(cfg, currentTarget, tag)
+            }
+        }
+
+        parallel branches
+
+        batch.each { target ->
+            scanTarget(cfg, target, tag, trivyDbReady)
+        }
+
+        builtList.addAll(batch.collect { it.name })
+    }
+
+    return builtList
+}
+
+void buildTarget(cfg, Map target, String tag) {
+    def repository = target.repository
+    def dockerfile = target.dockerfile
+    def buildArgs = (target.buildArgs ?: [:]) + [
+        ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
+    ]
+    def cacheFrom = "${repository}:latest"
+
+    echo ">>> Changes detected for ${target.name}. Building ${tag}..."
+
+    sh """
+        set -eu
+        export DOCKER_BUILDKIT=1
+        docker pull '${cacheFrom}' >/dev/null 2>&1 || true
+        docker build \\
+            --pull \\
+            --build-arg BUILDKIT_INLINE_CACHE=1 \\
+            --cache-from '${cacheFrom}' \\
+            ${buildArgsToFlags(buildArgs)} \\
+            -t '${repository}:${tag}' \\
+            -t '${repository}:latest' \\
+            -f '${dockerfile}' \\
+            .
+    """
+}
+
+void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
+    def repository = target.repository
+    def trivyCacheVolume = trivyDbReady ? 'trivy-cache' : "trivy-cache-${target.name}"
+    def trivyDbFlags = trivyDbReady ? '--skip-db-update' : ''
+
+    echo ">>> Scanning Image ${repository}:${tag}..."
+    sh """
+        set -eu
+        docker run --rm \\
+            -v /var/run/docker.sock:/var/run/docker.sock \\
+            -v ${trivyCacheVolume}:/root/.cache/trivy \\
+            ${cfg.trivyImage} \\
+            image ${trivyDbFlags} --scanners vuln --severity CRITICAL --exit-code 1 --no-progress '${repository}:${tag}'
+    """
+}
+
+String buildArgsToFlags(Map buildArgs) {
+    if (!buildArgs) {
+        return ''
+    }
+
+    return buildArgs.collect { key, value ->
+        "--build-arg ${key}=${shellQuote(value.toString())}"
+    }.join(' ')
+}
+
+String shellQuote(String value) {
+    return "'${value.replace("'", "'\"'\"'")}'"
+}
+
 boolean isServiceImpacted(String service, List changedFiles) {
     return changedFiles.any { path ->
         path.startsWith("services/${service}/") || isGlobalBackendImpact(path)
@@ -147,4 +322,12 @@ boolean isGlobalWebImpact(String path, cfg) {
         path == 'pnpm-lock.yaml' ||
         path == 'pnpm-workspace.yaml' ||
         path == 'turbo.json'
+}
+
+String resolveRepository(cfg, String service) {
+    def namespace = cfg.registryNamespace?.trim() ? cfg.registryNamespace.trim() : cfg.dockerOrg
+    if (cfg.registryHost?.trim()) {
+        return "${cfg.registryHost.trim()}/${namespace}/${service}"
+    }
+    return "${namespace}/${service}"
 }

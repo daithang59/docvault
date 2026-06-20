@@ -1,0 +1,18 @@
+# Keep shell scripts executable inside Linux containers from Windows checkouts.
+.gitattributes text eol=lf
+*.sh text eol=lf
+*.mjs text eol=lf
+
+* text=auto eol=lf
+
+*.bat text eol=crlf
+*.cmd text eol=crlf
+
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.pdf binary
+*.zip binary
+*.jar binary

@@ -1,5 +1,13 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
+import {
+  IsArray,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  MaxLength,
+  Min,
+} from 'class-validator';
 
 export class CreateVersionDto {
   @Type(() => Number)
@@ -26,4 +34,16 @@ export class CreateVersionDto {
   @IsOptional()
   @IsString()
   contentType?: string;
+
+  @IsOptional()
+  @IsIn(['NOT_SCANNED', 'CLEAR', 'DETECTED'])
+  dlpStatus?: string;
+
+  @IsOptional()
+  @IsArray()
+  dlpFindings?: Array<Record<string, unknown>>;
+
+  @IsOptional()
+  @IsString()
+  dlpSuggestedClassification?: string;
 }

@@ -22,11 +22,22 @@ export class AuditClient {
     return process.env.AUDIT_SERVICE_URL;
   }
 
+  private get ingestToken(): string | undefined {
+    return process.env.AUDIT_INGEST_TOKEN;
+  }
+
   async emitEvent(context: RequestContext, event: AuditEventPayload) {
     const url = this.baseUrl;
     if (!url) {
       this.logger.warn(
         `AUDIT_SERVICE_URL not set — audit event "${event.action}" dropped`,
+      );
+      return;
+    }
+    const ingestToken = this.ingestToken;
+    if (!ingestToken) {
+      this.logger.warn(
+        `AUDIT_INGEST_TOKEN not set — audit event "${event.action}" dropped`,
       );
       return;
     }
@@ -50,7 +61,7 @@ export class AuditClient {
           },
           {
             headers: {
-              authorization: context.authorization,
+              'x-docvault-service-token': ingestToken,
               'x-request-id': context.traceId,
               'x-user-id': context.actorId,
               'x-roles': context.roles.join(','),

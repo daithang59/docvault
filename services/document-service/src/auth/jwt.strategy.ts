@@ -11,7 +11,35 @@ type KeycloakAccessToken = {
   realm_access?: { roles?: string[] };
   aud?: string | string[];
   azp?: string;
+  iss?: string;
 };
+
+function normalizeUrl(value: string): string {
+  return value.replace(/\/$/, '');
+}
+
+function getKeycloakIssuers(baseUrl: string, realm: string): string[] {
+  const configuredIssuers = (process.env.KEYCLOAK_ISSUER ?? '')
+    .split(',')
+    .map((value) => value.trim())
+    .filter(Boolean)
+    .map(normalizeUrl);
+  const internalIssuer = `${normalizeUrl(baseUrl)}/realms/${realm}`;
+
+  return Array.from(new Set([...configuredIssuers, internalIssuer]));
+}
+
+function getKeycloakJwksUri(baseUrl: string, realm: string): string {
+  const explicitJwksUri = process.env.KEYCLOAK_JWKS_URI?.trim();
+  if (explicitJwksUri) {
+    return explicitJwksUri;
+  }
+
+  const jwksBaseUrl = normalizeUrl(
+    process.env.KEYCLOAK_JWKS_BASE_URL ?? baseUrl,
+  );
+  return `${jwksBaseUrl}/realms/${realm}/protocol/openid-connect/certs`;
+}
 
 @Injectable()
 export class JwtStrategy extends PassportStrategy(Strategy) {
@@ -20,12 +48,13 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   constructor() {
     const baseUrl = process.env.KEYCLOAK_BASE_URL!;
     const realm = process.env.KEYCLOAK_REALM!;
-    const issuer = `${baseUrl}/realms/${realm}`;
+    const issuers = getKeycloakIssuers(baseUrl, realm);
+    const jwksUri = getKeycloakJwksUri(baseUrl, realm);
     const audience = process.env.KEYCLOAK_AUDIENCE;
 
     super({
       jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
-      issuer,
+      issuer: issuers,
       algorithms: ['RS256'],
       // Keycloak in Docker may have clock drift causing tokens to appear expired
       // minutes after issuance. Signature is still verified by JWKS, so we bypass
@@ -35,7 +64,7 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
         cache: true,
         rateLimit: true,
         jwksRequestsPerMinute: 10,
-        jwksUri: `${issuer}/protocol/openid-connect/certs`,
+        jwksUri,
       }),
     });
 
@@ -45,12 +74,16 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
   validate(payload: KeycloakAccessToken) {
     // Manually validate expiry with generous clock tolerance (5 min) to handle
     // Keycloak Docker clock drift that causes valid tokens to appear expired.
-    if (payload.exp) {
-      const now = Math.floor(Date.now() / 1000);
-      const CLOCK_DRIFT_TOLERANCE_SECONDS = 300;
-      if (payload.exp + CLOCK_DRIFT_TOLERANCE_SECONDS < now) {
-        throw new UnauthorizedException('Token expired');
-      }
+    // Fail-closed: a token without a numeric exp claim is rejected outright.
+    if (typeof payload.exp !== 'number') {
+      throw new UnauthorizedException('Token missing expiry');
+    }
+    const now = Math.floor(Date.now() / 1000);
+    const toleranceSeconds = Number(
+      process.env.JWT_CLOCK_TOLERANCE_SECONDS ?? 300,
+    );
+    if (payload.exp + toleranceSeconds < now) {
+      throw new UnauthorizedException('Token expired');
     }
 
     if (this.audience) {

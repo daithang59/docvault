@@ -23,7 +23,6 @@ export class WatermarkService {
   ): Promise<Buffer> {
     const type = (contentType ?? '').toLowerCase();
 
-
     if (type.includes('application/pdf')) {
       // Validate actual PDF magic bytes — some files have .pdf extension but are HTML/DOCX
       const header = data.subarray(0, 5).toString('ascii');
@@ -52,7 +51,10 @@ export class WatermarkService {
     return data;
   }
 
-  private applyLegacyHeaderWatermark(data: Buffer, ctx: WatermarkContext): Buffer {
+  private applyLegacyHeaderWatermark(
+    data: Buffer,
+    ctx: WatermarkContext,
+  ): Buffer {
     const header = [
       '---DOCVAULT-WATERMARK---',
       `CLASSIFICATION: ${ctx.classification}`,
@@ -66,7 +68,10 @@ export class WatermarkService {
     return Buffer.concat([Buffer.from(header, 'utf8'), data]);
   }
 
-  private async applyPdfWatermark(data: Buffer, ctx: WatermarkContext): Promise<Buffer> {
+  private async applyPdfWatermark(
+    data: Buffer,
+    ctx: WatermarkContext,
+  ): Promise<Buffer> {
     // Explicitly convert Node Buffer → Uint8Array for pdf-lib compatibility
     const uint8 = new Uint8Array(data.buffer, data.byteOffset, data.byteLength);
     const pdfDoc = await PDFDocument.load(uint8, {
@@ -83,15 +88,15 @@ export class WatermarkService {
     const angleRad = (angleDeg * Math.PI) / 180;
 
     // Perpendicular "below" direction for the rotated text
-    const perpX = Math.sin(angleRad);   // moves along perpendicular x
-    const perpY = -Math.cos(angleRad);  // moves along perpendicular y
+    const perpX = Math.sin(angleRad); // moves along perpendicular x
+    const perpY = -Math.cos(angleRad); // moves along perpendicular y
 
     for (const page of pdfDoc.getPages()) {
       const { width, height } = page.getSize();
 
       const fontSize = Math.max(16, Math.min(width, height) * 0.028);
       const smallFontSize = fontSize * 0.72;
-      const lineGap = fontSize * 1.1;  // gap between line1 and line2
+      const lineGap = fontSize * 1.1; // gap between line1 and line2
 
       // Tile spacing
       const spacingX = 340;
@@ -108,7 +113,7 @@ export class WatermarkService {
             y: baseY,
             size: fontSize,
             font,
-            color: rgb(0.45, 0.05, 0.60),
+            color: rgb(0.45, 0.05, 0.6),
             opacity: 0.15,
             rotate: degrees(angleDeg),
           });
@@ -119,7 +124,7 @@ export class WatermarkService {
             y: baseY + perpY * lineGap,
             size: smallFontSize,
             font,
-            color: rgb(0.45, 0.05, 0.60),
+            color: rgb(0.45, 0.05, 0.6),
             opacity: 0.11,
             rotate: degrees(angleDeg),
           });
@@ -136,4 +141,3 @@ export class WatermarkService {
     return Buffer.from(bytes);
   }
 }
-

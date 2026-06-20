@@ -158,19 +158,19 @@ export class DocumentsProxyController {
   /**
    * Stream a document for inline preview (supports Range requests for PDF.js).
    *
-   * Unlike streamVersion, this:
-   * - Allows compliance_officer
-   * - Does not apply watermarks
-   * - Uses Content-Disposition: inline
+   * Unlike streamVersion, this uses Content-Disposition: inline and does not
+   * apply watermarks. Compliance officers are blocked because preview is file
+   * content access.
    */
   @Get(':docId/preview')
   @UseGuards(AuthGuard('jwt'), RolesGuard)
-  @Roles('viewer', 'editor', 'approver', 'compliance_officer', 'admin')
+  @Roles('viewer', 'editor', 'approver', 'admin')
   @ApiOperation({
     summary: 'Stream document for inline preview',
     description:
       'Streams the document binary for browser-based preview. ' +
-      'Supports HTTP Range requests. Does not apply watermarks.',
+      'Supports HTTP Range requests. Does not apply watermarks. ' +
+      'Compliance officers cannot preview file content.',
   })
   async preview(
     @Param('docId') docId: string,

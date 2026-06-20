@@ -8,6 +8,7 @@ import {
   HttpCode,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation } from '@nestjs/swagger';
+import { Throttle } from '@nestjs/throttler';
 import { Response, Request } from 'express';
 import axios from 'axios';
 import * as jwt from 'jsonwebtoken';
@@ -19,6 +20,17 @@ function parseCookies(raw: string): Record<string, string> {
       const [k, ...v] = c.trim().split('=');
       return [k, decodeURIComponent(v.join('='))];
     }),
+  );
+}
+
+function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
   );
 }
 
@@ -56,6 +68,7 @@ export class AuthController {
    * app directly — it handles the flow without involving the gateway's /auth routes.
    */
   @Get('login')
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @ApiOperation({
     summary: 'Initiate Keycloak OIDC login (redirect to Keycloak)',
     description:
@@ -156,6 +169,7 @@ export class AuthController {
             .join(' ') ||
             undefined),
         roles: payload.realm_access?.roles ?? [],
+        groups: normalizeGroups(payload.groups),
       };
 
       // Set session cookies on the gateway origin

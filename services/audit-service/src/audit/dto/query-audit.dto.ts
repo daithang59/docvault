@@ -1,12 +1,21 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
+  IsArray,
   IsDateString,
+  IsIn,
   IsInt,
   IsOptional,
   IsString,
   Max,
   Min,
 } from 'class-validator';
+
+export const AUDIT_ACTION_GROUPS = [
+  'AUTHORIZED_CONTENT_ACCESS',
+  'DESTRUCTIVE_ACTIVITY',
+] as const;
+
+export type AuditActionGroup = (typeof AUDIT_ACTION_GROUPS)[number];
 
 export class QueryAuditDto {
   @IsOptional()
@@ -18,12 +27,28 @@ export class QueryAuditDto {
   action?: string;
 
   @IsOptional()
+  @IsIn([...AUDIT_ACTION_GROUPS])
+  actionGroup?: AuditActionGroup;
+
+  @IsOptional()
   @IsString()
   resourceType?: string;
 
   @IsOptional()
   @IsString()
   resourceId?: string;
+
+  @IsOptional()
+  @IsString()
+  documentId?: string;
+
+  @IsOptional()
+  @IsString()
+  aclId?: string;
+
+  @IsOptional()
+  @IsString()
+  recommendationId?: string;
 
   @IsOptional()
   @IsString()
@@ -56,4 +81,10 @@ export class QueryAuditDto {
   @Min(1)
   @Max(200)
   limit?: number;
+
+  @IsOptional()
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  @IsArray()
+  @IsString({ each: true })
+  excludeActions?: string[];
 }

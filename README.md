@@ -333,12 +333,19 @@ Includes:
 - Expired token → 401
 - Viewer creates document → 403
 - Editor creates + uploads → 201, file stored in MinIO ✅
+- Viewer guessed confidential metadata/history/comments/ACL → 403
+- Confidential document presign → stream-only response, no direct URL
+- GROUP ACL metadata access with `finance-team`
+- EICAR malware upload blocked before MinIO storage
+- DLP sensitive upload escalates classification to `CONFIDENTIAL`
 - Viewer downloads draft → 403
 - Editor submits → PENDING
 - Approver approves → PUBLISHED
 - Approve again → 409 Conflict
 - Viewer downloads PUBLISHED → 200
 - Compliance Officer downloads file → 403
+- Retention evidence + admin retention run → archived record
+- Audit verify-chain + security summary → 200
 - Compliance Officer views audit → 200
 - Viewer views audit → 403
 
@@ -433,6 +440,7 @@ docvault/
 │   ├── start-sequential.mjs   # Sequential startup script for all services
 │   └── demo.sh                 # Demo script
 └── docs/
+    ├── TEAM_SETUP_DEPLOYMENT_GUIDE.md # Team setup, CI/CD, EKS and PR checklist
     ├── demo-users.md           # Account & permission info
     ├── demo-flow.md            # Step-by-step demo scenarios
     ├── ERD.md                  # Entity Relationship Diagram

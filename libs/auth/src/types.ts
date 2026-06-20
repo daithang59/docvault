@@ -7,6 +7,7 @@ export type KeycloakAccessToken = {
   sub: string;
   preferred_username?: string;
   email?: string;
+  groups?: string[];
   realm_access?: { roles?: string[] };
   resource_access?: Record<string, { roles?: string[] }>;
   aud?: string | string[];
@@ -21,6 +22,7 @@ export type ServiceUser = {
   username?: string;
   email?: string;
   roles: string[];
+  groups?: string[];
   raw?: KeycloakAccessToken;
 };
 
@@ -29,6 +31,7 @@ export type RequestContext = {
   authorization?: string;
   actorId: string;
   roles: string[];
+  groups?: string[];
   ip?: string;
 };
 
@@ -38,11 +41,29 @@ export function buildActorId(user: ServiceUser | undefined): string {
   return user.username ?? user.sub ?? 'unknown';
 }
 
+export function normalizeGroups(groups?: string[]): string[] {
+  return Array.from(
+    new Set(
+      (groups ?? [])
+        .map((group) => group.trim())
+        .filter(Boolean)
+        .map((group) => group.replace(/^\/+/, '')),
+    ),
+  );
+}
+
 /** Build a RequestContext from an Express Request */
 export function buildRequestContext(req: any): RequestContext {
   const headerRoles =
     typeof req.headers['x-roles'] === 'string'
       ? req.headers['x-roles']
+          .split(',')
+          .map((v: string) => v.trim())
+          .filter(Boolean)
+      : [];
+  const headerGroups =
+    typeof req.headers['x-groups'] === 'string'
+      ? req.headers['x-groups']
           .split(',')
           .map((v: string) => v.trim())
           .filter(Boolean)
@@ -55,6 +76,7 @@ export function buildRequestContext(req: any): RequestContext {
     authorization: req.headers.authorization,
     actorId: user ? buildActorId(user) : (req.headers['x-user-id'] ?? 'unknown'),
     roles: user?.roles ?? headerRoles,
+    groups: normalizeGroups(user?.groups ?? headerGroups),
     ip: req.ip,
   };
 }

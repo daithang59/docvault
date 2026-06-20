@@ -1,0 +1,65 @@
+\chapter{Tóm tắt API contract}
+
+\section{Nguyên tắc chung}
+
+Frontend gọi toàn bộ API thông qua gateway với base URL:
+
+\begin{lstlisting}
+http://localhost:3000/api
+\end{lstlisting}
+
+Các request cần header:
+
+\begin{lstlisting}
+Authorization: Bearer <keycloak_jwt>
+\end{lstlisting}
+
+Gateway xác thực JWT, kiểm tra role ở mức route và proxy request xuống service tương ứng. Các endpoint chi tiết tài liệu, workflow history, comments và ACL được policy-filter ở backend.
+
+\section{Nhóm endpoint chính}
+
+\begingroup
+\small
+\begin{longtable}{p{0.25\textwidth}p{0.43\textwidth}p{0.20\textwidth}}
+\caption{Tóm tắt endpoint chính} \\
+\toprule
+\textbf{Chức năng} & \textbf{Endpoint} & \textbf{Vai trò chính} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Chức năng} & \textbf{Endpoint} & \textbf{Vai trò chính} \\
+\midrule
+\endhead
+Login & \code{GET /auth/login} & Public \\
+Current user & \code{GET /auth/me} & Authenticated \\
+List documents & \code{GET /metadata/documents} & All roles \\
+Create document & \code{POST /metadata/documents} & Editor, Admin \\
+Document detail & \code{GET /metadata/documents/:docId} & Policy-filtered \\
+Update metadata & \code{PATCH /metadata/documents/:docId} & Owner Editor, Admin \\
+ACL list/upsert & \codecell{\code{GET/POST /metadata/documents/}\\\code{:docId/acl}} & Policy-filtered, Editor/Admin \\
+Workflow history & \codecell{\code{GET /metadata/documents/}\\\code{:docId/workflow-history}} & Policy-filtered \\
+Upload file & \code{POST /documents/:docId/upload} & Editor, Admin \\
+Authorize download & \codecell{\code{POST /metadata/documents/}\\\code{:docId/download-authorize}} & Policy-filtered \\
+Presign download & \codecell{\code{POST /documents/:docId/}\\\code{presign-download}} & Policy-filtered \\
+Stream file & \codecell{\code{GET /documents/:docId/}\\\code{versions/:version/stream}} & Policy-filtered \\
+Submit & \code{POST /workflow/:docId/submit} & Editor, Admin \\
+Approve & \code{POST /workflow/:docId/approve} & Approver, Admin \\
+Reject & \code{POST /workflow/:docId/reject} & Approver, Admin \\
+Archive & \code{POST /workflow/:docId/archive} & Editor, Admin \\
+Audit query & \code{GET /audit/query} & Compliance, Admin \\
+Verify chain & \code{GET /audit/verify-chain} & Compliance, Admin \\
+Security summary & \code{GET /audit/security-summary} & Compliance, Admin \\
+Retention list & \codecell{\code{GET /metadata/retention/}\\\code{documents}} & Compliance, Admin \\
+Retention run & \code{POST /metadata/retention/run} & Admin \\
+Evidence packet & \codecell{\code{GET /metadata/documents/}\\\code{:docId/evidence-packet}} & Compliance, Admin \\
+\bottomrule
+\end{longtable}
+\endgroup
+
+\section{Compliance Officer rule}
+
+Compliance Officer được phép xem audit, retention, security summary và evidence packet. Tuy nhiên, vai trò này không được preview, stream, presign hoặc download file content. Quy tắc này là một trong các acceptance criteria quan trọng của đề tài.
+
+\section{Grant token}
+
+Download và preview grant token được cấp bởi metadata-service sau khi policy check thành công. Token có thời hạn ngắn và được document-service xác minh trước khi trả nội dung. Thiết kế này giúp tách bước quyết định quyền khỏi bước phát file, đồng thời tránh để frontend tự quyết định quyền.

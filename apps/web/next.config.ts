@@ -1,19 +1,51 @@
+import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { NextConfig } from "next";
+import { securityHeaders } from "./src/lib/security/security-headers";
 
-const GATEWAY_URL = process.env.GATEWAY_URL ?? 'http://localhost:3000';
+const dirname = path.dirname(fileURLToPath(import.meta.url));
+const repoRoot = path.resolve(dirname, '../..');
+const webNodeModules = path.join(dirname, 'node_modules');
 
 const nextConfig: NextConfig = {
   output: 'standalone',
-
-  // Proxy browser API calls to the gateway service internally.
-  // This avoids exposing the gateway via NodePort/LoadBalancer and
-  // eliminates hardcoded gateway URLs in the frontend build.
-  async rewrites() {
+  poweredByHeader: false,
+  turbopack: {
+    root: repoRoot,
+    resolveAlias: {
+      '@tailwindcss/postcss': path.join(
+        webNodeModules,
+        '@tailwindcss/postcss',
+      ),
+      next: path.join(webNodeModules, 'next'),
+      tailwindcss: path.join(webNodeModules, 'tailwindcss'),
+    },
+  },
+  async headers() {
     return [
       {
-        // Exclude Next.js API routes (auth, health) from proxying
-        source: '/api/:path((?!auth|health).*)',
-        destination: `${GATEWAY_URL}/api/:path*`,
+        source: '/robots.txt',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+        ],
+      },
+      {
+        source: '/sitemap.xml',
+        headers: [
+          ...securityHeaders,
+          {
+            key: 'Cache-Control',
+            value: 'public, max-age=86400',
+          },
+        ],
+      },
+      {
+        source: '/:path*',
+        headers: securityHeaders,
       },
     ];
   },

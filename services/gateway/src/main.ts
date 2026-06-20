@@ -29,6 +29,7 @@ async function bootstrap() {
       'X-Request-ID',
       'X-User-ID',
       'X-Roles',
+      'X-Docvault-Step-Up-Proof',
     ],
   });
 
@@ -50,7 +51,7 @@ async function bootstrap() {
       );
       res.setHeader(
         'Access-Control-Allow-Headers',
-        'Authorization,Content-Type,X-Request-ID,X-User-ID,X-Roles',
+        'Authorization,Content-Type,X-Request-ID,X-User-ID,X-Roles,X-Docvault-Step-Up-Proof',
       );
       res.setHeader('Access-Control-Allow-Credentials', 'true');
       res.setHeader('Access-Control-Max-Age', '86400');

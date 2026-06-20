@@ -6,6 +6,9 @@ import { documentsKeys } from './documents.keys';
 import {
   getDocuments,
   getDocument,
+  getComplianceEvidencePacket,
+  getDocumentAiGuardrails,
+  previewDocumentAccessImpact,
   createDocument,
   updateDocument,
   uploadDocumentFile,
@@ -14,11 +17,20 @@ import {
   addAclEntry,
   authorizeDownload,
   presignDownload,
+  setDocumentLegalHold,
+  restoreDocumentVersion,
+  listTrash,
+  restoreDocumentFromTrash,
+  setApprovalChain,
+  getDocumentApprovers,
 } from './documents.api';
-import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto } from './documents.types';
+import type { ClassificationLevel } from '@/types/enums';
+import type { DocumentListFilters, CreateDocumentDto, UpdateDocumentDto, AddAclEntryDto, LegalHoldRequest } from './documents.types';
 import { triggerBrowserDownload, revokeObjectUrl } from '@/lib/utils/download';
 import { getErrorMessage } from '@/lib/api/errors';
 import apiClient from '@/lib/api/client';
+import { requestSensitiveActionProof } from '@/features/security/sensitive-action.api';
+import { getShareToken } from '@/features/share-links/share-token-store';
 
 // ── Queries ──────────────────────────────────────────────────────────────────
 
@@ -45,11 +57,51 @@ export function useWorkflowHistory(id: string) {
   });
 }
 
+export function useDocumentApprovers(id: string, enabled = true) {
+  return useQuery({
+    queryKey: documentsKeys.approvers(id),
+    queryFn: () => getDocumentApprovers(id),
+    enabled: Boolean(id) && enabled,
+    staleTime: 60 * 1000,
+  });
+}
+
 export function useDocumentAcl(id: string) {
   return useQuery({
     queryKey: documentsKeys.acl(id),
     queryFn: () => getDocumentAcl(id),
     enabled: Boolean(id),
+  });
+}
+
+export function useComplianceEvidencePacket(id: string, enabled = false) {
+  return useQuery({
+    queryKey: documentsKeys.complianceEvidencePacket(id),
+    queryFn: () => getComplianceEvidencePacket(id),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
+export function useDocumentAiGuardrails(id: string, enabled = true) {
+  return useQuery({
+    queryKey: documentsKeys.aiGuardrails(id),
+    queryFn: () => getDocumentAiGuardrails(id),
+    enabled: Boolean(id) && enabled,
+  });
+}
+
+export function useDocumentAccessImpact(
+  id: string,
+  classification: ClassificationLevel,
+  enabled = true,
+) {
+  return useQuery({
+    queryKey: documentsKeys.accessImpact(id, classification),
+    queryFn: () => previewDocumentAccessImpact(id, { classification }),
+    enabled: Boolean(id) && enabled,
+    retry: false,
+    refetchOnWindowFocus: false,
+    staleTime: 5 * 60 * 1000,
   });
 }
 
@@ -75,6 +127,68 @@ export function useUpdateDocument(id: string) {
       qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
       qc.invalidateQueries({ queryKey: documentsKeys.lists() });
       toast.success('Document updated successfully');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useSetLegalHold(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (dto: LegalHoldRequest) => setDocumentLegalHold(id, dto),
+    onSuccess: (_data, variables) => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
+      toast.success(
+        variables.hold ? 'Legal hold placed' : 'Legal hold released',
+      );
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useTrash() {
+  return useQuery({
+    queryKey: [...documentsKeys.all, 'trash'] as const,
+    queryFn: listTrash,
+  });
+}
+
+export function useRestoreFromTrash() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (docId: string) => restoreDocumentFromTrash(docId),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: [...documentsKeys.all, 'trash'] });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      toast.success('Document restored');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useSetApprovalChain(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (approvers: string[]) => setApprovalChain(id, approvers),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      toast.success('Approval chain saved');
+    },
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+export function useRestoreDocumentVersion(id: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (version: number) => restoreDocumentVersion(id, version),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: documentsKeys.detail(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.workflowHistory(id) });
+      qc.invalidateQueries({ queryKey: documentsKeys.lists() });
+      toast.success('Version restored');
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
@@ -110,22 +224,52 @@ export function useAddAclEntry(id: string) {
 export function useDownloadDocument() {
   return useMutation({
     mutationFn: async ({ id, filename }: { id: string; filename?: string }) => {
-      const authorization = await authorizeDownload(id);
+      const authorization = await authorizeDownload(id, undefined, getShareToken(id));
       const result = await presignDownload(id, authorization.version, authorization.grantToken);
       const resolvedFilename = filename ?? result.filename ?? authorization.filename ?? `document-${id}`;
+      const resolvedVersion = result.version ?? authorization.version;
 
-      if (result.url) {
-        // Non-watermark: direct MinIO presigned URL
-        triggerBrowserDownload(result.url, resolvedFilename);
-      } else {
-        // Watermark required: fetch via authenticated axios, then download blob
-        const streamUrl = `/documents/${id}/versions/${authorization.version}/stream?token=${encodeURIComponent(authorization.grantToken)}`;
-        const response = await apiClient.get(streamUrl, { responseType: 'blob' });
-        const blobUrl = URL.createObjectURL(response.data);
-        triggerBrowserDownload(blobUrl, resolvedFilename);
-        setTimeout(() => revokeObjectUrl(blobUrl), 5000);
-      }
+      // Always stream through the gateway. In EKS, MinIO is cluster-internal, so
+      // browser-facing presigned URLs like http://minio:9000 are not reachable.
+      const streamUrl = `/documents/${id}/versions/${resolvedVersion}/stream?token=${encodeURIComponent(authorization.grantToken)}`;
+      const response = await apiClient.get(streamUrl, { responseType: 'blob' });
+      const blobUrl = URL.createObjectURL(response.data);
+      triggerBrowserDownload(blobUrl, resolvedFilename);
+      setTimeout(() => revokeObjectUrl(blobUrl), 5000);
     },
     onError: (err) => toast.error(getErrorMessage(err)),
   });
+}
+
+export function useExportComplianceEvidencePacket(id: string) {
+  return useMutation({
+    mutationFn: async (challengePhrase: string) => {
+      const { proof } = await requestSensitiveActionProof({
+        action: 'export-evidence-packet',
+        challengePhrase,
+      });
+      const packet = await getComplianceEvidencePacket(id, {
+        stepUpProof: proof,
+      });
+      const blob = new Blob([JSON.stringify(packet, null, 2)], {
+        type: 'application/json',
+      });
+      const blobUrl = URL.createObjectURL(blob);
+      triggerBrowserDownload(blobUrl, buildEvidencePacketFilename(packet.document.title, id));
+      setTimeout(() => revokeObjectUrl(blobUrl), 5000);
+      return packet;
+    },
+    onSuccess: () => toast.success('Evidence packet exported'),
+    onError: (err) => toast.error(getErrorMessage(err)),
+  });
+}
+
+function buildEvidencePacketFilename(title: string | undefined, docId: string) {
+  const base = (title ?? `document-${docId}`)
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+    .slice(0, 80);
+
+  return `docvault-evidence-${base || docId}.json`;
 }

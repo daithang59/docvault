@@ -1,0 +1,132 @@
+\chapter{Phân tích yêu cầu và thiết kế tổng thể}
+
+\section{Tổng quan bài toán}
+
+DocVault hướng đến bài toán quản lý tài liệu trong môi trường có nhiều vai trò và nhiều mức độ nhạy cảm dữ liệu. Một tài liệu đi qua nhiều trạng thái: bản nháp, chờ duyệt, đã xuất bản và đã lưu trữ. Trong quá trình đó, mỗi vai trò chỉ được thực hiện những thao tác phù hợp. Editor có thể tạo và gửi duyệt tài liệu; Approver có thể phê duyệt hoặc từ chối; Viewer chỉ được truy cập tài liệu đã xuất bản nếu policy cho phép; Compliance Officer có thể xem audit và evidence nhưng không được truy cập nội dung file; Admin có quyền quản trị rộng hơn.
+
+Điểm cốt lõi của bài toán không chỉ là lưu file, mà là kiểm soát file theo ngữ cảnh. Cùng một file có thể được phép preview với người này nhưng bị từ chối với người khác; có thể được cấp presigned URL khi là tài liệu public nhưng phải stream qua backend khi là tài liệu confidential; có thể cho phép xem metadata nhưng không cho tải nội dung. Vì vậy, hệ thống cần mô hình policy đủ rõ và được thực thi ở backend.
+
+\section{Tác nhân hệ thống}
+
+\begin{table}[H]
+\centering
+\caption{Các tác nhân chính trong DocVault}
+\label{tab:actors}
+\begin{tabularx}{\textwidth}{p{0.24\textwidth}Y}
+\toprule
+\textbf{Tác nhân} & \textbf{Vai trò trong hệ thống} \\
+\midrule
+Viewer & Người dùng đọc tài liệu đã được xuất bản trong phạm vi policy cho phép; có thể preview/download tài liệu public hoặc tài liệu được cấp quyền. \\
+Editor & Người tạo và quản lý tài liệu của mình; có thể tạo draft, chỉnh metadata, upload phiên bản, gửi duyệt và archive khi có quyền. \\
+Approver & Người kiểm tra tài liệu đang ở trạng thái chờ duyệt; có thể approve hoặc reject theo quy trình. \\
+Compliance Officer & Người kiểm tra tuân thủ; được xem audit, metadata/evidence được phép, nhưng bị chặn preview, stream, presign và download nội dung file. \\
+Admin & Người quản trị hệ thống; có quyền rộng hơn trên tài liệu, thành viên, evidence và retention. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Yêu cầu chức năng}
+
+Các yêu cầu chức năng được nhóm theo miền nghiệp vụ như sau:
+
+\subsection{Xác thực và phân quyền}
+
+Hệ thống cần hỗ trợ đăng nhập thông qua Keycloak, đọc thông tin người dùng hiện tại và phân quyền theo vai trò. Navigation, command palette và các thao tác trên UI cần thay đổi theo role, nhưng backend vẫn phải là nơi quyết định cuối cùng. Các request không có token, token hết hạn hoặc token không hợp lệ phải bị từ chối.
+
+\subsection{Quản lý tài liệu}
+
+Người dùng có quyền có thể tạo tài liệu mới với tiêu đề, mô tả, classification và tags. Sau khi tạo, tài liệu ở trạng thái \code{DRAFT}. Editor hoặc Admin có thể upload file ban đầu hoặc upload phiên bản mới. Hệ thống cần lưu checksum, kích thước, MIME type, tên file và người upload cho từng version.
+
+\subsection{Workflow phê duyệt}
+
+Tài liệu đi qua vòng đời chính \code{DRAFT -> PENDING -> PUBLISHED -> ARCHIVED}. Editor gửi tài liệu từ Draft sang Pending. Approver phê duyệt tài liệu Pending sang Published hoặc từ chối để quay về Draft. Tài liệu Published có thể được archive theo quyền. Mỗi transition cần ghi workflow history và audit event.
+
+\subsection{Preview và download}
+
+Người dùng có quyền có thể preview hoặc download tài liệu tùy trạng thái, classification, role, ownership và ACL. Với tài liệu nhạy cảm, hệ thống có thể không trả về URL tải trực tiếp mà trả về endpoint stream có kiểm soát. Compliance Officer luôn bị chặn truy cập nội dung file.
+
+\subsection{Audit, security và evidence}
+
+Hệ thống cần ghi audit event cho các hành động quan trọng, hỗ trợ truy vấn audit theo bộ lọc, kiểm tra hash-chain và hiển thị security summary. Compliance/Admin có thể xuất evidence packet liên quan đến tài liệu, recommendation hoặc compliance flow.
+
+\subsection{Retention và access review}
+
+Tài liệu đã xuất bản cần có retention evidence dựa trên classification. Admin có thể chạy retention job demo để auto-archive các tài liệu đến hạn. Compliance/Admin có thể xem access review cho tài liệu nhạy cảm, broad ACL grant hoặc quyền đã cũ.
+
+\section{Yêu cầu phi chức năng}
+
+\begin{table}[H]
+\centering
+\caption{Yêu cầu phi chức năng}
+\label{tab:nfr}
+\begin{tabularx}{\textwidth}{p{0.25\textwidth}Y}
+\toprule
+\textbf{Nhóm yêu cầu} & \textbf{Mô tả} \\
+\midrule
+Bảo mật & Backend phải enforce policy; token và grant phải được xác minh; nội dung file không được lộ qua evidence hoặc audit. \\
+Truy vết & Các thao tác quan trọng cần tạo audit event; audit chain cần có khả năng verify. \\
+Tách biệt trách nhiệm & Mỗi service sở hữu một bounded context rõ ràng; document-service không tự quyết định policy download. \\
+Khả năng kiểm thử & Có unit test, E2E runtime, frontend test/lint/build và pipeline scan. \\
+Khả năng triển khai & Hỗ trợ local Docker Compose, Docker image, Kubernetes/Helm và GitOps. \\
+Khả năng mở rộng & Thiết kế cho phép bổ sung queue, email notification, SBOM, signing, KMS và policy-as-code trong tương lai. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\section{Mô hình threat cơ bản}
+
+Để định hướng thiết kế bảo mật, hệ thống xem xét các nhóm rủi ro sau:
+
+\begin{itemize}
+  \item \textbf{Truy cập trái phép metadata}: người dùng đoán document id và gọi API chi tiết, workflow history, comments hoặc ACL.
+  \item \textbf{Tải nội dung file trái phép}: người dùng gọi trực tiếp presign, stream hoặc download endpoint mà không có quyền.
+  \item \textbf{Lạm dụng Compliance Officer}: người có vai trò compliance được xem nhiều metadata nhưng không được dùng vai trò này để lấy file.
+  \item \textbf{Upload file độc hại}: file chứa EICAR/malware không được lưu vào MinIO và không tạo version metadata.
+  \item \textbf{Rò rỉ dữ liệu nhạy cảm}: file public/internal chứa email, số điện thoại, từ khóa confidential/secret cần được phát hiện và nâng classification.
+  \item \textbf{Downgrade classification không hợp lệ}: tài liệu đã bị DLP phát hiện không được hạ xuống public/internal nếu không có quyền và lý do hợp lệ.
+  \item \textbf{Giả mạo audit}: người dùng thường không được append audit event trực tiếp; audit ingest cần service token.
+  \item \textbf{Sửa audit log cũ}: hash-chain cần phát hiện khi audit event bị thay đổi trực tiếp trong storage.
+\end{itemize}
+
+\section{Kiến trúc tổng thể}
+
+Kiến trúc DocVault gồm bốn lớp: frontend, gateway, microservices và hạ tầng dữ liệu. Frontend Next.js là giao diện người dùng. API Gateway là điểm vào duy nhất cho frontend, chịu trách nhiệm xác thực, role guard, proxy request và truyền ngữ cảnh. Các service phía sau xử lý nghiệp vụ riêng. Hạ tầng dữ liệu gồm Keycloak, PostgreSQL, MongoDB và MinIO/S3.
+
+\begin{lstlisting}[caption={Mô hình kiến trúc tổng thể của DocVault},label={fig:architecture-overview}]
+Frontend Next.js
+       |
+       v
+API Gateway: JWT, RBAC, routing, context headers
+       |
+       +--> metadata-service: metadata, ACL, policy, retention
+       +--> document-service: upload, stream, MinIO/S3
+       +--> workflow-service: submit, approve, reject, archive
+       +--> audit-service: audit events, hash-chain, security summary
+       +--> notification-service: notification sink
+
+Infrastructure: Keycloak, PostgreSQL, MongoDB, MinIO, Kubernetes/EKS
+\end{lstlisting}
+
+\section{Luồng nghiệp vụ chính}
+
+Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhập, tạo tài liệu, upload file và submit. Approver đăng nhập, kiểm tra tài liệu pending và approve. Viewer đăng nhập, xem tài liệu đã published và download nếu policy cho phép. Compliance Officer đăng nhập, xem audit/evidence nhưng bị chặn preview/download nội dung file.
+
+\begin{lstlisting}[caption={Luồng nghiệp vụ demo chính của DocVault},label={fig:main-flow}]
+Editor      -> create draft -> upload file -> submit for review
+Approver    -> open approvals -> review -> approve
+Viewer      -> open published document -> preview/download if allowed
+Compliance  -> inspect audit/evidence -> file content access denied
+\end{lstlisting}
+
+\section{Nguyên tắc thiết kế}
+
+Thiết kế DocVault tuân theo các nguyên tắc sau:
+
+\begin{enumerate}
+  \item \textbf{Backend authoritative}: frontend chỉ hỗ trợ UX; backend luôn là nơi thực thi policy.
+  \item \textbf{Tách metadata và blob}: metadata nằm ở PostgreSQL, file nằm ở MinIO/S3, version metadata chỉ giữ object key và checksum.
+  \item \textbf{Deny wins}: ACL deny có độ ưu tiên cao hơn allow.
+  \item \textbf{Metadata-only compliance}: compliance có thể kiểm tra hệ thống mà không cần truy cập nội dung file.
+  \item \textbf{Evidence without leakage}: evidence không chứa file content, presigned URL, grant token hoặc object key nhạy cảm.
+  \item \textbf{Security as pipeline gates}: các bước scan/test cần chạy tự động trong pipeline thay vì phụ thuộc thao tác thủ công.
+\end{enumerate}

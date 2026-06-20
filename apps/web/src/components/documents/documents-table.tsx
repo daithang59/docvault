@@ -1,6 +1,7 @@
 'use client';
 
-import { useState, useRef, useCallback, useMemo } from 'react';
+import { useEffect, useState, useRef, useCallback, useMemo, type ComponentType } from 'react';
+import { createPortal } from 'react-dom';
 import {
   useReactTable,
   getCoreRowModel,
@@ -11,7 +12,7 @@ import {
   SortingState,
   RowSelectionState,
 } from '@tanstack/react-table';
-import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2 } from 'lucide-react';
+import { ArrowUpDown, ArrowUp, ArrowDown, MoreHorizontal, Eye, Pencil, Send, CheckCircle, XCircle, Archive, Download, Trash2, Lock } from 'lucide-react';
 import Link from 'next/link';
 import { DocumentListItem } from '@/types/document';
 import { StatusBadge } from '@/components/badges/status-badge';
@@ -19,13 +20,24 @@ import { ClassificationBadge } from '@/components/badges/classification-badge';
 import { formatDateTime } from '@/lib/utils/date';
 import { truncateEnd } from '@/lib/utils/format';
 import { useAuth } from '@/lib/auth/auth-context';
-import { canEditDocument, canSubmitDocument, canApproveDocument, canRejectDocument, canArchiveDocument, canDownloadDocument, canDeleteDocument } from '@/lib/auth/guards';
+import {
+  canEditDocument,
+  canSubmitDocument,
+  canApproveDocument,
+  canRejectDocument,
+  canArchiveDocument,
+  canDeleteDocument,
+  getExplainableDocumentAccessDecision,
+} from '@/lib/auth/permissions';
 import { useOwnerDisplayNames } from '@/features/approvals/approvals.hooks';
 import { ROUTES } from '@/lib/constants/routes';
+import { cn } from '@/lib/utils/cn';
 
 interface DocumentsTableProps {
   data: DocumentListItem[];
   enableSelection?: boolean;
+  onRowClick?: (doc: DocumentListItem) => void;
+  activeRowId?: string | null;
   onSubmit?: (doc: DocumentListItem) => void;
   onApprove?: (doc: DocumentListItem) => void;
   onReject?: (doc: DocumentListItem) => void;
@@ -41,6 +53,8 @@ interface DocumentsTableProps {
 export function DocumentsTable({
   data,
   enableSelection = false,
+  onRowClick,
+  activeRowId = null,
   onSubmit,
   onApprove,
   onReject,
@@ -57,7 +71,11 @@ export function DocumentsTable({
   const { data: displayNames } = useOwnerDisplayNames(ownerIds);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [rowSelection, setRowSelection] = useState<RowSelectionState>({});
-  const [activeMenu, setActiveMenu] = useState<string | null>(null);
+  const [activeMenu, setActiveMenu] = useState<{
+    id: string;
+    top: number;
+    left: number;
+  } | null>(null);
   const [hoveredRow, setHoveredRow] = useState<string | null>(null);
   const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -69,12 +87,32 @@ export function DocumentsTable({
     setHoveredRow(null);
   }, []);
 
+  const documentsById = useMemo(
+    () => new Map(data.map((document) => [document.id, document])),
+    [data],
+  );
+
+  useEffect(() => {
+    setRowSelection((currentSelection) => {
+      const retainedSelection = Object.fromEntries(
+        Object.entries(currentSelection).filter(
+          ([documentId, selected]) => selected && documentsById.has(documentId),
+        ),
+      );
+
+      return Object.keys(retainedSelection).length ===
+        Object.keys(currentSelection).length
+        ? currentSelection
+        : retainedSelection;
+    });
+  }, [documentsById]);
+
   const selectedDocs = useMemo(() => {
     return Object.keys(rowSelection)
       .filter((key) => rowSelection[key])
-      .map((key) => data[parseInt(key)])
-      .filter(Boolean);
-  }, [rowSelection, data]);
+      .map((key) => documentsById.get(key))
+      .filter((document): document is DocumentListItem => Boolean(document));
+  }, [rowSelection, documentsById]);
 
   const bulkSubmittable = useMemo(
     () => selectedDocs.filter((d) => canSubmitDocument(session, d)),
@@ -133,9 +171,20 @@ export function DocumentsTable({
         const isHovered = hoveredRow === doc.id;
         return (
           <div className="relative">
-            <Link href={ROUTES.DOCUMENT_DETAIL(doc.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
-              {truncateEnd(doc.title, 60)}
-            </Link>
+            <span className="inline-flex items-center gap-1.5">
+              {doc.legalHold && (
+                <span
+                  title="Legal hold active — exempt from retention auto-archive"
+                  aria-label="Legal hold active"
+                  className="inline-flex h-4 w-4 shrink-0 items-center justify-center rounded text-amber-600"
+                >
+                  <Lock className="h-3.5 w-3.5" />
+                </span>
+              )}
+              <Link href={ROUTES.DOCUMENT_DETAIL(doc.id)} className="text-[var(--text-main)] font-medium hover:text-[var(--color-primary)] transition-colors text-sm">
+                {truncateEnd(doc.title, 60)}
+              </Link>
+            </span>
             {doc.tags.length > 0 && (
               <div className="mt-1 flex flex-wrap gap-1">
                 {doc.tags.slice(0, 3).map((tag) => (
@@ -175,7 +224,7 @@ export function DocumentsTable({
     {
       accessorKey: 'classification',
       header: 'Classification',
-      cell: ({ row }) => <ClassificationBadge classification={(row.original.classificationLevel ?? row.original.classification) as import('@/types/enums').ClassificationLevel} />,
+      cell: ({ row }) => <ClassificationBadge classification={row.original.classification} />,
     },
     {
       accessorKey: 'status',
@@ -210,23 +259,39 @@ export function DocumentsTable({
       header: '',
       cell: ({ row }) => {
         const doc = row.original;
-        const isMenuOpen = activeMenu === doc.id;
+        const isMenuOpen = activeMenu?.id === doc.id;
+        const downloadDecision = getExplainableDocumentAccessDecision(session, doc, 'download');
 
         return (
           <div className="relative">
             <button
-              onClick={(e) => { e.stopPropagation(); setActiveMenu(isMenuOpen ? null : doc.id); }}
+              onClick={(e) => {
+                e.stopPropagation();
+                if (isMenuOpen) {
+                  setActiveMenu(null);
+                  return;
+                }
+
+                const rect = e.currentTarget.getBoundingClientRect();
+                setActiveMenu({
+                  id: doc.id,
+                  top: Math.max(8, Math.min(rect.bottom + 8, window.innerHeight - 280)),
+                  left: Math.max(8, Math.min(rect.right - 192, window.innerWidth - 200)),
+                });
+              }}
               className="rounded-xl p-1.5 text-[var(--text-muted)] transition-all hover:bg-[var(--bg-muted)] hover:text-[var(--text-main)] active:scale-95"
               aria-label="Actions"
             >
               <MoreHorizontal className="h-4 w-4" />
             </button>
-            {isMenuOpen && (
+            {isMenuOpen && activeMenu && createPortal(
               <>
                 <div className="fixed inset-0 z-10" onClick={() => setActiveMenu(null)} />
                 <div
-                  className="absolute right-0 top-full z-20 mt-2 w-48 overflow-hidden rounded-2xl border"
+                  className="fixed z-20 max-h-[min(22rem,calc(100vh-1rem))] w-48 overflow-y-auto rounded-2xl border"
                   style={{
+                    top: activeMenu.top,
+                    left: activeMenu.left,
                     background: 'var(--surface-overlay-strong)',
                     borderColor: 'var(--surface-border)',
                     backdropFilter: 'blur(16px)',
@@ -250,14 +315,22 @@ export function DocumentsTable({
                   {canArchiveDocument(session, doc) && onArchive && (
                     <ActionMenuItem icon={Archive} label="Archive" onClick={() => { setActiveMenu(null); onArchive(doc); }} />
                   )}
-                  {canDownloadDocument(session, doc) && onDownload && (
+                  {downloadDecision.allowed && onDownload && (
                     <ActionMenuItem icon={Download} label="Download" onClick={() => { setActiveMenu(null); onDownload(doc); }} />
+                  )}
+                  {!downloadDecision.allowed && onDownload && downloadDecision.reason && (
+                    <DisabledActionMenuItem
+                      icon={Download}
+                      label="Download"
+                      reason={downloadDecision.reason}
+                    />
                   )}
                   {canDeleteDocument(session, doc) && onDelete && (
                     <ActionMenuItem icon={Trash2} label="Delete" onClick={() => { setActiveMenu(null); onDelete(doc); }} />
                   )}
                 </div>
-              </>
+              </>,
+              document.body,
             )}
           </div>
         );
@@ -265,6 +338,7 @@ export function DocumentsTable({
     },
   ];
 
+  // eslint-disable-next-line react-hooks/incompatible-library -- TanStack Table is a known React Compiler incompatible API.
   const table = useReactTable({
     data,
     columns,
@@ -272,6 +346,7 @@ export function DocumentsTable({
     onSortingChange: setSorting,
     onRowSelectionChange: setRowSelection,
     enableRowSelection: enableSelection,
+    getRowId: (row) => row.id,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
     getFilteredRowModel: getFilteredRowModel(),
@@ -279,7 +354,7 @@ export function DocumentsTable({
 
   return (
     <div
-      className="overflow-hidden rounded-2xl border"
+      className="rounded-2xl border"
       style={{
         background: 'var(--table-surface-bg)',
         borderColor: 'var(--border-soft)',
@@ -290,13 +365,13 @@ export function DocumentsTable({
       {/* Bulk action bar */}
       {enableSelection && selectedDocs.length > 0 && (
         <div
-          className="flex items-center gap-3 border-b px-4 py-2.5 animate-fade"
+          className="flex flex-col gap-3 border-b px-4 py-3 animate-fade sm:flex-row sm:items-center sm:gap-3"
           style={{ background: 'var(--color-primary-bg)', borderColor: 'var(--border-soft)' }}
         >
           <span className="text-sm font-medium text-[var(--color-primary)]">
             {selectedDocs.length} selected
           </span>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {bulkSubmittable.length > 0 && onBulkSubmit && (
               <button
                 onClick={() => { onBulkSubmit(bulkSubmittable); setRowSelection({}); }}
@@ -336,7 +411,7 @@ export function DocumentsTable({
           </div>
           <button
             onClick={() => setRowSelection({})}
-            className="ml-auto text-xs text-[var(--text-muted)] hover:text-[var(--text-main)] transition-colors"
+            className="text-left text-xs text-[var(--text-muted)] transition-colors hover:text-[var(--text-main)] sm:ml-auto sm:text-right"
           >
             Clear
           </button>
@@ -361,28 +436,44 @@ export function DocumentsTable({
             ))}
           </thead>
           <tbody>
-            {table.getRowModel().rows.map((row, rowIndex) => (
-              <tr
-                key={row.id}
-                className={`group border-b last:border-0 transition-all duration-150 ${row.getIsSelected() ? 'ring-1 ring-inset ring-[var(--color-primary)]/20' : ''}`}
-                style={{
-                  borderColor: 'var(--table-row-border)',
-                  background: row.getIsSelected()
-                    ? 'var(--color-primary-bg)'
-                    : rowIndex % 2 === 0
-                      ? 'transparent'
-                      : 'var(--table-row-alt-bg)',
-                }}
-                onMouseEnter={() => handleRowEnter(row.original.id)}
-                onMouseLeave={handleRowLeave}
-              >
-                {row.getVisibleCells().map((cell) => (
-                  <td key={cell.id} className="px-4 py-3 transition-colors group-hover:bg-[var(--bg-muted)]/30">
-                    {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                  </td>
-                ))}
-              </tr>
-            ))}
+            {table.getRowModel().rows.map((row, rowIndex) => {
+              const isActive = activeRowId === row.original.id;
+              return (
+                <tr
+                  key={row.id}
+                  className={cn(
+                    'group border-b last:border-0 transition-all duration-150',
+                    row.getIsSelected() && 'ring-1 ring-inset ring-[var(--color-primary)]/20',
+                    isActive && 'ring-1 ring-inset ring-[var(--color-primary)]/40',
+                    onRowClick && 'cursor-pointer',
+                  )}
+                  style={{
+                    borderColor: 'var(--table-row-border)',
+                    background: row.getIsSelected() || isActive
+                      ? 'var(--color-primary-bg)'
+                      : rowIndex % 2 === 0
+                        ? 'transparent'
+                        : 'var(--table-row-alt-bg)',
+                  }}
+                  onMouseEnter={() => handleRowEnter(row.original.id)}
+                  onMouseLeave={handleRowLeave}
+                  onClick={(event) => {
+                    if (!onRowClick) return;
+                    // Ignore clicks on interactive elements (links, buttons, checkboxes, selects).
+                    if ((event.target as HTMLElement).closest('a,button,input,select,[role="menu"]')) {
+                      return;
+                    }
+                    onRowClick(row.original);
+                  }}
+                >
+                  {row.getVisibleCells().map((cell) => (
+                    <td key={cell.id} className="px-4 py-2.5 transition-colors group-hover:bg-[var(--bg-muted)]/30">
+                      {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                    </td>
+                  ))}
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
@@ -411,13 +502,41 @@ function SortableHeader({ label, column }: { label: string; column: { getIsSorte
   );
 }
 
+function DisabledActionMenuItem({
+  icon: Icon,
+  label,
+  reason,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <button
+      type="button"
+      disabled
+      className="mx-1.5 first:mt-1.5 last:mb-1.5 flex w-[calc(100%-0.75rem)] cursor-not-allowed items-start gap-2.5 rounded-xl px-3 py-2 text-left text-sm opacity-75"
+      title={reason}
+      aria-label={`${label} unavailable: ${reason}`}
+    >
+      <Icon className="mt-0.5 h-3.5 w-3.5 shrink-0 text-[var(--text-faint)]" />
+      <span className="min-w-0">
+        <span className="block text-[var(--text-muted)]">{label}</span>
+        <span className="block truncate text-[10px] leading-tight text-[var(--text-faint)]">
+          {reason}
+        </span>
+      </span>
+    </button>
+  );
+}
+
 function ActionMenuItem({
   icon: Icon,
   label,
   href,
   onClick,
 }: {
-  icon: React.ComponentType<{ className?: string }>;
+  icon: ComponentType<{ className?: string }>;
   label: string;
   href?: string;
   onClick?: () => void;

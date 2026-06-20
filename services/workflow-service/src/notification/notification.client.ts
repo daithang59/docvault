@@ -4,15 +4,20 @@ import { firstValueFrom } from 'rxjs';
 import { RequestContext } from '../common/request-context';
 
 export type NotificationType =
-  | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'ARCHIVED' | 'DELETED';
+  | 'SUBMITTED'
+  | 'APPROVED'
+  | 'REJECTED'
+  | 'ARCHIVED'
+  | 'DELETED';
 
 export interface NotificationPayload {
-  type:         NotificationType;
-  docId:        string;
-  recipientId?:   string;    // single recipient
-  recipientIds?: string[];   // multi-recipient
-  docTitle?:    string;
-  reason?:      string;
+  type: NotificationType;
+  docId: string;
+  recipientId?: string; // single recipient
+  recipientIds?: string[]; // multi-recipient
+  docTitle?: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
 }
 
 @Injectable()
@@ -24,7 +29,9 @@ export class NotificationClient {
 
   async notify(context: RequestContext, body: NotificationPayload) {
     if (!this.baseUrl) {
-      this.logger.warn('NOTIFICATION_SERVICE_URL not set — skipping notification');
+      this.logger.warn(
+        'NOTIFICATION_SERVICE_URL not set — skipping notification',
+      );
       return;
     }
 
@@ -33,20 +40,21 @@ export class NotificationClient {
         this.http.post(
           `${this.baseUrl}/notify`,
           {
-            type:         body.type,
-            docId:        body.docId,
-            recipientId:   body.recipientId,
-            recipientIds:  body.recipientIds,
-            docTitle:     body.docTitle,
-            reason:       body.reason,
-            traceId:      context.traceId,
+            type: body.type,
+            docId: body.docId,
+            recipientId: body.recipientId,
+            recipientIds: body.recipientIds,
+            docTitle: body.docTitle,
+            reason: body.reason,
+            metadata: body.metadata,
+            traceId: context.traceId,
           },
           {
             headers: {
-              authorization:  context.authorization,
+              authorization: context.authorization,
               'x-request-id': context.traceId,
-              'x-user-id':   context.actorId,
-              'x-roles':     context.roles.join(','),
+              'x-user-id': context.actorId,
+              'x-roles': context.roles.join(','),
             },
           },
         ),

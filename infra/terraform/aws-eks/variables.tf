@@ -63,3 +63,65 @@ variable "enable_nat_gateway" {
   type        = bool
   default     = false
 }
+
+variable "nodeport_access_cidrs" {
+  description = "CIDR blocks allowed to reach NodePort services (web, keycloak). Use 0.0.0.0/0 for open access."
+  type        = list(string)
+  default     = ["0.0.0.0/0"]
+}
+
+variable "enable_jenkins_roles_anywhere" {
+  description = "Create IAM Roles Anywhere resources for the local Jenkins controller VM."
+  type        = bool
+  default     = false
+}
+
+variable "jenkins_rolesanywhere_trust_anchor_name" {
+  description = "IAM Roles Anywhere trust anchor name for the Jenkins CA certificate."
+  type        = string
+  default     = "docvault-jenkins-local-ca"
+}
+
+variable "jenkins_rolesanywhere_profile_name" {
+  description = "IAM Roles Anywhere profile name for Jenkins."
+  type        = string
+  default     = "docvault-jenkins-profile"
+}
+
+variable "jenkins_rolesanywhere_role_name" {
+  description = "IAM role name that Jenkins assumes through IAM Roles Anywhere."
+  type        = string
+  default     = "docvault-jenkins-secretsmanager-read"
+}
+
+variable "jenkins_secretsmanager_policy_name" {
+  description = "Inline IAM policy name for Jenkins Secrets Manager read access."
+  type        = string
+  default     = "docvault-jenkins-secretsmanager-read"
+}
+
+variable "jenkins_rolesanywhere_ca_certificate_path" {
+  description = "Local path to the public CA certificate PEM used as the IAM Roles Anywhere trust anchor. Do not point this at a private key."
+  type        = string
+  default     = ""
+}
+
+variable "jenkins_rolesanywhere_certificate_common_name" {
+  description = "Expected X.509 subject CN for the Jenkins controller client certificate."
+  type        = string
+  default     = "jenkins-controller"
+}
+
+variable "jenkins_rolesanywhere_session_duration_seconds" {
+  description = "Duration, in seconds, for IAM Roles Anywhere temporary credentials issued to Jenkins."
+  type        = number
+  default     = 3600
+}
+
+variable "jenkins_secretsmanager_secret_names" {
+  description = "Secrets Manager secret names Jenkins may read through the AWS Secrets Manager Credentials Provider plugin."
+  type        = list(string)
+  default = [
+    "harbor-docvault-dev-robot-token",
+  ]
+}

@@ -11,14 +11,17 @@ set -e
 
 KC_URL="${KEYCLOAK_URL:-http://keycloak:8080}"
 KC_ADMIN="${KEYCLOAK_ADMIN:-admin}"
-KC_ADMIN_PW="${KEYCLOAK_ADMIN_PASSWORD:-adminpw}"
+: "${KEYCLOAK_ADMIN_PASSWORD:?KEYCLOAK_ADMIN_PASSWORD is required}"
+KC_ADMIN_PW="${KEYCLOAK_ADMIN_PASSWORD}"
 REALM="${KEYCLOAK_REALM:-docvault}"
 
-echo "[seed-roles] Waiting for Keycloak to be ready at ${KC_URL}..."
-until curl -fsS "${KC_URL}/health/ready" > /dev/null 2>&1; do
+READY_URL="${KC_URL}/realms/${REALM}/.well-known/openid-configuration"
+
+echo "[seed-roles] Waiting for Keycloak realm to be ready at ${READY_URL}..."
+until curl -fsS "${READY_URL}" > /dev/null 2>&1; do
   sleep 2
 done
-echo "[seed-roles] Keycloak is ready."
+echo "[seed-roles] Keycloak realm is ready."
 
 # ── Get admin token ──────────────────────────────────────────────────
 get_token() {

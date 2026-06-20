@@ -7,12 +7,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditClient } from '../audit/audit.client';
+import { OrgService } from '../org/org.service';
 import { UpdateStatusDto } from './dto/update-status.dto';
 import {
   RequestContext,
   ServiceUser,
   buildActorId,
 } from '../common/request-context';
+import { buildRetentionEvidence } from '../common/classification.constants';
 
 /**
  * MVP transition map:
@@ -35,6 +37,7 @@ export class StatusService {
   constructor(
     private readonly prisma: PrismaService,
     private readonly auditClient: AuditClient,
+    private readonly orgService: OrgService,
   ) {}
 
   async update(
@@ -43,8 +46,9 @@ export class StatusService {
     user: ServiceUser,
     context: RequestContext,
   ) {
-    const document = await this.prisma.document.findUnique({
-      where: { id: docId },
+    const organizationId = await this.orgService.requireOrgId(context.actorId);
+    const document = await this.prisma.document.findFirst({
+      where: { id: docId, organizationId },
     });
 
     if (!document) {
@@ -83,7 +87,12 @@ export class StatusService {
     const updateData: Record<string, any> = { status: transition.to };
 
     if (dto.action === 'APPROVE') {
-      updateData.publishedAt = new Date();
+      const publishedAt = new Date();
+      updateData.publishedAt = publishedAt;
+      Object.assign(
+        updateData,
+        buildRetentionEvidence(document.classification as any, publishedAt),
+      );
     }
     if (dto.action === 'ARCHIVE') {
       updateData.archivedAt = new Date();

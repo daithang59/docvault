@@ -42,8 +42,6 @@ Các khoảng trống quan trọng còn lại:
 - Stateful components trên K8s demo còn dùng `emptyDir`, chưa có PVC.
 - Evidence fail/pass pipeline, ArgoCD rollback, Harbor scan, tamper audit chưa được đóng gói thành bộ demo rõ ràng.
 
----
-
 # Phần I. Web App DocVault
 
 Phần này ưu tiên những việc làm cho DocVault giống một hệ thống quản lý tài liệu bảo mật doanh nghiệp hơn, đúng với góp ý về RBAC, ACL, workflow, audit, hash, secret key, key rotation, malware/DLP và governance.
@@ -51,7 +49,7 @@ Phần này ưu tiên những việc làm cho DocVault giống một hệ thốn
 ## Ưu tiên Web App
 
 | Ưu tiên | Hạng mục | Trạng thái hiện tại | Mục tiêu |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | W-P0.1 | Secret/key lifecycle, MFA, key rotation | Có secret demo và fallback secret | Không hard-code/fallback secret, có MFA và rotation plan/demo |
 | W-P0.2 | Authorization policy thống nhất | Download policy khá tốt, metadata/detail chưa chặt đều | RBAC + ACL + status + classification nhất quán |
 | W-P0.3 | Audit trust boundary | Có hash-chain, nhưng endpoint ghi audit cần khóa chặt | Chỉ service hợp lệ được ghi audit |
@@ -67,7 +65,7 @@ Phần này ưu tiên những việc làm cho DocVault giống một hệ thốn
 
 ## W-P0.1 - Siết secret/key lifecycle, MFA và key rotation
 
-Lý do ưu tiên: thầy nhắc trực tiếp về secret key và key rotation. Hiện `infra/k8s/infra-deps/app-secrets.yaml` chứa demo plaintext secret, Keycloak realm có client secret/user password demo, và `DOWNLOAD_GRANT_SECRET`/`PREVIEW_GRANT_SECRET` còn có fallback mặc định trong code.
+Lý do ưu tiên: thầy nhắc trực tiếp về secret key và key rotation. Hiện `infra/k8s/infra-deps/base/app-secrets.yaml` tham chiếu secret runtime qua External Secrets, Keycloak realm có client secret/user password demo, và `DOWNLOAD_GRANT_SECRET`/`PREVIEW_GRANT_SECRET` còn có fallback mặc định trong code.
 
 Việc nên làm:
 
@@ -405,8 +403,6 @@ Chỉ nên làm sau khi W-P0 và W-P1 ổn:
 5. Risk scoring theo classification + download frequency.
 6. Full records management nâng cao.
 
----
-
 # Phần II. Pipeline DevSecOps và GitOps
 
 Phần này ưu tiên những việc chứng minh DocVault không chỉ bảo mật ở tầng ứng dụng, mà còn kiểm soát toàn bộ supply chain từ code, dependency, image, manifest, secret, registry đến deployment trên Kubernetes.
@@ -414,7 +410,7 @@ Phần này ưu tiên những việc chứng minh DocVault không chỉ bảo m�
 ## Ưu tiên Pipeline DevSecOps
 
 | Ưu tiên | Hạng mục | Trạng thái hiện tại | Mục tiêu |
-|---|---|---|---|
+| --- | --- | --- | --- |
 | D-P0.1 | Dev/prod GitOps | Một namespace `docvault` là chính | Tách `docvault-dev` và `docvault-prod` |
 | D-P0.2 | Persistent storage K8s | Infra deps dùng `emptyDir` | PVC/StorageClass cho Postgres, Mongo, MinIO |
 | D-P0.3 | Private registry Harbor/Nexus | Jenkins/values dùng Docker Hub | Harbor chính, image promotion rõ |
@@ -748,8 +744,6 @@ Chỉ nên làm sau khi D-P0 và D-P1 ổn:
 4. Artifactory có thể đưa vào báo cáo như enterprise reference, không nên ưu tiên triển khai nếu Harbor đã đủ cho MVP.
 5. Chaos testing để tạo dữ liệu vận hành.
 
----
-
 # Thứ tự thực hiện đề xuất
 
 ## Sprint 1 - Web App security core
@@ -785,8 +779,6 @@ Chỉ nên làm sau khi D-P0 và D-P1 ổn:
 2. W-P2.1: Shared auth/contracts.
 3. W-P1.4: Security dashboard ứng dụng.
 4. W-P3/D-P3: AI/AIOps/LLM remediation future work.
-
----
 
 # Một câu định vị nên dùng trong báo cáo
 

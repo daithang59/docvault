@@ -3,8 +3,11 @@
   Detect node external IP and patch K8s deployments + Keycloak with the correct URLs.
 
 .DESCRIPTION
+  NodePort fallback helper. For the GitOps ingress deployment, prefer the
+  Argo-managed public ingress and stable DNS values under infra/k8s.
+
   Run this script after scaling EKS nodes back up. It:
-    1. Detects the first available node external IP
+    1. Detects available node external IPs
     2. Patches web and gateway deployments with NodePort-based URLs
     3. Updates Keycloak client redirect URIs via the admin API
 
@@ -21,40 +24,79 @@ $ErrorActionPreference = "Stop"
 
 Write-Host "`n=== DocVault EKS Access Setup ===" -ForegroundColor Cyan
 
-# ── Step 1: Detect node external IP ─────────────────────────────
-Write-Host "`n[1/3] Detecting node external IP..." -ForegroundColor Yellow
+# ── Step 1: Detect node external IPs ────────────────────────────
+Write-Host "`n[1/3] Detecting node external IPs..." -ForegroundColor Yellow
 
-$nodeIp = ""
+$nodeIps = @()
 $maxAttempts = 12
 for ($i = 1; $i -le $maxAttempts; $i++) {
     # Parse 'kubectl get nodes -o wide' — EXTERNAL-IP is column 7
     $lines = kubectl get nodes -o wide 2>$null | Select-Object -Skip 1
+    $foundIps = @()
     foreach ($line in $lines) {
         $cols = $line -split '\s+'
         if ($cols.Length -ge 7 -and $cols[6] -ne '<none>') {
-            $nodeIp = $cols[6]
-            break
+            $foundIps += $cols[6]
         }
     }
-    if ($nodeIp) { break }
+    $nodeIps = @($foundIps | Select-Object -Unique)
+    if ($nodeIps.Count -gt 0) { break }
     Write-Host "  Attempt $i/$maxAttempts - no nodes with ExternalIP yet, waiting 15s..."
     Start-Sleep -Seconds 15
 }
 
-if (-not $nodeIp) {
+if ($nodeIps.Count -eq 0) {
     Write-Error "No node external IP found. Are nodes running? Check: kubectl get nodes -o wide"
     exit 1
 }
 
+$nodeIp = $nodeIps[0]
+$webUrls = @($nodeIps | ForEach-Object { "http://${_}:30006" })
+$kcUrls = @($nodeIps | ForEach-Object { "http://${_}:30080" })
 $webUrl = "http://${nodeIp}:30006"
 $kcUrl  = "http://${nodeIp}:30080"
+$kcIssuers = @($kcUrls | ForEach-Object { "${_}/realms/docvault" })
+$kcIssuer = $kcIssuers[0]
+$allowedOrigins = @($webUrls + @("http://localhost:3006")) -join ","
+$acceptedIssuers = @($kcIssuers | Select-Object -Unique) -join ","
 
-Write-Host "  Node IP:  $nodeIp" -ForegroundColor Green
-Write-Host "  Web URL:  $webUrl" -ForegroundColor Green
-Write-Host "  KC URL:   $kcUrl" -ForegroundColor Green
+Write-Host "  Node IPs:     $($nodeIps -join ', ')" -ForegroundColor Green
+Write-Host "  Web URLs:     $($webUrls -join ', ')" -ForegroundColor Green
+Write-Host "  KC URLs:      $($kcUrls -join ', ')" -ForegroundColor Green
+Write-Host "  Canonical Web: $webUrl" -ForegroundColor Green
+Write-Host "  KC Issuers:   $acceptedIssuers" -ForegroundColor Green
 
 # ── Step 2: Patch deployments ───────────────────────────────────
 Write-Host "`n[2/3] Patching deployments..." -ForegroundColor Yellow
+
+$runtimePatchedApps = @(
+    "docvault-web",
+    "docvault-gateway",
+    "docvault-metadata",
+    "docvault-document-service",
+    "docvault-workflow-service",
+    "docvault-audit-service",
+    "docvault-notification-service"
+)
+
+foreach ($app in $runtimePatchedApps) {
+    $argoPatch = @{
+        spec = @{
+            ignoreDifferences = @(
+                @{
+                    group = "apps"
+                    kind = "Deployment"
+                    jsonPointers = @("/spec/template/spec/containers/0/env")
+                }
+            )
+            syncPolicy = @{
+                syncOptions = @("CreateNamespace=true", "RespectIgnoreDifferences=true")
+            }
+        }
+    } | ConvertTo-Json -Depth 10
+
+    kubectl patch application $app -n argocd --type merge -p $argoPatch 2>$null | Out-Null
+}
 
 # Patch web app
 Write-Host "  Patching docvault-web..."
@@ -66,7 +108,26 @@ kubectl set env deployment/docvault-web -n $Namespace `
 Write-Host "  Patching docvault-gateway..."
 kubectl set env deployment/docvault-gateway -n $Namespace `
     FRONTEND_URL="$webUrl" `
-    ALLOWED_ORIGINS="$webUrl,http://localhost:3006"
+    ALLOWED_ORIGINS="$allowedOrigins" `
+    KEYCLOAK_BASE_URL="http://keycloak:8080" `
+    KEYCLOAK_ISSUER="$acceptedIssuers"
+
+# Patch backend services to accept public Keycloak issuers while keeping
+# KEYCLOAK_BASE_URL on the in-cluster service for JWKS/token calls.
+$authDeployments = @(
+    "docvault-metadata",
+    "docvault-document-service",
+    "docvault-workflow-service",
+    "docvault-audit-service",
+    "docvault-notification-service"
+)
+
+foreach ($deployment in $authDeployments) {
+    Write-Host "  Patching $deployment auth issuer..."
+    kubectl set env deployment/$deployment -n $Namespace `
+        KEYCLOAK_BASE_URL="http://keycloak:8080" `
+        KEYCLOAK_ISSUER="$acceptedIssuers"
+}
 
 Write-Host "  Deployments patched. Pods will restart automatically." -ForegroundColor Green
 
@@ -117,28 +178,45 @@ if ($kcReady) {
             -Headers @{ Authorization = "Bearer $adminToken" }
         $clientUuid = $clients[0].id
 
-        # Update redirect URIs and web origins
-        $updateBody = @{
-            redirectUris = @(
-                "http://localhost:3000/*",
-                "http://localhost:3006/*",
-                "http://localhost:3006/api/auth/callback",
-                "$webUrl/*",
-                "$webUrl/api/auth/callback"
-            )
-            webOrigins = @(
-                "http://localhost:3000",
-                "http://localhost:3006",
-                $webUrl
-            )
-        } | ConvertTo-Json
+        # Update redirect URIs, post-logout redirects, and web origins.
+        # Keep the existing client object so Keycloak does not drop unrelated
+        # client settings during PUT.
+        $client = $clients[0]
+        $redirectUris = @(
+            "http://localhost:3000/*",
+            "http://localhost:3006/*",
+            "http://localhost:3006/api/auth/callback"
+        )
+        foreach ($url in $webUrls) {
+            $redirectUris += "$url/*"
+            $redirectUris += "$url/api/auth/callback"
+        }
+        $client.redirectUris = @($redirectUris | Select-Object -Unique)
+
+        $webOrigins = @(
+            "http://localhost:3000",
+            "http://localhost:3006"
+        )
+        $webOrigins += $webUrls
+        $client.webOrigins = @($webOrigins | Select-Object -Unique)
+
+        if (-not $client.attributes) {
+            $client | Add-Member -MemberType NoteProperty -Name attributes -Value ([pscustomobject]@{})
+        }
+        $client.attributes | Add-Member `
+            -MemberType NoteProperty `
+            -Name "post.logout.redirect.uris" `
+            -Value "+" `
+            -Force
+
+        $updateBody = $client | ConvertTo-Json -Depth 20
 
         Invoke-RestMethod -Method Put `
             -Uri "http://localhost:18090/admin/realms/docvault/clients/$clientUuid" `
             -Headers @{ Authorization = "Bearer $adminToken"; "Content-Type" = "application/json" } `
             -Body $updateBody
 
-        Write-Host "  Keycloak redirect URIs updated." -ForegroundColor Green
+        Write-Host "  Keycloak redirect and logout URIs updated." -ForegroundColor Green
     }
     catch {
         Write-Warning "Could not auto-update Keycloak: $_"
@@ -157,6 +235,7 @@ else {
 Write-Host "`n=== Setup Complete ===" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "  Web App:      $webUrl" -ForegroundColor Green
+Write-Host "  All Web URLs: $($webUrls -join ', ')" -ForegroundColor Green
 Write-Host "  Keycloak:     $kcUrl" -ForegroundColor Green
 Write-Host "  Gateway API:  $webUrl/api  (proxied via Next.js)" -ForegroundColor Green
 Write-Host ""

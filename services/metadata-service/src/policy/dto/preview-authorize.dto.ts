@@ -1,5 +1,5 @@
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, Min } from 'class-validator';
+import { IsInt, IsOptional, IsString, MaxLength, Min } from 'class-validator';
 
 export class PreviewAuthorizeDto {
   @IsOptional()
@@ -7,4 +7,9 @@ export class PreviewAuthorizeDto {
   @IsInt()
   @Min(1)
   version?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(256)
+  shareToken?: string;
 }

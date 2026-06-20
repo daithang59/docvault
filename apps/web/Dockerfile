@@ -1,7 +1,11 @@
 FROM node:20-alpine AS base                                                                                   
+ARG ALPINE_SECURITY_REFRESH=manual
 ENV PNPM_HOME="/pnpm"                                                                                         
 ENV PATH="$PNPM_HOME:$PATH"                                                                                   
-RUN corepack enable pnpm                                                                                      
+RUN echo "alpine-security-refresh=${ALPINE_SECURITY_REFRESH}" && \
+    apk add --no-cache --upgrade libcrypto3 libssl3 && \
+    corepack enable pnpm && \
+    corepack prepare pnpm@9.15.0 --activate
                                                                                                               
 FROM base AS builder                                                                                          
 RUN apk update && apk add --no-cache libc6-compat                                                             
@@ -17,6 +21,14 @@ COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml                                                  
 RUN pnpm install --frozen-lockfile                                                                            
 COPY --from=builder /app/out/full/ .                                                                          
+
+ARG NEXT_PUBLIC_APP_NAME=DocVault
+ARG NEXT_PUBLIC_API_BASE_URL=/api
+ARG GATEWAY_URL=http://docvault-gateway:3000
+ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
+ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
+ENV GATEWAY_URL=${GATEWAY_URL}
+
 RUN pnpm turbo run build --filter=web...                                                                      
                                                                                                             
 FROM base AS runner                                                                                           

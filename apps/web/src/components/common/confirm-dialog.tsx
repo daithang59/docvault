@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useEffect, useId, useRef, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
 
 interface ConfirmDialogProps {
@@ -13,6 +13,7 @@ interface ConfirmDialogProps {
   variant?: 'default' | 'destructive';
   onConfirm: () => void | Promise<void>;
   loading?: boolean;
+  confirmDisabled?: boolean;
   children?: React.ReactNode;
 }
 
@@ -26,10 +27,53 @@ export function ConfirmDialog({
   variant = 'default',
   onConfirm,
   loading,
+  confirmDisabled = false,
   children,
 }: ConfirmDialogProps) {
   const [internalLoading, setInternalLoading] = useState(false);
   const isLoading = loading || internalLoading;
+  const dialogRef = useRef<HTMLDivElement>(null);
+  const previousFocusRef = useRef<HTMLElement | null>(null);
+  const isLoadingRef = useRef(isLoading);
+  const onOpenChangeRef = useRef(onOpenChange);
+  const titleId = useId();
+  const descriptionId = useId();
+
+  useEffect(() => {
+    isLoadingRef.current = isLoading;
+  }, [isLoading]);
+
+  useEffect(() => {
+    onOpenChangeRef.current = onOpenChange;
+  }, [onOpenChange]);
+
+  useEffect(() => {
+    if (!open) return;
+
+    previousFocusRef.current =
+      document.activeElement instanceof HTMLElement ? document.activeElement : null;
+
+    const focusTimer = window.setTimeout(() => {
+      const firstFocusable = dialogRef.current?.querySelector<HTMLElement>(
+        'textarea, input, select, button, a[href], [tabindex]:not([tabindex="-1"])',
+      );
+      firstFocusable?.focus();
+    }, 0);
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key !== 'Escape' || isLoadingRef.current) return;
+      event.preventDefault();
+      onOpenChangeRef.current(false);
+    }
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.clearTimeout(focusTimer);
+      window.removeEventListener('keydown', handleKeyDown);
+      previousFocusRef.current?.focus();
+      previousFocusRef.current = null;
+    };
+  }, [open]);
 
   async function handleConfirm() {
     setInternalLoading(true);
@@ -46,10 +90,17 @@ export function ConfirmDialog({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center">
       <div
+        aria-hidden="true"
         className="absolute inset-0 bg-black/40 backdrop-blur-sm"
         onClick={() => !isLoading && onOpenChange(false)}
       />
       <div
+        ref={dialogRef}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby={titleId}
+        aria-describedby={description ? descriptionId : undefined}
+        tabIndex={-1}
         className="relative z-10 mx-4 w-full max-w-md rounded-2xl border p-6"
         style={{
           background: 'var(--surface-overlay-strong)',
@@ -64,9 +115,9 @@ export function ConfirmDialog({
             </div>
           )}
           <div>
-            <h2 className="text-base font-semibold text-[var(--text-strong)]">{title}</h2>
+            <h2 id={titleId} className="text-base font-semibold text-[var(--text-strong)]">{title}</h2>
             {description && (
-              <p className="mt-1 text-sm text-[var(--text-muted)]">{description}</p>
+              <p id={descriptionId} className="mt-1 text-sm text-[var(--text-muted)]">{description}</p>
             )}
           </div>
         </div>
@@ -82,7 +133,7 @@ export function ConfirmDialog({
           </button>
           <button
             onClick={handleConfirm}
-            disabled={isLoading}
+            disabled={isLoading || confirmDisabled}
             className={`rounded-xl px-4 py-2 text-sm font-medium text-white transition-colors disabled:opacity-50 ${
               variant === 'destructive'
                 ? 'bg-[var(--color-destructive)] hover:brightness-95'

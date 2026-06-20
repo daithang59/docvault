@@ -199,6 +199,7 @@ export function AppSidebar() {
       {/* Mobile toggle */}
       <button
         onClick={() => setMobileOpen(true)}
+        aria-label="Open navigation"
         className="lg:hidden fixed left-4 top-4 z-40 rounded-xl p-2.5 text-white transition-all active:scale-95"
         style={{
           background: 'rgba(15,23,42,0.85)',
@@ -234,6 +235,7 @@ export function AppSidebar() {
 
             <button
               onClick={() => setMobileOpen(false)}
+              aria-label="Close navigation"
               className="absolute right-4 top-4 z-20 flex items-center justify-center rounded-lg p-1 text-[var(--sidebar-text)] transition-colors hover:bg-white/5 hover:text-[var(--sidebar-text-active)]"
             >
               <X className="h-5 w-5" />

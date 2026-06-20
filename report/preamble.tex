@@ -1,0 +1,109 @@
+\usepackage{iftex}
+\ifPDFTeX
+  \usepackage[utf8]{inputenc}
+  \usepackage[T5]{fontenc}
+  \usepackage[english,vietnamese]{babel}
+\else
+  \usepackage{fontspec}
+  \usepackage[english,vietnamese]{babel}
+  \IfFontExistsTF{Latin Modern Roman}
+    {\setmainfont{Latin Modern Roman}}
+    {\setmainfont{TeX Gyre Termes}}
+  \IfFontExistsTF{Latin Modern Sans}
+    {\setsansfont{Latin Modern Sans}}
+    {\setsansfont{Arial}}
+  \IfFontExistsTF{Latin Modern Mono}
+    {\setmonofont{Latin Modern Mono}[
+      BoldFont={Latin Modern Mono},
+      ItalicFont={Latin Modern Mono},
+      BoldItalicFont={Latin Modern Mono}
+    ]}
+    {\setmonofont{Consolas}}
+\fi
+
+\usepackage{geometry}
+\geometry{left=3cm,right=2cm,top=2.5cm,bottom=2.5cm}
+\usepackage{setspace}
+\onehalfspacing
+\emergencystretch=2em
+
+\usepackage{graphicx}
+\graphicspath{
+  {../docs/images/web/}
+  {../docs/evidence/screenshots/}
+  {figures/}
+}
+
+\usepackage{booktabs}
+\usepackage{longtable}
+\usepackage{tabularx}
+\usepackage{array}
+\usepackage{multirow}
+\usepackage{makecell}
+\usepackage{float}
+\usepackage{caption}
+\usepackage{subcaption}
+\usepackage{enumitem}
+\usepackage{xcolor}
+\usepackage{tcolorbox}
+\usepackage{listings}
+\usepackage{csquotes}
+\DeclareQuoteAlias{english}{vietnamese}
+\usepackage[
+  backend=biber,
+  style=ieee,
+  sorting=none
+]{biblatex}
+\DeclareLanguageMapping{vietnamese}{english}
+\addbibresource{refs.bib}
+
+\usepackage{hyperref}
+\hypersetup{
+  colorlinks=true,
+  linkcolor=black,
+  citecolor=black,
+  urlcolor=blue,
+  pdftitle={Triển khai hệ thống quản lý tài liệu bảo mật DocVault theo quy trình DevSecOps},
+  pdfauthor={DocVault}
+}
+
+\definecolor{docvaultblue}{HTML}{1F4E79}
+\definecolor{docvaultgray}{HTML}{F2F4F7}
+\definecolor{docvaultgreen}{HTML}{177245}
+\definecolor{docvaultred}{HTML}{B42318}
+\definecolor{docvaultamber}{HTML}{B54708}
+
+\setlist[itemize]{topsep=4pt,itemsep=2pt,parsep=0pt}
+\setlist[enumerate]{topsep=4pt,itemsep=2pt,parsep=0pt}
+
+\captionsetup{font=small,labelfont=bf}
+
+\lstdefinestyle{docvaultcode}{
+  basicstyle=\ttfamily\small,
+  backgroundcolor=\color{docvaultgray},
+  breaklines=true,
+  columns=fullflexible,
+  frame=single,
+  rulecolor=\color{black!20},
+  tabsize=2,
+  showstringspaces=false
+}
+\lstset{style=docvaultcode}
+
+\newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcommand{\code}[1]{\texttt{#1}}
+\newcommand{\codecell}[1]{\makecell[l]{#1}}
+\newcommand{\statusdone}{\textcolor{docvaultgreen}{Đã triển khai}}
+\newcommand{\statusprogress}{\textcolor{docvaultamber}{Đang hoàn thiện}}
+\newcommand{\statusgap}{\textcolor{docvaultred}{Cần bổ sung}}
+
+\tcbset{
+  colback=docvaultgray,
+  colframe=docvaultblue,
+  arc=1mm,
+  boxrule=0.6pt,
+  left=6pt,
+  right=6pt,
+  top=6pt,
+  bottom=6pt
+}
