@@ -43,7 +43,7 @@ spec:
       containers:
         - name: keycloak
           image: quay.io/keycloak/keycloak:26.0
-          args: ["start-dev", "--import-realm"]
+          args: ["start", "--import-realm"]
           securityContext:
             runAsNonRoot: true
             runAsUser: 1000
@@ -56,6 +56,20 @@ spec:
           ports:
             - containerPort: 8080
           env:
+            - name: KC_DB
+              value: postgres
+            - name: KC_DB_URL
+              value: jdbc:postgresql://keycloak-postgres-rw.docvault.svc.cluster.local:5432/keycloak
+            - name: KC_DB_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres-app
+                  key: username
+            - name: KC_DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: keycloak-postgres-app
+                  key: password
             - name: KEYCLOAK_ADMIN
               valueFrom:
                 secretKeyRef:

@@ -12,3 +12,4 @@ resources:
   - postgres.yaml
   - secretstore.yaml
   - storageclass.yaml
+  - keycloak-postgres.yaml
