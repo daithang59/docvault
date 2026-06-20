@@ -122,9 +122,11 @@ Write-Host "3. Reading Terraform outputs..." -ForegroundColor Cyan
 $BucketName = Get-TerraformOutput "documents_bucket_name"
 $KmsKeyArn = Get-TerraformOutput "documents_kms_key_arn"
 $RoleArn = Get-TerraformOutput "document_service_role_arn"
+$Region = Get-TerraformOutput "region"
 
 Write-Host "4. Updating Helm values with yq..." -ForegroundColor Cyan
 Set-YqString '.env.S3_BUCKET = strenv(DOCVAULT_S3_BUCKET)' "DOCVAULT_S3_BUCKET" $BucketName
+Set-YqString '.env.S3_REGION = strenv(DOCVAULT_S3_REGION)' "DOCVAULT_S3_REGION" $Region
 Set-YqString '.env.S3_KMS_KEY_ID = strenv(DOCVAULT_S3_KMS_KEY_ARN)' "DOCVAULT_S3_KMS_KEY_ARN" $KmsKeyArn
 Set-YqString '.serviceAccount.annotations."eks.amazonaws.com/role-arn" = strenv(DOCVAULT_DOCUMENT_SERVICE_ROLE_ARN)' "DOCVAULT_DOCUMENT_SERVICE_ROLE_ARN" $RoleArn
 
