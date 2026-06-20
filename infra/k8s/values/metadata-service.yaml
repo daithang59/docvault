@@ -2,9 +2,9 @@
 namespace: docvault
 
 image:
-  repository: daithang59/metadata-service
-  tag: "v33"
-  digest: "sha256:c0b17a14f136a21a62483ccbaf9c22c1cb1966884444a74897327c5764d49f3b"
+  repository: "harbor.docvault.id.vn/docvault-dev/metadata-service"
+  tag: "v9-ad76f1e1bd85"
+  digest: "sha256:751d127036d5a5a3dd28149a1759ced981da45b9ed6360962fa0323761f3a2fa"
 
 healthPath: /health
 
