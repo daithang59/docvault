@@ -31,8 +31,13 @@ def call() {
         : false
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
-        : false
-    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
+        : true
+    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: '/var/jenkins_home/caches/dependency-check'
+    def registryBuildCache = env.REGISTRY_BUILD_CACHE?.trim()
+        ? env.REGISTRY_BUILD_CACHE.equalsIgnoreCase('true')
+        : true
+    def registryBuildCacheSuffix = env.REGISTRY_BUILD_CACHE_SUFFIX?.trim() ?: 'buildcache'
+    def alpineSecurityRefresh = env.ALPINE_SECURITY_REFRESH?.trim() ?: 'manual'
     def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
 
     return [
@@ -52,6 +57,9 @@ def call() {
         cosignTlogUpload: cosignTlogUpload,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
+        registryBuildCache: registryBuildCache,
+        registryBuildCacheSuffix: registryBuildCacheSuffix,
+        alpineSecurityRefresh: alpineSecurityRefresh,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
         kyvernoImage: 'ghcr.io/kyverno/kyverno-cli:v1.12.0',

@@ -242,27 +242,64 @@ List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady
 void buildTarget(cfg, Map target, String tag) {
     def repository = target.repository
     def dockerfile = target.dockerfile
+    def alpineSecurityRefresh = cfg.alpineSecurityRefresh?.trim() ?: 'manual'
     def buildArgs = (target.buildArgs ?: [:]) + [
-        ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
+        ALPINE_SECURITY_REFRESH: alpineSecurityRefresh
     ]
-    def cacheFrom = "${repository}:latest"
+    def cacheRef = "${repository}:${cfg.registryBuildCacheSuffix ?: 'buildcache'}"
+    def useRegistryCache = cfg.registryBuildCache != null &&
+        cfg.registryBuildCache.toString().equalsIgnoreCase('true') &&
+        cfg.registryHost?.trim()
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
 
-    sh """
-        set -eu
-        export DOCKER_BUILDKIT=1
-        docker pull '${cacheFrom}' >/dev/null 2>&1 || true
-        docker build \\
-            --pull \\
-            --build-arg BUILDKIT_INLINE_CACHE=1 \\
-            --cache-from '${cacheFrom}' \\
-            ${buildArgsToFlags(buildArgs)} \\
-            -t '${repository}:${tag}' \\
-            -t '${repository}:latest' \\
-            -f '${dockerfile}' \\
-            .
-    """
+    if (useRegistryCache) {
+        echo ">>> Using BuildKit registry cache: ${cacheRef}"
+        sh """
+            set -eu
+            export DOCKER_BUILDKIT=1
+
+            if docker buildx version >/dev/null 2>&1; then
+                docker buildx inspect docvault-builder >/dev/null 2>&1 || \\
+                    docker buildx create --name docvault-builder --driver docker-container >/dev/null 2>&1 || true
+                docker buildx inspect --bootstrap docvault-builder >/dev/null
+
+                docker buildx build \\
+                    --builder docvault-builder \\
+                    --pull \\
+                    --load \\
+                    --cache-from type=registry,ref='${cacheRef}' \\
+                    --cache-to type=registry,ref='${cacheRef}',mode=max \\
+                    ${buildArgsToFlags(buildArgs)} \\
+                    -t '${repository}:${tag}' \\
+                    -t '${repository}:latest' \\
+                    -f '${dockerfile}' \\
+                    .
+            else
+                echo "WARNING: Docker buildx was not found. Falling back to local Docker cache only."
+                docker build \\
+                    --pull \\
+                    ${buildArgsToFlags(buildArgs)} \\
+                    -t '${repository}:${tag}' \\
+                    -t '${repository}:latest' \\
+                    -f '${dockerfile}' \\
+                    .
+            fi
+        """
+    } else {
+        echo '>>> Registry build cache disabled; using local Docker cache only.'
+        sh """
+            set -eu
+            export DOCKER_BUILDKIT=1
+            docker build \\
+                --pull \\
+                ${buildArgsToFlags(buildArgs)} \\
+                -t '${repository}:${tag}' \\
+                -t '${repository}:latest' \\
+                -f '${dockerfile}' \\
+                .
+        """
+    }
 }
 
 void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
