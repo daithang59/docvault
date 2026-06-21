@@ -72,6 +72,8 @@ spec:
           resources:
             {{- toYaml (.Values.seed.resources | default .Values.resources) | nindent 12 }}
           env:
+            - name: COREPACK_HOME
+              value: /tmp/corepack
             {{- range $key, $value := .Values.env }}
             - name: {{ $key }}
               value: {{ $value | quote }}

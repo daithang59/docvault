@@ -58,7 +58,8 @@ spec:
                 -r docvault \
                 -s "secret=$CLIENT_SECRET" \
                 -s 'redirectUris=["http://localhost:3000/*","http://localhost:3006/*","http://localhost:3006/api/auth/callback","https://app.docvault.id.vn/*","https://app.docvault.id.vn/api/auth/callback"]' \
-                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]'
+                -s 'webOrigins=["http://localhost:3000","http://localhost:3006","https://app.docvault.id.vn"]' \
+                -s "secret=$KEYCLOAK_CLIENT_SECRET"
           env:
             - name: HOME
               value: /tmp

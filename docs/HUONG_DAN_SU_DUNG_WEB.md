@@ -59,7 +59,6 @@ Mỗi vai trò chỉ thấy các mục phù hợp. Bảng dưới đây liệt k
 | Mục menu | Chức năng | Vai trò thấy được |
 |---|---|---|
 | **Dashboard** | Tổng quan, thống kê, hành động nhanh | Tất cả |
-| **Demo Kit** | Checklist bằng chứng phục vụ demo/báo cáo | Compliance Officer, Admin |
 | **Documents** | Danh sách toàn bộ tài liệu được phép xem | Tất cả |
 | **My Documents** | Tài liệu do bạn sở hữu | Editor, Admin |
 | **New Document** | Tạo tài liệu mới | Editor, Admin |
@@ -244,9 +243,9 @@ Chỉ **Editor (chủ sở hữu)** và **Admin** quản lý được ACL.
 
 - Vào **Retention** để xem trạng thái vòng đời và tự động archive của tài liệu đã xuất bản.
 
-### 8.6. Demo Kit
+### 8.6. Demo Kit nội bộ
 
-- Vào **Demo Kit** để xem checklist bằng chứng runtime phục vụ demo và chụp ảnh báo cáo.
+- Demo Kit không còn là mục sidebar của sản phẩm. Route `/demo-kit` chỉ giữ cho presenter/nội bộ khi cần checklist bằng chứng runtime và chụp ảnh báo cáo.
 
 > Compliance Officer thấy metadata của mọi tài liệu PUBLISHED và ARCHIVED để phục vụ kiểm toán, nhưng chỉ preview được tài liệu PUBLIC và không bao giờ tải được file.
 
