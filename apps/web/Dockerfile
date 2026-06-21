@@ -19,7 +19,7 @@ RUN apk update && apk add --no-cache libc6-compat
 WORKDIR /app                                                                                                  
 COPY --from=builder /app/out/json/ .                                                                          
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml                                                  
-RUN pnpm install --frozen-lockfile                                                                            
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile                                                                            
 COPY --from=builder /app/out/full/ .                                                                          
 
 ARG NEXT_PUBLIC_APP_NAME=DocVault
@@ -29,7 +29,9 @@ ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV GATEWAY_URL=${GATEWAY_URL}
 
-RUN pnpm turbo run build --filter=web...                                                                      
+RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
+    --mount=type=cache,id=next-cache,target=/app/apps/web/.next/cache \
+    pnpm turbo run build --filter=web...                                                                      
                                                                                                             
 FROM base AS runner                                                                                           
 WORKDIR /app                                                                                                  

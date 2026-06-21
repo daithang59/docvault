@@ -25,7 +25,7 @@ WORKDIR /app
 # First copy the pruned package.json and lockfile
 COPY --from=builder /app/out/json/ .
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml
-RUN pnpm install --frozen-lockfile
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile
 
 # Copy the rest of the source and build
 COPY --from=builder /app/out/full/ .
@@ -34,7 +34,7 @@ ARG SERVICE_NAME
 RUN if [ -f "services/${SERVICE_NAME}/prisma/schema.prisma" ]; then \
       cd services/${SERVICE_NAME} && pnpm prisma generate; \
     fi
-RUN pnpm turbo run build --filter=${SERVICE_NAME}...
+RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo pnpm turbo run build --filter=${SERVICE_NAME}...
 RUN mkdir -p /tmp/service-prisma && \
     if [ -d "services/${SERVICE_NAME}/prisma" ]; then \
       cp -a "services/${SERVICE_NAME}/prisma" /tmp/service-prisma/prisma; \
