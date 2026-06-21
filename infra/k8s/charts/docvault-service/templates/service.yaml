@@ -3,6 +3,13 @@ kind: Service
 metadata:
   name: {{ .Release.Name }}
   namespace: {{ .Values.namespace | quote }}
+  labels:
+    app: {{ .Release.Name }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: {{ .Release.Name }}
+    app.kubernetes.io/part-of: docvault-app
+    app.kubernetes.io/managed-by: Helm
 spec:
   type: {{ .Values.service.type }}
   ports:

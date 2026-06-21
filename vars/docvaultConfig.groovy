@@ -32,8 +32,11 @@ def call() {
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : false
-    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
+    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: '/var/jenkins_home/caches/dependency-check'
     def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
+    def createGitOpsPr = env.CREATE_GITOPS_PR?.trim()
+        ? env.CREATE_GITOPS_PR.equalsIgnoreCase('true')
+        : true
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -50,6 +53,7 @@ def call() {
         cosignPasswordCredentialId: cosignPasswordCredentialId,
         cosignPublicKeyCredentialId: cosignPublicKeyCredentialId,
         cosignTlogUpload: cosignTlogUpload,
+        createGitOpsPr: createGitOpsPr,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
         nodeImage: 'node:20-alpine',

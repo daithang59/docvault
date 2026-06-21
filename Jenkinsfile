@@ -1,4 +1,4 @@
-@Library('docvault@fix/web-seed-job-main-sync') _
+@Library('docvault@feat/terraform-modules') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -134,13 +134,18 @@ pipeline {
         )
         booleanParam(
             name: 'DEPENDENCY_CHECK_NO_UPDATE',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
         )
         booleanParam(
             name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
             defaultValue: true,
             description: 'Temporarily continue the pipeline when Dependency Check fails. The stage/build will be marked unstable.'
+        )
+        booleanParam(
+            name: 'CREATE_GITOPS_PR',
+            defaultValue: true,
+            description: 'Create a GitHub Pull Request for GitOps manifest updates instead of pushing directly to the target branch.'
         )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
@@ -231,6 +236,7 @@ pipeline {
                     cfg.kubeconfigCredentialId = params.KUBECONFIG_CREDENTIAL_ID?.trim()
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
+                    cfg.createGitOpsPr = params.CREATE_GITOPS_PR != null ? params.CREATE_GITOPS_PR : true
 
                     cfg.useNvdKey = true
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE
@@ -250,7 +256,7 @@ pipeline {
                     cfg.branchName = resolvedBranchName ?: '(unknown)'
                     cfg.isPullRequest = env.CHANGE_ID?.trim() ? true : false
                     cfg.isReleaseBuild = !cfg.isPullRequest && cfg.branchName == cfg.releaseBranch
-                    cfg.imageTag = "v${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
+                    cfg.imageTag = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
 
                     env.IS_PULL_REQUEST = cfg.isPullRequest ? 'true' : 'false'
                     env.IS_RELEASE_BUILD = cfg.isReleaseBuild ? 'true' : 'false'

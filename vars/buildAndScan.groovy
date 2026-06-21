@@ -59,6 +59,9 @@ def call(cfg) {
     }
 
     def trivyDbReady = buildTargets ? warmTrivyCache(cfg) : false
+    if (buildTargets) {
+        initBuildx()
+    }
     def builtList = buildTargets ? withRegistryLogin(cfg) {
         runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady)
     } : []
@@ -168,14 +171,21 @@ def withRegistryLogin(cfg, Closure body) {
 
     def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
     def registryArg = shellQuote(cfg.registryHost.trim())
-    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialId = cfg.registryCacheCredentialId ?: env.REGISTRY_CACHE_CREDENTIAL_ID ?: 'harbor-docvault-dev-cache-token'
     def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
     def result = null
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
             if (credentialType == 'secretText') {
-                def registryUsername = cfg.registryUsername?.trim()
+                def registryUsername = cfg.registryCacheUsername?.trim() ?: env.REGISTRY_CACHE_USERNAME?.trim()
+                if (!registryUsername) {
+                    if (credentialId == 'harbor-docvault-dev-cache-token') {
+                        registryUsername = 'robot$cache-dev'
+                    } else {
+                        registryUsername = cfg.registryUsername?.trim()
+                    }
+                }
                 if (!registryUsername) {
                     error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
                 }
@@ -245,21 +255,28 @@ void buildTarget(cfg, Map target, String tag) {
     def buildArgs = (target.buildArgs ?: [:]) + [
         ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
     ]
-    def cacheFrom = "${repository}:latest"
+
+    // Parse registry host and service path explicitly
+    def repoParts = repository.tokenize('/')
+    assert repoParts.size() >= 3
+    def registryHost = repoParts[0]
+    def repositoryName = repoParts.drop(2).join('/')
+    def cacheRef = "${registryHost}/docvault-cache/${repositoryName}"
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
 
     sh """
         set -eu
         export DOCKER_BUILDKIT=1
-        docker pull '${cacheFrom}' >/dev/null 2>&1 || true
-        docker build \\
+
+        # Build image, load it locally for scan/push stages, and push cache to registry
+        docker buildx build \\
             --pull \\
-            --build-arg BUILDKIT_INLINE_CACHE=1 \\
-            --cache-from '${cacheFrom}' \\
+            --cache-from=type=registry,ref=${cacheRef} \\
+            --cache-to=type=registry,ref=${cacheRef},mode=max \\
             ${buildArgsToFlags(buildArgs)} \\
             -t '${repository}:${tag}' \\
-            -t '${repository}:latest' \\
+            --load \\
             -f '${dockerfile}' \\
             .
     """
@@ -330,4 +347,16 @@ String resolveRepository(cfg, String service) {
         return "${cfg.registryHost.trim()}/${namespace}/${service}"
     }
     return "${namespace}/${service}"
+}
+
+void initBuildx() {
+    echo ">>> Initializing Buildx builder..."
+    sh """
+        set -eu
+        export DOCKER_BUILDKIT=1
+        docker buildx use docvault-builder >/dev/null 2>&1 || \\
+            docker buildx create --name docvault-builder --driver docker-container --use || true
+        docker buildx use docvault-builder
+        docker buildx inspect --bootstrap
+    """
 }
