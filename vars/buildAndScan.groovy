@@ -267,9 +267,8 @@ void buildTarget(cfg, Map target, String tag) {
         export DOCKER_BUILDKIT=1
 
         # Ensure Buildx container builder is created, selected, and ready
-        docker buildx inspect docvault-builder >/dev/null 2>&1 || \\
+        docker buildx use docvault-builder >/dev/null 2>&1 || \\
             docker buildx create --name docvault-builder --driver docker-container --use
-        docker buildx use docvault-builder
         docker buildx inspect --bootstrap
 
         # Build image, load it locally for scan/push stages, and push cache to registry
