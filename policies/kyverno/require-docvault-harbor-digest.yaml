@@ -1,0 +1,42 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-docvault-harbor-digest
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deployment-images-from-harbor-by-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              selector:
+                matchLabels:
+                  app.kubernetes.io/part-of: docvault-app
+      validate:
+        message: "DocVault application Deployments must use Harbor images pinned by sha256 digest."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "harbor.docvault.id.vn/docvault-*/*:*@sha256:?*"
+    - name: job-images-from-harbor-by-digest
+      match:
+        any:
+          - resources:
+              kinds:
+                - Job
+              selector:
+                matchLabels:
+                  app.kubernetes.io/part-of: docvault-app
+      validate:
+        message: "DocVault application Jobs must use Harbor images pinned by sha256 digest."
+        pattern:
+          spec:
+            template:
+              spec:
+                containers:
+                  - image: "harbor.docvault.id.vn/docvault-*/*:*@sha256:?*"
