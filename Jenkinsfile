@@ -134,7 +134,7 @@ pipeline {
         )
         booleanParam(
             name: 'DEPENDENCY_CHECK_NO_UPDATE',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
         )
         booleanParam(

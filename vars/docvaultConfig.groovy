@@ -32,7 +32,7 @@ def call() {
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : false
-    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: ''
+    def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: '/var/jenkins_home/caches/dependency-check'
     def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
 
     return [
