@@ -22,8 +22,9 @@ def call(Map cfg = [:]) {
             set -eu
 
             rm -rf .scannerwork
-            mkdir -p .sonar-cache .scannerwork
-            chmod 777 .sonar-cache .scannerwork
+            mkdir -p .scannerwork
+            chmod 777 .scannerwork
+            docker volume create docvault-sonar-cache >/dev/null
 
             CONFIGURED_SONAR_HOST="${hostOverride}"
             SONAR_HOST=""
@@ -66,7 +67,7 @@ def call(Map cfg = [:]) {
             docker run --rm \\
                 ${dockerRunArgs} \\
                 -v "${env.WORKSPACE}:/usr/src" \\
-                -v "${env.WORKSPACE}/.sonar-cache:/opt/sonar-scanner/.sonar/cache" \\
+                -v "docvault-sonar-cache:/opt/sonar-scanner/.sonar/cache" \\
                 -w /usr/src \\
                 -e SONAR_HOST_URL="\${SONAR_HOST}" \\
                 -e SONAR_TOKEN="${env.SONAR_AUTH_TOKEN}" \\
