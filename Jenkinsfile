@@ -1,4 +1,4 @@
-@Library('docvault@fix/web-seed-job-main-sync') _
+@Library('docvault@feat/terraform-modules') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -250,7 +250,7 @@ pipeline {
                     cfg.branchName = resolvedBranchName ?: '(unknown)'
                     cfg.isPullRequest = env.CHANGE_ID?.trim() ? true : false
                     cfg.isReleaseBuild = !cfg.isPullRequest && cfg.branchName == cfg.releaseBranch
-                    cfg.imageTag = "v${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
+                    cfg.imageTag = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
 
                     env.IS_PULL_REQUEST = cfg.isPullRequest ? 'true' : 'false'
                     env.IS_RELEASE_BUILD = cfg.isReleaseBuild ? 'true' : 'false'
