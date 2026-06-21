@@ -4,26 +4,44 @@ def call(cfg) {
     def status = sh(
         script: """
         set -eu
+        rm -rf policy-report policy-rendered
         mkdir -p policy-report
         mkdir -p policy-rendered
 
         echo ">>> Rendering DocVault Helm values for policy checks..."
+        common_values="infra/k8s/values/common-harbor.yaml"
         for f in infra/k8s/values/*.yaml; do
             name="\$(basename "\$f" .yaml)"
+            if [ "\$name" = "common-harbor" ]; then
+                continue
+            fi
+            case "\$f" in
+                *.example.yaml) continue ;;
+            esac
+
+            value_args="-f \$f"
+            if [ -f "\$common_values" ]; then
+                value_args="-f \$common_values -f \$f"
+            fi
+
             docker run --rm \\
                 -v ${env.WORKSPACE}:/workspace \\
                 -w /workspace \\
                 ${cfg.helmImage ?: 'alpine/helm:3.16.4'} \\
                 template "docvault-\$name" infra/k8s/charts/docvault-service \\
                 -n docvault \\
-                -f "\$f" \\
+                \$value_args \\
                 > "policy-rendered/\$name.yaml"
         done
 
         echo ">>> Scanning infra/k8s manifests and rendered Helm output against Kyverno policies..."
 
         RESOURCES=""
-        for f in infra/k8s/infra-deps/*.yaml; do
+        for f in \$(find infra/k8s infra/argocd-apps infra/argocd-bootstrap \\
+            -path 'infra/k8s/charts' -prune -o \\
+            -path 'infra/k8s/values' -prune -o \\
+            -path 'infra/k8s/harbor' -prune -o \\
+            -type f \\( -name '*.yaml' -o -name '*.yml' \\) -print); do
             if grep -q "kind:" "\$f"; then
                 RESOURCES="\$RESOURCES --resource /workspace/\$f"
             fi

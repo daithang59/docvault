@@ -1,0 +1,60 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-docvault-restricted-containers
+spec:
+  validationFailureAction: Enforce
+  background: true
+  rules:
+    - name: deployment-restricted-container-context
+      match:
+        any:
+          - resources:
+              kinds:
+                - Deployment
+              selector:
+                matchLabels:
+                  app.kubernetes.io/part-of: docvault-app
+      validate:
+        message: "DocVault Deployments must run as non-root with RuntimeDefault seccomp, no privilege escalation, read-only root filesystem, and all capabilities dropped."
+        pattern:
+          spec:
+            template:
+              spec:
+                securityContext:
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
+                containers:
+                  - securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                        drop:
+                          - ALL
+    - name: job-restricted-container-context
+      match:
+        any:
+          - resources:
+              kinds:
+                - Job
+              selector:
+                matchLabels:
+                  app.kubernetes.io/part-of: docvault-app
+      validate:
+        message: "DocVault Jobs must run as non-root with RuntimeDefault seccomp, no privilege escalation, read-only root filesystem, and all capabilities dropped."
+        pattern:
+          spec:
+            template:
+              spec:
+                securityContext:
+                  runAsNonRoot: true
+                  seccompProfile:
+                    type: RuntimeDefault
+                containers:
+                  - securityContext:
+                      allowPrivilegeEscalation: false
+                      readOnlyRootFilesystem: true
+                      capabilities:
+                        drop:
+                          - ALL
