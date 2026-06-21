@@ -60,12 +60,14 @@ def pushImages(cfg, builtList, tag) {
 
                 withCredentials([string(credentialsId: credentialId, variable: 'DOCKER_PASS')]) {
                     sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u ${shellQuote(registryUsername)} --password-stdin ${registryArg}"
+                    sh "chmod 755 '${dockerConfigDir}' && chmod 644 '${dockerConfigDir}/config.json' || true"
                     pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
                     sh "docker logout ${registryArg} || true"
                 }
             } else if (credentialType == 'usernamePassword') {
                 withCredentials([usernamePassword(credentialsId: credentialId, passwordVariable: 'DOCKER_PASS', usernameVariable: 'DOCKER_USER')]) {
                     sh "printf '%s' \"\$DOCKER_PASS\" | docker login -u \"\$DOCKER_USER\" --password-stdin ${registryArg}"
+                    sh "chmod 755 '${dockerConfigDir}' && chmod 644 '${dockerConfigDir}/config.json' || true"
                     pushBuiltImagesAndResolveDigests(cfg, builtList, tag, imageDigests)
                     sh "docker logout ${registryArg} || true"
                 }

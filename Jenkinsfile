@@ -54,7 +54,7 @@ pipeline {
         )
         booleanParam(
             name: 'SIGN_IMAGES',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Sign pushed image digests with cosign. Requires cosign-private-key and cosign-password credentials.'
         )
         string(
