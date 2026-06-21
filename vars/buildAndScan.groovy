@@ -245,21 +245,34 @@ void buildTarget(cfg, Map target, String tag) {
     def buildArgs = (target.buildArgs ?: [:]) + [
         ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
     ]
-    def cacheFrom = "${repository}:latest"
+
+    // Parse registry host and service path explicitly
+    def repoParts = repository.tokenize('/')
+    assert repoParts.size() >= 3
+    def registryHost = repoParts[0]
+    def repositoryName = repoParts.drop(2).join('/')
+    def cacheRef = "${registryHost}/docvault-cache/${repositoryName}"
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
 
     sh """
         set -eu
         export DOCKER_BUILDKIT=1
-        docker pull '${cacheFrom}' >/dev/null 2>&1 || true
-        docker build \\
+
+        # Ensure Buildx container builder is created, selected, and ready
+        docker buildx inspect docvault-builder >/dev/null 2>&1 || \\
+            docker buildx create --name docvault-builder --driver docker-container --use
+        docker buildx use docvault-builder
+        docker buildx inspect --bootstrap
+
+        # Build image, load it locally for scan/push stages, and push cache to registry
+        docker buildx build \\
             --pull \\
-            --build-arg BUILDKIT_INLINE_CACHE=1 \\
-            --cache-from '${cacheFrom}' \\
+            --cache-from=type=registry,ref=${cacheRef} \\
+            --cache-to=type=registry,ref=${cacheRef},mode=max \\
             ${buildArgsToFlags(buildArgs)} \\
             -t '${repository}:${tag}' \\
-            -t '${repository}:latest' \\
+            --load \\
             -f '${dockerfile}' \\
             .
     """
