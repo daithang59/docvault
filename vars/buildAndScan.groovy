@@ -168,7 +168,7 @@ def withRegistryLogin(cfg, Closure body) {
 
     def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
     def registryArg = shellQuote(cfg.registryHost.trim())
-    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialId = cfg.registryCacheCredentialId ?: env.REGISTRY_CACHE_CREDENTIAL_ID ?: 'harbor-docvault-dev-cache-token'
     def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
     def result = null
 
