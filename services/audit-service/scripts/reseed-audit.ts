@@ -61,7 +61,8 @@ async function main(): Promise<number> {
     const model = mongoose.model('AuditEvent', AuditEventSchema);
 
     // 1. Clean slate: drop the collection so stale (forked) data and any old
-    //    indexes are gone, then re-sync indexes (creates unique prevHash index).
+    //    indexes are gone, then re-sync indexes (creates the compound unique
+    //    epochId+prevHash index).
     const collections = await mongoose.connection
       .db!.listCollections({ name: 'audit_events' })
       .toArray();
@@ -70,7 +71,7 @@ async function main(): Promise<number> {
     }
     await model.syncIndexes();
     console.log(
-      'Dropped audit_events and synced indexes (unique prevHash enforced).',
+      'Dropped audit_events and synced indexes (unique epochId+prevHash enforced).',
     );
 
     const service = new AuditService(model as any);
