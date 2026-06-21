@@ -142,6 +142,11 @@ pipeline {
             defaultValue: true,
             description: 'Temporarily continue the pipeline when Dependency Check fails. The stage/build will be marked unstable.'
         )
+        booleanParam(
+            name: 'CREATE_GITOPS_PR',
+            defaultValue: true,
+            description: 'Create a GitHub Pull Request for GitOps manifest updates instead of pushing directly to the target branch.'
+        )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
             defaultValue: '',
@@ -231,6 +236,7 @@ pipeline {
                     cfg.kubeconfigCredentialId = params.KUBECONFIG_CREDENTIAL_ID?.trim()
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
+                    cfg.createGitOpsPr = params.CREATE_GITOPS_PR != null ? params.CREATE_GITOPS_PR : true
 
                     cfg.useNvdKey = true
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE

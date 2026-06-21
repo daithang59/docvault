@@ -314,7 +314,41 @@ EOF
                     git -C '${gitOpsWorktree}' commit -m "${commitMsg}"
                 """
 
-                pushWithRetry(gitOpsWorktree, targetBranch)
+                if (cfg.createGitOpsPr) {
+                    def repoUrl = cfg.gitOpsRepoUrl.toString().trim()
+                    def matcher = repoUrl =~ /github\.com[:\/]([^\/]+)\/([^\.]+)(\.git)?/
+                    if (!matcher) {
+                        error("Could not parse owner/repo from GitOps URL: ${repoUrl}")
+                    }
+                    def repoPath = "${matcher[0][1]}/${matcher[0][2]}"
+                    def prBranch = "gitops-update-${tag}-${env.BUILD_NUMBER}"
+
+                    echo ">>> Pull Request mode enabled. Checking out feature branch '${prBranch}'..."
+                    sh "git -C '${gitOpsWorktree}' checkout -b '${prBranch}'"
+                    pushWithRetry(gitOpsWorktree, prBranch)
+
+                    def prTitle = "chore(gitops): update image references to ${tag}"
+                    def prBody = "Automated PR created by Jenkins pipeline build #${env.BUILD_NUMBER} to update container image references to tag `${tag}`."
+                    def apiPayload = """{
+                        "title": "${prTitle}",
+                        "head": "${prBranch}",
+                        "base": "${targetBranch}",
+                        "body": "${prBody}"
+                    }"""
+
+                    echo ">>> Creating GitHub Pull Request to target branch '${targetBranch}'..."
+                    sh """
+                        set +x
+                        curl -fsS -X POST \\
+                            -H "Accept: application/vnd.github+json" \\
+                            -H "Authorization: Bearer \$GIT_PASS" \\
+                            -H "X-GitHub-Api-Version: 2022-11-28" \\
+                            "https://api.github.com/repos/${repoPath}/pulls" \\
+                            -d '${shellQuote(apiPayload)}'
+                    """
+                } else {
+                    pushWithRetry(gitOpsWorktree, targetBranch)
+                }
             }
         } finally {
             sh "rm -f '${askPassScript}'"
