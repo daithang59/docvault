@@ -59,6 +59,9 @@ def call(cfg) {
     }
 
     def trivyDbReady = buildTargets ? warmTrivyCache(cfg) : false
+    if (buildTargets) {
+        initBuildx()
+    }
     def builtList = buildTargets ? withRegistryLogin(cfg) {
         runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady)
     } : []
@@ -266,11 +269,6 @@ void buildTarget(cfg, Map target, String tag) {
         set -eu
         export DOCKER_BUILDKIT=1
 
-        # Ensure Buildx container builder is created, selected, and ready
-        docker buildx use docvault-builder >/dev/null 2>&1 || \\
-            docker buildx create --name docvault-builder --driver docker-container --use
-        docker buildx inspect --bootstrap
-
         # Build image, load it locally for scan/push stages, and push cache to registry
         docker buildx build \\
             --pull \\
@@ -349,4 +347,16 @@ String resolveRepository(cfg, String service) {
         return "${cfg.registryHost.trim()}/${namespace}/${service}"
     }
     return "${namespace}/${service}"
+}
+
+void initBuildx() {
+    echo ">>> Initializing Buildx builder..."
+    sh """
+        set -eu
+        export DOCKER_BUILDKIT=1
+        docker buildx use docvault-builder >/dev/null 2>&1 || \\
+            docker buildx create --name docvault-builder --driver docker-container --use || true
+        docker buildx use docvault-builder
+        docker buildx inspect --bootstrap
+    """
 }
