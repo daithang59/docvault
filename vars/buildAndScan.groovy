@@ -175,7 +175,14 @@ def withRegistryLogin(cfg, Closure body) {
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
             if (credentialType == 'secretText') {
-                def registryUsername = cfg.registryUsername?.trim()
+                def registryUsername = cfg.registryCacheUsername?.trim() ?: env.REGISTRY_CACHE_USERNAME?.trim()
+                if (!registryUsername) {
+                    if (credentialId == 'harbor-docvault-dev-cache-token') {
+                        registryUsername = 'robot$cache-dev'
+                    } else {
+                        registryUsername = cfg.registryUsername?.trim()
+                    }
+                }
                 if (!registryUsername) {
                     error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
                 }
