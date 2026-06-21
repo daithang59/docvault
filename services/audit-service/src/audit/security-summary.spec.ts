@@ -791,6 +791,17 @@ describe('AuditService security summary', () => {
       toObject: () => ({ eventId: 'event-recommendation-updated' }),
     });
     const service = new AuditService({
+      find: jest.fn().mockReturnValue(
+        makeFindChain(
+          jest.fn().mockResolvedValue([
+            {
+              eventId: 'previous-event',
+              prevHash: null,
+              hash: 'previous-hash',
+            },
+          ]),
+        ),
+      ),
       findOne: jest.fn().mockReturnValue({
         sort: jest.fn().mockReturnValue({
           lean: jest.fn().mockResolvedValue({ hash: 'previous-hash' }),

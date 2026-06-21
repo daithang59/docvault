@@ -61,6 +61,58 @@ Hai giá trị này được khai báo trong:
 vars/docvaultConfig.groovy
 ```
 
+## 1.1. Cache Build Và Dependency Scan
+
+Pipeline hiện dùng hai lớp cache chính để giảm thời gian chạy lại sau mỗi commit.
+
+### Docker BuildKit registry cache
+
+Docker build dùng BuildKit registry cache trong Harbor thay vì dựa vào tag `latest`.
+Mỗi image có cache tag riêng:
+
+```text
+harbor.docvault.id.vn/docvault-dev/<service>:buildcache
+```
+
+Jenkins parameters:
+
+```text
+REGISTRY_BUILD_CACHE=true
+REGISTRY_BUILD_CACHE_SUFFIX=buildcache
+ALPINE_SECURITY_REFRESH=manual
+```
+
+`ALPINE_SECURITY_REFRESH` chỉ nên đổi có chủ đích, ví dụ theo tuần hoặc trước release. Không dùng `BUILD_NUMBER` cho biến này vì nó làm invalid Docker cache ở mọi build.
+Nếu Jenkins agent chưa có Docker buildx, pipeline sẽ cảnh báo và fallback về `docker build` thường thay vì fail toàn bộ build.
+
+Implementation:
+
+```text
+vars/buildAndScan.groovy
+```
+
+### Dependency Check persistent cache
+
+Dependency Check lưu database CVE trong cache persistent:
+
+```text
+DEPENDENCY_CHECK_DATA_DIR=/var/jenkins_home/caches/dependency-check
+```
+
+Sau khi cache đã warm, commit thường nên chạy:
+
+```text
+DEPENDENCY_CHECK_NO_UPDATE=true
+```
+
+Nếu cache chưa có `odc.mv.db`, helper sẽ tự cho phép update một lần để khởi tạo cache. Full update nên chạy theo lịch nightly hoặc trước release thay vì mọi commit.
+
+Implementation:
+
+```text
+vars/dependencyCheck.groovy
+```
+
 ## 2. Cấu Hình OWASP ZAP DAST
 
 OWASP ZAP được cấu hình là stage DAST tùy chọn sau deploy.

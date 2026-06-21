@@ -4,45 +4,49 @@ import { AuditService } from './audit.service';
  * Unit tests for AuditService hash chain logic.
  *
  * Uses a plain mock model (no module mocking needed) — the service
- * only needs `findOne().sort().lean()` and `create()`, so we wire
+ * only needs `find().sort().limit().lean()` and `create()`, so we wire
  * those up directly in the test.
  */
 
 describe('AuditService — Hash Chain', () => {
   // Plain mock model — no NestJS/Mongoose dependency
   let mockLean: jest.Mock;
+  let mockFindLean: jest.Mock;
   let mockCreate: jest.Mock;
   let mockFindOne: jest.Mock;
   let mockFindOneSort: jest.Mock;
+  let mockFind: jest.Mock;
   let mockFindSort: jest.Mock;
   let service: AuditService;
 
   beforeEach(() => {
     mockLean = jest.fn();
+    mockFindLean = jest.fn();
     mockCreate = jest.fn();
     mockFindOneSort = jest.fn().mockReturnValue({ lean: mockLean });
     mockFindSort = jest.fn().mockReturnValue({
       limit: jest.fn().mockReturnValue({
-        lean: jest.fn().mockResolvedValue([]),
+        lean: mockFindLean,
       }),
     });
 
     mockFindOne = jest.fn().mockReturnValue({
       sort: mockFindOneSort,
     });
+    mockFind = jest.fn().mockReturnValue({
+      sort: mockFindSort,
+    });
 
     const mockModel = {
       create: mockCreate,
-      // MongoDB: findOne({}).sort(...).lean()
       findOne: mockFindOne,
-      find: jest.fn().mockReturnValue({
-        sort: mockFindSort,
-      }),
+      find: mockFind,
     };
 
     service = new AuditService(mockModel as any);
 
     mockLean.mockResolvedValue(null);
+    mockFindLean.mockResolvedValue([]);
     // Simulate MongoDB: only the first argument is returned as saved document
     mockCreate.mockImplementation((data) =>
       Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
@@ -122,7 +126,14 @@ describe('AuditService — Hash Chain', () => {
 
   it('second event chains from first event hash', async () => {
     const first = await service.create(baseDto);
-    mockLean.mockResolvedValue({ hash: first.hash });
+    mockFindLean.mockResolvedValue([
+      {
+        eventId: first.eventId,
+        timestamp: first.timestamp,
+        prevHash: first.prevHash,
+        hash: first.hash,
+      },
+    ]);
 
     const second = await service.create({
       ...baseDto,
@@ -137,8 +148,9 @@ describe('AuditService — Hash Chain', () => {
   it('hash is deterministic for same input', async () => {
     const result1 = await service.create(timestampedDto);
 
-    // Reset mocks so findOne returns null again (fresh chain)
+    // Reset mocks so find returns an empty chain again.
     mockLean.mockResolvedValue(null);
+    mockFindLean.mockResolvedValue([]);
     mockCreate.mockImplementation((data) =>
       Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
     );
@@ -152,6 +164,7 @@ describe('AuditService — Hash Chain', () => {
     const result1 = await service.create(timestampedDto);
 
     mockLean.mockResolvedValue(null);
+    mockFindLean.mockResolvedValue([]);
     mockCreate.mockImplementation((data) =>
       Promise.resolve({ ...data, toObject: () => ({ ...data }) }),
     );
@@ -177,22 +190,25 @@ describe('AuditService — Hash Chain', () => {
     expect(result.prevHash).toBeNull();
   });
 
-  it('selects the previous chain head with deterministic timestamp and _id ordering', async () => {
+  it('loads epoch events to select the actual chain tail', async () => {
     await service.create(baseDto);
 
-    expect(mockFindOne).toHaveBeenCalledWith(
+    expect(mockFind).toHaveBeenCalledWith(
       {
         $or: [{ epochId: 'default' }, { epochId: { $exists: false } }],
       },
-      { hash: 1 },
+      {
+        _id: 1,
+        eventId: 1,
+        timestamp: 1,
+        prevHash: 1,
+        hash: 1,
+      },
     );
-    expect(mockFindOneSort).toHaveBeenCalledWith({
-      timestamp: -1,
-      _id: -1,
-    });
+    expect(mockFindSort).toHaveBeenCalledWith({ timestamp: 1, _id: 1 });
   });
 
-  it('verifies the chain with deterministic timestamp and _id ordering', async () => {
+  it('loads events in stable order before chain verification', async () => {
     await service.verifyChain();
 
     expect(mockFindSort).toHaveBeenCalledWith({
@@ -218,6 +234,32 @@ describe('AuditService — Hash Chain', () => {
       signedCount: 0,
       unsignedCount: 2,
     });
+  });
+
+  it('appends after the real chain tail when timestamps are inverted', async () => {
+    const storedModel = makeStoredModel();
+    const storedService = new AuditService(storedModel as any);
+
+    const first = await storedService.create({
+      ...baseDto,
+      eventId: 'timestamp-inversion-parent',
+      timestamp: '2026-06-20T18:18:03.216Z',
+    });
+    const second = await storedService.create({
+      ...baseDto,
+      eventId: 'timestamp-inversion-child',
+      action: 'DOCUMENT_METADATA_READ_DENIED',
+      timestamp: '2026-06-20T18:18:03.213Z',
+    });
+    const third = await storedService.create({
+      ...baseDto,
+      eventId: 'timestamp-inversion-next',
+      action: 'DOCUMENT_VIEWED',
+      timestamp: '2026-06-20T18:18:03.214Z',
+    });
+
+    expect(second.prevHash).toBe(first.hash);
+    expect(third.prevHash).toBe(second.hash);
   });
 
   it('verifies a clean chain when metadata is empty', async () => {
@@ -366,7 +408,7 @@ describe('AuditService — HMAC signing', () => {
 
 describe('AuditService — concurrent append (race fix)', () => {
   /**
-   * Stored model that enforces the unique-prevHash invariant the real
+   * Stored model that enforces the active-epoch chain invariant the real
    * MongoDB index provides: two events may never share the same prevHash.
    * A violation throws an E11000-shaped error so we can prove the in-process
    * mutex prevents the chain from forking under concurrent writes.
@@ -381,10 +423,10 @@ describe('AuditService — concurrent append (race fix)', () => {
         const prevKey = data.prevHash ?? '__null__';
         if (usedPrevHashes.has(prevKey)) {
           const err: any = new Error(
-            `E11000 duplicate key error collection: audit_events index: prevHash_1 dup key: { prevHash: "${data.prevHash}" }`,
+            `E11000 duplicate key error collection: audit_events index: epochId_1_prevHash_1 dup key: { prevHash: "${data.prevHash}" }`,
           );
           err.code = 11000;
-          err.keyPattern = { prevHash: 1 };
+          err.keyPattern = { epochId: 1, prevHash: 1 };
           throw err;
         }
         usedPrevHashes.add(prevKey);
@@ -447,7 +489,7 @@ describe('AuditService — concurrent append (race fix)', () => {
     );
 
     // Every write succeeded — the mutex funnelled them so none collided on the
-    // unique prevHash index.
+    // unique active-epoch chain index.
     expect(results).toHaveLength(burst);
 
     // No duplicate prevHash (fork-free) and no duplicate hashes.
@@ -510,6 +552,17 @@ describe('AuditService — concurrent append (race fix)', () => {
           }),
         }),
       }),
+      find: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            lean: jest.fn(async () => {
+              headReads += 1;
+              // After the collision, the visible chain has advanced to externalHead.
+              return headReads === 1 ? [] : [externalHead, ...saved];
+            }),
+          }),
+        }),
+      }),
     };
 
     const service = new AuditService(model as any);
@@ -531,7 +584,7 @@ describe('AuditService — concurrent append (race fix)', () => {
   });
 
   it('gives up with a clear error after exhausting retries under relentless contention', async () => {
-    // The unique prevHash index rejects every insert (a pathological writer
+    // The unique active-epoch chain index rejects every insert (a pathological writer
     // perpetually grabs the head first). The service must fail loudly rather
     // than spin forever.
     const model = {
@@ -544,6 +597,13 @@ describe('AuditService — concurrent append (race fix)', () => {
       findOne: jest.fn().mockReturnValue({
         sort: jest.fn().mockReturnValue({
           lean: jest.fn(async () => null),
+        }),
+      }),
+      find: jest.fn().mockReturnValue({
+        sort: jest.fn().mockReturnValue({
+          limit: jest.fn().mockReturnValue({
+            lean: jest.fn(async () => []),
+          }),
         }),
       }),
     };
@@ -635,7 +695,7 @@ describe('AuditService — audit chain epochs', () => {
               sortByDirection(
                 events.filter((event) => matchesFilter(event, filter)),
                 sort,
-              ).slice(0, limit),
+              ).slice(0, limit === 0 ? undefined : limit),
             ),
           })),
         })),
@@ -670,7 +730,7 @@ describe('AuditService — audit chain epochs', () => {
               sortByDirection(
                 epochs.filter((item) => matchesFilter(item, filter)),
                 sort,
-              ).slice(0, limit),
+              ).slice(0, limit === 0 ? undefined : limit),
             ),
           })),
         })),
