@@ -1,4 +1,4 @@
-@Library('docvault@feat/web-deployment') _
+@Library('docvault@main') _
 
 def cfg = [:]
 
