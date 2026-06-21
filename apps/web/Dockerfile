@@ -15,7 +15,7 @@ COPY . .
 RUN turbo prune web --docker                                                                                  
                                                                                                               
 FROM base AS installer                                                                                        
-RUN apk update && apk add --no-cache libc6-compat                                                             
+RUN apk update && apk add --no-cache libc6-compat python3 make g++ cairo-dev pango-dev giflib-dev jpeg-dev pixman-dev
 WORKDIR /app                                                                                                  
 COPY --from=builder /app/out/json/ .                                                                          
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml                                                  
@@ -33,7 +33,8 @@ RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
     --mount=type=cache,id=next-cache,target=/app/apps/web/.next/cache \
     pnpm turbo run build --filter=web...                                                                      
                                                                                                             
-FROM base AS runner                                                                                           
+FROM base AS runner
+RUN apk add --no-cache cairo pango giflib jpeg pixman                                                                                           
 WORKDIR /app                                                                                                  
 ENV NODE_ENV=production                                                                                       
 RUN addgroup --system --gid 1001 nodejs                                                                       
