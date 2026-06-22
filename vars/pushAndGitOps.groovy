@@ -306,12 +306,7 @@ EOF
                 """
 
                 if (cfg.createGitOpsPr) {
-                    def repoUrl = cfg.gitOpsRepoUrl.toString().trim()
-                    def matcher = repoUrl =~ /github\.com[:\/]([^\/]+)\/([^\.]+)(\.git)?/
-                    if (!matcher) {
-                        error("Could not parse owner/repo from GitOps URL: ${repoUrl}")
-                    }
-                    def repoPath = "${matcher[0][1]}/${matcher[0][2]}"
+                    def repoPath = parseRepoPath(cfg.gitOpsRepoUrl.toString().trim())
                     def prBranch = "gitops-update-${tag}-${env.BUILD_NUMBER}"
 
                     echo ">>> Pull Request mode enabled. Checking out feature branch '${prBranch}'..."
@@ -472,4 +467,13 @@ def pushWithRetry(gitOpsWorktree, targetBranch) {
 
 String shellQuote(String value) {
     return "'${value.replace("'", "'\"'\"'")}'"
+}
+
+@NonCPS
+String parseRepoPath(String repoUrl) {
+    def matcher = repoUrl =~ /github\.com[:\/]([^\/]+)\/([^\.]+)(\.git)?/
+    if (!matcher) {
+        throw new IllegalArgumentException("Could not parse owner/repo from GitOps URL: ${repoUrl}")
+    }
+    return "${matcher[0][1]}/${matcher[0][2]}"
 }
