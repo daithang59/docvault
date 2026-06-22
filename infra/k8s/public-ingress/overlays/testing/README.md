@@ -27,8 +27,8 @@ Overlay này mở endpoint public cho môi trường testing.
 
 - `keycloak-client-public-url-job.yaml`
   - Argo CD PostSync `Job`.
-  - Dùng `kcadm.sh` để cập nhật redirect URI và web origin của client `docvault-gateway`.
-  - Đọc admin credential từ secret `keycloak-secret`.
+  - Dùng `kcadm.sh` để cập nhật client secret, redirect URI và web origin của client `docvault-gateway`.
+  - Đọc admin credential từ secret `keycloak-secret` và client secret từ `docvault-app-secrets`.
   - Cần thiết để Keycloak chấp nhận callback từ `https://app.docvault.id.vn`.
 
 ## Vai trò trong pipeline

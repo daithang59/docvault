@@ -2,8 +2,8 @@
 namespace: docvault
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/document-service"
-  tag: "v11-91993dc50756"
-  digest: "sha256:1c0d64a90d9912a0ba67aef1853f2430291dd32327329238cd1566074adfc543"
+  tag: "6b6db2e2f46c"
+  digest: "sha256:27fb5d0c0676a8d225cb81b6988ed60f650e625fb02326e8f63e19109a5d3f09"
 healthPath: /health
 service:
   type: ClusterIP
