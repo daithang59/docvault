@@ -10,6 +10,11 @@ metadata:
   labels:
     app: {{ .Release.Name }}
     job: {{ .Release.Name }}-{{ $seedNameSuffix }}
+    app.kubernetes.io/name: {{ .Release.Name }}
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: seed
+    app.kubernetes.io/part-of: docvault-app
+    app.kubernetes.io/managed-by: Helm
   annotations:
     checkov.io/skip1: CKV_K8S_8=Seed is a short-lived Job; liveness probes are for long-running workloads.
     checkov.io/skip2: CKV_K8S_9=Seed is a short-lived Job; readiness probes are not used for one-shot jobs.
@@ -26,6 +31,10 @@ spec:
       labels:
         app: {{ .Release.Name }}
         job: {{ .Release.Name }}-{{ $seedNameSuffix }}
+        app.kubernetes.io/name: {{ .Release.Name }}
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: seed
+        app.kubernetes.io/part-of: docvault-app
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
