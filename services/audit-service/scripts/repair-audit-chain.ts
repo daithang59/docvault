@@ -290,16 +290,18 @@ Environment:
 
     console.log('Applying repairs...');
 
-    // Drop the unique prevHash index temporarily to avoid conflicts during
-    // bulk update (events may temporarily share prevHash values mid-repair).
+    // Drop unique chain indexes temporarily to avoid conflicts during bulk
+    // update (events may temporarily share prevHash values mid-repair).
     let droppedIndex = false;
-    try {
-      await collection.dropIndex('prevHash_1');
-      droppedIndex = true;
-      console.log('  Temporarily dropped unique prevHash index.');
-    } catch {
-      // Index may not exist or have a different name — proceed anyway.
-      console.log('  Note: Could not drop prevHash index (may not exist). Proceeding.');
+    for (const indexName of ['epochId_1_prevHash_1', 'prevHash_1']) {
+      try {
+        await collection.dropIndex(indexName);
+        droppedIndex = true;
+        console.log(`  Temporarily dropped ${indexName}.`);
+      } catch {
+        // Index may not exist or have a different name — proceed anyway.
+        console.log(`  Note: Could not drop ${indexName}. Proceeding.`);
+      }
     }
 
     let updatedCount = 0;
@@ -329,10 +331,14 @@ Environment:
       }
     }
 
-    // Recreate the unique index
+    // Recreate the current unique chain index. Do not recreate the legacy
+    // global prevHash_1 index; epochs need their own genesis event.
     if (droppedIndex) {
-      await collection.createIndex({ prevHash: 1 }, { unique: true });
-      console.log('  Recreated unique prevHash index.');
+      await collection.createIndex(
+        { epochId: 1, prevHash: 1 },
+        { unique: true },
+      );
+      console.log('  Recreated unique epochId+prevHash index.');
     }
 
     console.log('');
