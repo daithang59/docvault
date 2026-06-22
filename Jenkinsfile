@@ -1,4 +1,4 @@
-@Library('docvault@feat/terraform-modules') _
+@Library('docvault@audit-devsecops-pipeline') _
 
 def cfg = [:]
 def changeSet = [:]
