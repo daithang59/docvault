@@ -35,6 +35,16 @@ spec:
     enabled: false
     image: percona/pmm-client:3.6.0
 
+  users:
+    - name: audit_app
+      db: admin
+      passwordSecretRef:
+        name: audit-mongodb-app-credentials
+        key: password
+      roles:
+        - name: dbOwner
+          db: docvault_audit
+
   replsets:
     - name: rs0
       size: 3
