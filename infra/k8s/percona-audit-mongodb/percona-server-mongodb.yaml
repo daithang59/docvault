@@ -1,0 +1,106 @@
+apiVersion: psmdb.percona.com/v1
+kind: PerconaServerMongoDB
+metadata:
+  name: audit-mongodb
+  namespace: docvault
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  crVersion: 1.22.0
+  pause: false
+  unmanaged: false
+  enableVolumeExpansion: true
+
+  image: percona/percona-server-mongodb:8.0.19-7
+  imagePullPolicy: IfNotPresent
+
+  unsafeFlags:
+    tls: false
+    replsetSize: false
+    mongosSize: false
+    terminationGracePeriod: false
+    backupIfUnhealthy: false
+
+  secrets:
+    users: audit-mongodb-secrets
+
+  updateStrategy: SmartUpdate
+  upgradeOptions:
+    versionServiceEndpoint: https://check.percona.com
+    apply: disabled
+    schedule: "0 2 * * *"
+    setFCV: false
+
+  pmm:
+    enabled: false
+
+  replsets:
+    - name: rs0
+      size: 3
+      serviceAccountName: audit-mongodb
+      affinity:
+        antiAffinityTopologyKey: kubernetes.io/hostname
+      podDisruptionBudget:
+        maxUnavailable: 1
+      expose:
+        enabled: false
+        type: ClusterIP
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+      volumeSpec:
+        persistentVolumeClaim:
+          storageClassName: docvault-gp3
+          resources:
+            requests:
+              storage: 10Gi
+      hidden:
+        enabled: false
+      nonvoting:
+        enabled: false
+      arbiter:
+        enabled: false
+
+  sharding:
+    enabled: false
+
+  backup:
+    enabled: true
+    image: percona/percona-backup-mongodb:2.12.0
+    resources:
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 512Mi
+    storages:
+      s3:
+        type: s3
+        main: true
+        s3:
+          bucket: docvault-mongodb-backups-testing-913355241407
+          region: ap-southeast-1
+          prefix: audit-mongodb
+          serverSideEncryption:
+            kmsKeyID: alias/docvault-mongodb-backups-testing
+            sseAlgorithm: aws:kms
+    pitr:
+      enabled: false
+    tasks:
+      - name: daily-s3
+        enabled: true
+        schedule: "0 0 19 * * *"
+        retention:
+          type: count
+          count: 30
+          deleteFromStorage: true
+        storageName: s3
+        compressionType: gzip
+
+  logcollector:
+    enabled: false
