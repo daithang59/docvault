@@ -57,8 +57,6 @@ def call() {
         createGitOpsPr: createGitOpsPr,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
-        registryBuildCache: registryBuildCache,
-        registryBuildCacheSuffix: registryBuildCacheSuffix,
         alpineSecurityRefresh: alpineSecurityRefresh,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
