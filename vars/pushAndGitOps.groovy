@@ -196,18 +196,12 @@ void signImageDigest(cfg, String service, String imageRef) {
         string(credentialsId: passwordCredentialId, variable: 'COSIGN_PASSWORD')
     ]) {
         withEnv([
-            "COSIGN_IMAGE=${cosignImage}",
             "COSIGN_IMAGE_REF=${imageRef}",
             "COSIGN_TLOG_FLAG=${signTlogFlag}"
         ]) {
             sh '''
                 set -eu
-                docker run --rm \
-                    -e COSIGN_PASSWORD \
-                    -e COSIGN_PRIVATE_KEY \
-                    -e DOCKER_CONFIG=/docker-config \
-                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
-                    "${COSIGN_IMAGE}" sign --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY "${COSIGN_IMAGE_REF}"
+                cosign sign --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY "${COSIGN_IMAGE_REF}"
             '''
         }
     }
@@ -220,17 +214,12 @@ void signImageDigest(cfg, String service, String imageRef) {
     echo ">>> Verifying cosign signature for ${service}: ${imageRef}"
     withCredentials([string(credentialsId: publicKeyCredentialId, variable: 'COSIGN_PUBLIC_KEY')]) {
         withEnv([
-            "COSIGN_IMAGE=${cosignImage}",
             "COSIGN_IMAGE_REF=${imageRef}",
             "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
         ]) {
             sh '''
                 set -eu
-                docker run --rm \
-                    -e COSIGN_PUBLIC_KEY \
-                    -e DOCKER_CONFIG=/docker-config \
-                    -v "${DOCKER_CONFIG}:/docker-config:ro" \
-                    "${COSIGN_IMAGE}" verify ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY "${COSIGN_IMAGE_REF}"
+                cosign verify ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY "${COSIGN_IMAGE_REF}"
             '''
         }
     }

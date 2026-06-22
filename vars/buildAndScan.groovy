@@ -273,7 +273,7 @@ void buildTarget(cfg, Map target, String tag) {
         docker buildx build \\
             --pull \\
             --cache-from=type=registry,ref=${cacheRef} \\
-            --cache-to=type=registry,ref=${cacheRef},mode=max \\
+            --cache-to=type=registry,ref=${cacheRef},mode=min \\
             ${buildArgsToFlags(buildArgs)} \\
             -t '${repository}:${tag}' \\
             --load \\
