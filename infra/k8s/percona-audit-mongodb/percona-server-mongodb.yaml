@@ -33,6 +33,7 @@ spec:
 
   pmm:
     enabled: false
+    image: percona/pmm-client:3.6.0
 
   replsets:
     - name: rs0
@@ -60,10 +61,13 @@ spec:
               storage: 10Gi
       hidden:
         enabled: false
+        size: 2
       nonvoting:
         enabled: false
+        size: 3
       arbiter:
         enabled: false
+        size: 1
 
   sharding:
     enabled: false
