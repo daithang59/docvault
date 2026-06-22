@@ -11,6 +11,34 @@ patches:
       apiVersion: external-secrets.io/v1
       kind: ExternalSecret
       metadata:
+        name: postgres-secret
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: ConfigMap
+      metadata:
+        name: postgres-init-sql
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: db
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: db
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
         name: minio-secret
         namespace: docvault
   - patch: |-
