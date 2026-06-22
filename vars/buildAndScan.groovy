@@ -296,6 +296,17 @@ void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
             ${cfg.trivyImage} \\
             image ${trivyDbFlags} --scanners vuln --severity CRITICAL --exit-code 1 --no-progress '${repository}:${tag}'
     """
+
+    echo ">>> Generating SBOM for ${target.name} Image..."
+    sh """
+        set -eu
+        docker run --rm \\
+            -v /var/run/docker.sock:/var/run/docker.sock \\
+            -v ${trivyCacheVolume}:/root/.cache/trivy \\
+            -v ${env.WORKSPACE}:/workspace \\
+            ${cfg.trivyImage} \\
+            image ${trivyDbFlags} --format spdx-json --output "/workspace/sbom-${target.name}.json" --no-progress '${repository}:${tag}'
+    """
 }
 
 String buildArgsToFlags(Map buildArgs) {

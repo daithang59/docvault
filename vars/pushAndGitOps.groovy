@@ -189,6 +189,9 @@ void signImageDigest(cfg, String service, String imageRef) {
     def signTlogFlag = tlogUpload ? '--tlog-upload=true' : '--tlog-upload=false'
     def verifyTlogFlag = tlogUpload ? '' : '--insecure-ignore-tlog=true'
 
+    def sbomFile = "${env.WORKSPACE}/sbom-${service}.json"
+    def hasSbom = fileExists(sbomFile)
+
     echo ">>> Signing ${service} image digest with cosign: ${imageRef}"
 
     withCredentials([
@@ -203,6 +206,22 @@ void signImageDigest(cfg, String service, String imageRef) {
                 set -eu
                 cosign sign --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY "${COSIGN_IMAGE_REF}"
             '''
+        }
+
+        if (hasSbom) {
+            echo ">>> Attesting and signing SBOM for ${service}..."
+            withEnv([
+                "COSIGN_IMAGE_REF=${imageRef}",
+                "COSIGN_TLOG_FLAG=${signTlogFlag}",
+                "SBOM_FILE=${sbomFile}"
+            ]) {
+                sh '''
+                    set -eu
+                    cosign attest --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY --type spdxjson --predicate "${SBOM_FILE}" "${COSIGN_IMAGE_REF}"
+                '''
+            }
+        } else {
+            echo ">>> SBOM file not found at ${sbomFile}; skipping SBOM attestation."
         }
     }
 
@@ -221,6 +240,19 @@ void signImageDigest(cfg, String service, String imageRef) {
                 set -eu
                 cosign verify ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY "${COSIGN_IMAGE_REF}"
             '''
+        }
+
+        if (hasSbom) {
+            echo ">>> Verifying SBOM attestation signature for ${service}..."
+            withEnv([
+                "COSIGN_IMAGE_REF=${imageRef}",
+                "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
+            ]) {
+                sh '''
+                    set -eu
+                    cosign verify-attestation ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY --type spdxjson "${COSIGN_IMAGE_REF}"
+                '''
+            }
         }
     }
 }
@@ -315,23 +347,46 @@ EOF
 
                     def prTitle = "chore(gitops): update image references to ${tag}"
                     def prBody = "Automated PR created by Jenkins pipeline build #${env.BUILD_NUMBER} to update container image references to tag `${tag}`."
-                    def apiPayload = """{
-                        "title": "${prTitle}",
-                        "head": "${prBranch}",
-                        "base": "${targetBranch}",
-                        "body": "${prBody}"
-                    }"""
+                    def payloadJson = groovy.json.JsonOutput.toJson([
+                        title: prTitle,
+                        head: prBranch,
+                        base: targetBranch,
+                        body: prBody
+                    ])
+                    def payloadFile = "${env.WORKSPACE}/pr-payload.json"
+                    writeFile(file: payloadFile, text: payloadJson)
+
+                    def responseFile = sh(script: 'mktemp', returnStdout: true).trim()
+                    def statusFile = sh(script: 'mktemp', returnStdout: true).trim()
 
                     echo ">>> Creating GitHub Pull Request to target branch '${targetBranch}'..."
-                    sh """
-                        set +x
-                        curl -fsS -X POST \\
-                            -H "Accept: application/vnd.github+json" \\
-                            -H "Authorization: Bearer \$GIT_PASS" \\
-                            -H "X-GitHub-Api-Version: 2022-11-28" \\
-                            "https://api.github.com/repos/${repoPath}/pulls" \\
-                            -d '${shellQuote(apiPayload)}'
-                    """
+                    try {
+                        sh """
+                            set +x
+                            curl -sS -X POST \\
+                                -H "Accept: application/vnd.github+json" \\
+                                -H "Authorization: Bearer \$GIT_PASS" \\
+                                -H "X-GitHub-Api-Version: 2022-11-28" \\
+                                "https://api.github.com/repos/${repoPath}/pulls" \\
+                                -d @"${payloadFile}" \\
+                                -o "${responseFile}" \\
+                                -w "%{http_code}" > "${statusFile}"
+                        """
+                        def httpStatus = readFile(statusFile).trim()
+                        def httpResponse = readFile(responseFile).trim()
+                        echo ">>> GitHub API Response Status: ${httpStatus}"
+                        echo ">>> Response Body: ${httpResponse}"
+
+                        if (httpStatus == '201') {
+                            echo ">>> Pull Request created successfully."
+                        } else if (httpStatus == '422' && (httpResponse.contains('already exists') || httpResponse.contains('A pull request already exists'))) {
+                            echo ">>> A Pull Request for this branch already exists. Proceeding."
+                        } else {
+                            error("Failed to create GitHub Pull Request. Status: ${httpStatus}, Response: ${httpResponse}")
+                        }
+                    } finally {
+                        sh "rm -f '${payloadFile}' '${responseFile}' '${statusFile}'"
+                    }
                 } else {
                     pushWithRetry(gitOpsWorktree, targetBranch)
                 }
