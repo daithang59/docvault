@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/docvault"
-  tag: "v11-91993dc50756"
-  digest: "sha256:214a9920040c83fe2b0da794d95b1025052f5d6818d63ab5e90b0cbf170a8e03"
+  tag: "6b6db2e2f46c"
+  digest: "sha256:f2d7345b16124baa45cdfee5eeb550e2b242049fcaeb6c4bdaa3d3edd33b10b4"
 
 healthPath: /api/health
 
