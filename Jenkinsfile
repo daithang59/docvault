@@ -1,4 +1,4 @@
-@Library('docvault@feat/terraform-modules') _
+@Library('docvault@feat/kyverno-k8s-manifests') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -51,6 +51,21 @@ pipeline {
             name: 'PUSH_LATEST',
             defaultValue: false,
             description: 'Also push the mutable latest tag. Keep false when Harbor tag immutability is enabled.'
+        )
+        booleanParam(
+            name: 'REGISTRY_BUILD_CACHE',
+            defaultValue: true,
+            description: 'Use BuildKit registry cache in Harbor, for example <image>:buildcache, to speed up repeated Docker builds.'
+        )
+        string(
+            name: 'REGISTRY_BUILD_CACHE_SUFFIX',
+            defaultValue: 'buildcache',
+            description: 'Mutable tag suffix used only for BuildKit registry cache. This is not deployed by Argo CD.'
+        )
+        string(
+            name: 'ALPINE_SECURITY_REFRESH',
+            defaultValue: 'manual',
+            description: 'Change this value intentionally, for example weekly, to refresh Alpine security packages without invalidating Docker cache every build.'
         )
         booleanParam(
             name: 'SIGN_IMAGES',
@@ -135,7 +150,7 @@ pipeline {
         booleanParam(
             name: 'DEPENDENCY_CHECK_NO_UPDATE',
             defaultValue: true,
-            description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
+            description: 'Use the cached Dependency Check vulnerability database. If the cache is empty, the helper will allow one update to initialize it.'
         )
         booleanParam(
             name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
@@ -149,8 +164,8 @@ pipeline {
         )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
-            defaultValue: '',
-            description: 'Optional host cache directory for Dependency Check data. Leave blank to use Docker volume docvault-dependency-check-data.'
+            defaultValue: '/var/jenkins_home/caches/dependency-check',
+            description: 'Persistent host/cache directory for Dependency Check data. Override this if your Jenkins agent uses a different mounted cache path.'
         )
     }
 
@@ -203,6 +218,13 @@ pipeline {
                         : cfg.registryUsername
 
                     cfg.pushLatest = params.PUSH_LATEST
+                    cfg.registryBuildCache = params.REGISTRY_BUILD_CACHE
+                    cfg.registryBuildCacheSuffix = params.REGISTRY_BUILD_CACHE_SUFFIX?.trim()
+                        ? params.REGISTRY_BUILD_CACHE_SUFFIX.trim()
+                        : cfg.registryBuildCacheSuffix
+                    cfg.alpineSecurityRefresh = params.ALPINE_SECURITY_REFRESH?.trim()
+                        ? params.ALPINE_SECURITY_REFRESH.trim()
+                        : cfg.alpineSecurityRefresh
                     cfg.signImages = params.SIGN_IMAGES
                     cfg.cosignKeyCredentialId = params.COSIGN_KEY_CREDENTIAL_ID?.trim()
                         ? params.COSIGN_KEY_CREDENTIAL_ID.trim()
@@ -275,6 +297,9 @@ pipeline {
                     echo ">>> Registry credential type: ${cfg.registryCredentialType}"
                     echo ">>> Registry username: ${cfg.registryUsername ?: '(credential-provided)'}"
                     echo ">>> PUSH_LATEST=${params.PUSH_LATEST}"
+                    echo ">>> REGISTRY_BUILD_CACHE=${params.REGISTRY_BUILD_CACHE}"
+                    echo ">>> REGISTRY_BUILD_CACHE_SUFFIX=${cfg.registryBuildCacheSuffix}"
+                    echo ">>> ALPINE_SECURITY_REFRESH=${cfg.alpineSecurityRefresh}"
                     echo ">>> SIGN_IMAGES=${params.SIGN_IMAGES}"
                     echo ">>> COSIGN_KEY_CREDENTIAL_ID=${cfg.cosignKeyCredentialId ?: '(not set)'}"
                     echo ">>> COSIGN_PASSWORD_CREDENTIAL_ID=${cfg.cosignPasswordCredentialId ?: '(not set)'}"

@@ -234,14 +234,19 @@ interface BehaviorBucket {
   windowEndedAt: Date;
 }
 
+interface OrderedAuditChain {
+  events: any[];
+  error?: AuditChainVerificationResult;
+}
+
 @Injectable()
 export class AuditService {
   // In-process serialization of chain appends. The hash chain is inherently
   // sequential (each event links to the previous head), so appends cannot run
   // in parallel without forking. This promise queue funnels all concurrent
   // create() calls through one at a time, eliminating intra-instance
-  // contention. The unique prevHash index + retry below remain the safety net
-  // for the rare cross-instance race.
+  // contention. The unique (epochId, prevHash) index + retry below remain the
+  // safety net for the rare cross-instance race.
   private chainLock: Promise<unknown> = Promise.resolve();
 
   constructor(
@@ -296,17 +301,16 @@ export class AuditService {
 
     const signing = this.getSigningSecret();
 
-    // The hash chain is linearized by a unique index on `prevHash`: each head
-    // can be extended by exactly one event. Concurrent writers that read the
-    // same head will collide on insert (E11000); the loser re-reads the new
-    // head and retries. This guarantees a single, fork-free chain without a
-    // global lock or a transaction.
+    // The hash chain is linearized by a unique index on `(epochId, prevHash)`:
+    // each head can be extended by exactly one event. Concurrent writers that
+    // read the same tail will collide on insert (E11000); the loser re-reads
+    // the new tail and retries. This guarantees a single, fork-free chain
+    // inside the active epoch without a global lock or a transaction.
     for (let attempt = 0; attempt < MAX_CHAIN_APPEND_ATTEMPTS; attempt += 1) {
-      // 1. Get hash of the most recent event for chain linking
-      const lastEvent = await this.auditEvent
-        .findOne(this.epochEventFilter(epochId), { hash: 1 })
-        .sort({ timestamp: -1, _id: -1 })
-        .lean();
+      // 1. Get the actual chain tail for linking. Wall-clock timestamps can be
+      // slightly inverted under bursty writes, so the tail is the event whose
+      // hash is not referenced by any later event's prevHash.
+      const lastEvent = await this.getCurrentChainTail(epochId);
 
       const prevHash = lastEvent?.hash ?? null;
       const canonicalPayload = this.buildCanonicalPayload(canonicalFields);
@@ -359,8 +363,8 @@ export class AuditService {
 
   /**
    * True when the error is a MongoDB duplicate-key (E11000) violation on the
-   * unique prevHash index, meaning a concurrent writer already extended the
-   * head we read.
+   * unique (epochId, prevHash) index, meaning a concurrent writer already
+   * extended the tail we read.
    */
   private isDuplicatePrevHash(error: unknown): boolean {
     if (!error || typeof error !== 'object') return false;
@@ -432,6 +436,60 @@ export class AuditService {
     return {
       $or: [{ epochId }, { epochId: { $exists: false } }],
     };
+  }
+
+  private async getCurrentChainTail(epochId: string): Promise<any | null> {
+    const events = await this.loadEpochEvents(epochId, {
+      _id: 1,
+      eventId: 1,
+      timestamp: 1,
+      prevHash: 1,
+      hash: 1,
+    });
+    if (events.length === 0) return null;
+
+    const prevHashes = new Set<string>();
+    for (const event of events) {
+      if (event.prevHash !== null && event.prevHash !== undefined) {
+        prevHashes.add(String(event.prevHash));
+      }
+    }
+
+    const tails = events.filter(
+      (event) => typeof event.hash === 'string' && !prevHashes.has(event.hash),
+    );
+
+    if (tails.length === 1) return tails[0];
+
+    throw new ServiceUnavailableException(
+      `Audit chain tail is ambiguous; found ${tails.length} candidate tails in epoch ${epochId}.`,
+    );
+  }
+
+  private async loadEpochEvents(
+    epochId: string,
+    projection: Record<string, unknown>,
+    limit?: number,
+  ): Promise<any[]> {
+    let query: any = this.auditEvent.find(
+      this.epochEventFilter(epochId),
+      projection,
+    );
+
+    if (typeof query.sort === 'function') {
+      query = query.sort({ timestamp: 1, _id: 1 });
+    }
+    if (
+      (limit !== undefined || typeof query.lean !== 'function') &&
+      typeof query.limit === 'function'
+    ) {
+      query = query.limit(limit ?? 0);
+    }
+    if (typeof query.lean === 'function') {
+      return query.lean();
+    }
+
+    return query;
   }
 
   private isDuplicateKey(error: unknown): boolean {
@@ -1674,14 +1732,10 @@ export class AuditService {
   async verifyChain(limit = 1000): Promise<AuditChainVerificationResult> {
     const activeEpoch = await this.getActiveEpochRecord();
     const epochId = activeEpoch?.epochId ?? DEFAULT_EPOCH_ID;
-    const filter = this.auditChainEpoch ? this.epochEventFilter(epochId) : {};
-    const events = await this.auditEvent
-      .find(filter, { _id: 0 })
-      .sort({ timestamp: 1, _id: 1 })
-      .limit(limit)
-      .lean();
-
-    const chain = this.verifyEventSequence(events);
+    const events = await this.loadEpochEvents(epochId, { _id: 0 });
+    const ordered = this.orderEventsByChain(events);
+    const chain =
+      ordered.error ?? this.verifyEventSequence(ordered.events.slice(0, limit));
 
     if (!this.auditChainEpoch) {
       return chain;
@@ -1705,6 +1759,107 @@ export class AuditService {
       historicalCompromisedCount: compromisedEpochs.length,
       compromisedEpochs,
     };
+  }
+
+  private orderEventsByChain(events: any[]): OrderedAuditChain {
+    if (events.length === 0) return { events: [] };
+
+    const childrenByPrevHash = new Map<string | null, any[]>();
+    const eventKeys = new Set<string>();
+
+    for (const event of events) {
+      const key = this.eventIdentity(event);
+      if (eventKeys.has(key)) {
+        return {
+          events: [],
+          error: {
+            valid: false,
+            checked: 0,
+            message: `Duplicate audit event identity detected: ${key}.`,
+          },
+        };
+      }
+      eventKeys.add(key);
+
+      const prevHash = this.normalizePrevHash(event.prevHash);
+      const bucket = childrenByPrevHash.get(prevHash) ?? [];
+      bucket.push(event);
+      childrenByPrevHash.set(prevHash, bucket);
+    }
+
+    const genesisEvents = childrenByPrevHash.get(null) ?? [];
+    if (genesisEvents.length !== 1) {
+      return {
+        events: [],
+        error: {
+          valid: false,
+          checked: 0,
+          message: `Expected exactly one audit-chain genesis event, found ${genesisEvents.length}.`,
+        },
+      };
+    }
+
+    const ordered: any[] = [];
+    const visited = new Set<string>();
+    let current: any | undefined = genesisEvents[0];
+
+    while (current) {
+      const key = this.eventIdentity(current);
+      if (visited.has(key)) {
+        return {
+          events: ordered,
+          error: {
+            valid: false,
+            checked: ordered.length,
+            firstBrokenEventId: current.eventId,
+            message: `Audit chain cycle detected at eventId=${current.eventId}.`,
+          },
+        };
+      }
+      visited.add(key);
+      ordered.push(current);
+
+      const children = childrenByPrevHash.get(current.hash) ?? [];
+      if (children.length > 1) {
+        return {
+          events: ordered,
+          error: {
+            valid: false,
+            checked: ordered.length,
+            firstBrokenEventId: current.eventId,
+            lastTrustedHash: current.hash,
+            message: `Audit chain fork detected after eventId=${current.eventId}; ${children.length} events reference the same prevHash.`,
+          },
+        };
+      }
+
+      current = children[0];
+    }
+
+    if (ordered.length !== events.length) {
+      const disconnected = events.find(
+        (event) => !visited.has(this.eventIdentity(event)),
+      );
+      return {
+        events: ordered,
+        error: {
+          valid: false,
+          checked: ordered.length,
+          firstBrokenEventId: disconnected?.eventId,
+          message: `Audit chain has ${events.length - ordered.length} disconnected event(s).`,
+        },
+      };
+    }
+
+    return { events: ordered };
+  }
+
+  private normalizePrevHash(value: unknown): string | null {
+    return value === null || value === undefined ? null : String(value);
+  }
+
+  private eventIdentity(event: any): string {
+    return String(event.eventId ?? event._id ?? event.hash);
   }
 
   private verifyEventSequence(events: any[]): AuditChainVerificationResult {
