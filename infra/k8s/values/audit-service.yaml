@@ -1,5 +1,6 @@
 # audit-service values
 namespace: docvault
+replicaCount: 0
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/audit-service"
