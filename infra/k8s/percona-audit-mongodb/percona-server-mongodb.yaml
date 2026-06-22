@@ -98,7 +98,7 @@ spec:
     tasks:
       - name: daily-s3
         enabled: true
-        schedule: "0 0 19 * * *"
+        schedule: "0 19 * * *"
         retention:
           type: count
           count: 30
