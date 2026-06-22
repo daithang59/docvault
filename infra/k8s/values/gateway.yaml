@@ -4,7 +4,7 @@ namespace: docvault
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/gateway"
   tag: "6b6db2e2f46c"
-  digest: "sha256:e388f3ba9f4d2032eedd60623bf9084e6e1adc4a5ab9446e1b109093642ddb64"
+  digest: "sha256:d34a496fbe13a8603097a6ee606ca52a4b371107692747e30160f04724ed758a"
 
 healthPath: /api/health
 
