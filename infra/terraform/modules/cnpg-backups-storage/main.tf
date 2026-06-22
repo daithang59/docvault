@@ -203,10 +203,11 @@ resource "aws_iam_role" "cnpg_backups" {
 
 data "aws_iam_policy_document" "cnpg_backups" {
   statement {
-    sid    = "ListMetadataPostgresBackups"
+    sid    = "InspectBackupBucket"
     effect = "Allow"
 
     actions = [
+      "s3:GetBucketLocation",
       "s3:ListBucket",
       "s3:ListBucketMultipartUploads",
     ]
@@ -214,15 +215,6 @@ data "aws_iam_policy_document" "cnpg_backups" {
     resources = [
       aws_s3_bucket.cnpg_backups.arn,
     ]
-
-    condition {
-      test     = "StringLike"
-      variable = "s3:prefix"
-      values = [
-        "metadata-postgres",
-        local.metadata_backup_prefix,
-      ]
-    }
   }
 
   statement {
