@@ -24,6 +24,13 @@ envFrom:
   - secretRef:
       name: docvault-app-secrets
 
+envValueFrom:
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: metadata-postgres-app
+        key: uri
+
 migration:
   enabled: true
   command: "./node_modules/.bin/prisma migrate deploy"
