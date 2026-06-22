@@ -1,6 +1,6 @@
 # audit-service values
 namespace: docvault
-replicaCount: 0
+replicaCount: 1
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/audit-service"
@@ -19,6 +19,13 @@ env:
   KEYCLOAK_ISSUER: "https://auth.docvault.id.vn/realms/docvault"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_AUDIENCE: "docvault-gateway"
+
+envValueFrom:
+  - name: MONGODB_URI
+    valueFrom:
+      secretKeyRef:
+        name: audit-mongodb-app-credentials
+        key: MONGODB_URI
 
 envFrom:
   - secretRef:
