@@ -3,6 +3,7 @@ kind: Kustomization
 
 resources:
   - ../testing
+  - metadata-postgres-cnpg.yaml
 
 patches:
   - patch: |-
