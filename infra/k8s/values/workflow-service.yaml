@@ -4,7 +4,7 @@ namespace: docvault
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/workflow-service"
   tag: "6b6db2e2f46c"
-  digest: "sha256:37ba81555448cbb164913f44f4521ff9221cd67e75bbd11936635168be9f88c7"
+  digest: "sha256:d21d930ded6824241cb5765fca5b121191bc909acdfc8bda9343bc782d02c05e"
 
 healthPath: /health
 
