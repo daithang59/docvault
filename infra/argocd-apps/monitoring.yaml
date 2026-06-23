@@ -26,10 +26,6 @@ spec:
         prometheus:
           prometheusSpec:
             serviceMonitorSelectorNilUsesHelmValues: false
-        nodeExporter:
-          enabled: false
-        prometheus-node-exporter:
-          enabled: false
   destination:
     server: "https://kubernetes.default.svc"
     namespace: monitoring

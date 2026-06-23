@@ -26,41 +26,13 @@ def call(cfg) {
 
             sh '''
                 set -eu
-
-                container_name="docvault-zap-${BUILD_NUMBER:-$$}"
-                cleanup_zap_container() {
-                    docker rm -f "$container_name" >/dev/null 2>&1 || true
-                }
-                trap cleanup_zap_container EXIT
-
-                cleanup_zap_container
-                rm -f zap-report/zap_report.html zap-report/zap_report.json
-
-                docker create --name "$container_name" \
+                docker run --rm \
+                    -v "$(pwd)/zap-report:/zap/wrk:rw" \
                     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
                     -t "$ZAP_TARGET" \
                     -r zap_report.html \
                     -J zap_report.json \
-                    -I >/dev/null
-
-                set +e
-                docker start -a "$container_name"
-                zap_status=$?
-                set -e
-
-                copy_failed=0
-                docker cp "$container_name:/zap/wrk/zap_report.html" zap-report/zap_report.html || copy_failed=1
-                docker cp "$container_name:/zap/wrk/zap_report.json" zap-report/zap_report.json || copy_failed=1
-
-                if [ "$copy_failed" -ne 0 ]; then
-                    echo "ZAP container did not expose the expected reports under /zap/wrk."
-                    exit 1
-                fi
-
-                if [ "$zap_status" -ne 0 ]; then
-                    echo "ZAP baseline exited with status $zap_status after reports were collected."
-                    exit "$zap_status"
-                fi
+                    -I
             '''
         }
     }

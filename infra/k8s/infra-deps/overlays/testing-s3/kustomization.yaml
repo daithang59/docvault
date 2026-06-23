@@ -3,37 +3,8 @@ kind: Kustomization
 
 resources:
   - ../testing
-  - metadata-postgres-cnpg.yaml
 
 patches:
-  - patch: |-
-      $patch: delete
-      apiVersion: external-secrets.io/v1
-      kind: ExternalSecret
-      metadata:
-        name: postgres-secret
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: ConfigMap
-      metadata:
-        name: postgres-init-sql
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: StatefulSet
-      metadata:
-        name: db
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: db
-        namespace: docvault
   - patch: |-
       $patch: delete
       apiVersion: external-secrets.io/v1
@@ -61,25 +32,4 @@ patches:
       kind: Job
       metadata:
         name: minio-init
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: external-secrets.io/v1
-      kind: ExternalSecret
-      metadata:
-        name: mongodb-secret
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: apps/v1
-      kind: StatefulSet
-      metadata:
-        name: mongo
-        namespace: docvault
-  - patch: |-
-      $patch: delete
-      apiVersion: v1
-      kind: Service
-      metadata:
-        name: mongo
         namespace: docvault

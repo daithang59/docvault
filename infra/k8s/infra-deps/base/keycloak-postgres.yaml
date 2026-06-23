@@ -4,7 +4,7 @@ metadata:
   name: keycloak-postgres
   namespace: docvault
 spec:
-  instances: 2
+  instances: 3
 
   storage:
     size: 10Gi

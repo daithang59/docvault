@@ -68,41 +68,6 @@ output "document_service_role_arn" {
   value       = module.documents_storage.document_service_role_arn
 }
 
-output "cnpg_backups_bucket_name" {
-  description = "S3 bucket used for CloudNativePG database backups."
-  value       = module.cnpg_backups_storage.bucket_name
-}
-
-output "cnpg_backups_kms_key_arn" {
-  description = "KMS key ARN used for CloudNativePG backup bucket SSE-KMS."
-  value       = module.cnpg_backups_storage.kms_key_arn
-}
-
-output "cnpg_backups_role_arn" {
-  description = "IAM role ARN used by CloudNativePG metadata PostgreSQL pods for S3 backup access."
-  value       = module.cnpg_backups_storage.role_arn
-}
-
-output "mongodb_backups_bucket_name" {
-  description = "S3 bucket used for Percona MongoDB backups."
-  value       = module.mongodb_backups_storage.bucket_name
-}
-
-output "mongodb_backups_kms_key_arn" {
-  description = "KMS key ARN used for MongoDB backup bucket SSE-KMS."
-  value       = module.mongodb_backups_storage.kms_key_arn
-}
-
-output "mongodb_backups_kms_alias_name" {
-  description = "KMS alias name used by Percona backup server-side encryption settings."
-  value       = module.mongodb_backups_storage.kms_alias_name
-}
-
-output "mongodb_backups_role_arn" {
-  description = "IAM role ARN used by Percona MongoDB operator and database service accounts for S3 backup access."
-  value       = module.mongodb_backups_storage.role_arn
-}
-
 output "jenkins_rolesanywhere_trust_anchor_arn" {
   description = "IAM Roles Anywhere trust anchor ARN for Jenkins."
   value       = module.jenkins_roles_anywhere.trust_anchor_arn
