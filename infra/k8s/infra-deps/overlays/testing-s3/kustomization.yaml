@@ -62,3 +62,24 @@ patches:
       metadata:
         name: minio-init
         namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: external-secrets.io/v1
+      kind: ExternalSecret
+      metadata:
+        name: mongodb-secret
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: apps/v1
+      kind: StatefulSet
+      metadata:
+        name: mongo
+        namespace: docvault
+  - patch: |-
+      $patch: delete
+      apiVersion: v1
+      kind: Service
+      metadata:
+        name: mongo
+        namespace: docvault
