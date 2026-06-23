@@ -1,4 +1,4 @@
-@Library('docvault@feat/web-deployment') _
+@Library('docvault@audit-devsecops-pipeline') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -51,6 +51,21 @@ pipeline {
             name: 'PUSH_LATEST',
             defaultValue: false,
             description: 'Also push the mutable latest tag. Keep false when Harbor tag immutability is enabled.'
+        )
+        booleanParam(
+            name: 'REGISTRY_BUILD_CACHE',
+            defaultValue: true,
+            description: 'Use BuildKit registry cache in Harbor, for example <image>:buildcache, to speed up repeated Docker builds.'
+        )
+        string(
+            name: 'REGISTRY_BUILD_CACHE_SUFFIX',
+            defaultValue: 'buildcache',
+            description: 'Mutable tag suffix used only for BuildKit registry cache. This is not deployed by Argo CD.'
+        )
+        string(
+            name: 'ALPINE_SECURITY_REFRESH',
+            defaultValue: 'manual',
+            description: 'Change this value intentionally, for example weekly, to refresh Alpine security packages without invalidating Docker cache every build.'
         )
         booleanParam(
             name: 'SIGN_IMAGES',
@@ -134,8 +149,8 @@ pipeline {
         )
         booleanParam(
             name: 'DEPENDENCY_CHECK_NO_UPDATE',
-            defaultValue: false,
-            description: 'Disable automatic database updates for Dependency Check (useful on old agents with cached data to speed up scan).'
+            defaultValue: true,
+            description: 'Use the cached Dependency Check vulnerability database. If the cache is empty, the helper will allow one update to initialize it.'
         )
         booleanParam(
             name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
@@ -144,8 +159,8 @@ pipeline {
         )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
-            defaultValue: '',
-            description: 'Optional host cache directory for Dependency Check data. Leave blank to use Docker volume docvault-dependency-check-data.'
+            defaultValue: '/var/jenkins_home/caches/dependency-check',
+            description: 'Persistent host/cache directory for Dependency Check data. Override this if your Jenkins agent uses a different mounted cache path.'
         )
     }
 
@@ -198,6 +213,13 @@ pipeline {
                         : cfg.registryUsername
 
                     cfg.pushLatest = params.PUSH_LATEST
+                    cfg.registryBuildCache = params.REGISTRY_BUILD_CACHE
+                    cfg.registryBuildCacheSuffix = params.REGISTRY_BUILD_CACHE_SUFFIX?.trim()
+                        ? params.REGISTRY_BUILD_CACHE_SUFFIX.trim()
+                        : cfg.registryBuildCacheSuffix
+                    cfg.alpineSecurityRefresh = params.ALPINE_SECURITY_REFRESH?.trim()
+                        ? params.ALPINE_SECURITY_REFRESH.trim()
+                        : cfg.alpineSecurityRefresh
                     cfg.signImages = params.SIGN_IMAGES
                     cfg.cosignKeyCredentialId = params.COSIGN_KEY_CREDENTIAL_ID?.trim()
                         ? params.COSIGN_KEY_CREDENTIAL_ID.trim()
@@ -250,7 +272,7 @@ pipeline {
                     cfg.branchName = resolvedBranchName ?: '(unknown)'
                     cfg.isPullRequest = env.CHANGE_ID?.trim() ? true : false
                     cfg.isReleaseBuild = !cfg.isPullRequest && cfg.branchName == cfg.releaseBranch
-                    cfg.imageTag = "v${env.BUILD_NUMBER}-${sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()}"
+                    cfg.imageTag = sh(script: 'git rev-parse --short=12 HEAD', returnStdout: true).trim()
 
                     env.IS_PULL_REQUEST = cfg.isPullRequest ? 'true' : 'false'
                     env.IS_RELEASE_BUILD = cfg.isReleaseBuild ? 'true' : 'false'
@@ -269,6 +291,9 @@ pipeline {
                     echo ">>> Registry credential type: ${cfg.registryCredentialType}"
                     echo ">>> Registry username: ${cfg.registryUsername ?: '(credential-provided)'}"
                     echo ">>> PUSH_LATEST=${params.PUSH_LATEST}"
+                    echo ">>> REGISTRY_BUILD_CACHE=${params.REGISTRY_BUILD_CACHE}"
+                    echo ">>> REGISTRY_BUILD_CACHE_SUFFIX=${cfg.registryBuildCacheSuffix}"
+                    echo ">>> ALPINE_SECURITY_REFRESH=${cfg.alpineSecurityRefresh}"
                     echo ">>> SIGN_IMAGES=${params.SIGN_IMAGES}"
                     echo ">>> COSIGN_KEY_CREDENTIAL_ID=${cfg.cosignKeyCredentialId ?: '(not set)'}"
                     echo ">>> COSIGN_PASSWORD_CREDENTIAL_ID=${cfg.cosignPasswordCredentialId ?: '(not set)'}"
@@ -575,14 +600,18 @@ def runPnpmTask(cfg, String taskName) {
 
     echo ">>> Running pnpm ${taskName}..."
     def pnpmStoreVolume = cfg.pnpmStoreVolume ?: 'docvault-pnpm-store'
+    def turboCacheVolume = cfg.turboCacheVolume ?: 'docvault-turbo-cache'
 
     sh """
         set -eu
         docker volume create '${pnpmStoreVolume}' >/dev/null
+        docker volume create '${turboCacheVolume}' >/dev/null
         docker run --rm \\
             --network host \\
+            -e TURBO_CACHE_DIR=/app/.turbo \\
             -v ${env.WORKSPACE}:/app \\
             -v ${pnpmStoreVolume}:/pnpm/store \\
+            -v ${turboCacheVolume}:/app/.turbo \\
             -w /app \\
             ${cfg.nodeImage} \\
             sh -c "corepack enable && pnpm config set store-dir /pnpm/store && pnpm ${taskName}"
