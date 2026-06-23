@@ -1,4 +1,4 @@
-@Library('docvault@feat/kyverno-k8s-manifests') _
+@Library('docvault@audit-devsecops-pipeline') _
 
 def cfg = [:]
 def changeSet = [:]
