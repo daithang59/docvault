@@ -45,11 +45,12 @@ Thư mục này chứa các Argo CD child `Application`. Root app trong `infra/a
   - Cài Helm chart `kube-prometheus-stack`.
   - Tạo monitoring stack trong namespace `monitoring`.
   - Bật Grafana/Prometheus và thêm datasource Loki cho Grafana.
+  - Tắt `prometheus-node-exporter` trong môi trường testing để giảm pod pressure trên từng node.
   - Sync wave `2`.
 
 - `loki.yaml`
   - Cài Helm chart `loki-stack`.
-  - Bật Loki và Promtail để thu log từ cluster.
+  - Bật Loki; tắt Promtail trong môi trường testing để giảm pod pressure trên từng node.
   - Tắt Grafana/Prometheus trong chart này vì đã có `monitoring.yaml`.
   - Sync wave `2`.
 
