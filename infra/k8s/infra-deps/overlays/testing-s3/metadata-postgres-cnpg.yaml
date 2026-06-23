@@ -1,0 +1,62 @@
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: metadata-postgres
+  namespace: docvault
+  annotations:
+    argocd.argoproj.io/sync-wave: "0"
+spec:
+  instances: 2
+  imageName: ghcr.io/cloudnative-pg/postgresql:16.11-system-trixie
+
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::913355241407:role/docvault-eks-cnpg-backups
+
+  storage:
+    size: 10Gi
+    storageClass: docvault-gp3
+
+  resources:
+    requests:
+      cpu: 100m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 1Gi
+
+  bootstrap:
+    initdb:
+      database: docvault_metadata
+      owner: docvault
+
+  backup:
+    retentionPolicy: 30d
+    target: primary
+    barmanObjectStore:
+      destinationPath: s3://docvault-cnpg-backups-testing-913355241407/metadata-postgres
+      s3Credentials:
+        inheritFromIAMRole: true
+      data:
+        compression: gzip
+        jobs: 1
+      wal:
+        compression: gzip
+        maxParallel: 1
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: metadata-postgres-daily
+  namespace: docvault
+  annotations:
+    argocd.argoproj.io/sync-wave: "1"
+spec:
+  backupOwnerReference: cluster
+  cluster:
+    name: metadata-postgres
+  immediate: true
+  method: barmanObjectStore
+  schedule: "0 0 18 * * *"
+  target: primary
