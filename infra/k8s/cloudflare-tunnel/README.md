@@ -6,7 +6,7 @@ Thư mục này chứa manifest triển khai Cloudflare Tunnel bằng `cloudflar
 
 - `cloudflared.yaml`
   - Tạo namespace `cloudflare-tunnel`.
-  - Tạo Deployment `cloudflared` với 2 replicas.
+  - Tạo Deployment `cloudflared` với 1 replica.
   - Dùng image `cloudflare/cloudflared:2026.5.0`.
   - Lấy tunnel token từ secret `cloudflared-token`, key `token`.
   - Bật metrics ở port `2000`.
