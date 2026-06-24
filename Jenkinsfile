@@ -1,4 +1,4 @@
-@Library('docvault@audit-devsecops-pipeline') _
+@Library('docvault@fix/sbom-attestion') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -69,7 +69,7 @@ pipeline {
         )
         booleanParam(
             name: 'SIGN_IMAGES',
-            defaultValue: false,
+            defaultValue: true,
             description: 'Sign pushed image digests with cosign. Requires cosign-private-key and cosign-password credentials.'
         )
         string(
@@ -99,7 +99,7 @@ pipeline {
         )
         string(
             name: 'GITOPS_BRANCH',
-            defaultValue: 'gitops-testing',
+            defaultValue: 'main',
             description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).'
         )
         string(
@@ -156,6 +156,11 @@ pipeline {
             name: 'ALLOW_DEPENDENCY_CHECK_FAILURE',
             defaultValue: true,
             description: 'Temporarily continue the pipeline when Dependency Check fails. The stage/build will be marked unstable.'
+        )
+        booleanParam(
+            name: 'CREATE_GITOPS_PR',
+            defaultValue: true,
+            description: 'Create a GitHub Pull Request for GitOps manifest updates instead of pushing directly to the target branch.'
         )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
@@ -253,6 +258,7 @@ pipeline {
                     cfg.kubeconfigCredentialId = params.KUBECONFIG_CREDENTIAL_ID?.trim()
                         ? params.KUBECONFIG_CREDENTIAL_ID.trim()
                         : cfg.kubeconfigCredentialId
+                    cfg.createGitOpsPr = params.CREATE_GITOPS_PR != null ? params.CREATE_GITOPS_PR : true
 
                     cfg.useNvdKey = true
                     cfg.dependencyCheckNoUpdate = params.DEPENDENCY_CHECK_NO_UPDATE

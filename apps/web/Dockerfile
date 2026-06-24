@@ -15,11 +15,11 @@ COPY . .
 RUN turbo prune web --docker                                                                                  
                                                                                                               
 FROM base AS installer                                                                                        
-RUN apk update && apk add --no-cache libc6-compat                                                             
+RUN apk update && apk add --no-cache libc6-compat python3 make g++ cairo-dev pango-dev giflib-dev jpeg-dev pixman-dev
 WORKDIR /app                                                                                                  
 COPY --from=builder /app/out/json/ .                                                                          
 COPY --from=builder /app/out/pnpm-lock.yaml ./pnpm-lock.yaml                                                  
-RUN pnpm install --frozen-lockfile                                                                            
+RUN --mount=type=cache,id=pnpm-store,target=/pnpm/store pnpm install --frozen-lockfile                                                                            
 COPY --from=builder /app/out/full/ .                                                                          
 
 ARG NEXT_PUBLIC_APP_NAME=DocVault
@@ -29,9 +29,12 @@ ENV NEXT_PUBLIC_APP_NAME=${NEXT_PUBLIC_APP_NAME}
 ENV NEXT_PUBLIC_API_BASE_URL=${NEXT_PUBLIC_API_BASE_URL}
 ENV GATEWAY_URL=${GATEWAY_URL}
 
-RUN pnpm turbo run build --filter=web...                                                                      
+RUN --mount=type=cache,id=turbo-cache,target=/app/.turbo \
+    --mount=type=cache,id=next-cache,target=/app/apps/web/.next/cache \
+    pnpm turbo run build --filter=web...                                                                      
                                                                                                             
-FROM base AS runner                                                                                           
+FROM base AS runner
+RUN apk add --no-cache cairo pango giflib jpeg pixman                                                                                           
 WORKDIR /app                                                                                                  
 ENV NODE_ENV=production                                                                                       
 RUN addgroup --system --gid 1001 nodejs                                                                       
