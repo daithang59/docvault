@@ -3,8 +3,8 @@ namespace: docvault
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/metadata-service"
-  tag: "v9-ad76f1e1bd85"
-  digest: "sha256:751d127036d5a5a3dd28149a1759ced981da45b9ed6360962fa0323761f3a2fa"
+  tag: "d8b543ecb94e"
+  digest: "sha256:6bcf276e29a96cab64f06cfe5f5aa8c25cb9ec029a58fee6fc36d9e5596e75ab"
 
 healthPath: /health
 
@@ -23,6 +23,13 @@ env:
 envFrom:
   - secretRef:
       name: docvault-app-secrets
+
+envValueFrom:
+  - name: DATABASE_URL
+    valueFrom:
+      secretKeyRef:
+        name: metadata-postgres-app
+        key: uri
 
 migration:
   enabled: true

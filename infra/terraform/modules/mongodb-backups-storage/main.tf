@@ -1,13 +1,14 @@
 data "aws_caller_identity" "current" {}
 
 locals {
-  backup_bucket_name      = "docvault-cnpg-backups-${var.environment}-${data.aws_caller_identity.current.account_id}"
-  service_account_name    = "metadata-postgres"
-  service_account_ns      = "docvault"
-  metadata_backup_prefix  = "metadata-postgres/*"
+  backup_bucket_name    = "docvault-mongodb-backups-${var.environment}-${data.aws_caller_identity.current.account_id}"
+  backup_prefix         = "audit-mongodb/*"
+  service_account_ns    = "docvault"
+  service_account_names = ["percona-psmdb-operator", "audit-mongodb"]
+  kms_alias_name        = "alias/docvault-mongodb-backups-${var.environment}"
 }
 
-data "aws_iam_policy_document" "cnpg_backup_kms" {
+data "aws_iam_policy_document" "mongodb_backup_kms" {
   #checkov:skip=CKV_AWS_109:KMS key policies require Resource "*" because the policy is attached to one key; principals and kms:ViaService conditions scope usage.
   #checkov:skip=CKV_AWS_111:KMS key policies require Resource "*" because the policy is attached to one key; write actions are scoped by principals and conditions.
   #checkov:skip=CKV_AWS_356:KMS key policies require Resource "*" because the policy is attached to one key.
@@ -25,12 +26,12 @@ data "aws_iam_policy_document" "cnpg_backup_kms" {
   }
 
   statement {
-    sid    = "AllowMetadataPostgresBackupsViaS3"
+    sid    = "AllowMongoBackupsViaS3"
     effect = "Allow"
 
     principals {
       type        = "AWS"
-      identifiers = [aws_iam_role.cnpg_backups.arn]
+      identifiers = [aws_iam_role.mongodb_backups.arn]
     }
 
     actions = [
@@ -52,41 +53,42 @@ data "aws_iam_policy_document" "cnpg_backup_kms" {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:s3:arn"
       values = [
-        aws_s3_bucket.cnpg_backups.arn,
-        "${aws_s3_bucket.cnpg_backups.arn}/metadata-postgres/*",
+        aws_s3_bucket.mongodb_backups.arn,
+        "${aws_s3_bucket.mongodb_backups.arn}/audit-mongodb/*",
       ]
     }
   }
 }
 
-resource "aws_kms_key" "cnpg_backups" {
-  description             = "DocVault CloudNativePG backup encryption key"
+resource "aws_kms_key" "mongodb_backups" {
+  description             = "DocVault Percona MongoDB backup encryption key"
   deletion_window_in_days = 30
   enable_key_rotation     = true
-  policy                  = data.aws_iam_policy_document.cnpg_backup_kms.json
+  policy                  = data.aws_iam_policy_document.mongodb_backup_kms.json
 
   tags = merge(var.tags, {
-    Name = "docvault-cnpg-backups-${var.environment}"
+    Name = "docvault-mongodb-backups-${var.environment}"
   })
 }
 
-resource "aws_kms_alias" "cnpg_backups" {
-  name          = "alias/docvault-cnpg-backups-${var.environment}"
-  target_key_id = aws_kms_key.cnpg_backups.key_id
+resource "aws_kms_alias" "mongodb_backups" {
+  name          = local.kms_alias_name
+  target_key_id = aws_kms_key.mongodb_backups.key_id
 }
 
-resource "aws_s3_bucket" "cnpg_backups" {
+resource "aws_s3_bucket" "mongodb_backups" {
   #checkov:skip=CKV_AWS_144:Cross-region replication is intentionally disabled for the testing environment to control AWS cost.
   #checkov:skip=CKV_AWS_18:S3 server access logging is not enabled yet for this low-cost testing backup bucket; CloudTrail/S3 data events can be added later.
-  bucket = local.backup_bucket_name
+  bucket              = local.backup_bucket_name
+  object_lock_enabled = true
 
   tags = merge(var.tags, {
     Name = local.backup_bucket_name
   })
 }
 
-resource "aws_s3_bucket_public_access_block" "cnpg_backups" {
-  bucket = aws_s3_bucket.cnpg_backups.id
+resource "aws_s3_bucket_public_access_block" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
 
   block_public_acls       = true
   block_public_policy     = true
@@ -94,20 +96,20 @@ resource "aws_s3_bucket_public_access_block" "cnpg_backups" {
   restrict_public_buckets = true
 }
 
-resource "aws_s3_bucket_versioning" "cnpg_backups" {
-  bucket = aws_s3_bucket.cnpg_backups.id
+resource "aws_s3_bucket_versioning" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
 
   versioning_configuration {
     status = "Enabled"
   }
 }
 
-resource "aws_s3_bucket_server_side_encryption_configuration" "cnpg_backups" {
-  bucket = aws_s3_bucket.cnpg_backups.id
+resource "aws_s3_bucket_server_side_encryption_configuration" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
 
   rule {
     apply_server_side_encryption_by_default {
-      kms_master_key_id = aws_kms_key.cnpg_backups.arn
+      kms_master_key_id = aws_kms_key.mongodb_backups.arn
       sse_algorithm     = "aws:kms"
     }
 
@@ -115,11 +117,22 @@ resource "aws_s3_bucket_server_side_encryption_configuration" "cnpg_backups" {
   }
 }
 
-resource "aws_s3_bucket_lifecycle_configuration" "cnpg_backups" {
-  bucket = aws_s3_bucket.cnpg_backups.id
+resource "aws_s3_bucket_object_lock_configuration" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
 
   rule {
-    id     = "cnpg-backup-hygiene"
+    default_retention {
+      mode = "GOVERNANCE"
+      days = 30
+    }
+  }
+}
+
+resource "aws_s3_bucket_lifecycle_configuration" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
+
+  rule {
+    id     = "mongodb-backup-hygiene"
     status = "Enabled"
 
     filter {
@@ -136,7 +149,7 @@ resource "aws_s3_bucket_lifecycle_configuration" "cnpg_backups" {
   }
 }
 
-data "aws_iam_policy_document" "cnpg_backups_bucket" {
+data "aws_iam_policy_document" "mongodb_backups_bucket" {
   statement {
     sid    = "DenyInsecureTransport"
     effect = "Deny"
@@ -149,8 +162,8 @@ data "aws_iam_policy_document" "cnpg_backups_bucket" {
     actions = ["s3:*"]
 
     resources = [
-      aws_s3_bucket.cnpg_backups.arn,
-      "${aws_s3_bucket.cnpg_backups.arn}/*",
+      aws_s3_bucket.mongodb_backups.arn,
+      "${aws_s3_bucket.mongodb_backups.arn}/*",
     ]
 
     condition {
@@ -161,12 +174,12 @@ data "aws_iam_policy_document" "cnpg_backups_bucket" {
   }
 }
 
-resource "aws_s3_bucket_policy" "cnpg_backups" {
-  bucket = aws_s3_bucket.cnpg_backups.id
-  policy = data.aws_iam_policy_document.cnpg_backups_bucket.json
+resource "aws_s3_bucket_policy" "mongodb_backups" {
+  bucket = aws_s3_bucket.mongodb_backups.id
+  policy = data.aws_iam_policy_document.mongodb_backups_bucket.json
 }
 
-data "aws_iam_policy_document" "cnpg_backups_assume_role" {
+data "aws_iam_policy_document" "mongodb_backups_assume_role" {
   statement {
     effect = "Allow"
 
@@ -189,19 +202,20 @@ data "aws_iam_policy_document" "cnpg_backups_assume_role" {
       test     = "StringEquals"
       variable = "${var.oidc_provider}:sub"
       values = [
-        "system:serviceaccount:${local.service_account_ns}:${local.service_account_name}",
+        for service_account_name in local.service_account_names :
+        "system:serviceaccount:${local.service_account_ns}:${service_account_name}"
       ]
     }
   }
 }
 
-resource "aws_iam_role" "cnpg_backups" {
-  name               = "${var.name}-cnpg-backups"
-  assume_role_policy = data.aws_iam_policy_document.cnpg_backups_assume_role.json
+resource "aws_iam_role" "mongodb_backups" {
+  name               = "${var.name}-mongodb-backups"
+  assume_role_policy = data.aws_iam_policy_document.mongodb_backups_assume_role.json
   tags               = var.tags
 }
 
-data "aws_iam_policy_document" "cnpg_backups" {
+data "aws_iam_policy_document" "mongodb_backups" {
   statement {
     sid    = "InspectBackupBucket"
     effect = "Allow"
@@ -213,12 +227,13 @@ data "aws_iam_policy_document" "cnpg_backups" {
     ]
 
     resources = [
-      aws_s3_bucket.cnpg_backups.arn,
+      aws_s3_bucket.mongodb_backups.arn,
     ]
+
   }
 
   statement {
-    sid    = "ReadWriteMetadataPostgresBackupObjects"
+    sid    = "ReadWriteAuditMongoBackupObjects"
     effect = "Allow"
 
     actions = [
@@ -230,7 +245,7 @@ data "aws_iam_policy_document" "cnpg_backups" {
     ]
 
     resources = [
-      "${aws_s3_bucket.cnpg_backups.arn}/${local.metadata_backup_prefix}",
+      "${aws_s3_bucket.mongodb_backups.arn}/${local.backup_prefix}",
     ]
   }
 
@@ -246,7 +261,7 @@ data "aws_iam_policy_document" "cnpg_backups" {
     ]
 
     resources = [
-      aws_kms_key.cnpg_backups.arn,
+      aws_kms_key.mongodb_backups.arn,
     ]
 
     condition {
@@ -259,20 +274,20 @@ data "aws_iam_policy_document" "cnpg_backups" {
       test     = "StringLike"
       variable = "kms:EncryptionContext:aws:s3:arn"
       values = [
-        aws_s3_bucket.cnpg_backups.arn,
-        "${aws_s3_bucket.cnpg_backups.arn}/metadata-postgres/*",
+        aws_s3_bucket.mongodb_backups.arn,
+        "${aws_s3_bucket.mongodb_backups.arn}/audit-mongodb/*",
       ]
     }
   }
 }
 
-resource "aws_iam_policy" "cnpg_backups" {
-  name   = "${var.name}-cnpg-backups"
-  policy = data.aws_iam_policy_document.cnpg_backups.json
+resource "aws_iam_policy" "mongodb_backups" {
+  name   = "${var.name}-mongodb-backups"
+  policy = data.aws_iam_policy_document.mongodb_backups.json
   tags   = var.tags
 }
 
-resource "aws_iam_role_policy_attachment" "cnpg_backups" {
-  role       = aws_iam_role.cnpg_backups.name
-  policy_arn = aws_iam_policy.cnpg_backups.arn
+resource "aws_iam_role_policy_attachment" "mongodb_backups" {
+  role       = aws_iam_role.mongodb_backups.name
+  policy_arn = aws_iam_policy.mongodb_backups.arn
 }
