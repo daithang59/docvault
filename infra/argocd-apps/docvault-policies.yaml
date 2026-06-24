@@ -1,22 +1,20 @@
 apiVersion: argoproj.io/v1alpha1
 kind: Application
 metadata:
-  name: docvault-public-ingress
+  name: docvault-policies
   namespace: argocd
   annotations:
-    argocd.argoproj.io/sync-wave: "2"
+    argocd.argoproj.io/sync-wave: "1"
 spec:
   project: default
   source:
     repoURL: 'https://github.com/daithang59/docvault.git'
     targetRevision: main
-    path: infra/k8s/public-ingress/overlays/testing
+    path: policies/eks-runtime
   destination:
     server: 'https://kubernetes.default.svc'
-    namespace: docvault
+    namespace: kyverno
   syncPolicy:
     automated:
-      prune: false
+      prune: true
       selfHeal: true
-    syncOptions:
-      - CreateNamespace=true

@@ -1,5 +1,5 @@
 def call() {
-    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'gitops-testing'
+    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'main'
     def releaseBranch = env.RELEASE_BRANCH?.trim() ? env.RELEASE_BRANCH.trim() : 'main'
     def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'https://sonarqube.docvault.id.vn'
     def deployTargetUrl = env.DEPLOY_TARGET_URL?.trim() ? env.DEPLOY_TARGET_URL.trim() : ''
