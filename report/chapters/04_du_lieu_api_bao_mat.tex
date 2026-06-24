@@ -6,6 +6,15 @@ DocVault tách dữ liệu thành ba nhóm chính. Metadata tài liệu thuộc 
 
 Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Cách thiết kế này giúp hệ thống vừa có thể truy vấn metadata nhanh, vừa có thể lưu file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
 
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth,height=0.86\textheight,keepaspectratio]{docvault-erd-visual-clean.drawio.png}
+\caption{ERD và ranh giới sở hữu dữ liệu trong DocVault}
+\label{fig:data-ownership-erd}
+\end{figure}
+\end{landscape}
+
 \section{Các thực thể chính}
 
 \subsection{documents}
