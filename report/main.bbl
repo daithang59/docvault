@@ -140,6 +140,278 @@
       \verb https://argo-cd.readthedocs.io/en/stable/
       \endverb
     \endentry
+    \entry{terraform_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=1129ea7ef173c0128f37020fea647cec}{%
+           family={{HashiCorp}},
+           familyi={H\bibinitperiod}}}%
+      }
+      \strng{namehash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{fullhash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{fullhashraw}{1129ea7ef173c0128f37020fea647cec}
+      \strng{bibnamehash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{authorbibnamehash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{authornamehash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{authorfullhash}{1129ea7ef173c0128f37020fea647cec}
+      \strng{authorfullhashraw}{1129ea7ef173c0128f37020fea647cec}
+      \field{sortinit}{5}
+      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Backend Block Configuration Overview}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://developer.hashicorp.com/terraform/language/backend
+      \endverb
+      \verb{url}
+      \verb https://developer.hashicorp.com/terraform/language/backend
+      \endverb
+    \endentry
+    \entry{aws_eks_irsa}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=3eb2c1a57a8160029f036e3dcbf84bf1}{%
+           family={{Amazon Web Services}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{fullhash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{fullhashraw}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{bibnamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorbibnamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authornamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorfullhash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorfullhashraw}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \field{extraname}{1}
+      \field{sortinit}{6}
+      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{IAM Roles for Service Accounts}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+      \endverb
+      \verb{url}
+      \verb https://docs.aws.amazon.com/eks/latest/userguide/iam-roles-for-service-accounts.html
+      \endverb
+    \endentry
+    \entry{aws_s3_kms}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=3eb2c1a57a8160029f036e3dcbf84bf1}{%
+           family={{Amazon Web Services}},
+           familyi={A\bibinitperiod}}}%
+      }
+      \strng{namehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{fullhash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{fullhashraw}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{bibnamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorbibnamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authornamehash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorfullhash}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \strng{authorfullhashraw}{3eb2c1a57a8160029f036e3dcbf84bf1}
+      \field{extraname}{2}
+      \field{sortinit}{7}
+      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Using Server-Side Encryption with AWS KMS Keys}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
+      \endverb
+      \verb{url}
+      \verb https://docs.aws.amazon.com/AmazonS3/latest/userguide/UsingKMSEncryption.html
+      \endverb
+    \endentry
+    \entry{cnpg_backup}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=4f2503babdc3fd80d169c97e65a571c9}{%
+           family={{CloudNativePG Project}},
+           familyi={C\bibinitperiod}}}%
+      }
+      \strng{namehash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{fullhash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{fullhashraw}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{bibnamehash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{authorbibnamehash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{authornamehash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{authorfullhash}{4f2503babdc3fd80d169c97e65a571c9}
+      \strng{authorfullhashraw}{4f2503babdc3fd80d169c97e65a571c9}
+      \field{sortinit}{8}
+      \field{sortinithash}{a231b008ebf0ecbe0b4d96dcc159445f}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Backup and Recovery}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://cloudnative-pg.io/documentation/current/backup/
+      \endverb
+      \verb{url}
+      \verb https://cloudnative-pg.io/documentation/current/backup/
+      \endverb
+    \endentry
+    \entry{kubernetes_networkpolicy}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=97d5f1c7ec302d71272e93170d6ec381}{%
+           family={{Kubernetes Authors}},
+           familyi={K\bibinitperiod}}}%
+      }
+      \strng{namehash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{fullhash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{fullhashraw}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{bibnamehash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{authorbibnamehash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{authornamehash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{authorfullhash}{97d5f1c7ec302d71272e93170d6ec381}
+      \strng{authorfullhashraw}{97d5f1c7ec302d71272e93170d6ec381}
+      \field{sortinit}{9}
+      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Network Policies}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      \endverb
+      \verb{url}
+      \verb https://kubernetes.io/docs/concepts/services-networking/network-policies/
+      \endverb
+    \endentry
+    \entry{external_secrets_aws}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=120522b3f36726dd51db1c3281f550cf}{%
+           family={{External Secrets Operator Project}},
+           familyi={E\bibinitperiod}}}%
+      }
+      \strng{namehash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{fullhash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{fullhashraw}{120522b3f36726dd51db1c3281f550cf}
+      \strng{bibnamehash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{authorbibnamehash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{authornamehash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{authorfullhash}{120522b3f36726dd51db1c3281f550cf}
+      \strng{authorfullhashraw}{120522b3f36726dd51db1c3281f550cf}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{AWS Secrets Manager Provider}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://external-secrets.io/latest/provider/aws-secrets-manager/
+      \endverb
+      \verb{url}
+      \verb https://external-secrets.io/latest/provider/aws-secrets-manager/
+      \endverb
+    \endentry
+    \entry{harbor_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=be622e0a8588b7427f03c93d854e1ed7}{%
+           family={{Harbor Project}},
+           familyi={H\bibinitperiod}}}%
+      }
+      \strng{namehash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{fullhash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{fullhashraw}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{bibnamehash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{authorbibnamehash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{authornamehash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{authorfullhash}{be622e0a8588b7427f03c93d854e1ed7}
+      \strng{authorfullhashraw}{be622e0a8588b7427f03c93d854e1ed7}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Working with Images and Tags}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://goharbor.io/docs/main/working-with-projects/working-with-images/
+      \endverb
+      \verb{url}
+      \verb https://goharbor.io/docs/main/working-with-projects/working-with-images/
+      \endverb
+    \endentry
+    \entry{sigstore_cosign}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=cc1ed375adc9f7db5212bc5b4e7ffdac}{%
+           family={{Sigstore Project}},
+           familyi={S\bibinitperiod}}}%
+      }
+      \strng{namehash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{fullhash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{fullhashraw}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{bibnamehash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{authorbibnamehash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{authornamehash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{authorfullhash}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \strng{authorfullhashraw}{cc1ed375adc9f7db5212bc5b4e7ffdac}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Signing Containers with Cosign}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.sigstore.dev/cosign/signing/signing_with_containers/
+      \endverb
+      \verb{url}
+      \verb https://docs.sigstore.dev/cosign/signing/signing_with_containers/
+      \endverb
+    \endentry
+    \entry{kyverno_cli}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=f31fc98376e933d96a1d782424476323}{%
+           family={{Kyverno Project}},
+           familyi={K\bibinitperiod}}}%
+      }
+      \strng{namehash}{f31fc98376e933d96a1d782424476323}
+      \strng{fullhash}{f31fc98376e933d96a1d782424476323}
+      \strng{fullhashraw}{f31fc98376e933d96a1d782424476323}
+      \strng{bibnamehash}{f31fc98376e933d96a1d782424476323}
+      \strng{authorbibnamehash}{f31fc98376e933d96a1d782424476323}
+      \strng{authornamehash}{f31fc98376e933d96a1d782424476323}
+      \strng{authorfullhash}{f31fc98376e933d96a1d782424476323}
+      \strng{authorfullhashraw}{f31fc98376e933d96a1d782424476323}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Kyverno CLI Reference}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://kyverno.io/docs/kyverno-cli/
+      \endverb
+      \verb{url}
+      \verb https://kyverno.io/docs/kyverno-cli/
+      \endverb
+    \endentry
     \entry{sonarqube_docs}{online}{}{}
       \name{author}{1}{}{%
         {{hash=613a509c0f3517ba4012a7935077b773}{%
@@ -154,8 +426,8 @@
       \strng{authornamehash}{613a509c0f3517ba4012a7935077b773}
       \strng{authorfullhash}{613a509c0f3517ba4012a7935077b773}
       \strng{authorfullhashraw}{613a509c0f3517ba4012a7935077b773}
-      \field{sortinit}{5}
-      \field{sortinithash}{20e9b4b0b173788c5dace24730f47d8c}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{SonarQube Server Documentation}}
@@ -184,8 +456,8 @@
       \strng{authornamehash}{8f145e9402dcaca0eb525b997bb2550e}
       \strng{authorfullhash}{8f145e9402dcaca0eb525b997bb2550e}
       \strng{authorfullhashraw}{8f145e9402dcaca0eb525b997bb2550e}
-      \field{sortinit}{6}
-      \field{sortinithash}{b33bc299efb3c36abec520a4c896a66d}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{Trivy Documentation}}
@@ -214,8 +486,8 @@
       \strng{authornamehash}{08c92d6085c899aad02358cf78f51038}
       \strng{authorfullhash}{08c92d6085c899aad02358cf78f51038}
       \strng{authorfullhashraw}{08c92d6085c899aad02358cf78f51038}
-      \field{sortinit}{7}
-      \field{sortinithash}{108d0be1b1bee9773a1173443802c0a3}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{Checkov Documentation}}
@@ -244,8 +516,8 @@
       \strng{authornamehash}{e28c18aaaf23b76c58b60c4054ca7d1f}
       \strng{authorfullhash}{e28c18aaaf23b76c58b60c4054ca7d1f}
       \strng{authorfullhashraw}{e28c18aaaf23b76c58b60c4054ca7d1f}
-      \field{sortinit}{9}
-      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{ZAP Baseline Scan}}
@@ -258,6 +530,66 @@
       \endverb
       \verb{url}
       \verb https://www.zaproxy.org/docs/docker/baseline-scan/
+      \endverb
+    \endentry
+    \entry{prometheus_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=6cf8f74708cd9ab082f17d5df3da9242}{%
+           family={{Prometheus Authors}},
+           familyi={P\bibinitperiod}}}%
+      }
+      \strng{namehash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{fullhash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{fullhashraw}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{bibnamehash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{authorbibnamehash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{authornamehash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{authorfullhash}{6cf8f74708cd9ab082f17d5df3da9242}
+      \strng{authorfullhashraw}{6cf8f74708cd9ab082f17d5df3da9242}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Prometheus Overview}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://prometheus.io/docs/introduction/overview/
+      \endverb
+      \verb{url}
+      \verb https://prometheus.io/docs/introduction/overview/
+      \endverb
+    \endentry
+    \entry{loki_docs}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=92d1002bbeda9145e9369766ab6d96a9}{%
+           family={{Grafana Labs}},
+           familyi={G\bibinitperiod}}}%
+      }
+      \strng{namehash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{fullhash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{fullhashraw}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{bibnamehash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{authorbibnamehash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{authornamehash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{authorfullhash}{92d1002bbeda9145e9369766ab6d96a9}
+      \strng{authorfullhashraw}{92d1002bbeda9145e9369766ab6d96a9}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Grafana Loki Overview}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://grafana.com/docs/loki/latest/get-started/overview/
+      \endverb
+      \verb{url}
+      \verb https://grafana.com/docs/loki/latest/get-started/overview/
       \endverb
     \endentry
   \enddatalist

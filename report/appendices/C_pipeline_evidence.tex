@@ -60,28 +60,3 @@ Loki & Query log namespace \code{docvault} & \path{loki-logs.png} & Chưa có \\
 Backup & CloudNativePG ScheduledBackup và object trong S3 backup bucket & \path{database-backup.png} & Chưa có \\
 \bottomrule
 \end{longtable}
-
-\section{Nguyên tắc chụp và kiểm tra ảnh}
-
-\begin{itemize}
-  \item Ảnh phải đọc được build number, commit SHA, thời điểm và trạng thái.
-  \item Các ảnh Jenkins, Harbor, GitOps và Argo CD phải thuộc cùng một lần phát hành.
-  \item Không chụp secret value, robot token, private key, kubeconfig, cookie, JWT hoặc presigned URL.
-  \item Ảnh AWS có thể giữ account ID, ARN và tên tài nguyên để phục vụ đối chiếu cấu hình; không được hiển thị access key, secret key, session token hoặc giá trị secret.
-  \item Không dùng ảnh chỉ thể hiện giao diện trống; mỗi ảnh phải chứng minh một claim cụ thể.
-  \item Caption phải giải thích kết quả, không chỉ lặp lại tên công cụ.
-\end{itemize}
-
-\section{Cách diễn giải khi bảo vệ}
-
-Khi trình bày pipeline, cần liên kết từng ảnh với một kiểm soát:
-
-\begin{itemize}
-  \item Jenkins chứng minh quy trình tự động và thứ tự gate.
-  \item SonarQube, Dependency-Check, Trivy, Checkov và Kyverno chứng minh kiểm tra trước phát hành.
-  \item Harbor, digest và Cosign chứng minh tính toàn vẹn của artifact.
-  \item GitOps commit và Argo CD chứng minh deployment có nguồn sự thật và khả năng reconcile.
-  \item Smoke test và ZAP chứng minh ứng dụng sau deploy có thể truy cập và đã được kiểm tra động.
-  \item Grafana và Loki chứng minh hệ thống có khả năng quan sát sau triển khai.
-  \item S3/KMS, IRSA, External Secrets và backup chứng minh kiểm soát dữ liệu và credential ở lớp hạ tầng.
-\end{itemize}

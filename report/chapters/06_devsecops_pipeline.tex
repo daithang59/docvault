@@ -23,7 +23,9 @@ Thiết kế trên hướng đến các mục tiêu sau:
 \label{fig:devsecops-pipeline-overview}
 \end{figure}
 
-Hình~\ref{fig:devsecops-pipeline-overview} trình bày chuỗi kiểm soát tổng thể. Trong phiên bản hiện tại, Jenkins cập nhật trực tiếp nhánh \code{gitops-testing} bằng commit có \code{[skip ci]} sau khi toàn bộ điều kiện phát hành được thỏa mãn. Bước tạo pull request trong sơ đồ là phương án gia cố tiếp theo nhằm bổ sung cơ chế rà soát và phê duyệt thay đổi GitOps.
+Hình~\ref{fig:devsecops-pipeline-overview} trình bày chuỗi kiểm soát tổng thể. Sơ đồ có thể chia thành ba phân đoạn nối tiếp. Phân đoạn CI (bên trái) bắt đầu khi mã nguồn được đẩy lên Git: Jenkins checkout, cài dependency, quét secret, chạy test/lint, rồi áp các security gate gồm SCA, Trivy, SonarQube và kiểm tra IaC. Phân đoạn đóng gói (ở giữa) build Docker image, quét image bằng Trivy, đẩy lên Harbor, lấy digest và tùy chọn ký bằng Cosign; chỉ image vượt qua mọi gate mới được phát hành. Phân đoạn CD theo GitOps (bên phải) là nơi Jenkins cập nhật desired state trên nhánh GitOps, Argo CD đối chiếu và đồng bộ xuống EKS, sau đó pipeline chạy kiểm tra sau triển khai gồm Argo CD health check, smoke test và DAST.
+
+Ranh giới quan trọng nhất trên sơ đồ là Jenkins không trực tiếp \code{kubectl apply} lên cụm; nó chỉ ghi trạng thái mong muốn vào Git, còn Argo CD mới là thành phần thực thi thay đổi trên cluster. Trong phiên bản hiện tại, Jenkins cập nhật trực tiếp nhánh \code{gitops-testing} bằng commit có \code{[skip ci]} sau khi toàn bộ điều kiện phát hành được thỏa mãn. Bước tạo pull request trong sơ đồ là phương án gia cố tiếp theo nhằm bổ sung cơ chế rà soát và phê duyệt thay đổi GitOps.
 
 \section{Kiến trúc hạ tầng trên AWS EKS}
 
@@ -89,6 +91,10 @@ Cấu hình hiện tại sử dụng managed node group có khả năng co giãn
 \end{landscape}
 
 Hình~\ref{fig:eks-deployment-architecture} cho thấy mối quan hệ giữa GitOps repository, Argo CD, các namespace ứng dụng và giám sát, nhóm controller nền tảng, Harbor, Keycloak và các dịch vụ AWS. Luồng truy cập công khai đi qua Cloudflare, AWS Load Balancer và ingress-nginx; luồng dữ liệu và bí mật lần lượt được bảo vệ bởi S3/KMS và AWS Secrets Manager.
+
+Có thể đọc sơ đồ theo bốn cụm. Cụm điều khiển triển khai gồm GitOps repository và Argo CD: Argo CD theo dõi nhánh GitOps và đồng bộ desired state vào cụm, đóng vai trò cầu nối duy nhất giữa Git và Kubernetes. Cụm workload ứng dụng là các namespace chạy gateway, web và sáu backend service, được đóng gói bằng Helm. Cụm nền tảng gồm các controller dùng chung như ingress-nginx, cert-manager, External Secrets Operator và CloudNativePG. Cụm dịch vụ AWS bên ngoài cluster gồm S3 (file và backup), KMS (khóa mã hóa), Secrets Manager (bí mật) và IAM/IRSA (cấp quyền cho ServiceAccount).
+
+Hai luồng được tô đậm trên sơ đồ minh họa rõ ranh giới bảo mật. Luồng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway, nghĩa là không có workload nào lộ trực tiếp ra Internet. Luồng bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nhờ đó repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
 
 \subsection{Lưu trữ tài liệu và backup}
 

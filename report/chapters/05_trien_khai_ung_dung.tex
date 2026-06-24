@@ -86,6 +86,33 @@ Metadata-service là nguồn sự thật cho tài liệu logic và policy. Servi
 
 Metadata-service là nơi quan trọng nhất để enforce policy liên quan đến metadata và grant token. Khi document-service cần đăng ký version mới hoặc khi workflow-service cần cập nhật trạng thái, các service này gọi metadata-service thay vì ghi trực tiếp vào database.
 
+Một ví dụ tiêu biểu cho nguyên tắc \emph{backend authoritative} là quy tắc chặn Compliance Officer tải file. Quy tắc này được đặt ngay đầu hàm kiểm tra quyền download trong \code{policy.service.ts}, trước cả các bước kiểm tra trạng thái và ACL, để bảo đảm không có nhánh nào bỏ sót:
+
+\begin{lstlisting}[language=java,caption={Quy tắc deny download của Compliance Officer trong \code{policy.service.ts}}]
+private getDeniedReason(status: string, roles: string[]): string | null {
+  if (roles.includes('compliance_officer')) {
+    return 'Compliance officers are never allowed to download files';
+  }
+  if (status !== 'PUBLISHED') {
+    return 'Only published documents can be downloaded';
+  }
+  return null;
+}
+\end{lstlisting}
+
+Vì quyết định nằm ở backend chứ không ở frontend, người dùng compliance không thể vượt qua bằng cách gọi trực tiếp API. Khi quy tắc trả về lý do từ chối, service ném \code{ForbiddenException} và ghi audit event tương ứng.
+
+Grant token download/preview cũng do metadata-service cấp. Token có thời hạn 300 giây, được ký bằng HMAC-SHA256 và hỗ trợ xoay khóa qua \code{kid}, sau đó document-service xác minh trước khi phát file:
+
+\begin{lstlisting}[language=java,caption={Cấp grant token ngắn hạn cho download}]
+const encoded = Buffer.from(JSON.stringify(tokenPayload))
+  .toString('base64url');
+const signature = createHmac('sha256', signing.secret)
+  .update(encoded)
+  .digest('base64url');
+return `${encoded}.${signature}`;
+\end{lstlisting}
+
 \section{Document-service}
 
 Document-service xử lý phần blob file. Service này nhận upload multipart, tính checksum SHA-256, scan malware/DLP, sinh object key và upload file lên MinIO/S3. Sau khi upload thành công, service gọi metadata-service để đăng ký version mới.
@@ -128,7 +155,7 @@ Môi trường local sử dụng Docker Compose để chạy các dependency:
   \item Keycloak cho identity, realm, roles và demo users.
 \end{itemize}
 
-Các service backend chạy trên các port \code{3000} đến \code{3005}, frontend thường chạy trên \code{3100} để tránh xung đột với gateway.
+Các service backend chạy trên các port \code{3000} đến \code{3005}; frontend chạy trên port \code{3006} (script \code{pnpm --filter web dev}) để tránh xung đột với gateway và các service backend.
 
 \section{Các màn hình minh họa}
 

@@ -103,6 +103,17 @@ Hình~\ref{fig:architecture-overview} mô tả cách các lớp này liên kết
 \end{figure}
 \end{landscape}
 
+Có thể đọc Hình~\ref{fig:architecture-overview} theo bốn lớp từ trên xuống:
+
+\begin{itemize}
+  \item \textbf{Lớp client và frontend}: trình duyệt người dùng tải ứng dụng Next.js. Frontend chỉ giữ một API base URL duy nhất trỏ đến gateway và không gọi trực tiếp bất kỳ microservice nào. Người dùng đăng nhập qua Keycloak theo luồng OIDC, sau đó frontend đính kèm JWT vào mỗi request gửi lên gateway.
+  \item \textbf{Lớp gateway}: API Gateway là điểm vào duy nhất. Tại đây JWT được xác minh với Keycloak qua JWKS, role được kiểm tra ở mức route, và request hợp lệ được proxy xuống service phù hợp kèm các header ngữ cảnh (\code{x-user-id}, \code{x-roles}, \code{x-groups}, \code{x-request-id}). Gateway không chứa nghiệp vụ tài liệu.
+  \item \textbf{Lớp microservice}: mỗi service sở hữu một bounded context riêng. Metadata-service giữ metadata, ACL, policy và cấp grant token; document-service xử lý blob file và đối tượng lưu trữ; workflow-service điều phối state machine; audit-service ghi và xác minh hash-chain; notification-service nhận thông báo nghiệp vụ. Các service giao tiếp với nhau bằng HTTP nội bộ (Axios) và được miễn rate limit qua header gọi nội bộ.
+  \item \textbf{Lớp hạ tầng dữ liệu}: Keycloak quản lý định danh; PostgreSQL lưu metadata; MongoDB lưu audit event; MinIO/S3 lưu file. Mỗi service chỉ truy cập kho dữ liệu thuộc bounded context của nó, tránh việc một service đọc trực tiếp database của service khác.
+\end{itemize}
+
+Điểm cốt lõi thể hiện trên sơ đồ là đường đi của một thao tác nhạy cảm như tải file: request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Nhờ vậy không có đường tắt nào cho phép bỏ qua lớp kiểm soát chính sách ở backend.
+
 \section{Luồng nghiệp vụ chính}
 
 Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhập, tạo tài liệu, upload file và submit. Approver đăng nhập, kiểm tra tài liệu pending và approve. Viewer đăng nhập, xem tài liệu đã published và download nếu policy cho phép. Compliance Officer đăng nhập, xem audit/evidence nhưng bị chặn preview/download nội dung file.
