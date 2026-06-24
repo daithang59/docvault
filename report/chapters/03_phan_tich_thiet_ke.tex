@@ -92,31 +92,92 @@ Khả năng mở rộng & Thiết kế cho phép bổ sung queue, email notifica
 
 Kiến trúc DocVault gồm bốn lớp: frontend, gateway, microservices và hạ tầng dữ liệu. Frontend Next.js là giao diện người dùng. API Gateway là điểm vào duy nhất cho frontend, chịu trách nhiệm xác thực, role guard, proxy request và truyền ngữ cảnh. Các service phía sau xử lý nghiệp vụ riêng. Hạ tầng dữ liệu gồm Keycloak, PostgreSQL, MongoDB và MinIO/S3.
 
-\begin{lstlisting}[caption={Mô hình kiến trúc tổng thể của DocVault},label={fig:architecture-overview}]
-Frontend Next.js
-       |
-       v
-API Gateway: JWT, RBAC, routing, context headers
-       |
-       +--> metadata-service: metadata, ACL, policy, retention
-       +--> document-service: upload, stream, MinIO/S3
-       +--> workflow-service: submit, approve, reject, archive
-       +--> audit-service: audit events, hash-chain, security summary
-       +--> notification-service: notification sink
+Hình~\ref{fig:architecture-overview} mô tả cách các lớp này liên kết với nhau. Điểm quan trọng của kiến trúc là frontend chỉ giao tiếp qua gateway, còn các microservice phía sau giữ ranh giới nghiệp vụ riêng: metadata-service sở hữu policy và metadata, document-service sở hữu blob file, workflow-service điều phối trạng thái, audit-service ghi nhận sự kiện và notification-service xử lý thông báo.
 
-Infrastructure: Keycloak, PostgreSQL, MongoDB, MinIO, Kubernetes/EKS
-\end{lstlisting}
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth,height=0.88\textheight,keepaspectratio]{docvault-architecture.drawio.png}
+\caption{Kiến trúc tổng thể ứng dụng DocVault}
+\label{fig:architecture-overview}
+\end{figure}
+\end{landscape}
 
 \section{Luồng nghiệp vụ chính}
 
 Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhập, tạo tài liệu, upload file và submit. Approver đăng nhập, kiểm tra tài liệu pending và approve. Viewer đăng nhập, xem tài liệu đã published và download nếu policy cho phép. Compliance Officer đăng nhập, xem audit/evidence nhưng bị chặn preview/download nội dung file.
 
-\begin{lstlisting}[caption={Luồng nghiệp vụ demo chính của DocVault},label={fig:main-flow}]
-Editor      -> create draft -> upload file -> submit for review
-Approver    -> open approvals -> review -> approve
-Viewer      -> open published document -> preview/download if allowed
-Compliance  -> inspect audit/evidence -> file content access denied
-\end{lstlisting}
+\begin{figure}[H]
+\centering
+\resizebox{0.96\textwidth}{!}{%
+\begin{tikzpicture}[
+  font=\sffamily\small,
+  >=Latex,
+  role/.style={
+    draw=#1!75,
+    fill=#1!12,
+    rounded corners=2pt,
+    minimum width=2.7cm,
+    minimum height=1.05cm,
+    align=center,
+    font=\sffamily\bfseries\small
+  },
+  card/.style={
+    draw=#1!70,
+    fill=#1!7,
+    rounded corners=4pt,
+    text width=10.4cm,
+    minimum height=1.15cm,
+    align=left,
+    inner xsep=10pt,
+    inner ysep=7pt
+  },
+  flow/.style={->, thick, draw=black!65},
+  audit/.style={->, dashed, thick, draw=docvaultamber!90!black},
+  denyflow/.style={->, thick, draw=docvaultred}
+]
+
+\node[card=docvaultblue] (editorFlow) at (4.2,0)
+  {\textbf{1. Tạo và gửi tài liệu}\\
+  Đăng nhập $\rightarrow$ tạo \textbf{DRAFT} $\rightarrow$ upload file/metadata $\rightarrow$ submit for review.};
+\node[role=docvaultblue, left=0.5cm of editorFlow] (editorRole) {Editor};
+
+\node[card=docvaultgreen, below=0.38cm of editorFlow] (approverFlow)
+  {\textbf{2. Duyệt tài liệu}\\
+  Mở Approvals $\rightarrow$ review \textbf{PENDING} $\rightarrow$ approve/reject $\rightarrow$ \textbf{PUBLISHED}.};
+\node[role=docvaultgreen, left=0.5cm of approverFlow] (approverRole) {Approver};
+
+\node[card=docvaultamber, below=0.38cm of approverFlow] (viewerFlow)
+  {\textbf{3. Truy cập tài liệu đã xuất bản}\\
+  Mở Documents $\rightarrow$ xem \textbf{PUBLISHED} $\rightarrow$ xin quyền preview/download $\rightarrow$ presigned URL hoặc controlled stream nếu policy cho phép.};
+\node[role=docvaultamber, left=0.5cm of viewerFlow] (viewerRole) {Viewer};
+
+\node[card=docvaultred, below=0.38cm of viewerFlow] (complianceFlow)
+  {\textbf{4. Kiểm tra tuân thủ không truy cập nội dung}\\
+  Mở Audit/Security/Evidence $\rightarrow$ kiểm tra hash-chain/evidence $\rightarrow$ thử preview/download nội dung file $\rightarrow$ bị deny theo metadata-only compliance.};
+\node[role=docvaultred, left=0.5cm of complianceFlow] (complianceRole) {Compliance\\Officer};
+
+\node[
+  draw=black!25,
+  fill=docvaultgray,
+  rounded corners=3pt,
+  text width=10.4cm,
+  align=center,
+  below=0.55cm of complianceFlow,
+  inner ysep=6pt
+] (auditNote)
+  {Workflow history và audit event được ghi cho các thao tác quan trọng như upload, submit, approve, download và deny file content.};
+
+\draw[flow] (editorFlow.south) -- node[right, font=\scriptsize] {DRAFT $\rightarrow$ PENDING} (approverFlow.north);
+\draw[flow] (approverFlow.south) -- node[right, font=\scriptsize] {PENDING $\rightarrow$ PUBLISHED} (viewerFlow.north);
+\draw[flow] (viewerFlow.south) -- node[right, font=\scriptsize] {audit/evidence} (complianceFlow.north);
+\draw[denyflow] (complianceFlow.south) -- (auditNote.north);
+
+\end{tikzpicture}%
+}
+\caption{Luồng nghiệp vụ demo chính theo vai trò trong DocVault}
+\label{fig:main-flow}
+\end{figure}
 
 \section{Nguyên tắc thiết kế}
 

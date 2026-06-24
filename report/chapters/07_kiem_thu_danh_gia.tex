@@ -58,19 +58,19 @@ Audit ingest & Viewer cannot ingest fake audit event & PASS \\
 
 \section{Kiểm thử frontend và UI evidence}
 
-Frontend được kiểm tra bằng lint, build, typecheck và test component/helper. Ngoài ra, thư mục \code{docs/evidence/screenshots} có các screenshot Playwright cho nhiều màn hình trọng yếu như Dashboard, Documents, Approvals, Audit, Security và Evidence. Các screenshot này không chỉ dùng để minh họa UI, mà còn là bằng chứng rằng các màn hình chính render được và có trạng thái nội dung phù hợp.
+Frontend được kiểm tra bằng lint, build, typecheck và test component/helper. Ngoài ra, bộ screenshot trong \code{report/images/screen} ghi nhận các màn hình trọng yếu như Dashboard, Documents, Approvals, Audit, Security và Access Review trên môi trường triển khai. Các screenshot này vừa minh họa UI, vừa cung cấp bằng chứng trực quan rằng các màn hình chính render được và hiển thị trạng thái dữ liệu phù hợp.
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\textwidth]{dashboard-command-center-playwright.png}
-\caption{Bằng chứng Playwright cho dashboard command center}
+\includegraphics[width=0.92\textwidth]{screen/dashboard.png}
+\caption{Bằng chứng giao diện dashboard command center}
 \label{fig:evidence-dashboard}
 \end{figure}
 
 \begin{figure}[H]
 \centering
-\includegraphics[width=0.92\textwidth]{approvals-sla-readiness-playwright.png}
-\caption{Bằng chứng Playwright cho approvals SLA readiness}
+\includegraphics[width=0.92\textwidth]{screen/approvals.png}
+\caption{Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}
 \label{fig:evidence-approvals}
 \end{figure}
 
