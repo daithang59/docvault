@@ -7,7 +7,7 @@ spec:
   project: default
   source:
     repoURL: https://github.com/daithang59/docvault.git
-    targetRevision: gitops-testing
+    targetRevision: main
     path: infra/argocd-apps
     directory:
       recurse: false

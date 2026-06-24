@@ -79,6 +79,7 @@ resource "aws_kms_alias" "mongodb_backups" {
 resource "aws_s3_bucket" "mongodb_backups" {
   #checkov:skip=CKV_AWS_144:Cross-region replication is intentionally disabled for the testing environment to control AWS cost.
   #checkov:skip=CKV_AWS_18:S3 server access logging is not enabled yet for this low-cost testing backup bucket; CloudTrail/S3 data events can be added later.
+  #checkov:skip=CKV2_AWS_62:Event notifications are not required as this bucket is only used for passive storage of database backups.
   bucket              = local.backup_bucket_name
   object_lock_enabled = true
 
