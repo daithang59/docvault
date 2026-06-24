@@ -2,119 +2,138 @@
 \contentsline {chapter}{Lời cảm ơn}{1}{chapter*.1}%
 \contentsline {chapter}{Tóm tắt}{2}{chapter*.2}%
 \contentsline {chapter}{Abstract}{3}{chapter*.3}%
-\contentsline {chapter}{Danh mục từ viết tắt}{10}{chapter*.7}%
-\contentsline {chapter}{\numberline {1}Tổng quan đề tài}{12}{chapter.1}%
-\contentsline {section}{\numberline {1.1}Bối cảnh}{12}{section.1.1}%
-\contentsline {section}{\numberline {1.2}Vấn đề cần giải quyết}{13}{section.1.2}%
-\contentsline {section}{\numberline {1.3}Mục tiêu đề tài}{13}{section.1.3}%
-\contentsline {section}{\numberline {1.4}Phạm vi thực hiện}{14}{section.1.4}%
-\contentsline {section}{\numberline {1.5}Đóng góp của đề tài}{15}{section.1.5}%
-\contentsline {section}{\numberline {1.6}Cấu trúc báo cáo}{15}{section.1.6}%
-\contentsline {chapter}{\numberline {2}Cơ sở lý thuyết và công nghệ nền tảng}{17}{chapter.2}%
-\contentsline {section}{\numberline {2.1}Hệ thống quản lý tài liệu bảo mật}{17}{section.2.1}%
-\contentsline {section}{\numberline {2.2}Kiến trúc microservices}{17}{section.2.2}%
-\contentsline {section}{\numberline {2.3}Xác thực và phân quyền}{18}{section.2.3}%
-\contentsline {subsection}{\numberline {2.3.1}Keycloak, OIDC và JWT}{18}{subsection.2.3.1}%
-\contentsline {subsection}{\numberline {2.3.2}RBAC}{18}{subsection.2.3.2}%
-\contentsline {subsection}{\numberline {2.3.3}ACL và deny-overrides}{19}{subsection.2.3.3}%
-\contentsline {section}{\numberline {2.4}Phân loại tài liệu và kiểm soát nội dung}{19}{section.2.4}%
-\contentsline {section}{\numberline {2.5}Audit, hash-chain và compliance evidence}{19}{section.2.5}%
-\contentsline {section}{\numberline {2.6}DevSecOps}{20}{section.2.6}%
-\contentsline {section}{\numberline {2.7}Các nhóm kiểm thử bảo mật trong pipeline}{20}{section.2.7}%
-\contentsline {section}{\numberline {2.8}GitOps và Argo CD}{20}{section.2.8}%
-\contentsline {chapter}{\numberline {3}Phân tích yêu cầu và thiết kế tổng thể}{22}{chapter.3}%
-\contentsline {section}{\numberline {3.1}Tổng quan bài toán}{22}{section.3.1}%
-\contentsline {section}{\numberline {3.2}Tác nhân hệ thống}{23}{section.3.2}%
-\contentsline {section}{\numberline {3.3}Yêu cầu chức năng}{23}{section.3.3}%
-\contentsline {subsection}{\numberline {3.3.1}Xác thực và phân quyền}{23}{subsection.3.3.1}%
-\contentsline {subsection}{\numberline {3.3.2}Quản lý tài liệu}{23}{subsection.3.3.2}%
-\contentsline {subsection}{\numberline {3.3.3}Workflow phê duyệt}{24}{subsection.3.3.3}%
-\contentsline {subsection}{\numberline {3.3.4}Preview và download}{24}{subsection.3.3.4}%
-\contentsline {subsection}{\numberline {3.3.5}Audit, security và evidence}{24}{subsection.3.3.5}%
-\contentsline {subsection}{\numberline {3.3.6}Retention và access review}{24}{subsection.3.3.6}%
-\contentsline {section}{\numberline {3.4}Yêu cầu phi chức năng}{25}{section.3.4}%
-\contentsline {section}{\numberline {3.5}Mô hình threat cơ bản}{25}{section.3.5}%
-\contentsline {section}{\numberline {3.6}Kiến trúc tổng thể}{26}{section.3.6}%
-\contentsline {section}{\numberline {3.7}Luồng nghiệp vụ chính}{28}{section.3.7}%
-\contentsline {section}{\numberline {3.8}Nguyên tắc thiết kế}{28}{section.3.8}%
-\contentsline {chapter}{\numberline {4}Thiết kế dữ liệu, API và chính sách bảo mật}{30}{chapter.4}%
-\contentsline {section}{\numberline {4.1}Tổng quan thiết kế dữ liệu}{30}{section.4.1}%
-\contentsline {section}{\numberline {4.2}Các thực thể chính}{32}{section.4.2}%
-\contentsline {subsection}{\numberline {4.2.1}documents}{32}{subsection.4.2.1}%
-\contentsline {subsection}{\numberline {4.2.2}document\_versions}{32}{subsection.4.2.2}%
-\contentsline {subsection}{\numberline {4.2.3}document\_acl}{32}{subsection.4.2.3}%
-\contentsline {subsection}{\numberline {4.2.4}document\_workflow\_history}{32}{subsection.4.2.4}%
-\contentsline {subsection}{\numberline {4.2.5}audit\_events}{32}{subsection.4.2.5}%
-\contentsline {section}{\numberline {4.3}Document lifecycle}{33}{section.4.3}%
-\contentsline {section}{\numberline {4.4}Ma trận phân quyền}{35}{section.4.4}%
-\contentsline {subsection}{\numberline {4.4.1}Quyền xem và tải theo classification}{35}{subsection.4.4.1}%
-\contentsline {section}{\numberline {4.5}Chính sách Compliance Officer}{37}{section.4.5}%
-\contentsline {section}{\numberline {4.6}Thiết kế preview/download authorization}{37}{section.4.6}%
-\contentsline {section}{\numberline {4.7}Malware scanning và DLP}{39}{section.4.7}%
-\contentsline {section}{\numberline {4.8}Audit ingest boundary}{39}{section.4.8}%
-\contentsline {section}{\numberline {4.9}Luồng compliance evidence}{39}{section.4.9}%
-\contentsline {section}{\numberline {4.10}API contract tổng quan}{40}{section.4.10}%
-\contentsline {chapter}{\numberline {5}Triển khai ứng dụng DocVault}{42}{chapter.5}%
-\contentsline {section}{\numberline {5.1}Cấu trúc monorepo}{42}{section.5.1}%
-\contentsline {section}{\numberline {5.2}Frontend Next.js}{42}{section.5.2}%
-\contentsline {subsection}{\numberline {5.2.1}Permission-aware UI}{44}{subsection.5.2.1}%
-\contentsline {section}{\numberline {5.3}Gateway}{44}{section.5.3}%
-\contentsline {section}{\numberline {5.4}Metadata-service}{45}{section.5.4}%
-\contentsline {section}{\numberline {5.5}Document-service}{45}{section.5.5}%
-\contentsline {section}{\numberline {5.6}Workflow-service}{45}{section.5.6}%
-\contentsline {section}{\numberline {5.7}Audit-service}{46}{section.5.7}%
-\contentsline {section}{\numberline {5.8}Notification-service}{46}{section.5.8}%
-\contentsline {section}{\numberline {5.9}Hạ tầng local}{46}{section.5.9}%
-\contentsline {section}{\numberline {5.10}Các màn hình minh họa}{46}{section.5.10}%
-\contentsline {section}{\numberline {5.11}Luồng demo ứng dụng}{48}{section.5.11}%
-\contentsline {chapter}{\numberline {6}Quy trình DevSecOps và hạ tầng triển khai}{50}{chapter.6}%
-\contentsline {section}{\numberline {6.1}Mục tiêu của DevSecOps pipeline}{50}{section.6.1}%
-\contentsline {section}{\numberline {6.2}Jenkins pipeline tổng thể}{50}{section.6.2}%
-\contentsline {section}{\numberline {6.3}Pre-build Security}{51}{section.6.3}%
-\contentsline {section}{\numberline {6.4}Build và scan image}{52}{section.6.4}%
-\contentsline {section}{\numberline {6.5}Push image và GitOps update}{52}{section.6.5}%
-\contentsline {section}{\numberline {6.6}Argo CD health check}{52}{section.6.6}%
-\contentsline {section}{\numberline {6.7}Post-deploy smoke test}{52}{section.6.7}%
-\contentsline {section}{\numberline {6.8}DAST bằng OWASP ZAP}{53}{section.6.8}%
-\contentsline {section}{\numberline {6.9}Observability}{53}{section.6.9}%
-\contentsline {section}{\numberline {6.10}Mapping stage, công cụ và bằng chứng}{53}{section.6.10}%
-\contentsline {section}{\numberline {6.11}Trạng thái hiện tại của pipeline}{54}{section.6.11}%
-\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{55}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{55}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{55}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{56}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Security evidence}{57}{section.7.4}%
-\contentsline {section}{\numberline {7.5}Pipeline evidence}{58}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{58}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{59}{section.7.7}%
-\contentsline {section}{\numberline {7.8}Nhận xét chung}{60}{section.7.8}%
-\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{61}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Kết quả đạt được}{61}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{61}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Hạn chế}{62}{section.8.3}%
-\contentsline {section}{\numberline {8.4}Hướng phát triển}{62}{section.8.4}%
-\contentsline {section}{\numberline {8.5}Kết luận chung}{63}{section.8.5}%
-\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{64}{appendix.A}%
-\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{64}{section.A.1}%
-\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{64}{section.A.2}%
-\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{64}{section.A.3}%
-\contentsline {section}{\numberline {A.4}Chạy migration}{64}{section.A.4}%
-\contentsline {section}{\numberline {A.5}Khởi động backend}{65}{section.A.5}%
-\contentsline {section}{\numberline {A.6}Khởi động frontend}{65}{section.A.6}%
-\contentsline {section}{\numberline {A.7}Tài khoản demo}{65}{section.A.7}%
-\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{66}{section.A.8}%
-\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{67}{appendix.B}%
-\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{67}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{67}{section.B.2}%
-\contentsline {section}{\numberline {B.3}Compliance Officer rule}{68}{section.B.3}%
-\contentsline {section}{\numberline {B.4}Grant token}{68}{section.B.4}%
-\contentsline {chapter}{\numberline {C}Pipeline evidence}{69}{appendix.C}%
-\contentsline {section}{\numberline {C.1}Tham số Jenkins khuyến nghị}{69}{section.C.1}%
-\contentsline {section}{\numberline {C.2}Bằng chứng cần chụp}{69}{section.C.2}%
-\contentsline {section}{\numberline {C.3}Diễn giải khi bảo vệ}{70}{section.C.3}%
-\contentsline {chapter}{\numberline {D}Danh sách hình ảnh minh họa}{71}{appendix.D}%
-\contentsline {section}{\numberline {D.1}Ảnh UI đã sử dụng}{71}{section.D.1}%
-\contentsline {section}{\numberline {D.2}Ảnh UI nên bổ sung}{71}{section.D.2}%
-\contentsline {section}{\numberline {D.3}Ảnh cần bổ sung trước khi nộp}{71}{section.D.3}%
+\contentsline {chapter}{Danh mục từ viết tắt}{11}{chapter*.7}%
+\contentsline {chapter}{\numberline {1}Tổng quan đề tài}{13}{chapter.1}%
+\contentsline {section}{\numberline {1.1}Bối cảnh}{13}{section.1.1}%
+\contentsline {section}{\numberline {1.2}Vấn đề cần giải quyết}{14}{section.1.2}%
+\contentsline {section}{\numberline {1.3}Mục tiêu đề tài}{14}{section.1.3}%
+\contentsline {section}{\numberline {1.4}Phạm vi thực hiện}{15}{section.1.4}%
+\contentsline {section}{\numberline {1.5}Đóng góp của đề tài}{16}{section.1.5}%
+\contentsline {section}{\numberline {1.6}Cấu trúc báo cáo}{16}{section.1.6}%
+\contentsline {chapter}{\numberline {2}Cơ sở lý thuyết và công nghệ nền tảng}{18}{chapter.2}%
+\contentsline {section}{\numberline {2.1}Hệ thống quản lý tài liệu bảo mật}{18}{section.2.1}%
+\contentsline {section}{\numberline {2.2}Kiến trúc microservices}{18}{section.2.2}%
+\contentsline {section}{\numberline {2.3}Xác thực và phân quyền}{19}{section.2.3}%
+\contentsline {subsection}{\numberline {2.3.1}Keycloak, OIDC và JWT}{19}{subsection.2.3.1}%
+\contentsline {subsection}{\numberline {2.3.2}RBAC}{19}{subsection.2.3.2}%
+\contentsline {subsection}{\numberline {2.3.3}ACL và deny-overrides}{20}{subsection.2.3.3}%
+\contentsline {section}{\numberline {2.4}Phân loại tài liệu và kiểm soát nội dung}{20}{section.2.4}%
+\contentsline {section}{\numberline {2.5}Audit, hash-chain và compliance evidence}{20}{section.2.5}%
+\contentsline {section}{\numberline {2.6}DevSecOps}{21}{section.2.6}%
+\contentsline {section}{\numberline {2.7}Các nhóm kiểm thử bảo mật trong pipeline}{21}{section.2.7}%
+\contentsline {section}{\numberline {2.8}GitOps và Argo CD}{21}{section.2.8}%
+\contentsline {chapter}{\numberline {3}Phân tích yêu cầu và thiết kế tổng thể}{23}{chapter.3}%
+\contentsline {section}{\numberline {3.1}Tổng quan bài toán}{23}{section.3.1}%
+\contentsline {section}{\numberline {3.2}Tác nhân hệ thống}{24}{section.3.2}%
+\contentsline {section}{\numberline {3.3}Yêu cầu chức năng}{24}{section.3.3}%
+\contentsline {subsection}{\numberline {3.3.1}Xác thực và phân quyền}{24}{subsection.3.3.1}%
+\contentsline {subsection}{\numberline {3.3.2}Quản lý tài liệu}{24}{subsection.3.3.2}%
+\contentsline {subsection}{\numberline {3.3.3}Workflow phê duyệt}{25}{subsection.3.3.3}%
+\contentsline {subsection}{\numberline {3.3.4}Preview và download}{25}{subsection.3.3.4}%
+\contentsline {subsection}{\numberline {3.3.5}Audit, security và evidence}{25}{subsection.3.3.5}%
+\contentsline {subsection}{\numberline {3.3.6}Retention và access review}{25}{subsection.3.3.6}%
+\contentsline {section}{\numberline {3.4}Yêu cầu phi chức năng}{26}{section.3.4}%
+\contentsline {section}{\numberline {3.5}Mô hình threat cơ bản}{26}{section.3.5}%
+\contentsline {section}{\numberline {3.6}Kiến trúc tổng thể}{27}{section.3.6}%
+\contentsline {section}{\numberline {3.7}Luồng nghiệp vụ chính}{29}{section.3.7}%
+\contentsline {section}{\numberline {3.8}Nguyên tắc thiết kế}{29}{section.3.8}%
+\contentsline {chapter}{\numberline {4}Thiết kế dữ liệu, API và chính sách bảo mật}{31}{chapter.4}%
+\contentsline {section}{\numberline {4.1}Tổng quan thiết kế dữ liệu}{31}{section.4.1}%
+\contentsline {section}{\numberline {4.2}Các thực thể chính}{33}{section.4.2}%
+\contentsline {subsection}{\numberline {4.2.1}documents}{33}{subsection.4.2.1}%
+\contentsline {subsection}{\numberline {4.2.2}document\_versions}{33}{subsection.4.2.2}%
+\contentsline {subsection}{\numberline {4.2.3}document\_acl}{33}{subsection.4.2.3}%
+\contentsline {subsection}{\numberline {4.2.4}document\_workflow\_history}{33}{subsection.4.2.4}%
+\contentsline {subsection}{\numberline {4.2.5}audit\_events}{33}{subsection.4.2.5}%
+\contentsline {section}{\numberline {4.3}Document lifecycle}{34}{section.4.3}%
+\contentsline {section}{\numberline {4.4}Ma trận phân quyền}{36}{section.4.4}%
+\contentsline {subsection}{\numberline {4.4.1}Quyền xem và tải theo classification}{36}{subsection.4.4.1}%
+\contentsline {section}{\numberline {4.5}Chính sách Compliance Officer}{38}{section.4.5}%
+\contentsline {section}{\numberline {4.6}Thiết kế preview/download authorization}{38}{section.4.6}%
+\contentsline {section}{\numberline {4.7}Malware scanning và DLP}{40}{section.4.7}%
+\contentsline {section}{\numberline {4.8}Audit ingest boundary}{40}{section.4.8}%
+\contentsline {section}{\numberline {4.9}Luồng compliance evidence}{40}{section.4.9}%
+\contentsline {section}{\numberline {4.10}API contract tổng quan}{41}{section.4.10}%
+\contentsline {chapter}{\numberline {5}Triển khai ứng dụng DocVault}{43}{chapter.5}%
+\contentsline {section}{\numberline {5.1}Cấu trúc monorepo}{43}{section.5.1}%
+\contentsline {section}{\numberline {5.2}Frontend Next.js}{43}{section.5.2}%
+\contentsline {subsection}{\numberline {5.2.1}Permission-aware UI}{45}{subsection.5.2.1}%
+\contentsline {section}{\numberline {5.3}Gateway}{45}{section.5.3}%
+\contentsline {section}{\numberline {5.4}Metadata-service}{46}{section.5.4}%
+\contentsline {section}{\numberline {5.5}Document-service}{46}{section.5.5}%
+\contentsline {section}{\numberline {5.6}Workflow-service}{46}{section.5.6}%
+\contentsline {section}{\numberline {5.7}Audit-service}{47}{section.5.7}%
+\contentsline {section}{\numberline {5.8}Notification-service}{47}{section.5.8}%
+\contentsline {section}{\numberline {5.9}Hạ tầng local}{47}{section.5.9}%
+\contentsline {section}{\numberline {5.10}Các màn hình minh họa}{47}{section.5.10}%
+\contentsline {section}{\numberline {5.11}Luồng demo ứng dụng}{49}{section.5.11}%
+\contentsline {chapter}{\numberline {6}Quy trình DevSecOps và hạ tầng triển khai}{51}{chapter.6}%
+\contentsline {section}{\numberline {6.1}Mục tiêu và phạm vi triển khai}{51}{section.6.1}%
+\contentsline {section}{\numberline {6.2}Kiến trúc hạ tầng trên AWS EKS}{52}{section.6.2}%
+\contentsline {subsection}{\numberline {6.2.1}Hạ tầng dưới dạng mã với Terraform}{52}{subsection.6.2.1}%
+\contentsline {subsection}{\numberline {6.2.2}Lưu trữ tài liệu và backup}{54}{subsection.6.2.2}%
+\contentsline {section}{\numberline {6.3}Tổ chức workload trên Kubernetes}{55}{section.6.3}%
+\contentsline {subsection}{\numberline {6.3.1}Helm chart và Kustomize overlay}{55}{subsection.6.3.1}%
+\contentsline {subsection}{\numberline {6.3.2}Ingress, DNS và TLS}{56}{subsection.6.3.2}%
+\contentsline {section}{\numberline {6.4}Quản lý secret và quyền truy cập AWS}{57}{section.6.4}%
+\contentsline {section}{\numberline {6.5}Mô hình GitOps với Argo CD}{58}{section.6.5}%
+\contentsline {subsection}{\numberline {6.5.1}App-of-apps và thứ tự đồng bộ}{58}{subsection.6.5.1}%
+\contentsline {subsection}{\numberline {6.5.2}Cập nhật desired state}{58}{subsection.6.5.2}%
+\contentsline {section}{\numberline {6.6}Harbor và bảo mật chuỗi cung ứng phần mềm}{59}{section.6.6}%
+\contentsline {section}{\numberline {6.7}Jenkins pipeline}{60}{section.6.7}%
+\contentsline {subsection}{\numberline {6.7.1}Phân tách CI và CD}{60}{subsection.6.7.1}%
+\contentsline {subsection}{\numberline {6.7.2}Các stage chính}{60}{subsection.6.7.2}%
+\contentsline {section}{\numberline {6.8}Các cổng kiểm soát chất lượng và bảo mật}{61}{section.6.8}%
+\contentsline {subsection}{\numberline {6.8.1}Secret scanning}{61}{subsection.6.8.1}%
+\contentsline {subsection}{\numberline {6.8.2}Kiểm thử và chất lượng mã nguồn}{61}{subsection.6.8.2}%
+\contentsline {subsection}{\numberline {6.8.3}SCA và filesystem scanning}{62}{subsection.6.8.3}%
+\contentsline {subsection}{\numberline {6.8.4}IaC và policy-as-code}{62}{subsection.6.8.4}%
+\contentsline {section}{\numberline {6.9}Build, quét và phát hành container image}{63}{section.6.9}%
+\contentsline {section}{\numberline {6.10}Kiểm tra sau triển khai}{63}{section.6.10}%
+\contentsline {subsection}{\numberline {6.10.1}Argo CD health gate}{63}{subsection.6.10.1}%
+\contentsline {subsection}{\numberline {6.10.2}Smoke test}{63}{subsection.6.10.2}%
+\contentsline {subsection}{\numberline {6.10.3}DAST bằng OWASP ZAP}{64}{subsection.6.10.3}%
+\contentsline {section}{\numberline {6.11}Giám sát và tập trung log}{64}{section.6.11}%
+\contentsline {section}{\numberline {6.12}Mapping kiểm soát, công cụ và bằng chứng}{65}{section.6.12}%
+\contentsline {section}{\numberline {6.13}Đánh giá trạng thái triển khai}{66}{section.6.13}%
+\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{68}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{68}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{68}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{69}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Security evidence}{70}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Pipeline evidence}{71}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{71}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{72}{section.7.7}%
+\contentsline {section}{\numberline {7.8}Nhận xét chung}{73}{section.7.8}%
+\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{74}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Kết quả đạt được}{74}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{74}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Hạn chế}{75}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Hướng phát triển}{75}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Kết luận chung}{76}{section.8.5}%
+\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{77}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{77}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{77}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{77}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Chạy migration}{77}{section.A.4}%
+\contentsline {section}{\numberline {A.5}Khởi động backend}{78}{section.A.5}%
+\contentsline {section}{\numberline {A.6}Khởi động frontend}{78}{section.A.6}%
+\contentsline {section}{\numberline {A.7}Tài khoản demo}{78}{section.A.7}%
+\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{79}{section.A.8}%
+\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{80}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{80}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{80}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Compliance Officer rule}{81}{section.B.3}%
+\contentsline {section}{\numberline {B.4}Grant token}{81}{section.B.4}%
+\contentsline {chapter}{\numberline {C}Bộ bằng chứng DevSecOps}{82}{appendix.C}%
+\contentsline {section}{\numberline {C.1}Cấu hình pipeline dùng khi thu thập bằng chứng}{82}{section.C.1}%
+\contentsline {section}{\numberline {C.2}Ma trận bằng chứng cần thu thập}{82}{section.C.2}%
+\contentsline {section}{\numberline {C.3}Nguyên tắc chụp và kiểm tra ảnh}{84}{section.C.3}%
+\contentsline {section}{\numberline {C.4}Cách diễn giải khi bảo vệ}{84}{section.C.4}%
+\contentsline {chapter}{\numberline {D}Danh mục hình ảnh báo cáo}{85}{appendix.D}%
+\contentsline {section}{\numberline {D.1}Ảnh giao diện ứng dụng}{85}{section.D.1}%
+\contentsline {section}{\numberline {D.2}Ảnh DevSecOps đã có}{85}{section.D.2}%
+\contentsline {section}{\numberline {D.3}Ảnh DevSecOps cần bổ sung}{85}{section.D.3}%
+\contentsline {section}{\numberline {D.4}Yêu cầu bảo mật đối với ảnh}{86}{section.D.4}%
 \babel@toc {english}{}\relax 
 \babel@toc {vietnamese}{}\relax 

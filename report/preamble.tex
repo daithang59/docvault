@@ -67,7 +67,7 @@
   linkcolor=black,
   citecolor=black,
   urlcolor=blue,
-  pdftitle={Triển khai hệ thống quản lý tài liệu bảo mật DocVault theo quy trình DevSecOps},
+  pdftitle={Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps},
   pdfauthor={DocVault}
 }
 
@@ -100,6 +100,24 @@
 \newcommand{\statusdone}{\textcolor{docvaultgreen}{Đã triển khai}}
 \newcommand{\statusprogress}{\textcolor{docvaultamber}{Đang hoàn thiện}}
 \newcommand{\statusgap}{\textcolor{docvaultred}{Cần bổ sung}}
+\newcommand{\evidenceplaceholder}[3]{%
+  \begin{figure}[H]
+    \centering
+    \begin{tcolorbox}[
+      width=0.94\textwidth,
+      colback=docvaultamber!5,
+      colframe=docvaultamber,
+      title={Vị trí chèn hình minh chứng}
+    ]
+      \centering
+      \textbf{#1}\par
+      \vspace{2mm}
+      \small #3
+    \end{tcolorbox}
+    \caption{#1 (cần bổ sung ảnh minh chứng)}
+    \label{#2}
+  \end{figure}
+}
 
 \tcbset{
   colback=docvaultgray,

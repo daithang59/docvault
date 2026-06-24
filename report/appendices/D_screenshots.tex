@@ -1,46 +1,59 @@
-\chapter{Danh sách hình ảnh minh họa}
+\chapter{Danh mục hình ảnh báo cáo}
 
-\section{Ảnh UI đã sử dụng}
+\section{Ảnh giao diện ứng dụng}
 
-Các ảnh trong \code{report/images/screen} được sử dụng cho phần triển khai ứng dụng và bằng chứng giao diện:
+Các ảnh trong \code{report/images/screen} minh họa những chức năng chính của DocVault:
 
 \begin{itemize}
-  \item \code{dashboard.png}: dashboard.
-  \item \code{document.png}: danh sách và tổng quan tài liệu.
-  \item \code{approvals.png}: phê duyệt.
+  \item \code{dashboard.png}: dashboard tổng quan.
+  \item \code{document.png}: danh sách tài liệu.
+  \item \code{approvals.png}: hàng đợi phê duyệt.
   \item \code{audit.png}: audit log.
   \item \code{security.png}: security posture.
   \item \code{accessreview.png}: rà soát quyền truy cập.
 \end{itemize}
 
-\section{Ảnh UI nên bổ sung}
+Các ảnh giao diện nên bổ sung nếu còn dung lượng báo cáo gồm màn hình đăng nhập Keycloak, tạo tài liệu, chi tiết tài liệu, workflow timeline, Evidence Center, retention và thông báo từ chối download do policy.
 
-Để mô tả đầy đủ hơn các luồng chính của frontend, có thể bổ sung:
+\section{Ảnh DevSecOps đã có}
 
-\begin{itemize}
-  \item Màn hình đăng nhập qua Keycloak.
-  \item Form tạo tài liệu và upload file.
-  \item Chi tiết tài liệu, version history và workflow timeline.
-  \item Evidence Center và retention policy.
-  \item Thông báo lỗi khi người dùng bị policy từ chối download.
-\end{itemize}
-
-\section{Ảnh cần bổ sung trước khi nộp}
-
-Trước khi nộp bản cuối, nên bổ sung các ảnh pipeline/evidence sau:
+Thư mục \code{report/images/infra} hiện có:
 
 \begin{itemize}
-  \item Jenkins stage view của build mới nhất.
-  \item SonarQube project dashboard.
-  \item Dependency Check report.
-  \item Trivy image scan log/report.
-  \item Checkov/Terraform validate log.
-  \item Docker Hub hoặc registry image tags.
-  \item GitOps commit cập nhật Helm values.
-  \item Argo CD applications Synced/Healthy.
-  \item ZAP HTML report summary.
-  \item Grafana workload dashboard.
-  \item Loki query log namespace \code{docvault}.
+  \item \code{CICDPipelineFlow.png}: sơ đồ tổng quan CI, CD theo GitOps và kiểm tra sau triển khai.
 \end{itemize}
 
-Khi chụp ảnh, cần che hoặc loại bỏ token, secret, kubeconfig, IP nhạy cảm và thông tin tài khoản không dùng cho demo công khai.
+\section{Ảnh DevSecOps cần bổ sung}
+
+Các placeholder trong Chương 6 được thiết kế để thay bằng ảnh có cùng ý nghĩa. Danh sách file khuyến nghị:
+
+\begin{itemize}
+  \item \code{eks-architecture.png}
+  \item \code{aws-resources.png}
+  \item \code{eks-workloads.png}
+  \item \code{external-secrets.png}
+  \item \code{argocd-applications.png}
+  \item \code{harbor-artifacts.png}
+  \item \code{cosign-verification.png}
+  \item \code{jenkins-stage-view.png}
+  \item \code{sonarqube-quality-gate.png}
+  \item \code{sca-trivy-results.png}
+  \item \code{iac-policy-results.png}
+  \item \code{post-deploy-validation.png}
+  \item \code{grafana-dashboard.png}
+  \item \code{loki-logs.png}
+\end{itemize}
+
+Sau khi có ảnh thật, thay lệnh \code{\textbackslash evidenceplaceholder} tương ứng bằng môi trường \code{figure} và \code{\textbackslash includegraphics}. Nên giữ nguyên caption và label để các tham chiếu trong nội dung không bị thay đổi.
+
+\section{Yêu cầu bảo mật đối với ảnh}
+
+Trước khi đưa ảnh vào báo cáo, phải loại bỏ hoặc che các thông tin sau:
+
+\begin{itemize}
+  \item password, token, secret value, private key và credential ID có tính nhạy cảm;
+  \item nội dung kubeconfig, JWT, cookie, presigned URL và object key thực;
+  \item dữ liệu tài liệu của người dùng;
+  \item thông tin AWS không cần thiết như account ID đầy đủ hoặc ARN nhạy cảm;
+  \item địa chỉ quản trị nội bộ không phục vụ giải thích kiến trúc.
+\end{itemize}

@@ -1,52 +1,86 @@
-\chapter{Pipeline evidence}
+\chapter{Bộ bằng chứng DevSecOps}
 
-\section{Tham số Jenkins khuyến nghị}
+\section{Cấu hình pipeline dùng khi thu thập bằng chứng}
 
-Khi ứng dụng đã deploy lên EKS và web URL reachable, pipeline có thể chạy với các tham số:
+Bộ ảnh cuối cùng nên được lấy từ cùng một commit và cùng một lần phát hành để có thể đối chiếu xuyên suốt từ Jenkins, Harbor, GitOps đến EKS. Các tham số quan trọng cần ghi nhận gồm:
 
 \begin{lstlisting}
-RUN_ZAP=true
-DEPLOY_TARGET_URL=http://<node-external-ip>:30006
-ZAP_TARGET=http://<node-external-ip>:30006
+RELEASE_BRANCH=main
+REGISTRY_HOST=harbor.docvault.id.vn
+REGISTRY_NAMESPACE=docvault-dev
+PUSH_LATEST=false
+ENFORCE_SONAR_QG=true
+GITOPS_BRANCH=gitops-testing
 RUN_ARGO_HEALTH_CHECK=true
 KUBECONFIG_CREDENTIAL_ID=jenkins-argocd-kubeconfig
-GITOPS_BRANCH=gitops-testing
+DEPLOY_TARGET_URL=https://app.docvault.id.vn
+RUN_ZAP=true
+ZAP_TARGET=https://app.docvault.id.vn
 \end{lstlisting}
 
-\section{Bằng chứng cần chụp}
+Nếu cần chứng minh ký artifact, bật thêm:
 
-\begin{longtable}{p{0.28\textwidth}p{0.58\textwidth}}
-\caption{Danh sách pipeline evidence cần đưa vào khi nộp} \\
+\begin{lstlisting}
+SIGN_IMAGES=true
+COSIGN_KEY_CREDENTIAL_ID=cosign-private-key
+COSIGN_PASSWORD_CREDENTIAL_ID=cosign-password
+COSIGN_PUBLIC_KEY_CREDENTIAL_ID=cosign-public-key
+\end{lstlisting}
+
+\section{Ma trận bằng chứng cần thu thập}
+
+\begin{longtable}{p{0.22\textwidth}p{0.39\textwidth}>{\raggedright\arraybackslash\scriptsize}p{0.28\textwidth}}
+\caption{Danh sách bằng chứng DevSecOps cần đưa vào bản nộp}
+\label{tab:appendix-devsecops-evidence} \\
 \toprule
-\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\textbf{Bằng chứng} & \textbf{Nội dung bắt buộc} & \textbf{Tên file đề xuất} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\textbf{Bằng chứng} & \textbf{Nội dung bắt buộc} & \textbf{Tên file đề xuất} \\
 \midrule
 \endhead
-Jenkins build & Build number, branch, stage view xanh, timestamp. \\
-Pre-build Security & Các stage SCA, Trivy FS, Unit Tests, SAST, Checkov, Terraform Validate pass. \\
-Build \& Scan & Service image được build và scan image. \\
-Push \& GitOps & Image tag được push, GitOps branch được cập nhật. \\
-Argo CD & Các application chính Synced/Healthy. \\
-Smoke test & \code{GET /} và \code{GET /api/health} pass. \\
-ZAP report & \code{zap\_report.html} và \code{zap\_report.json} được archive. \\
-Grafana & Pod health, CPU/RAM hoặc workload status. \\
-Loki & Query log namespace \code{docvault}. \\
+Kiến trúc EKS & VPC, EKS, namespace, GitOps, registry, secret, storage, monitoring và luồng truy cập & \path{eks-architecture.png} \\
+Jenkins Stage View & Build number, branch, commit, trạng thái các stage và timestamp & \path{jenkins-stage-view.png} \\
+Secret/quality gate & TruffleHog, unit test, lint, workspace build & \path{jenkins-quality-gates.png} \\
+SonarQube & Quality Gate, bug, vulnerability, hotspot, smell, coverage & \path{sonarqube-quality-gate.png} \\
+SCA/Trivy FS & Dependency-Check và Trivy không còn finding vượt ngưỡng & \path{sca-trivy-results.png} \\
+IaC/policy & Checkov, Terraform Validate và Kyverno report & \path{iac-policy-results.png} \\
+Harbor & Project, repository, Git SHA tag, digest và vulnerability scan & \path{harbor-artifacts.png} \\
+Cosign & Kết quả sign/verify theo image digest khi tính năng được bật & \path{cosign-verification.png} \\
+GitOps commit & Commit cập nhật repository, tag và digest trên \code{gitops-testing} & \path{gitops-commit.png} \\
+Argo CD & Root app, child app và trạng thái \code{Synced}/\code{Healthy} & \path{argocd-applications.png} \\
+EKS workload & Node, pod, service, ingress và namespace ở trạng thái ổn định & \path{eks-workloads.png} \\
+AWS resources & EKS, EC2 node group, S3, KMS, IAM/IRSA và Secrets Manager & \path{aws-resources.png} \\
+Smoke test & HTTP status web root và \code{/api/health} & \path{smoke-test.png} \\
+ZAP & Summary và artifact HTML/JSON & \path{zap-summary.png} \\
+Grafana & Node/pod health, CPU, memory, restart & \path{grafana-dashboard.png} \\
+Loki & Query log namespace \code{docvault} & \path{loki-logs.png} \\
+Backup & CloudNativePG ScheduledBackup và object trong S3 backup bucket & \path{database-backup.png} \\
 \bottomrule
 \end{longtable}
 
-\section{Diễn giải khi bảo vệ}
-
-Khi trình bày pipeline, không nên chỉ nói ``pipeline chạy xanh''. Cần giải thích pipeline chứng minh điều gì:
+\section{Nguyên tắc chụp và kiểm tra ảnh}
 
 \begin{itemize}
-  \item SAST/SCA giúp phát hiện lỗi mã nguồn và dependency trước khi build image.
-  \item Trivy/Checkov/Terraform validate giúp kiểm tra artifact và hạ tầng.
-  \item Docker build và image scan giúp đảm bảo image tạo ra có thể triển khai và đã được quét.
-  \item GitOps update giúp trạng thái deploy có lịch sử trong Git.
-  \item Argo CD health chứng minh cluster đã reconcile về trạng thái mong muốn.
-  \item Smoke test chứng minh app sau deploy reachable.
-  \item ZAP DAST kiểm tra ứng dụng đang chạy và tạo report bảo mật động.
+  \item Ảnh phải đọc được build number, commit SHA, thời điểm và trạng thái.
+  \item Các ảnh Jenkins, Harbor, GitOps và Argo CD phải thuộc cùng một lần phát hành.
+  \item Không chụp secret value, robot token, private key, kubeconfig, cookie, JWT hoặc presigned URL.
+  \item Nếu ảnh chứa AWS account ID, ARN hoặc địa chỉ hạ tầng không cần công khai, phải che trước khi đưa vào báo cáo.
+  \item Không dùng ảnh chỉ thể hiện giao diện trống; mỗi ảnh phải chứng minh một claim cụ thể.
+  \item Caption phải giải thích kết quả, không chỉ lặp lại tên công cụ.
+\end{itemize}
+
+\section{Cách diễn giải khi bảo vệ}
+
+Khi trình bày pipeline, cần liên kết từng ảnh với một kiểm soát:
+
+\begin{itemize}
+  \item Jenkins chứng minh quy trình tự động và thứ tự gate.
+  \item SonarQube, Dependency-Check, Trivy, Checkov và Kyverno chứng minh kiểm tra trước phát hành.
+  \item Harbor, digest và Cosign chứng minh tính toàn vẹn của artifact.
+  \item GitOps commit và Argo CD chứng minh deployment có nguồn sự thật và khả năng reconcile.
+  \item Smoke test và ZAP chứng minh ứng dụng sau deploy có thể truy cập và đã được kiểm tra động.
+  \item Grafana và Loki chứng minh hệ thống có khả năng quan sát sau triển khai.
+  \item S3/KMS, IRSA, External Secrets và backup chứng minh kiểm soát dữ liệu và credential ở lớp hạ tầng.
 \end{itemize}
