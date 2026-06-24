@@ -57,6 +57,28 @@ module "documents_storage" {
   tags              = local.tags
 }
 
+module "cnpg_backups_storage" {
+  source = "../modules/cnpg-backups-storage"
+
+  aws_region        = var.aws_region
+  environment       = var.environment
+  name              = local.name
+  oidc_provider     = module.eks_cluster.oidc_provider
+  oidc_provider_arn = module.eks_cluster.oidc_provider_arn
+  tags              = local.tags
+}
+
+module "mongodb_backups_storage" {
+  source = "../modules/mongodb-backups-storage"
+
+  aws_region        = var.aws_region
+  environment       = var.environment
+  name              = local.name
+  oidc_provider     = module.eks_cluster.oidc_provider
+  oidc_provider_arn = module.eks_cluster.oidc_provider_arn
+  tags              = local.tags
+}
+
 module "jenkins_roles_anywhere" {
   source = "../modules/jenkins-roles-anywhere"
 

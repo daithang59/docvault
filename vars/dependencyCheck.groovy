@@ -62,6 +62,7 @@ def call(cfg = [:]) {
         withEnv([
             "DEPENDENCY_CHECK_DATA_MOUNT=${dataMount}",
             "DEPENDENCY_CHECK_UPDATE_FLAG=${updateFlag}",
+            "DEPENDENCY_CHECK_NO_UPDATE_EFFECTIVE=${noUpdate ? 'true' : 'false'}",
             "DEPENDENCY_CHECK_USE_NVD_KEY=${useApiKey ? 'true' : 'false'}"
         ]) {
             sh '''
@@ -74,36 +75,41 @@ def call(cfg = [:]) {
 
             echo "Dependency Check is starting. The first NVD database update can be quiet and take several minutes."
             echo "Using Dependency Check data mount: $DEPENDENCY_CHECK_DATA_MOUNT"
-            echo "Checking NVD API connectivity from inside the Dependency Check container..."
 
-            docker run --rm \
-                -e DEPENDENCY_CHECK_USE_NVD_KEY \
-                -e NVD_API_KEY \
-                --entrypoint /bin/sh \
-                owasp/dependency-check:latest \
-                -c '
-                    set -eu
-                    url="https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1"
+            if [ "$DEPENDENCY_CHECK_NO_UPDATE_EFFECTIVE" = "true" ]; then
+                echo "Dependency Check no-update mode is active; skipping NVD API connectivity probe."
+            else
+                echo "Checking NVD API connectivity from inside the Dependency Check container..."
 
-                    if command -v curl >/dev/null 2>&1; then
-                        if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
-                            curl -fsS --connect-timeout 15 --max-time 60 -H "apiKey: $NVD_API_KEY" "$url" >/dev/null
+                docker run --rm \
+                    -e DEPENDENCY_CHECK_USE_NVD_KEY \
+                    -e NVD_API_KEY \
+                    --entrypoint /bin/sh \
+                    owasp/dependency-check:latest \
+                    -c '
+                        set -eu
+                        url="https://services.nvd.nist.gov/rest/json/cves/2.0?resultsPerPage=1"
+
+                        if command -v curl >/dev/null 2>&1; then
+                            if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
+                                curl -fsS --connect-timeout 15 --max-time 60 -H "apiKey: $NVD_API_KEY" "$url" >/dev/null
+                            else
+                                curl -fsS --connect-timeout 15 --max-time 60 "$url" >/dev/null
+                            fi
+                        elif command -v wget >/dev/null 2>&1; then
+                            if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
+                                wget -q -T 60 --spider --header "apiKey: $NVD_API_KEY" "$url"
+                            else
+                                wget -q -T 60 --spider "$url"
+                            fi
                         else
-                            curl -fsS --connect-timeout 15 --max-time 60 "$url" >/dev/null
+                            echo "No curl/wget in the Dependency Check image; skipping explicit NVD connectivity probe."
+                            exit 0
                         fi
-                    elif command -v wget >/dev/null 2>&1; then
-                        if [ "$DEPENDENCY_CHECK_USE_NVD_KEY" = "true" ]; then
-                            wget -q -T 60 --spider --header "apiKey: $NVD_API_KEY" "$url"
-                        else
-                            wget -q -T 60 --spider "$url"
-                        fi
-                    else
-                        echo "No curl/wget in the Dependency Check image; skipping explicit NVD connectivity probe."
-                        exit 0
-                    fi
 
-                    echo "NVD API connectivity check passed."
-                '
+                        echo "NVD API connectivity check passed."
+                    '
+            fi
 
             dependency_check_console_log="$WORKSPACE/dependency-check-report/dependency-check-console.log"
             scan_status=0

@@ -31,8 +31,9 @@ def call() {
         : false
     def dependencyCheckNoUpdate = env.DEPENDENCY_CHECK_NO_UPDATE?.trim()
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
-        : false
+        : true
     def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: '/var/jenkins_home/caches/dependency-check'
+    def alpineSecurityRefresh = env.ALPINE_SECURITY_REFRESH?.trim() ?: 'manual'
     def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
     def createGitOpsPr = env.CREATE_GITOPS_PR?.trim()
         ? env.CREATE_GITOPS_PR.equalsIgnoreCase('true')
@@ -56,6 +57,7 @@ def call() {
         createGitOpsPr: createGitOpsPr,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
+        alpineSecurityRefresh: alpineSecurityRefresh,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',
         kyvernoImage: 'ghcr.io/kyverno/kyverno-cli:v1.12.0',

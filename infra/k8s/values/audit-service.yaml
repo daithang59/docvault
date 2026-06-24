@@ -1,10 +1,11 @@
 # audit-service values
 namespace: docvault
+replicaCount: 1
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/audit-service"
-  tag: "v9-ad76f1e1bd85"
-  digest: "sha256:1e62a43738842ac418332de1d68cd3e26d05694cf8f4a7132a502e294ca00f3e"
+  tag: "d8b543ecb94e"
+  digest: "sha256:235a9c4c04822432bb114b3335f23caabfc4560b65bad3cac8b79b1bba8541ea"
 
 healthPath: /health
 
@@ -18,6 +19,13 @@ env:
   KEYCLOAK_ISSUER: "https://auth.docvault.id.vn/realms/docvault"
   KEYCLOAK_REALM: "docvault"
   KEYCLOAK_AUDIENCE: "docvault-gateway"
+
+envValueFrom:
+  - name: MONGODB_URI
+    valueFrom:
+      secretKeyRef:
+        name: audit-mongodb-app-credentials
+        key: MONGODB_URI
 
 envFrom:
   - secretRef:

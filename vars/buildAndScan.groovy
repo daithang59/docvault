@@ -252,8 +252,9 @@ List runBuildsInBatches(cfg, List buildTargets, String tag, boolean trivyDbReady
 void buildTarget(cfg, Map target, String tag) {
     def repository = target.repository
     def dockerfile = target.dockerfile
+    def alpineSecurityRefresh = cfg.alpineSecurityRefresh?.trim() ?: 'manual'
     def buildArgs = (target.buildArgs ?: [:]) + [
-        ALPINE_SECURITY_REFRESH: (env.BUILD_NUMBER ?: 'local')
+        ALPINE_SECURITY_REFRESH: alpineSecurityRefresh
     ]
 
     // Parse registry host and service path explicitly
@@ -272,6 +273,7 @@ void buildTarget(cfg, Map target, String tag) {
         # Build image, load it locally for scan/push stages, and push cache to registry
         docker buildx build \\
             --pull \\
+            --provenance=false \\
             --cache-from=type=registry,ref=${cacheRef} \\
             --cache-to=type=registry,ref=${cacheRef},mode=min \\
             ${buildArgsToFlags(buildArgs)} \\
