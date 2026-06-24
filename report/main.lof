@@ -12,14 +12,14 @@
 \addvspace {10\p@ }
 \contentsline {figure}{\numberline {5.1}{\ignorespaces Màn hình dashboard của DocVault}}{42}{figure.caption.19}%
 \contentsline {figure}{\numberline {5.2}{\ignorespaces Màn hình danh sách tài liệu}}{43}{figure.caption.20}%
-\contentsline {figure}{\numberline {5.3}{\ignorespaces Màn hình đăng nhập DocVault}}{46}{figure.caption.21}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Màn hình rà soát quyền truy cập}}{46}{figure.caption.21}%
 \contentsline {figure}{\numberline {5.4}{\ignorespaces Màn hình phê duyệt tài liệu}}{46}{figure.caption.22}%
 \contentsline {figure}{\numberline {5.5}{\ignorespaces Màn hình audit log}}{47}{figure.caption.23}%
 \contentsline {figure}{\numberline {5.6}{\ignorespaces Màn hình security posture}}{47}{figure.caption.24}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng Playwright cho dashboard command center}}{56}{figure.caption.25}%
-\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng Playwright cho approvals SLA readiness}}{56}{figure.caption.26}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng giao diện dashboard command center}}{56}{figure.caption.25}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}}{56}{figure.caption.26}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

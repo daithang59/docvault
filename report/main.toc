@@ -112,8 +112,8 @@
 \contentsline {section}{\numberline {C.2}Bằng chứng cần chụp}{68}{section.C.2}%
 \contentsline {section}{\numberline {C.3}Diễn giải khi bảo vệ}{69}{section.C.3}%
 \contentsline {chapter}{\numberline {D}Danh sách hình ảnh minh họa}{70}{appendix.D}%
-\contentsline {section}{\numberline {D.1}Ảnh UI đã có}{70}{section.D.1}%
-\contentsline {section}{\numberline {D.2}Ảnh evidence đã có}{70}{section.D.2}%
-\contentsline {section}{\numberline {D.3}Ảnh cần bổ sung trước khi nộp}{71}{section.D.3}%
+\contentsline {section}{\numberline {D.1}Ảnh UI đã sử dụng}{70}{section.D.1}%
+\contentsline {section}{\numberline {D.2}Ảnh UI nên bổ sung}{70}{section.D.2}%
+\contentsline {section}{\numberline {D.3}Ảnh cần bổ sung trước khi nộp}{70}{section.D.3}%
 \babel@toc {english}{}\relax 
 \babel@toc {vietnamese}{}\relax 
