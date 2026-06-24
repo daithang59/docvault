@@ -4,7 +4,7 @@ replicaCount: 1
 
 image:
   repository: "harbor.docvault.id.vn/docvault-dev/audit-service"
-  tag: "d8b543ecb94e"
+  tag: "9c7b7077cf48"
   digest: "sha256:235a9c4c04822432bb114b3335f23caabfc4560b65bad3cac8b79b1bba8541ea"
 
 healthPath: /health

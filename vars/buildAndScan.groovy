@@ -59,6 +59,9 @@ def call(cfg) {
     }
 
     def trivyDbReady = buildTargets ? warmTrivyCache(cfg) : false
+    if (buildTargets) {
+        initBuildx()
+    }
     def builtList = buildTargets ? withRegistryLogin(cfg) {
         runBuildsInBatches(cfg, buildTargets, tag, trivyDbReady)
     } : []
@@ -168,14 +171,21 @@ def withRegistryLogin(cfg, Closure body) {
 
     def dockerConfigDir = sh(script: 'mktemp -d', returnStdout: true).trim()
     def registryArg = shellQuote(cfg.registryHost.trim())
-    def credentialId = cfg.registryCredentialId ?: 'dockerhub-credentials'
+    def credentialId = cfg.registryCacheCredentialId ?: env.REGISTRY_CACHE_CREDENTIAL_ID ?: 'harbor-docvault-dev-cache-token'
     def credentialType = (cfg.registryCredentialType ?: 'usernamePassword').toString().trim()
     def result = null
 
     try {
         withEnv(["DOCKER_CONFIG=${dockerConfigDir}"]) {
             if (credentialType == 'secretText') {
-                def registryUsername = cfg.registryUsername?.trim()
+                def registryUsername = cfg.registryCacheUsername?.trim() ?: env.REGISTRY_CACHE_USERNAME?.trim()
+                if (!registryUsername) {
+                    if (credentialId == 'harbor-docvault-dev-cache-token') {
+                        registryUsername = 'robot$cache-dev'
+                    } else {
+                        registryUsername = cfg.registryUsername?.trim()
+                    }
+                }
                 if (!registryUsername) {
                     error('REGISTRY_USERNAME is required when REGISTRY_CREDENTIAL_TYPE=secretText.')
                 }
@@ -246,60 +256,32 @@ void buildTarget(cfg, Map target, String tag) {
     def buildArgs = (target.buildArgs ?: [:]) + [
         ALPINE_SECURITY_REFRESH: alpineSecurityRefresh
     ]
-    def cacheRef = "${repository}:${cfg.registryBuildCacheSuffix ?: 'buildcache'}"
-    def useRegistryCache = cfg.registryBuildCache != null &&
-        cfg.registryBuildCache.toString().equalsIgnoreCase('true') &&
-        cfg.registryHost?.trim()
+
+    // Parse registry host and service path explicitly
+    def repoParts = repository.tokenize('/')
+    assert repoParts.size() >= 3
+    def registryHost = repoParts[0]
+    def repositoryName = repoParts.drop(2).join('/')
+    def cacheRef = "${registryHost}/docvault-cache/${repositoryName}"
 
     echo ">>> Changes detected for ${target.name}. Building ${tag}..."
 
-    if (useRegistryCache) {
-        echo ">>> Using BuildKit registry cache: ${cacheRef}"
-        sh """
-            set -eu
-            export DOCKER_BUILDKIT=1
+    sh """
+        set -eu
+        export DOCKER_BUILDKIT=1
 
-            if docker buildx version >/dev/null 2>&1; then
-                docker buildx inspect docvault-builder >/dev/null 2>&1 || \\
-                    docker buildx create --name docvault-builder --driver docker-container >/dev/null 2>&1 || true
-                docker buildx inspect --bootstrap docvault-builder >/dev/null
-
-                docker buildx build \\
-                    --builder docvault-builder \\
-                    --pull \\
-                    --load \\
-                    --cache-from type=registry,ref='${cacheRef}' \\
-                    --cache-to type=registry,ref='${cacheRef}',mode=max \\
-                    ${buildArgsToFlags(buildArgs)} \\
-                    -t '${repository}:${tag}' \\
-                    -t '${repository}:latest' \\
-                    -f '${dockerfile}' \\
-                    .
-            else
-                echo "WARNING: Docker buildx was not found. Falling back to local Docker cache only."
-                docker build \\
-                    --pull \\
-                    ${buildArgsToFlags(buildArgs)} \\
-                    -t '${repository}:${tag}' \\
-                    -t '${repository}:latest' \\
-                    -f '${dockerfile}' \\
-                    .
-            fi
-        """
-    } else {
-        echo '>>> Registry build cache disabled; using local Docker cache only.'
-        sh """
-            set -eu
-            export DOCKER_BUILDKIT=1
-            docker build \\
-                --pull \\
-                ${buildArgsToFlags(buildArgs)} \\
-                -t '${repository}:${tag}' \\
-                -t '${repository}:latest' \\
-                -f '${dockerfile}' \\
-                .
-        """
-    }
+        # Build image, load it locally for scan/push stages, and push cache to registry
+        docker buildx build \\
+            --pull \\
+            --provenance=false \\
+            --cache-from=type=registry,ref=${cacheRef} \\
+            --cache-to=type=registry,ref=${cacheRef},mode=min \\
+            ${buildArgsToFlags(buildArgs)} \\
+            -t '${repository}:${tag}' \\
+            --load \\
+            -f '${dockerfile}' \\
+            .
+    """
 }
 
 void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
@@ -315,6 +297,17 @@ void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
             -v ${trivyCacheVolume}:/root/.cache/trivy \\
             ${cfg.trivyImage} \\
             image ${trivyDbFlags} --scanners vuln --severity CRITICAL --exit-code 1 --no-progress '${repository}:${tag}'
+    """
+
+    echo ">>> Generating SBOM for ${target.name} Image..."
+    sh """
+        set -eu
+        docker run --rm \\
+            -v /var/run/docker.sock:/var/run/docker.sock \\
+            -v ${trivyCacheVolume}:/root/.cache/trivy \\
+            -v ${env.WORKSPACE}:/workspace \\
+            ${cfg.trivyImage} \\
+            image ${trivyDbFlags} --format cyclonedx --output "/workspace/sbom-${target.name}.json" --no-progress '${repository}:${tag}'
     """
 }
 
@@ -367,4 +360,16 @@ String resolveRepository(cfg, String service) {
         return "${cfg.registryHost.trim()}/${namespace}/${service}"
     }
     return "${namespace}/${service}"
+}
+
+void initBuildx() {
+    echo ">>> Initializing Buildx builder..."
+    sh """
+        set -eu
+        export DOCKER_BUILDKIT=1
+        docker buildx use docvault-builder >/dev/null 2>&1 || \\
+            docker buildx create --name docvault-builder --driver docker-container --use || true
+        docker buildx use docvault-builder
+        docker buildx inspect --bootstrap
+    """
 }

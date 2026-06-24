@@ -1,5 +1,5 @@
 def call() {
-    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'gitops-testing'
+    def gitOpsBranch = env.GITOPS_BRANCH?.trim() ? env.GITOPS_BRANCH.trim() : 'main'
     def releaseBranch = env.RELEASE_BRANCH?.trim() ? env.RELEASE_BRANCH.trim() : 'main'
     def sonarHostUrl = env.SONAR_HOST_URL?.trim() ? env.SONAR_HOST_URL.trim() : 'https://sonarqube.docvault.id.vn'
     def deployTargetUrl = env.DEPLOY_TARGET_URL?.trim() ? env.DEPLOY_TARGET_URL.trim() : ''
@@ -33,12 +33,11 @@ def call() {
         ? env.DEPENDENCY_CHECK_NO_UPDATE.equalsIgnoreCase('true')
         : true
     def dependencyCheckDataDir = env.DEPENDENCY_CHECK_DATA_DIR?.trim() ?: '/var/jenkins_home/caches/dependency-check'
-    def registryBuildCache = env.REGISTRY_BUILD_CACHE?.trim()
-        ? env.REGISTRY_BUILD_CACHE.equalsIgnoreCase('true')
-        : true
-    def registryBuildCacheSuffix = env.REGISTRY_BUILD_CACHE_SUFFIX?.trim() ?: 'buildcache'
     def alpineSecurityRefresh = env.ALPINE_SECURITY_REFRESH?.trim() ?: 'manual'
     def awsRegion = env.AWS_REGION?.trim() ?: 'ap-southeast-1'
+    def createGitOpsPr = env.CREATE_GITOPS_PR?.trim()
+        ? env.CREATE_GITOPS_PR.equalsIgnoreCase('true')
+        : true
 
     return [
         agentLabel: 'docker-agent-alpine-ubuntu-vm',
@@ -55,10 +54,9 @@ def call() {
         cosignPasswordCredentialId: cosignPasswordCredentialId,
         cosignPublicKeyCredentialId: cosignPublicKeyCredentialId,
         cosignTlogUpload: cosignTlogUpload,
+        createGitOpsPr: createGitOpsPr,
         dependencyCheckNoUpdate: dependencyCheckNoUpdate,
         dependencyCheckDataDir: dependencyCheckDataDir,
-        registryBuildCache: registryBuildCache,
-        registryBuildCacheSuffix: registryBuildCacheSuffix,
         alpineSecurityRefresh: alpineSecurityRefresh,
         nodeImage: 'node:20-alpine',
         trivyImage: 'aquasec/trivy:0.70.0',

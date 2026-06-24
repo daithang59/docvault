@@ -1,0 +1,34 @@
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: verify-image-signatures
+  annotations:
+    policies.kyverno.io/title: Verify DocVault Image Signatures
+    policies.kyverno.io/description: >-
+      Verifies that DocVault container images are signed by Cosign
+      before permitting deployment.
+spec:
+  validationFailureAction: Enforce
+  background: false
+  webhookConfiguration:
+    failurePolicy: Fail
+  rules:
+    - name: verify-cosign-signature
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              selector:
+                matchLabels:
+                  app.kubernetes.io/part-of: docvault-app
+      verifyImages:
+        - imageReferences:
+            - "harbor.docvault.id.vn/docvault-dev/*"
+          mutateDigest: true
+          attestors:
+            - entries:
+                - keys:
+                    secret:
+                      name: cosign-pub-key
+                      namespace: kyverno

@@ -9,7 +9,7 @@ spec:
   project: default
   source:
     repoURL: 'https://github.com/daithang59/docvault.git'
-    targetRevision: gitops-testing
+    targetRevision: main
     path: infra/k8s/infra-deps/overlays/testing-s3
   destination:
     server: 'https://kubernetes.default.svc'
