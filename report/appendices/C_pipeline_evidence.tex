@@ -1,52 +1,62 @@
-\chapter{Pipeline evidence}
+\chapter{Bộ bằng chứng DevSecOps}
 
-\section{Tham số Jenkins khuyến nghị}
+\section{Cấu hình pipeline dùng khi thu thập bằng chứng}
 
-Khi ứng dụng đã deploy lên EKS và web URL reachable, pipeline có thể chạy với các tham số:
+Bộ ảnh cuối cùng nên được lấy từ cùng một commit và cùng một lần phát hành để có thể đối chiếu xuyên suốt từ Jenkins, Harbor, GitOps đến EKS. Các tham số quan trọng cần ghi nhận gồm:
 
 \begin{lstlisting}
-RUN_ZAP=true
-DEPLOY_TARGET_URL=http://<node-external-ip>:30006
-ZAP_TARGET=http://<node-external-ip>:30006
+RELEASE_BRANCH=main
+REGISTRY_HOST=harbor.docvault.id.vn
+REGISTRY_NAMESPACE=docvault-dev
+PUSH_LATEST=false
+ENFORCE_SONAR_QG=true
+GITOPS_BRANCH=gitops-testing
 RUN_ARGO_HEALTH_CHECK=true
 KUBECONFIG_CREDENTIAL_ID=jenkins-argocd-kubeconfig
-GITOPS_BRANCH=gitops-testing
+DEPLOY_TARGET_URL=https://app.docvault.id.vn
+RUN_ZAP=true
+ZAP_TARGET=https://app.docvault.id.vn
 \end{lstlisting}
 
-\section{Bằng chứng cần chụp}
+Nếu cần chứng minh ký artifact, bật thêm:
 
-\begin{longtable}{p{0.28\textwidth}p{0.58\textwidth}}
-\caption{Danh sách pipeline evidence cần đưa vào khi nộp} \\
+\begin{lstlisting}
+SIGN_IMAGES=true
+COSIGN_KEY_CREDENTIAL_ID=cosign-private-key
+COSIGN_PASSWORD_CREDENTIAL_ID=cosign-password
+COSIGN_PUBLIC_KEY_CREDENTIAL_ID=cosign-public-key
+\end{lstlisting}
+
+\section{Ma trận bằng chứng DevSecOps}
+
+\begin{longtable}{p{0.18\textwidth}p{0.34\textwidth}>{\raggedright\arraybackslash\scriptsize}p{0.25\textwidth}p{0.12\textwidth}}
+\caption{Danh sách và trạng thái bằng chứng DevSecOps}
+\label{tab:appendix-devsecops-evidence} \\
 \toprule
-\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\textbf{Bằng chứng} & \textbf{Nội dung bắt buộc} & \textbf{Tên file} & \textbf{Trạng thái} \\
 \midrule
 \endfirsthead
 \toprule
-\textbf{Bằng chứng} & \textbf{Nội dung cần thể hiện} \\
+\textbf{Bằng chứng} & \textbf{Nội dung bắt buộc} & \textbf{Tên file} & \textbf{Trạng thái} \\
 \midrule
 \endhead
-Jenkins build & Build number, branch, stage view xanh, timestamp. \\
-Pre-build Security & Các stage SCA, Trivy FS, Unit Tests, SAST, Checkov, Terraform Validate pass. \\
-Build \& Scan & Service image được build và scan image. \\
-Push \& GitOps & Image tag được push, GitOps branch được cập nhật. \\
-Argo CD & Các application chính Synced/Healthy. \\
-Smoke test & \code{GET /} và \code{GET /api/health} pass. \\
-ZAP report & \code{zap\_report.html} và \code{zap\_report.json} được archive. \\
-Grafana & Pod health, CPU/RAM hoặc workload status. \\
-Loki & Query log namespace \code{docvault}. \\
+Kiến trúc EKS & EKS, namespace, GitOps, registry, secret, storage, monitoring và luồng truy cập & \path{docvault-eks-architecture.png} & Đã chèn \\
+Jenkins Stage View & Build number, branch, commit, trạng thái các stage và timestamp & \path{jenkins-stage-view.png} & Chưa có \\
+Secret/quality gate & TruffleHog, unit test, lint và workspace build & \path{jenkins-quality-gates.png} & Chưa có \\
+SonarQube & Quality Gate, bug, vulnerability, hotspot, smell và coverage & \path{sonarqube-quality-gate.png} & Chưa có \\
+SCA/Trivy FS & Dependency-Check và Trivy không còn finding vượt ngưỡng & \path{sca-trivy-results.png} & Chưa có \\
+IaC/policy & Checkov, Terraform Validate và Kyverno report & \path{iac-policy-results.png} & Chưa có \\
+Harbor registry & Project riêng và repository của các dịch vụ & \path{harbor.png} & Đã chèn \\
+SBOM/Cosign & Digest, trạng thái ký và thông tin SBOM của artifact & \path{harbor-docvault.png} & Đã chèn \\
+GitOps commit & Commit cập nhật repository, tag và digest trên \code{gitops-testing} & \path{gitops-commit.png} & Chưa có \\
+Argo CD & Root app, child app và trạng thái \code{Synced}/\code{Healthy} & \path{argocd-application.png} & Đã chèn \\
+EKS workload & Pod và các workload nền tảng ở trạng thái vận hành & \path{eks-workloads.png} & Đã chèn \\
+AWS resources & EKS, node group, VPC, S3, KMS và IAM/IRSA & Nhiều ảnh trong \path{images/infra} & Đã chèn \\
+External Secrets & Secret metadata trong AWS Secrets Manager, không hiển thị giá trị & \path{externalsecret.png} & Đã chèn \\
+Smoke test & HTTP status web root và \code{/api/health} & \path{smoke-test.png} & Chưa có \\
+ZAP & Summary và artifact HTML/JSON & \path{zap-summary.png} & Chưa có \\
+Grafana & Node/pod health, CPU, memory và restart & \path{grafana-dashboard.png} & Chưa có \\
+Loki & Query log namespace \code{docvault} & \path{loki-logs.png} & Chưa có \\
+Backup & CloudNativePG ScheduledBackup và object trong S3 backup bucket & \path{database-backup.png} & Chưa có \\
 \bottomrule
 \end{longtable}
-
-\section{Diễn giải khi bảo vệ}
-
-Khi trình bày pipeline, không nên chỉ nói ``pipeline chạy xanh''. Cần giải thích pipeline chứng minh điều gì:
-
-\begin{itemize}
-  \item SAST/SCA giúp phát hiện lỗi mã nguồn và dependency trước khi build image.
-  \item Trivy/Checkov/Terraform validate giúp kiểm tra artifact và hạ tầng.
-  \item Docker build và image scan giúp đảm bảo image tạo ra có thể triển khai và đã được quét.
-  \item GitOps update giúp trạng thái deploy có lịch sử trong Git.
-  \item Argo CD health chứng minh cluster đã reconcile về trạng thái mong muốn.
-  \item Smoke test chứng minh app sau deploy reachable.
-  \item ZAP DAST kiểm tra ứng dụng đang chạy và tạo report bảo mật động.
-\end{itemize}

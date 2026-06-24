@@ -65,16 +65,16 @@ Các service mặc định:
 
 \section{Khởi động frontend}
 
-Frontend nên chạy trên port \code{3100} để tránh xung đột với gateway:
+Frontend chạy trên port \code{3006} theo script \code{dev} của \code{apps/web}:
 
 \begin{lstlisting}[language=bash]
-pnpm --filter web dev -- --port 3100
+pnpm --filter web dev
 \end{lstlisting}
 
 Truy cập:
 
 \begin{lstlisting}
-http://localhost:3100
+http://localhost:3006
 \end{lstlisting}
 
 \section{Tài khoản demo}
@@ -82,11 +82,11 @@ http://localhost:3100
 Các tài khoản demo thường dùng:
 
 \begin{itemize}
-  \item \code{viewer1}
-  \item \code{editor1}
-  \item \code{approver1}
-  \item \code{co1}
-  \item \code{admin1}
+  \item \code{viewer1} (vai trò \code{viewer})
+  \item \code{editor1} (vai trò \code{editor})
+  \item \code{approver1} (vai trò \code{approver})
+  \item \code{co1} (vai trò \code{compliance\_officer})
+  \item \code{admin1} (vai trò \code{admin})
 \end{itemize}
 
 Mật khẩu demo nằm trong tài liệu hướng dẫn chạy nội bộ của repository và cần được thay đổi nếu triển khai ngoài môi trường dev.

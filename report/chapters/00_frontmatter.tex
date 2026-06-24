@@ -6,12 +6,14 @@
 
 {\Large \textbf{BÁO CÁO ĐỒ ÁN CHUYÊN NGÀNH}}\\[1.2cm]
 
-{\Large \textbf{TRIỂN KHAI HỆ THỐNG QUẢN LÝ TÀI LIỆU BẢO MẬT DOCVAULT THEO QUY TRÌNH DEVSECOPS}}\\[2.0cm]
+{\Large \textbf{PHÁT TRIỂN HỆ THỐNG QUẢN LÝ TÀI LIỆU BẢO MẬT DỰA TRÊN KIẾN TRÚC MICROSERVICES VÀ QUY TRÌNH DEVSECOPS}}\\[0.6cm]
+
+{\large \textit{Development of a Secure Document Management System based on Microservices Architecture and DevSecOps Pipeline}}\\[1.4cm]
 
 \begin{tabular}{rl}
 \textbf{Môn học:} & NT114 - Đồ án chuyên ngành \\
 \textbf{Sinh viên thực hiện:} & Huỳnh Lê Đại Thắng -- 23521422 \\
- & Nguyễn Trường Duy -- \underline{\hspace{3.5cm}} \\
+ & Nguyễn Trường Duy -- 23520380 \\
 \textbf{Giảng viên hướng dẫn:} & ThS. Lê Anh Tuấn \\
 \end{tabular}
 
@@ -23,11 +25,11 @@
 \chapter*{Lời cảm ơn}
 \addcontentsline{toc}{chapter}{Lời cảm ơn}
 
-Trong quá trình thực hiện đồ án chuyên ngành với đề tài ``Triển khai hệ thống quản lý tài liệu bảo mật DocVault theo quy trình DevSecOps'', em đã có cơ hội vận dụng kiến thức về phát triển phần mềm, kiến trúc microservices, bảo mật ứng dụng và tự động hóa triển khai vào một hệ thống có tính thực tiễn cao. Đề tài không chỉ tập trung vào việc xây dựng một ứng dụng quản lý tài liệu, mà còn đặt trọng tâm vào cách đưa các kiểm soát bảo mật vào toàn bộ vòng đời phát triển.
+Trong quá trình thực hiện đồ án chuyên ngành với đề tài ``Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps'', nhóm đã có cơ hội vận dụng kiến thức về phát triển phần mềm, kiến trúc microservices, bảo mật ứng dụng và tự động hóa triển khai vào một hệ thống có tính thực tiễn cao. Đề tài không chỉ tập trung vào việc xây dựng một ứng dụng quản lý tài liệu, mà còn đặt trọng tâm vào cách đưa các kiểm soát bảo mật vào toàn bộ vòng đời phát triển.
 
-Em xin gửi lời cảm ơn đến giảng viên hướng dẫn đã định hướng, góp ý và hỗ trợ em trong quá trình xác định phạm vi, thiết kế kiến trúc và hoàn thiện sản phẩm. Những góp ý trong quá trình thực hiện giúp em nhìn nhận rõ hơn mối liên hệ giữa yêu cầu nghiệp vụ, yêu cầu bảo mật và khả năng vận hành của hệ thống.
+Nhóm xin gửi lời cảm ơn đến thầy ThS. Lê Anh Tuấn đã định hướng, góp ý và hỗ trợ nhóm trong quá trình xác định phạm vi, thiết kế kiến trúc và hoàn thiện sản phẩm. Những góp ý trong quá trình thực hiện giúp nhóm nhìn nhận rõ hơn mối liên hệ giữa yêu cầu nghiệp vụ, yêu cầu bảo mật và khả năng vận hành của hệ thống.
 
-Em cũng xin cảm ơn nhà trường và khoa đã tạo điều kiện để em được thực hiện đồ án theo hướng thực hành, qua đó rèn luyện kỹ năng xây dựng hệ thống, kiểm thử, triển khai và trình bày kết quả kỹ thuật một cách có hệ thống. Mặc dù đã cố gắng hoàn thiện, báo cáo và sản phẩm vẫn có thể còn thiếu sót. Em mong nhận được góp ý để tiếp tục cải thiện hệ thống trong các giai đoạn sau.
+Nhóm cũng xin cảm ơn nhà trường và khoa đã tạo điều kiện để nhóm được thực hiện đồ án theo hướng thực hành, qua đó rèn luyện kỹ năng xây dựng hệ thống, kiểm thử, triển khai và trình bày kết quả kỹ thuật một cách có hệ thống. Mặc dù đã cố gắng hoàn thiện, báo cáo và sản phẩm vẫn có thể còn thiếu sót. Nhóm mong nhận được góp ý để tiếp tục cải thiện hệ thống trong các giai đoạn sau.
 
 \clearpage
 
@@ -38,7 +40,7 @@ DocVault là một hệ thống quản lý tài liệu bảo mật được xây
 
 Về mặt ứng dụng, DocVault được triển khai với frontend Next.js, API Gateway và các backend service NestJS gồm metadata-service, document-service, workflow-service, audit-service và notification-service. Hệ thống sử dụng Keycloak cho xác thực, PostgreSQL cho metadata, MongoDB cho audit log và MinIO/S3 cho lưu trữ file. Các kiểm soát bảo mật trọng tâm bao gồm phân quyền theo vai trò, ACL deny-overrides, kiểm soát preview/download, grant token ngắn hạn, hash-chain audit, malware scanning, DLP, retention evidence và compliance evidence packet.
 
-Về mặt DevSecOps, đề tài thiết kế và triển khai pipeline Jenkins nhằm tự động hóa các bước cài đặt phụ thuộc, kiểm thử, SAST, SCA, quét filesystem/image bằng Trivy, quét IaC bằng Checkov, validate Terraform, build Docker image, cập nhật GitOps branch, kiểm tra Argo CD health, smoke test sau triển khai và DAST bằng OWASP ZAP. Phần ứng dụng DocVault hiện đã gần hoàn thiện về runtime và bằng chứng kiểm thử; phần pipeline DevSecOps đang tiếp tục được hoàn thiện để tăng độ ổn định, khả năng lặp lại và chất lượng bằng chứng triển khai.
+Về mặt DevSecOps, đề tài thiết kế và triển khai pipeline Jenkins nhằm tự động hóa các bước cài đặt phụ thuộc, kiểm thử, SAST, SCA, quét filesystem/image bằng Trivy, quét IaC bằng Checkov, validate Terraform, build Docker image, cập nhật GitOps branch, kiểm tra Argo CD health, smoke test sau triển khai và DAST bằng OWASP ZAP. Cả hợp phần ứng dụng và hợp phần DevSecOps đều đã được hiện thực và có bằng chứng vận hành; các nội dung còn lại tập trung vào gia cố vận hành ở quy mô production như chuẩn hóa provenance, bắt buộc xác minh chữ ký tại admission và diễn tập khôi phục dữ liệu.
 
 \textbf{Từ khóa:} DocVault, quản lý tài liệu, bảo mật ứng dụng, microservices, DevSecOps, RBAC, ACL, audit, DLP, Jenkins, GitOps.
 
@@ -51,7 +53,7 @@ DocVault is a secure document management system designed around a microservices 
 
 The application layer consists of a Next.js frontend, an API Gateway, and NestJS microservices, including metadata, document, workflow, audit, and notification services. Keycloak provides identity and access management, PostgreSQL stores document metadata, MongoDB stores audit events, and MinIO/S3 stores file objects. Security controls include RBAC, ACL with deny-overrides semantics, short-lived grant tokens, tamper-evident audit hash chains, malware scanning, DLP classification escalation, retention evidence, and compliance evidence packets.
 
-The DevSecOps pipeline is implemented with Jenkins and integrates security checks throughout the build and deployment process. It includes dependency analysis, static application security testing, filesystem and image scanning, infrastructure-as-code scanning, Terraform validation, unit testing, Docker image build and scan, GitOps updates, Argo CD health checks, post-deploy smoke tests, and OWASP ZAP DAST. At the current stage, the application/runtime scope is nearly complete, while the DevSecOps pipeline is being refined to improve reliability, evidence quality, and deployment readiness.
+The DevSecOps pipeline is implemented with Jenkins and integrates security checks throughout the build and deployment process. It includes dependency analysis, static application security testing, filesystem and image scanning, infrastructure-as-code scanning, Terraform validation, unit testing, Docker image build and scan, GitOps updates, Argo CD health checks, post-deploy smoke tests, and OWASP ZAP DAST. Both the application and DevSecOps scopes are implemented and backed by operational evidence; the remaining work focuses on production-grade operational hardening, such as standardized provenance, admission-time signature enforcement, and data recovery drills.
 
 \textbf{Keywords:} DocVault, document management, application security, microservices, DevSecOps, RBAC, ACL, audit, DLP, Jenkins, GitOps.
 

@@ -44,9 +44,9 @@ Các mục tiêu cụ thể gồm:
 
 \section{Phạm vi thực hiện}
 
-Phạm vi đề tài được chia thành hai phần. Phần ứng dụng DocVault là trọng tâm hiện tại và đã được triển khai gần hoàn thiện. Phần này bao gồm giao diện web, backend microservices, các luồng nghiệp vụ, kiểm soát truy cập, audit, DLP, malware scanning, retention và evidence center.
+Phạm vi đề tài gồm hai hợp phần có quan hệ chặt chẽ. Hợp phần ứng dụng bao gồm giao diện web, các dịch vụ backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Hợp phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, quy trình CI/CD trên Jenkins, kho ảnh Harbor, GitOps với Argo CD, các cổng kiểm soát bảo mật và cơ chế giám sát sau triển khai.
 
-Phần DevSecOps pipeline đang trong quá trình hoàn thiện. Pipeline đã có cấu trúc và các stage quan trọng như SAST, SCA, Trivy, Checkov, Terraform validation, build/scan image, push image, GitOps update, Argo CD health check, smoke test và DAST bằng OWASP ZAP. Tuy nhiên, trong phạm vi báo cáo, phần pipeline được trình bày trung thực theo trạng thái hiện có: đã có thiết kế và bằng chứng chạy, nhưng vẫn còn các hướng cải tiến về production hardening, artifact signing, SBOM, policy-as-code và độ đầy đủ của bằng chứng triển khai.
+Tại thời điểm hoàn thành báo cáo, pipeline đã tích hợp SAST, SCA, quét secret, Trivy, Checkov, Terraform Validate, Kyverno CLI, build và quét container image, đẩy artifact lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST bằng OWASP ZAP. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Các nội dung còn lại tập trung vào gia cố vận hành ở quy mô production, thay vì bổ sung các thành phần nền tảng của quy trình.
 
 \begin{table}[H]
 \centering
@@ -60,15 +60,42 @@ Phần DevSecOps pipeline đang trong quá trình hoàn thiện. Pipeline đã c
 Backend microservices & Gateway, metadata-service, document-service, workflow-service, audit-service, notification-service. & \statusdone \\
 Bảo mật runtime & RBAC, ACL, grant token, compliance boundary, DLP, malware scanning, audit hash-chain. & \statusdone \\
 Local infrastructure & Postgres, MongoDB, MinIO, Keycloak qua Docker Compose. & \statusdone \\
-DevSecOps pipeline & Jenkins pipeline với các stage kiểm thử, scan, build, GitOps, Argo CD, smoke test, DAST. & \statusprogress \\
-Production hardening & SBOM, signing, policy-as-code, secret rotation/KMS, advanced observability. & \statusgap \\
+DevSecOps pipeline & Jenkins pipeline với các stage kiểm thử, quét bảo mật, build, Harbor, GitOps, Argo CD, smoke test và DAST. & \statusdone \\
+Hạ tầng cloud-native & Terraform, EKS, S3/KMS, IRSA, External Secrets, backup, Harbor và observability. & \statusdone \\
+Gia cố vận hành production & Remote Terraform state, private node, admission enforcement, provenance chuẩn hóa, NetworkPolicy giới hạn egress, log persistence và diễn tập khôi phục. & \statusprogress \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
 \section{Đóng góp của đề tài}
 
-Đề tài có bốn đóng góp chính. Thứ nhất, đề tài xây dựng một hệ thống quản lý tài liệu có đầy đủ luồng nghiệp vụ từ tạo tài liệu đến phê duyệt và lưu trữ. Thứ hai, hệ thống thể hiện rõ cách kết hợp các mô hình kiểm soát truy cập ở nhiều tầng: role, ACL, classification, status và ownership. Thứ ba, đề tài đưa các yêu cầu compliance vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Thứ tư, đề tài xây dựng pipeline DevSecOps nhằm tự động hóa kiểm thử và quét bảo mật, qua đó tạo nền tảng cho quá trình phát hành an toàn hơn.
+Đề tài có bốn đóng góp chính. Thứ nhất, đề tài xây dựng một hệ thống quản lý tài liệu bao phủ luồng nghiệp vụ từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai, hệ thống kết hợp nhiều lớp kiểm soát truy cập gồm vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu. Thứ ba, các yêu cầu tuân thủ được đưa vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Thứ tư, đề tài triển khai một quy trình DevSecOps có khả năng truy vết từ mã nguồn, container artifact, GitOps revision đến workload trên EKS; đồng thời tích hợp kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành.
+
+\section{Phân công công việc}
+
+Đề tài do hai thành viên cùng thực hiện theo hình thức đồng phụ trách: cả hai cùng tham gia khảo sát, thiết kế và kiểm thử toàn hệ thống, đồng thời mỗi người nhận vai trò chính ở một số hạng mục để bảo đảm tiến độ. Bảng~\ref{tab:work-assignment} tóm tắt phân công theo vai trò chính và vai trò phối hợp.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Phân công công việc giữa các thành viên}
+\label{tab:work-assignment}
+\begin{tabularx}{\textwidth}{p{0.34\textwidth}p{0.26\textwidth}Y}
+\toprule
+\textbf{Hạng mục} & \textbf{Phụ trách chính} & \textbf{Phối hợp} \\
+\midrule
+Thiết kế kiến trúc tổng thể & Cả hai & --- \\
+Frontend Next.js và permission-aware UI & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Backend microservices và bảo mật runtime & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Mô hình phân quyền (RBAC, ACL, classification) & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Audit hash-chain, DLP và evidence & Cả hai & --- \\
+Pipeline DevSecOps (Jenkins, các security gate) & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Hạ tầng cloud-native (Terraform, EKS, GitOps) & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Quản lý secret, registry và observability & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Kiểm thử, thu thập bằng chứng và viết báo cáo & Cả hai & --- \\
+\bottomrule
+\end{tabularx}
+\end{table}
 
 \section{Cấu trúc báo cáo}
 

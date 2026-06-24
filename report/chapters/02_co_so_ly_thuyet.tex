@@ -8,6 +8,38 @@ Hệ thống quản lý tài liệu (Document Management System - DMS) là hệ 
 
 DocVault được thiết kế theo quan điểm backend là nơi thực thi chính sách cuối cùng. Frontend có thể hiển thị hoặc vô hiệu hóa thao tác để cải thiện trải nghiệm người dùng, nhưng quyết định cho phép hoặc từ chối vẫn thuộc về metadata-service, document-service, gateway và audit-service.
 
+\section{Khảo sát các hệ thống tương tự}
+
+Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với các hệ thống này giúp xác định khoảng trống mà DocVault hướng tới. Bảng~\ref{tab:related-work} so sánh DocVault với ba đại diện tiêu biểu trên các tiêu chí liên quan trực tiếp đến phạm vi đề tài.
+
+\begin{itemize}
+  \item \textbf{Microsoft SharePoint}: nền tảng quản lý tài liệu và cộng tác thương mại, mạnh về tích hợp hệ sinh thái Microsoft 365, phân quyền và compliance; tuy nhiên là dịch vụ đóng, chủ yếu vận hành trên đám mây của nhà cung cấp và khó tùy biến sâu chính sách truy cập ở mức mã nguồn.
+  \item \textbf{Alfresco}: hệ thống ECM mã nguồn mở (có bản thương mại), hỗ trợ vòng đời tài liệu, phân quyền và audit; kiến trúc nghiêng về monolith/Java truyền thống và không đặt trọng tâm vào quy trình DevSecOps đi kèm.
+  \item \textbf{Nextcloud}: giải pháp self-hosted phổ biến cho lưu trữ và chia sẻ file, dễ triển khai; mạnh về chia sẻ và đồng bộ nhưng kiểm soát theo classification, DLP và audit tamper-evident không phải trọng tâm mặc định.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\caption{So sánh DocVault với một số hệ thống quản lý tài liệu tiêu biểu}
+\label{tab:related-work}
+\begin{tabularx}{\textwidth}{p{0.26\textwidth}YYYY}
+\toprule
+\textbf{Tiêu chí} & \textbf{SharePoint} & \textbf{Alfresco} & \textbf{Nextcloud} & \textbf{DocVault} \\
+\midrule
+Mô hình triển khai & Cloud đóng & Self-hosted & Self-hosted & Self-hosted \\
+RBAC + ACL deny-overrides & Có & Có & Một phần & Có \\
+Phân loại + kiểm soát theo classification & Có & Một phần & Hạn chế & Có \\
+DLP nâng classification tự động & Một phần & Hạn chế & Hạn chế & Có \\
+Audit tamper-evident (hash-chain) & Hạn chế & Hạn chế & Hạn chế & Có \\
+Compliance boundary (metadata-only) & Hạn chế & Hạn chế & Hạn chế & Có \\
+DevSecOps pipeline đi kèm & Không & Không & Không & Có \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Điểm khác biệt của DocVault không nằm ở việc thay thế các hệ thống trên về quy mô tính năng, mà ở cách kết hợp ba yếu tố trong cùng một đề tài: (1) kiểm soát truy cập nhiều lớp theo classification với ranh giới compliance metadata-only, (2) audit tamper-evident bằng hash-chain, và (3) đưa toàn bộ quy trình phát hành vào pipeline DevSecOps có bằng chứng. Đây là hướng tiếp cận phù hợp với mục tiêu học thuật của đề tài: minh họa cách bảo mật được đưa xuyên suốt từ thiết kế ứng dụng đến quy trình triển khai, thay vì chỉ xây dựng một DMS đầy đủ tính năng.
+
 \section{Kiến trúc microservices}
 
 Microservices là cách tổ chức hệ thống thành nhiều service nhỏ, mỗi service sở hữu một năng lực nghiệp vụ rõ ràng và có thể phát triển, kiểm thử, triển khai độc lập ở mức tương đối. Trong DocVault, kiến trúc này được dùng để tách các bounded context:
@@ -103,3 +135,61 @@ DAST & Kiểm thử ứng dụng đang chạy. & Baseline scan web app sau deplo
 GitOps là mô hình trong đó Git đóng vai trò nguồn sự thật cho trạng thái triển khai. Khi pipeline build image mới, thay vì trực tiếp chỉnh cluster bằng lệnh thủ công, pipeline cập nhật Helm values hoặc manifest trong một branch GitOps. Argo CD theo dõi branch này và đồng bộ trạng thái mong muốn vào Kubernetes cluster \cite{argocd_docs}.
 
 Trong DocVault, pipeline cập nhật các file values tương ứng với từng service. Sau đó Argo CD thực hiện sync các application như gateway, metadata-service, document-service, workflow-service, audit-service, notification-service và web. Cách tiếp cận này giúp tách trách nhiệm giữa build pipeline và deployment controller, đồng thời tạo lịch sử thay đổi triển khai trong Git.
+
+\section{Tổng hợp công nghệ và công cụ}
+
+Để có cái nhìn tổng thể, phần này tổng hợp các công nghệ và công cụ chính được sử dụng trong đề tài, chia thành hai nhóm: nhóm xây dựng ứng dụng (Bảng~\ref{tab:tech-stack-app}) và nhóm quy trình DevSecOps cùng hạ tầng triển khai (Bảng~\ref{tab:tech-stack-devsecops}). Các phiên bản được ghi nhận theo cấu hình thực tế trong repository tại thời điểm hoàn thành báo cáo.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Công nghệ xây dựng ứng dụng DocVault}
+\label{tab:tech-stack-app}
+\begin{tabularx}{\textwidth}{p{0.20\textwidth}p{0.26\textwidth}p{0.14\textwidth}Y}
+\toprule
+\textbf{Thành phần} & \textbf{Công nghệ} & \textbf{Phiên bản} & \textbf{Vai trò} \\
+\midrule
+Frontend & Next.js, React & 16.2, 19.2 & Giao diện web theo App Router. \\
+UI \& form & Tailwind CSS, Radix UI, React Hook Form, Zod & 4.x, 7.7, 4.3 & Thiết kế giao diện, form và validation phía client. \\
+Server state & TanStack Query & 5.90 & Quản lý dữ liệu server, cache và đồng bộ. \\
+Backend & NestJS & 10.0 & Framework cho gateway và các microservice. \\
+Ngôn ngữ & TypeScript & 5.x & Ngôn ngữ chính cho frontend và backend. \\
+Xác thực & Keycloak, passport-jwt, jwks-rsa & --- & OIDC/JWT, xác minh token bằng JWKS RS256. \\
+ORM & Prisma + adapter-pg & 7.5 & Truy cập PostgreSQL bằng driver adapter. \\
+Metadata DB & PostgreSQL & --- & Lưu metadata, ACL, workflow history. \\
+Audit DB & MongoDB, Mongoose & --- & Lưu audit event và hash-chain. \\
+Object storage & MinIO / Amazon S3 & --- & Lưu blob file tài liệu. \\
+Rate limit & \code{@nestjs/throttler} & 6.5 & Giới hạn tần suất request theo cấu hình chung. \\
+Monorepo & pnpm, Turbo & 9.15, 2.1 & Quản lý workspace và điều phối build. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+\begin{table}[H]
+\centering
+\small
+\caption{Công cụ DevSecOps và hạ tầng triển khai}
+\label{tab:tech-stack-devsecops}
+\begin{tabularx}{\textwidth}{p{0.22\textwidth}p{0.24\textwidth}Y}
+\toprule
+\textbf{Nhóm} & \textbf{Công cụ} & \textbf{Vai trò trong đề tài} \\
+\midrule
+CI/CD & Jenkins, Jenkins Shared Library & Điều phối pipeline, tách CI validation và CD release. \\
+Secret scan & TruffleHog & Phát hiện credential bị commit trong repository. \\
+SAST & SonarQube & Phân tích mã nguồn tĩnh và Quality Gate. \\
+SCA & OWASP Dependency-Check & Quét lỗ hổng thư viện phụ thuộc theo CVSS. \\
+FS/Image scan & Trivy & Quét filesystem và Docker image. \\
+IaC scan & Checkov & Quét cấu hình Terraform, Kubernetes, Helm. \\
+Policy-as-code & Kyverno CLI & Kiểm tra policy trên manifest đã render. \\
+IaC & Terraform & Mô tả hạ tầng AWS dưới dạng mã. \\
+Container & Docker BuildKit & Build và cache image theo batch. \\
+Registry & Harbor & Private registry, lưu SBOM và trạng thái ký. \\
+Ký artifact & Cosign & Ký và xác minh image digest. \\
+GitOps & Git, Argo CD & Đồng bộ desired state theo mô hình app-of-apps. \\
+Orchestration & Amazon EKS, Helm, Kustomize & Chạy workload trên Kubernetes. \\
+Secret \& key & AWS Secrets Manager, External Secrets, KMS & Quản lý bí mật và khóa mã hóa. \\
+DAST & OWASP ZAP & Quét động ứng dụng sau triển khai. \\
+Observability & Prometheus, Grafana, Loki & Thu thập metric, log và trực quan hóa. \\
+\bottomrule
+\end{tabularx}
+\end{table}
