@@ -79,6 +79,60 @@ Admin & Quản trị tài liệu, thành viên, evidence, retention và các tha
 \end{tabularx}
 \end{table}
 
+\subsection{Quyền xem và tải theo classification}
+
+Bảng~\ref{tab:content-access-by-role-classification} mô tả quyền truy cập nội dung file trong luồng người dùng thông thường. Ký hiệu \textbf{X} là xem trước nội dung và \textbf{T} là tải file. Quyền tải chỉ được xét khi tài liệu ở trạng thái \code{PUBLISHED} và đã có version; quyền xem trước có thể áp dụng ở các trạng thái workflow khác nếu đã có version. ACL \code{DENY} phù hợp được ưu tiên hơn quyền role. Các ô ghi ``Owner/ACL'' yêu cầu người dùng là chủ sở hữu hoặc có ACL \code{ALLOW} đúng loại quyền.
+
+\begin{landscape}
+\begin{table}[H]
+\centering
+\small
+\caption{Quyền xem và tải nội dung theo vai trò và classification}
+\label{tab:content-access-by-role-classification}
+\begin{tabularx}{\linewidth}{p{0.16\linewidth}YYYY}
+\toprule
+\textbf{Vai trò} &
+\textbf{PUBLIC} &
+\textbf{INTERNAL} &
+\textbf{CONFIDENTIAL} &
+\textbf{SECRET} \\
+\midrule
+Viewer &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Không\newline \textbf{T:} Không &
+\textbf{X:} Owner/ACL READ\newline \textbf{T:} Owner/ACL DOWNLOAD &
+\textbf{X:} Chỉ owner\newline \textbf{T:} Không \\
+\addlinespace
+Editor &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Owner/ACL READ\newline \textbf{T:} Owner/ACL DOWNLOAD &
+\textbf{X:} Chỉ owner\newline \textbf{T:} Không \\
+\addlinespace
+Approver &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Owner/ACL DOWNLOAD &
+\textbf{X:} Có\newline \textbf{T:} Owner/ACL DOWNLOAD \\
+\addlinespace
+Compliance Officer &
+\textbf{X:} Không\newline \textbf{T:} Không &
+\textbf{X:} Không\newline \textbf{T:} Không &
+\textbf{X:} Không\newline \textbf{T:} Không &
+\textbf{X:} Không\newline \textbf{T:} Không \\
+\addlinespace
+Admin &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Có &
+\textbf{X:} Có\newline \textbf{T:} Có \\
+\bottomrule
+\end{tabularx}
+\end{table}
+\end{landscape}
+
+Compliance Officer vẫn có thể đọc metadata của tài liệu \code{PUBLISHED}/\code{ARCHIVED} để phục vụ audit và evidence, nhưng không có quyền xem trước, stream, presign hoặc tải nội dung file ở bất kỳ classification nào. Share link có grant hợp lệ là một cơ chế cấp quyền riêng và không được biểu diễn trong ma trận role cơ sở này.
+
 \section{Chính sách Compliance Officer}
 
 Một quyết định thiết kế quan trọng của DocVault là tách rõ quyền compliance và quyền nội dung file. Compliance Officer cần xem metadata và audit để đánh giá tuân thủ, nhưng không nên có quyền tải file chỉ vì họ có quyền audit. Điều này giảm rủi ro lạm dụng vai trò compliance để truy cập tài liệu nhạy cảm.
