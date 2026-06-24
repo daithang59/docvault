@@ -68,7 +68,7 @@ Truy vết & Các thao tác quan trọng cần tạo audit event; audit chain c�
 Tách biệt trách nhiệm & Mỗi service sở hữu một bounded context rõ ràng; document-service không tự quyết định policy download. \\
 Khả năng kiểm thử & Có unit test, E2E runtime, frontend test/lint/build và pipeline scan. \\
 Khả năng triển khai & Hỗ trợ local Docker Compose, Docker image, Kubernetes/Helm và GitOps. \\
-Khả năng mở rộng & Thiết kế cho phép bổ sung queue, email notification, SBOM, signing, KMS và policy-as-code trong tương lai. \\
+Khả năng mở rộng & Kiến trúc cho phép bổ sung message queue, kênh thông báo, môi trường triển khai và replica độc lập; nền tảng hiện tại đã tích hợp SBOM, ký image, KMS, External Secrets và policy-as-code trong CI. \\
 \bottomrule
 \end{tabularx}
 \end{table}

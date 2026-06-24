@@ -93,9 +93,9 @@ Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát 
 
 \section{Pipeline evidence}
 
-Pipeline evidence gồm log, report và trạng thái runtime từ Jenkins, Harbor, Git, Argo CD và EKS. Tài liệu hardening trước đây ghi nhận build \#61 đã pass các stage chính. Tuy nhiên pipeline hiện tại đã được mở rộng thêm TruffleHog secret scan, change detection, lint/workspace build, SonarQube Quality Gate, Kyverno policy-as-code, Harbor digest pin và Cosign tùy chọn. Vì vậy, bộ bằng chứng cuối cùng cần được chụp lại từ một build mới chạy đúng phiên bản \code{Jenkinsfile} hiện tại.
+Bằng chứng pipeline gồm log, báo cáo và trạng thái thực thi từ Jenkins, Harbor, Git, Argo CD và EKS. Tài liệu kiểm chứng trước đây ghi nhận build \#61 đã hoàn thành các stage chính. Tuy nhiên, pipeline hiện tại đã được mở rộng thêm TruffleHog, phát hiện phạm vi thay đổi, lint và build toàn workspace, SonarQube Quality Gate, Kyverno policy-as-code, cố định digest trên Harbor và ký artifact bằng Cosign. Vì vậy, bộ bằng chứng Jenkins cuối cùng cần được thu thập từ một build mới chạy đúng phiên bản \code{Jenkinsfile} hiện tại.
 
-Các bằng chứng nên được đưa vào phụ lục hoặc slide bảo vệ:
+Các bằng chứng được sử dụng để đối chiếu kết quả triển khai gồm:
 
 \begin{itemize}
   \item Screenshot Jenkins build xanh và stage view.
@@ -104,8 +104,8 @@ Các bằng chứng nên được đưa vào phụ lục hoặc slide bảo vệ
   \item Dependency Check report.
   \item Trivy filesystem/image scan log.
   \item Checkov, Terraform Validate và Kyverno report.
-  \item Harbor image tag theo Git SHA, digest và vulnerability scan.
-  \item Cosign sign/verify log nếu tính năng ký image được bật.
+  \item Harbor image tag theo Git SHA, digest, SBOM, trạng thái ký và kết quả quét lỗ hổng.
+  \item Log ký và xác minh Cosign tương ứng với image digest.
   \item GitOps commit cập nhật repository, tag và digest trong Helm values.
   \item Argo CD application \code{Synced/Healthy}.
   \item Smoke test log cho web root và \code{/api/health}.
@@ -113,6 +113,8 @@ Các bằng chứng nên được đưa vào phụ lục hoặc slide bảo vệ
   \item Grafana/Loki screenshot cho observability.
   \item AWS EKS, S3, KMS, IAM/IRSA, Secrets Manager và CloudNativePG backup.
 \end{itemize}
+
+Các ảnh EKS, IAM/IRSA, S3/KMS, Secrets Manager, Argo CD và Harbor đã được đưa vào Chương 6. Các placeholder còn lại được giữ cho bằng chứng Jenkins, SonarQube, SCA/Trivy, IaC, kiểm tra sau triển khai, Grafana, Loki và bucket backup.
 
 \section{Đánh giá theo yêu cầu}
 
@@ -140,18 +142,18 @@ DevSecOps pipeline & Jenkins gates, Harbor/digest, Kyverno, GitOps, Argo CD, smo
 
 \section{Hạn chế hiện tại}
 
-Mặc dù hệ thống đã có nhiều bằng chứng runtime, vẫn còn một số hạn chế:
+Kết quả kiểm thử và đối chiếu cấu hình cho thấy hệ thống vẫn còn các giới hạn sau:
 
 \begin{itemize}
-  \item Notification-service hiện vẫn là dev sink, chưa phải hệ thống email/webhook/push hoàn chỉnh.
-  \item Browser-level E2E chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phần mạnh nhất hiện là API/runtime E2E.
-  \item Shared auth/contracts còn có thể tiếp tục consolidate để giảm trùng lặp giữa service.
-  \item Pipeline đã có digest pin, policy-as-code và khả năng ký image, nhưng vẫn cần SBOM, provenance và bắt buộc xác minh chữ ký ở admission time.
-  \item Kyverno hiện được chạy offline trong CI; chưa có bằng chứng admission controller chặn manifest vi phạm trực tiếp tại cluster.
+  \item Notification-service hiện vẫn sử dụng cơ chế lưu nhận phục vụ phát triển, chưa tích hợp đầy đủ email, webhook hoặc push notification.
+  \item Kiểm thử end-to-end ở cấp trình duyệt chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phạm vi kiểm chứng hiện tập trung vào API và runtime.
+  \item Thư viện xác thực và contract dùng chung cần tiếp tục được hợp nhất để giảm trùng lặp giữa các dịch vụ.
+  \item Harbor đã thể hiện SBOM và trạng thái ký của artifact; tuy nhiên provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký tại admission time chưa được triển khai.
+  \item Kyverno đã được sử dụng như cổng policy-as-code trong CI với manifest đã render; cụm EKS chưa có bằng chứng về admission controller chặn trực tiếp tài nguyên vi phạm.
   \item NetworkPolicy vẫn mở egress, Loki chưa có persistence và cấu hình quản trị monitoring cần được chuyển hoàn toàn sang External Secrets.
-  \item Backup PostgreSQL đã được cấu hình lên S3/KMS, nhưng cần diễn tập restore để xác minh RPO/RTO.
+  \item Backup PostgreSQL đã được cấu hình trên S3/KMS và có lịch chạy định kỳ; quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO.
 \end{itemize}
 
 \section{Nhận xét chung}
 
-DocVault đã đạt được mục tiêu của một hệ thống quản lý tài liệu bảo mật ở mức đồ án chuyên ngành: có kiến trúc rõ, có luồng nghiệp vụ hoàn chỉnh, có kiểm soát bảo mật backend, có audit/evidence và có pipeline DevSecOps với nhiều bước kiểm tra tự động. Điểm quan trọng là báo cáo không chỉ mô tả ý tưởng mà có thể đối chiếu với mã nguồn, tài liệu evidence và pipeline hiện có trong repository.
+DocVault đã đáp ứng các mục tiêu cốt lõi của một hệ thống quản lý tài liệu bảo mật trong phạm vi đồ án chuyên ngành. Kiến trúc, luồng nghiệp vụ, kiểm soát bảo mật backend, audit, evidence và pipeline DevSecOps đều có hiện thực tương ứng trong repository. Các kết luận trong báo cáo được đối chiếu với mã nguồn, cấu hình hạ tầng, báo cáo kiểm thử và ảnh chụp từ môi trường triển khai.

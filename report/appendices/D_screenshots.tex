@@ -15,26 +15,33 @@ Các ảnh trong \code{report/images/screen} minh họa những chức năng ch�
 
 Các ảnh giao diện nên bổ sung nếu còn dung lượng báo cáo gồm màn hình đăng nhập Keycloak, tạo tài liệu, chi tiết tài liệu, workflow timeline, Evidence Center, retention và thông báo từ chối download do policy.
 
-\section{Ảnh DevSecOps đã có}
+\section{Ảnh DevSecOps đã sử dụng}
 
-Thư mục \code{report/images/infra} hiện có:
+Các ảnh sau trong \code{report/images/infra} đã được chèn vào Chương 6:
 
 \begin{itemize}
   \item \code{CICDPipelineFlow.png}: sơ đồ tổng quan CI, CD theo GitOps và kiểm tra sau triển khai.
+  \item \code{docvault-eks-architecture.png}: kiến trúc triển khai DocVault trên EKS.
+  \item \code{docvault-eks.png}: thông tin cụm EKS.
+  \item \code{node-group.png}: managed node group và worker node.
+  \item \code{docvault-eks-vpc.png}: VPC và các subnet.
+  \item \code{s3bucket.png}: bucket lưu tài liệu và trạng thái versioning.
+  \item \code{s3bucketkms.png}: cấu hình mã hóa SSE-KMS của bucket tài liệu.
+  \item \code{kms.png}: các customer-managed KMS key.
+  \item \code{iamroles.png}: IAM role dùng cho IRSA.
+  \item \code{eks-workloads.png}: workload trên cụm EKS.
+  \item \code{externalsecret.png}: danh sách secret trong AWS Secrets Manager.
+  \item \code{argocd-application.png}: trạng thái application gốc và các application con.
+  \item \code{harbor.png}: project và repository trên Harbor.
+  \item \code{harbor-docvault.png}: digest, trạng thái ký và SBOM của artifact.
 \end{itemize}
 
-\section{Ảnh DevSecOps cần bổ sung}
+\section{Ảnh DevSecOps còn cần bổ sung}
 
-Các placeholder trong Chương 6 được thiết kế để thay bằng ảnh có cùng ý nghĩa. Danh sách file khuyến nghị:
+Các placeholder còn lại trong Chương 6 tương ứng với các bằng chứng chưa có ảnh chụp:
 
 \begin{itemize}
-  \item \code{eks-architecture.png}
-  \item \code{aws-resources.png}
-  \item \code{eks-workloads.png}
-  \item \code{external-secrets.png}
-  \item \code{argocd-applications.png}
-  \item \code{harbor-artifacts.png}
-  \item \code{cosign-verification.png}
+  \item \code{s3-backup.png}
   \item \code{jenkins-stage-view.png}
   \item \code{sonarqube-quality-gate.png}
   \item \code{sca-trivy-results.png}
@@ -44,7 +51,7 @@ Các placeholder trong Chương 6 được thiết kế để thay bằng ảnh 
   \item \code{loki-logs.png}
 \end{itemize}
 
-Sau khi có ảnh thật, thay lệnh \code{\textbackslash evidenceplaceholder} tương ứng bằng môi trường \code{figure} và \code{\textbackslash includegraphics}. Nên giữ nguyên caption và label để các tham chiếu trong nội dung không bị thay đổi.
+Khi bổ sung ảnh, cần sử dụng cùng một lần phát hành đối với Jenkins, Harbor, GitOps và Argo CD để bảo đảm khả năng đối chiếu commit, digest và trạng thái triển khai.
 
 \section{Yêu cầu bảo mật đối với ảnh}
 
@@ -54,6 +61,6 @@ Trước khi đưa ảnh vào báo cáo, phải loại bỏ hoặc che các thô
   \item password, token, secret value, private key và credential ID có tính nhạy cảm;
   \item nội dung kubeconfig, JWT, cookie, presigned URL và object key thực;
   \item dữ liệu tài liệu của người dùng;
-  \item thông tin AWS không cần thiết như account ID đầy đủ hoặc ARN nhạy cảm;
+  \item access key, secret key, session token hoặc giá trị secret trên AWS;
   \item địa chỉ quản trị nội bộ không phục vụ giải thích kiến trúc.
 \end{itemize}

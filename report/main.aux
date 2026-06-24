@@ -31,7 +31,7 @@
 \providecommand*\caption@xref[2]{\@setref\relax\@undefined{#1}}
 \newlabel{tab:scope-status}{{1.1}{16}{Phạm vi và trạng thái thực hiện của đề tài}{table.caption.8}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {1.5}Đóng góp của đề tài}{16}{section.1.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {1.6}Cấu trúc báo cáo}{16}{section.1.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {1.6}Cấu trúc báo cáo}{17}{section.1.6}\protected@file@percent }
 \@writefile{toc}{\contentsline {chapter}{\numberline {2}Cơ sở lý thuyết và công nghệ nền tảng}{18}{chapter.2}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
@@ -149,6 +149,10 @@
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
 \@writefile{toc}{\contentsline {section}{\numberline {6.1}Mục tiêu và phạm vi triển khai}{51}{section.6.1}\protected@file@percent }
+\abx@aux@cite{0}{terraform_docs}
+\abx@aux@segm{0}{0}{terraform_docs}
+\abx@aux@cite{0}{aws_eks_irsa}
+\abx@aux@segm{0}{0}{aws_eks_irsa}
 \@writefile{lof}{\contentsline {figure}{\numberline {6.1}{\ignorespaces Luồng tổng quan CI, CD theo GitOps và kiểm tra sau triển khai}}{52}{figure.caption.26}\protected@file@percent }
 \newlabel{fig:devsecops-pipeline-overview}{{6.1}{52}{Luồng tổng quan CI, CD theo GitOps và kiểm tra sau triển khai}{figure.caption.26}{}}
 \@writefile{toc}{\contentsline {section}{\numberline {6.2}Kiến trúc hạ tầng trên AWS EKS}{52}{section.6.2}\protected@file@percent }
@@ -159,166 +163,192 @@
 \newlabel{fig:aws-eks-node-group}{{6.3}{53}{Managed node group và các worker node ở trạng thái sẵn sàng}{figure.caption.28}{}}
 \@writefile{lof}{\contentsline {figure}{\numberline {6.4}{\ignorespaces Resource map của VPC gồm public/private subnet trên hai Availability Zone}}{53}{figure.caption.29}\protected@file@percent }
 \newlabel{fig:aws-vpc-subnets}{{6.4}{53}{Resource map của VPC gồm public/private subnet trên hai Availability Zone}{figure.caption.29}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.5}{\ignorespaces Kiến trúc triển khai DocVault trên AWS EKS (cần bổ sung ảnh minh chứng)}}{54}{figure.caption.30}\protected@file@percent }
-\newlabel{fig:placeholder-eks-architecture}{{6.5}{54}{Kiến trúc triển khai DocVault trên AWS EKS (cần bổ sung ảnh minh chứng)}{figure.caption.30}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.2}Lưu trữ tài liệu và backup}{54}{subsection.6.2.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.6}{\ignorespaces S3 bucket lưu tài liệu đã bật versioning trong môi trường testing}}{54}{figure.caption.31}\protected@file@percent }
-\newlabel{fig:aws-s3-documents}{{6.6}{54}{S3 bucket lưu tài liệu đã bật versioning trong môi trường testing}{figure.caption.31}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.7}{\ignorespaces S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}}{55}{figure.caption.32}\protected@file@percent }
-\newlabel{fig:aws-s3-kms}{{6.7}{55}{S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}{figure.caption.32}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.8}{\ignorespaces Các customer-managed KMS key dùng cho EKS, tài liệu và backup}}{55}{figure.caption.33}\protected@file@percent }
-\newlabel{fig:aws-kms-keys}{{6.8}{55}{Các customer-managed KMS key dùng cho EKS, tài liệu và backup}{figure.caption.33}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.9}{\ignorespaces S3 bucket lưu backup cơ sở dữ liệu (cần bổ sung ảnh minh chứng)}}{55}{figure.caption.34}\protected@file@percent }
-\newlabel{fig:placeholder-s3-backup}{{6.9}{55}{S3 bucket lưu backup cơ sở dữ liệu (cần bổ sung ảnh minh chứng)}{figure.caption.34}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.3}Tổ chức workload trên Kubernetes}{55}{section.6.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.1}Helm chart và Kustomize overlay}{55}{subsection.6.3.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.2}Ingress, DNS và TLS}{56}{subsection.6.3.2}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.10}{\ignorespaces Workload và endpoint của DocVault trên EKS (cần bổ sung ảnh minh chứng)}}{56}{figure.caption.35}\protected@file@percent }
-\newlabel{fig:placeholder-eks-workloads}{{6.10}{56}{Workload và endpoint của DocVault trên EKS (cần bổ sung ảnh minh chứng)}{figure.caption.35}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.4}Quản lý secret và quyền truy cập AWS}{57}{section.6.4}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.11}{\ignorespaces Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}}{57}{figure.caption.36}\protected@file@percent }
-\newlabel{fig:aws-irsa-roles}{{6.11}{57}{Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}{figure.caption.36}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.12}{\ignorespaces AWS Secrets Manager và External Secrets trên EKS (cần bổ sung ảnh minh chứng)}}{57}{figure.caption.37}\protected@file@percent }
-\newlabel{fig:placeholder-external-secrets}{{6.12}{57}{AWS Secrets Manager và External Secrets trên EKS (cần bổ sung ảnh minh chứng)}{figure.caption.37}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.5}Mô hình GitOps với Argo CD}{58}{section.6.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.1}App-of-apps và thứ tự đồng bộ}{58}{subsection.6.5.1}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.13}{\ignorespaces Argo CD app-of-apps và trạng thái đồng bộ (cần bổ sung ảnh minh chứng)}}{58}{figure.caption.38}\protected@file@percent }
-\newlabel{fig:placeholder-argocd}{{6.13}{58}{Argo CD app-of-apps và trạng thái đồng bộ (cần bổ sung ảnh minh chứng)}{figure.caption.38}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.2}Cập nhật desired state}{58}{subsection.6.5.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.6}Harbor và bảo mật chuỗi cung ứng phần mềm}{59}{section.6.6}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.14}{\ignorespaces Harbor projects, image artifact và vulnerability scan (cần bổ sung ảnh minh chứng)}}{59}{figure.caption.39}\protected@file@percent }
-\newlabel{fig:placeholder-harbor}{{6.14}{59}{Harbor projects, image artifact và vulnerability scan (cần bổ sung ảnh minh chứng)}{figure.caption.39}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.15}{\ignorespaces Chữ ký Cosign của image (cần bổ sung ảnh minh chứng)}}{60}{figure.caption.40}\protected@file@percent }
-\newlabel{fig:placeholder-cosign}{{6.15}{60}{Chữ ký Cosign của image (cần bổ sung ảnh minh chứng)}{figure.caption.40}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.7}Jenkins pipeline}{60}{section.6.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.1}Phân tách CI và CD}{60}{subsection.6.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.2}Các stage chính}{60}{subsection.6.7.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.5}{\ignorespaces Kiến trúc triển khai DocVault trên AWS EKS}}{54}{figure.caption.30}\protected@file@percent }
+\newlabel{fig:eks-deployment-architecture}{{6.5}{54}{Kiến trúc triển khai DocVault trên AWS EKS}{figure.caption.30}{}}
+\abx@aux@cite{0}{aws_s3_kms}
+\abx@aux@segm{0}{0}{aws_s3_kms}
+\abx@aux@cite{0}{cnpg_backup}
+\abx@aux@segm{0}{0}{cnpg_backup}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.2.2}Lưu trữ tài liệu và backup}{55}{subsection.6.2.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.6}{\ignorespaces S3 bucket lưu tài liệu đã bật versioning trong môi trường testing}}{55}{figure.caption.31}\protected@file@percent }
+\newlabel{fig:aws-s3-documents}{{6.6}{55}{S3 bucket lưu tài liệu đã bật versioning trong môi trường testing}{figure.caption.31}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.7}{\ignorespaces S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}}{56}{figure.caption.32}\protected@file@percent }
+\newlabel{fig:aws-s3-kms}{{6.7}{56}{S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}{figure.caption.32}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.8}{\ignorespaces Các customer-managed KMS key dùng cho EKS, tài liệu và backup}}{56}{figure.caption.33}\protected@file@percent }
+\newlabel{fig:aws-kms-keys}{{6.8}{56}{Các customer-managed KMS key dùng cho EKS, tài liệu và backup}{figure.caption.33}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.9}{\ignorespaces S3 bucket lưu backup cơ sở dữ liệu (cần bổ sung ảnh minh chứng)}}{56}{figure.caption.34}\protected@file@percent }
+\newlabel{fig:placeholder-s3-backup}{{6.9}{56}{S3 bucket lưu backup cơ sở dữ liệu (cần bổ sung ảnh minh chứng)}{figure.caption.34}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.3}Tổ chức workload trên Kubernetes}{56}{section.6.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.1}Helm chart và Kustomize overlay}{56}{subsection.6.3.1}\protected@file@percent }
+\abx@aux@cite{0}{kubernetes_networkpolicy}
+\abx@aux@segm{0}{0}{kubernetes_networkpolicy}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.3.2}Ingress, DNS và TLS}{57}{subsection.6.3.2}\protected@file@percent }
+\abx@aux@cite{0}{external_secrets_aws}
+\abx@aux@segm{0}{0}{external_secrets_aws}
+\abx@aux@cite{0}{aws_eks_irsa}
+\abx@aux@segm{0}{0}{aws_eks_irsa}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.10}{\ignorespaces Danh sách workload trên cụm EKS và trạng thái vận hành tại thời điểm thu thập bằng chứng}}{58}{figure.caption.35}\protected@file@percent }
+\newlabel{fig:eks-workloads}{{6.10}{58}{Danh sách workload trên cụm EKS và trạng thái vận hành tại thời điểm thu thập bằng chứng}{figure.caption.35}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.4}Quản lý secret và quyền truy cập AWS}{58}{section.6.4}\protected@file@percent }
+\abx@aux@cite{0}{argocd_docs}
+\abx@aux@segm{0}{0}{argocd_docs}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.11}{\ignorespaces Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}}{59}{figure.caption.36}\protected@file@percent }
+\newlabel{fig:aws-irsa-roles}{{6.11}{59}{Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}{figure.caption.36}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.12}{\ignorespaces Các secret của DocVault được quản lý tập trung trong AWS Secrets Manager}}{59}{figure.caption.37}\protected@file@percent }
+\newlabel{fig:aws-secrets-manager}{{6.12}{59}{Các secret của DocVault được quản lý tập trung trong AWS Secrets Manager}{figure.caption.37}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.5}Mô hình GitOps với Argo CD}{60}{section.6.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.1}App-of-apps và thứ tự đồng bộ}{60}{subsection.6.5.1}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.13}{\ignorespaces Application gốc \texttt  {docvault-root} đạt trạng thái \texttt  {Healthy} và \texttt  {Synced}}}{60}{figure.caption.38}\protected@file@percent }
+\newlabel{fig:argocd-app-of-apps}{{6.13}{60}{Application gốc \code {docvault-root} đạt trạng thái \code {Healthy} và \code {Synced}}{figure.caption.38}{}}
+\abx@aux@cite{0}{harbor_docs}
+\abx@aux@segm{0}{0}{harbor_docs}
+\abx@aux@cite{0}{sigstore_cosign}
+\abx@aux@segm{0}{0}{sigstore_cosign}
+\abx@aux@cite{0}{kyverno_cli}
+\abx@aux@segm{0}{0}{kyverno_cli}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.5.2}Cập nhật desired state}{61}{subsection.6.5.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {6.6}Harbor và bảo mật chuỗi cung ứng phần mềm}{61}{section.6.6}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.14}{\ignorespaces Project riêng \texttt  {docvault-dev} và các repository dịch vụ trên Harbor}}{62}{figure.caption.39}\protected@file@percent }
+\newlabel{fig:harbor-repositories}{{6.14}{62}{Project riêng \code {docvault-dev} và các repository dịch vụ trên Harbor}{figure.caption.39}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.15}{\ignorespaces Artifact Harbor được định danh bằng digest, có trạng thái ký và thông tin SBOM}}{62}{figure.caption.40}\protected@file@percent }
+\newlabel{fig:harbor-sbom-signature}{{6.15}{62}{Artifact Harbor được định danh bằng digest, có trạng thái ký và thông tin SBOM}{figure.caption.40}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.7}Jenkins pipeline}{63}{section.6.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.1}Phân tách CI và CD}{63}{subsection.6.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.7.2}Các stage chính}{63}{subsection.6.7.2}\protected@file@percent }
 \abx@aux@cite{0}{sonarqube_docs}
 \abx@aux@segm{0}{0}{sonarqube_docs}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.16}{\ignorespaces Jenkins build và Stage View (cần bổ sung ảnh minh chứng)}}{61}{figure.caption.41}\protected@file@percent }
-\newlabel{fig:placeholder-jenkins-stage-view}{{6.16}{61}{Jenkins build và Stage View (cần bổ sung ảnh minh chứng)}{figure.caption.41}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.8}Các cổng kiểm soát chất lượng và bảo mật}{61}{section.6.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.1}Secret scanning}{61}{subsection.6.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.2}Kiểm thử và chất lượng mã nguồn}{61}{subsection.6.8.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.16}{\ignorespaces Jenkins build và Stage View (cần bổ sung ảnh minh chứng)}}{64}{figure.caption.41}\protected@file@percent }
+\newlabel{fig:placeholder-jenkins-stage-view}{{6.16}{64}{Jenkins build và Stage View (cần bổ sung ảnh minh chứng)}{figure.caption.41}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.8}Các cổng kiểm soát chất lượng và bảo mật}{64}{section.6.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.1}Secret scanning}{64}{subsection.6.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.2}Kiểm thử và chất lượng mã nguồn}{64}{subsection.6.8.2}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.17}{\ignorespaces SonarQube Quality Gate của DocVault (cần bổ sung ảnh minh chứng)}}{64}{figure.caption.42}\protected@file@percent }
+\newlabel{fig:placeholder-sonarqube}{{6.17}{64}{SonarQube Quality Gate của DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.42}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.3}SCA và filesystem scanning}{64}{subsection.6.8.3}\protected@file@percent }
 \abx@aux@cite{0}{trivy_docs}
 \abx@aux@segm{0}{0}{trivy_docs}
 \abx@aux@cite{0}{checkov_docs}
 \abx@aux@segm{0}{0}{checkov_docs}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.17}{\ignorespaces SonarQube Quality Gate của DocVault (cần bổ sung ảnh minh chứng)}}{62}{figure.caption.42}\protected@file@percent }
-\newlabel{fig:placeholder-sonarqube}{{6.17}{62}{SonarQube Quality Gate của DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.42}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.3}SCA và filesystem scanning}{62}{subsection.6.8.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.18}{\ignorespaces Báo cáo SCA và Trivy filesystem (cần bổ sung ảnh minh chứng)}}{62}{figure.caption.43}\protected@file@percent }
-\newlabel{fig:placeholder-sca-trivy}{{6.18}{62}{Báo cáo SCA và Trivy filesystem (cần bổ sung ảnh minh chứng)}{figure.caption.43}{}}
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.4}IaC và policy-as-code}{62}{subsection.6.8.4}\protected@file@percent }
+\abx@aux@cite{0}{kyverno_cli}
+\abx@aux@segm{0}{0}{kyverno_cli}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.18}{\ignorespaces Báo cáo SCA và Trivy filesystem (cần bổ sung ảnh minh chứng)}}{65}{figure.caption.43}\protected@file@percent }
+\newlabel{fig:placeholder-sca-trivy}{{6.18}{65}{Báo cáo SCA và Trivy filesystem (cần bổ sung ảnh minh chứng)}{figure.caption.43}{}}
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.8.4}IaC và policy-as-code}{65}{subsection.6.8.4}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.19}{\ignorespaces Kết quả Checkov, Terraform Validate và Kyverno (cần bổ sung ảnh minh chứng)}}{65}{figure.caption.44}\protected@file@percent }
+\newlabel{fig:placeholder-iac-policy}{{6.19}{65}{Kết quả Checkov, Terraform Validate và Kyverno (cần bổ sung ảnh minh chứng)}{figure.caption.44}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.9}Build, quét và phát hành container image}{65}{section.6.9}\protected@file@percent }
 \abx@aux@cite{0}{argocd_docs}
 \abx@aux@segm{0}{0}{argocd_docs}
 \abx@aux@cite{0}{zap_baseline}
 \abx@aux@segm{0}{0}{zap_baseline}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.19}{\ignorespaces Kết quả Checkov, Terraform Validate và Kyverno (cần bổ sung ảnh minh chứng)}}{63}{figure.caption.44}\protected@file@percent }
-\newlabel{fig:placeholder-iac-policy}{{6.19}{63}{Kết quả Checkov, Terraform Validate và Kyverno (cần bổ sung ảnh minh chứng)}{figure.caption.44}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.9}Build, quét và phát hành container image}{63}{section.6.9}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {6.10}Kiểm tra sau triển khai}{63}{section.6.10}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.1}Argo CD health gate}{63}{subsection.6.10.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.2}Smoke test}{63}{subsection.6.10.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.3}DAST bằng OWASP ZAP}{64}{subsection.6.10.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {6.20}{\ignorespaces Argo CD health check, smoke test và OWASP ZAP (cần bổ sung ảnh minh chứng)}}{64}{figure.caption.45}\protected@file@percent }
-\newlabel{fig:placeholder-post-deploy}{{6.20}{64}{Argo CD health check, smoke test và OWASP ZAP (cần bổ sung ảnh minh chứng)}{figure.caption.45}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.11}Giám sát và tập trung log}{64}{section.6.11}\protected@file@percent }
+\abx@aux@cite{0}{prometheus_docs}
+\abx@aux@segm{0}{0}{prometheus_docs}
+\abx@aux@cite{0}{loki_docs}
+\abx@aux@segm{0}{0}{loki_docs}
+\@writefile{toc}{\contentsline {section}{\numberline {6.10}Kiểm tra sau triển khai}{66}{section.6.10}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.1}Argo CD health gate}{66}{subsection.6.10.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.2}Smoke test}{66}{subsection.6.10.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {subsection}{\numberline {6.10.3}DAST bằng OWASP ZAP}{66}{subsection.6.10.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.20}{\ignorespaces Argo CD health check, smoke test và OWASP ZAP (cần bổ sung ảnh minh chứng)}}{66}{figure.caption.45}\protected@file@percent }
+\newlabel{fig:placeholder-post-deploy}{{6.20}{66}{Argo CD health check, smoke test và OWASP ZAP (cần bổ sung ảnh minh chứng)}{figure.caption.45}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.11}Giám sát và tập trung log}{67}{section.6.11}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {6.21}{\ignorespaces Grafana dashboard giám sát EKS và workload DocVault (cần bổ sung ảnh minh chứng)}}{67}{figure.caption.46}\protected@file@percent }
+\newlabel{fig:placeholder-grafana}{{6.21}{67}{Grafana dashboard giám sát EKS và workload DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.46}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {6.22}{\ignorespaces Loki tập trung log của namespace DocVault (cần bổ sung ảnh minh chứng)}}{67}{figure.caption.47}\protected@file@percent }
+\newlabel{fig:placeholder-loki}{{6.22}{67}{Loki tập trung log của namespace DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.47}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.12}Mapping kiểm soát, công cụ và bằng chứng}{67}{section.6.12}\protected@file@percent }
 \gdef \LT@iii {\LT@entry 
     {1}{93.9406pt}\LT@entry 
     {1}{93.9406pt}\LT@entry 
     {1}{153.12456pt}\LT@entry 
     {1}{107.60431pt}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.21}{\ignorespaces Grafana dashboard giám sát EKS và workload DocVault (cần bổ sung ảnh minh chứng)}}{65}{figure.caption.46}\protected@file@percent }
-\newlabel{fig:placeholder-grafana}{{6.21}{65}{Grafana dashboard giám sát EKS và workload DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.46}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {6.22}{\ignorespaces Loki tập trung log của namespace DocVault (cần bổ sung ảnh minh chứng)}}{65}{figure.caption.47}\protected@file@percent }
-\newlabel{fig:placeholder-loki}{{6.22}{65}{Loki tập trung log của namespace DocVault (cần bổ sung ảnh minh chứng)}{figure.caption.47}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.12}Mapping kiểm soát, công cụ và bằng chứng}{65}{section.6.12}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces Mapping kiểm soát DevSecOps với công cụ và bằng chứng}}{65}{table.6.1}\protected@file@percent }
-\newlabel{tab:devsecops-control-evidence}{{6.1}{65}{Mapping kiểm soát DevSecOps với công cụ và bằng chứng}{table.6.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {6.13}Đánh giá trạng thái triển khai}{66}{section.6.13}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{68}{chapter.7}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {6.1}{\ignorespaces Mapping kiểm soát DevSecOps với công cụ và bằng chứng}}{68}{table.6.1}\protected@file@percent }
+\newlabel{tab:devsecops-control-evidence}{{6.1}{68}{Mapping kiểm soát DevSecOps với công cụ và bằng chứng}{table.6.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {6.13}Đánh giá trạng thái triển khai}{69}{section.6.13}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{70}{chapter.7}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{68}{section.7.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{68}{section.7.2}\protected@file@percent }
-\@writefile{lol}{\contentsline {lstlisting}{\numberline {7.1}{\ignorespaces Lệnh kiểm thử E2E runtime}}{68}{lstlisting.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{70}{section.7.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{70}{section.7.2}\protected@file@percent }
+\@writefile{lol}{\contentsline {lstlisting}{\numberline {7.1}{\ignorespaces Lệnh kiểm thử E2E runtime}}{70}{lstlisting.7.1}\protected@file@percent }
 \gdef \LT@iv {\LT@entry 
     {1}{121.26108pt}\LT@entry 
     {1}{212.30852pt}\LT@entry 
     {1}{93.9406pt}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Tóm tắt bằng chứng kiểm thử runtime}}{69}{table.7.1}\protected@file@percent }
-\newlabel{tab:runtime-evidence}{{7.1}{69}{Tóm tắt bằng chứng kiểm thử runtime}{table.7.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{69}{section.7.3}\protected@file@percent }
-\@writefile{lof}{\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng giao diện dashboard command center}}{70}{figure.caption.48}\protected@file@percent }
-\newlabel{fig:evidence-dashboard}{{7.1}{70}{Bằng chứng giao diện dashboard command center}{figure.caption.48}{}}
-\@writefile{lof}{\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}}{70}{figure.caption.49}\protected@file@percent }
-\newlabel{fig:evidence-approvals}{{7.2}{70}{Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}{figure.caption.49}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.4}Security evidence}{70}{section.7.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.5}Pipeline evidence}{71}{section.7.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{71}{section.7.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.1}{\ignorespaces Tóm tắt bằng chứng kiểm thử runtime}}{71}{table.7.1}\protected@file@percent }
+\newlabel{tab:runtime-evidence}{{7.1}{71}{Tóm tắt bằng chứng kiểm thử runtime}{table.7.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{71}{section.7.3}\protected@file@percent }
+\@writefile{lof}{\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng giao diện dashboard command center}}{72}{figure.caption.48}\protected@file@percent }
+\newlabel{fig:evidence-dashboard}{{7.1}{72}{Bằng chứng giao diện dashboard command center}{figure.caption.48}{}}
+\@writefile{lof}{\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}}{72}{figure.caption.49}\protected@file@percent }
+\newlabel{fig:evidence-approvals}{{7.2}{72}{Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}{figure.caption.49}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.4}Security evidence}{72}{section.7.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.5}Pipeline evidence}{73}{section.7.5}\protected@file@percent }
 \gdef \LT@v {\LT@entry 
     {1}{139.46779pt}\LT@entry 
     {1}{175.88815pt}\LT@entry 
     {1}{112.15425pt}}
-\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Mapping yêu cầu với hiện thực và bằng chứng}}{72}{table.7.2}\protected@file@percent }
-\newlabel{tab:req-impl-evidence}{{7.2}{72}{Mapping yêu cầu với hiện thực và bằng chứng}{table.7.2}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{72}{section.7.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {7.8}Nhận xét chung}{73}{section.7.8}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{74}{chapter.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{74}{section.7.6}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {7.2}{\ignorespaces Mapping yêu cầu với hiện thực và bằng chứng}}{74}{table.7.2}\protected@file@percent }
+\newlabel{tab:req-impl-evidence}{{7.2}{74}{Mapping yêu cầu với hiện thực và bằng chứng}{table.7.2}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{74}{section.7.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {7.8}Nhận xét chung}{75}{section.7.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{76}{chapter.8}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {8.1}Kết quả đạt được}{74}{section.8.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{74}{section.8.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.3}Hạn chế}{75}{section.8.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.4}Hướng phát triển}{75}{section.8.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {8.5}Kết luận chung}{76}{section.8.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{77}{appendix.A}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.1}Kết quả đạt được}{76}{section.8.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{77}{section.8.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.3}Hạn chế}{77}{section.8.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.4}Hướng phát triển}{78}{section.8.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {8.5}Kết luận chung}{78}{section.8.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{80}{appendix.A}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{77}{section.A.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{77}{section.A.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{77}{section.A.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.4}Chạy migration}{77}{section.A.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.5}Khởi động backend}{78}{section.A.5}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.6}Khởi động frontend}{78}{section.A.6}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.7}Tài khoản demo}{78}{section.A.7}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{79}{section.A.8}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{80}{section.A.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{80}{section.A.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{80}{section.A.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.4}Chạy migration}{80}{section.A.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.5}Khởi động backend}{81}{section.A.5}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.6}Khởi động frontend}{81}{section.A.6}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.7}Tài khoản demo}{81}{section.A.7}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{82}{section.A.8}\protected@file@percent }
 \gdef \LT@vi {\LT@entry 
     {1}{125.81102pt}\LT@entry 
     {1}{207.75163pt}\LT@entry 
     {1}{103.04742pt}}
-\@writefile{toc}{\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{80}{appendix.B}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{83}{appendix.B}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{80}{section.B.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{80}{section.B.2}\protected@file@percent }
-\@writefile{lot}{\contentsline {table}{\numberline {B.1}{\ignorespaces Tóm tắt endpoint chính}}{80}{table.B.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.3}Compliance Officer rule}{81}{section.B.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {B.4}Grant token}{81}{section.B.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {C}Bộ bằng chứng DevSecOps}{82}{appendix.C}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{83}{section.B.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{83}{section.B.2}\protected@file@percent }
+\@writefile{lot}{\contentsline {table}{\numberline {B.1}{\ignorespaces Tóm tắt endpoint chính}}{83}{table.B.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B.3}Compliance Officer rule}{84}{section.B.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {B.4}Grant token}{84}{section.B.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {C}Bộ bằng chứng DevSecOps}{85}{appendix.C}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {C.1}Cấu hình pipeline dùng khi thu thập bằng chứng}{82}{section.C.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.2}Ma trận bằng chứng cần thu thập}{82}{section.C.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.1}Cấu hình pipeline dùng khi thu thập bằng chứng}{85}{section.C.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.2}Ma trận bằng chứng DevSecOps}{85}{section.C.2}\protected@file@percent }
 \gdef \LT@vii {\LT@entry 
-    {1}{112.15425pt}\LT@entry 
-    {1}{189.54492pt}\LT@entry 
-    {1}{139.46779pt}}
-\@writefile{lot}{\contentsline {table}{\numberline {C.1}{\ignorespaces Danh sách bằng chứng DevSecOps cần đưa vào bản nộp}}{83}{table.C.1}\protected@file@percent }
-\newlabel{tab:appendix-devsecops-evidence}{{C.1}{83}{Danh sách bằng chứng DevSecOps cần đưa vào bản nộp}{table.C.1}{}}
-\@writefile{toc}{\contentsline {section}{\numberline {C.3}Nguyên tắc chụp và kiểm tra ảnh}{84}{section.C.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {C.4}Cách diễn giải khi bảo vệ}{84}{section.C.4}\protected@file@percent }
-\@writefile{toc}{\contentsline {chapter}{\numberline {D}Danh mục hình ảnh báo cáo}{85}{appendix.D}\protected@file@percent }
+    {1}{93.9406pt}\LT@entry 
+    {1}{166.78133pt}\LT@entry 
+    {1}{125.81102pt}\LT@entry 
+    {1}{66.62706pt}}
+\@writefile{lot}{\contentsline {table}{\numberline {C.1}{\ignorespaces Danh sách và trạng thái bằng chứng DevSecOps}}{86}{table.C.1}\protected@file@percent }
+\newlabel{tab:appendix-devsecops-evidence}{{C.1}{86}{Danh sách và trạng thái bằng chứng DevSecOps}{table.C.1}{}}
+\@writefile{toc}{\contentsline {section}{\numberline {C.3}Nguyên tắc chụp và kiểm tra ảnh}{87}{section.C.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {C.4}Cách diễn giải khi bảo vệ}{87}{section.C.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {chapter}{\numberline {D}Danh mục hình ảnh báo cáo}{88}{appendix.D}\protected@file@percent }
 \@writefile{lof}{\addvspace {10\p@ }}
 \@writefile{lot}{\addvspace {10\p@ }}
-\@writefile{toc}{\contentsline {section}{\numberline {D.1}Ảnh giao diện ứng dụng}{85}{section.D.1}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {D.2}Ảnh DevSecOps đã có}{85}{section.D.2}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {D.3}Ảnh DevSecOps cần bổ sung}{85}{section.D.3}\protected@file@percent }
-\@writefile{toc}{\contentsline {section}{\numberline {D.4}Yêu cầu bảo mật đối với ảnh}{86}{section.D.4}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {D.1}Ảnh giao diện ứng dụng}{88}{section.D.1}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {D.2}Ảnh DevSecOps đã sử dụng}{88}{section.D.2}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {D.3}Ảnh DevSecOps còn cần bổ sung}{89}{section.D.3}\protected@file@percent }
+\@writefile{toc}{\contentsline {section}{\numberline {D.4}Yêu cầu bảo mật đối với ảnh}{89}{section.D.4}\protected@file@percent }
 \babel@aux{english}{}
 \babel@aux{vietnamese}{}
 \abx@aux@read@bbl@mdfivesum{EA01CF73107A493ACE5D1A6CC286F8D8}
+\abx@aux@read@bblrerun
 \abx@aux@defaultrefcontext{0}{nist_ssdf}{none/global//global/global/global}
 \abx@aux@defaultrefcontext{0}{owasp_devsecops}{none/global//global/global/global}
 \abx@aux@defaultrefcontext{0}{keycloak_docs}{none/global//global/global/global}
@@ -327,4 +357,4 @@
 \abx@aux@defaultrefcontext{0}{trivy_docs}{none/global//global/global/global}
 \abx@aux@defaultrefcontext{0}{checkov_docs}{none/global//global/global/global}
 \abx@aux@defaultrefcontext{0}{zap_baseline}{none/global//global/global/global}
-\gdef \@abspage@last{88}
+\gdef \@abspage@last{91}
