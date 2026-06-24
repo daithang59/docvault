@@ -1,29 +1,31 @@
 \babel@toc {vietnamese}{}\relax 
 \addvspace {10\p@ }
 \contentsline {table}{\numberline {1.1}{\ignorespaces Phạm vi và trạng thái thực hiện của đề tài}}{17}{table.caption.8}%
+\contentsline {table}{\numberline {1.2}{\ignorespaces Phân công công việc giữa các thành viên}}{18}{table.caption.9}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {2.1}{\ignorespaces Các nhóm kiểm thử bảo mật trong DevSecOps pipeline}}{22}{table.caption.9}%
-\contentsline {table}{\numberline {2.2}{\ignorespaces Công nghệ xây dựng ứng dụng DocVault}}{24}{table.caption.10}%
-\contentsline {table}{\numberline {2.3}{\ignorespaces Công cụ DevSecOps và hạ tầng triển khai}}{25}{table.caption.11}%
+\contentsline {table}{\numberline {2.1}{\ignorespaces So sánh DocVault với một số hệ thống quản lý tài liệu tiêu biểu}}{20}{table.caption.10}%
+\contentsline {table}{\numberline {2.2}{\ignorespaces Các nhóm kiểm thử bảo mật trong DevSecOps pipeline}}{23}{table.caption.11}%
+\contentsline {table}{\numberline {2.3}{\ignorespaces Công nghệ xây dựng ứng dụng DocVault}}{25}{table.caption.12}%
+\contentsline {table}{\numberline {2.4}{\ignorespaces Công cụ DevSecOps và hạ tầng triển khai}}{26}{table.caption.13}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {3.1}{\ignorespaces Các tác nhân chính trong DocVault}}{27}{table.caption.12}%
-\contentsline {table}{\numberline {3.2}{\ignorespaces Yêu cầu phi chức năng}}{29}{table.caption.13}%
+\contentsline {table}{\numberline {3.1}{\ignorespaces Các tác nhân chính trong DocVault}}{28}{table.caption.14}%
+\contentsline {table}{\numberline {3.2}{\ignorespaces Yêu cầu phi chức năng}}{30}{table.caption.15}%
+\contentsline {table}{\numberline {3.3}{\ignorespaces Mô hình threat của DocVault ánh xạ theo STRIDE}}{31}{table.caption.16}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {4.1}{\ignorespaces Ma trận quyền tổng quan theo vai trò}}{40}{table.caption.18}%
-\contentsline {table}{\numberline {4.2}{\ignorespaces Quyền xem và tải nội dung theo vai trò và classification}}{42}{table.caption.19}%
-\contentsline {table}{\numberline {4.3}{\ignorespaces Nhóm API chính của DocVault}}{47}{table.4.3}%
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\contentsline {table}{\numberline {6.1}{\ignorespaces Mapping kiểm soát DevSecOps với công cụ và bằng chứng}}{75}{table.6.1}%
-\addvspace {10\p@ }
-\contentsline {table}{\numberline {7.1}{\ignorespaces Tóm tắt bằng chứng kiểm thử runtime}}{78}{table.7.1}%
-\contentsline {table}{\numberline {7.2}{\ignorespaces Mapping yêu cầu với hiện thực và bằng chứng}}{81}{table.7.2}%
+\contentsline {table}{\numberline {4.1}{\ignorespaces Ma trận quyền tổng quan theo vai trò}}{42}{table.caption.21}%
+\contentsline {table}{\numberline {4.2}{\ignorespaces Quyền xem và tải nội dung theo vai trò và classification}}{44}{table.caption.22}%
+\contentsline {table}{\numberline {4.3}{\ignorespaces Nhóm API chính của DocVault}}{49}{table.4.3}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {table}{\numberline {6.1}{\ignorespaces Mapping kiểm soát DevSecOps với công cụ và bằng chứng}}{77}{table.6.1}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {B.1}{\ignorespaces Tóm tắt endpoint chính}}{90}{table.B.1}%
+\contentsline {table}{\numberline {7.1}{\ignorespaces Tóm tắt bằng chứng kiểm thử runtime}}{80}{table.7.1}%
+\contentsline {table}{\numberline {7.2}{\ignorespaces Mapping yêu cầu với hiện thực và bằng chứng}}{83}{table.7.2}%
 \addvspace {10\p@ }
-\contentsline {table}{\numberline {C.1}{\ignorespaces Danh sách và trạng thái bằng chứng DevSecOps}}{93}{table.C.1}%
 \addvspace {10\p@ }
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {B.1}{\ignorespaces Tóm tắt endpoint chính}}{92}{table.B.1}%
+\addvspace {10\p@ }
+\contentsline {table}{\numberline {C.1}{\ignorespaces Danh sách và trạng thái bằng chứng DevSecOps}}{95}{table.C.1}%
 \babel@toc {english}{}\relax 
 \babel@toc {vietnamese}{}\relax 

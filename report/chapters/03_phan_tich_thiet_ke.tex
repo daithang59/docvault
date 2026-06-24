@@ -75,18 +75,37 @@ Khả năng mở rộng & Kiến trúc cho phép bổ sung message queue, kênh 
 
 \section{Mô hình threat cơ bản}
 
-Để định hướng thiết kế bảo mật, hệ thống xem xét các nhóm rủi ro sau:
+Để định hướng thiết kế bảo mật, hệ thống xem xét các nhóm rủi ro sau. Mỗi nhóm được phân loại theo khung STRIDE \cite{microsoft_stride} để làm rõ bản chất mối đe dọa và liên kết với biện pháp giảm thiểu tương ứng trong DocVault.
 
-\begin{itemize}
-  \item \textbf{Truy cập trái phép metadata}: người dùng đoán document id và gọi API chi tiết, workflow history, comments hoặc ACL.
-  \item \textbf{Tải nội dung file trái phép}: người dùng gọi trực tiếp presign, stream hoặc download endpoint mà không có quyền.
-  \item \textbf{Lạm dụng Compliance Officer}: người có vai trò compliance được xem nhiều metadata nhưng không được dùng vai trò này để lấy file.
-  \item \textbf{Upload file độc hại}: file chứa EICAR/malware không được lưu vào MinIO và không tạo version metadata.
-  \item \textbf{Rò rỉ dữ liệu nhạy cảm}: file public/internal chứa email, số điện thoại, từ khóa confidential/secret cần được phát hiện và nâng classification.
-  \item \textbf{Downgrade classification không hợp lệ}: tài liệu đã bị DLP phát hiện không được hạ xuống public/internal nếu không có quyền và lý do hợp lệ.
-  \item \textbf{Giả mạo audit}: người dùng thường không được append audit event trực tiếp; audit ingest cần service token.
-  \item \textbf{Sửa audit log cũ}: hash-chain cần phát hiện khi audit event bị thay đổi trực tiếp trong storage.
-\end{itemize}
+\begin{table}[H]
+\centering
+\small
+\caption{Mô hình threat của DocVault ánh xạ theo STRIDE}
+\label{tab:threat-model-stride}
+\begin{tabularx}{\textwidth}{p{0.20\textwidth}p{0.14\textwidth}Y}
+\toprule
+\textbf{Rủi ro} & \textbf{Loại STRIDE} & \textbf{Biện pháp giảm thiểu trong DocVault} \\
+\midrule
+Truy cập trái phép metadata & Information Disclosure & Người dùng đoán document id và gọi API chi tiết, workflow history, comments hoặc ACL; backend policy-filter theo role, owner, ACL, classification và status. \\
+\addlinespace
+Tải nội dung file trái phép & Elevation of Privilege & Gọi trực tiếp presign, stream hoặc download endpoint mà không có quyền; chặn bằng grant token ngắn hạn và tái xác minh ở document-service. \\
+\addlinespace
+Lạm dụng Compliance Officer & Elevation of Privilege & Vai trò compliance xem được nhiều metadata nhưng luôn bị deny nội dung file ở mọi classification. \\
+\addlinespace
+Upload file độc hại & Tampering & File EICAR/malware bị chặn trước khi ghi MinIO và không tạo version metadata. \\
+\addlinespace
+Rò rỉ dữ liệu nhạy cảm & Information Disclosure & DLP phát hiện email, số điện thoại, từ khóa nhạy cảm trong tài liệu public/internal và nâng classification. \\
+\addlinespace
+Downgrade classification không hợp lệ & Tampering & Tài liệu đã bị DLP phát hiện không được hạ xuống public/internal nếu thiếu quyền và lý do override hợp lệ. \\
+\addlinespace
+Giả mạo audit event & Spoofing & Người dùng thường không append audit trực tiếp; audit ingest yêu cầu service token. \\
+\addlinespace
+Sửa audit log cũ & Tampering & Hash-chain phát hiện khi audit event bị thay đổi trực tiếp trong storage. \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Phần lớn rủi ro tập trung vào hai loại Information Disclosure và Elevation of Privilege, phản ánh đúng đặc thù của một hệ thống quản lý tài liệu nhạy cảm: mối đe dọa chính là lộ dữ liệu và vượt quyền truy cập. Hai loại Tampering và Spoofing liên quan đến tính toàn vẹn của file và audit trail. Các nhóm Repudiation và Denial of Service không phải trọng tâm trong phạm vi đồ án; tính chống chối bỏ được hỗ trợ một phần qua audit hash-chain, còn chống từ chối dịch vụ được xử lý ở mức cơ bản bằng rate limiting.
 
 \section{Kiến trúc tổng thể}
 
@@ -103,7 +122,7 @@ Hình~\ref{fig:architecture-overview} mô tả cách các lớp này liên kết
 \end{figure}
 \end{landscape}
 
-Có thể đọc Hình~\ref{fig:architecture-overview} theo bốn lớp từ trên xuống:
+DocVault được tổ chức thành bốn lớp xếp chồng từ client đến hạ tầng dữ liệu, như minh họa ở Hình~\ref{fig:architecture-overview}:
 
 \begin{itemize}
   \item \textbf{Lớp client và frontend}: trình duyệt người dùng tải ứng dụng Next.js. Frontend chỉ giữ một API base URL duy nhất trỏ đến gateway và không gọi trực tiếp bất kỳ microservice nào. Người dùng đăng nhập qua Keycloak theo luồng OIDC, sau đó frontend đính kèm JWT vào mỗi request gửi lên gateway.
@@ -112,7 +131,7 @@ Có thể đọc Hình~\ref{fig:architecture-overview} theo bốn lớp từ tr�
   \item \textbf{Lớp hạ tầng dữ liệu}: Keycloak quản lý định danh; PostgreSQL lưu metadata; MongoDB lưu audit event; MinIO/S3 lưu file. Mỗi service chỉ truy cập kho dữ liệu thuộc bounded context của nó, tránh việc một service đọc trực tiếp database của service khác.
 \end{itemize}
 
-Điểm cốt lõi thể hiện trên sơ đồ là đường đi của một thao tác nhạy cảm như tải file: request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Nhờ vậy không có đường tắt nào cho phép bỏ qua lớp kiểm soát chính sách ở backend.
+Cách phân lớp này được thiết kế để không tồn tại đường tắt bỏ qua kiểm soát chính sách. Với một thao tác nhạy cảm như tải file, request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Nhờ vậy lớp backend luôn giữ vai trò quyết định cuối cùng về quyền truy cập.
 
 \section{Luồng nghiệp vụ chính}
 

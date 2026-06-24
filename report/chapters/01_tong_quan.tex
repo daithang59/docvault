@@ -71,6 +71,32 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 
 Đề tài có bốn đóng góp chính. Thứ nhất, đề tài xây dựng một hệ thống quản lý tài liệu bao phủ luồng nghiệp vụ từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai, hệ thống kết hợp nhiều lớp kiểm soát truy cập gồm vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu. Thứ ba, các yêu cầu tuân thủ được đưa vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Thứ tư, đề tài triển khai một quy trình DevSecOps có khả năng truy vết từ mã nguồn, container artifact, GitOps revision đến workload trên EKS; đồng thời tích hợp kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành.
 
+\section{Phân công công việc}
+
+Đề tài do hai thành viên cùng thực hiện theo hình thức đồng phụ trách: cả hai cùng tham gia khảo sát, thiết kế và kiểm thử toàn hệ thống, đồng thời mỗi người nhận vai trò chính ở một số hạng mục để bảo đảm tiến độ. Bảng~\ref{tab:work-assignment} tóm tắt phân công theo vai trò chính và vai trò phối hợp.
+
+\begin{table}[H]
+\centering
+\small
+\caption{Phân công công việc giữa các thành viên}
+\label{tab:work-assignment}
+\begin{tabularx}{\textwidth}{p{0.34\textwidth}p{0.26\textwidth}Y}
+\toprule
+\textbf{Hạng mục} & \textbf{Phụ trách chính} & \textbf{Phối hợp} \\
+\midrule
+Thiết kế kiến trúc tổng thể & Cả hai & --- \\
+Frontend Next.js và permission-aware UI & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Backend microservices và bảo mật runtime & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Mô hình phân quyền (RBAC, ACL, classification) & Huỳnh Lê Đại Thắng & Nguyễn Trường Duy \\
+Audit hash-chain, DLP và evidence & Cả hai & --- \\
+Pipeline DevSecOps (Jenkins, các security gate) & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Hạ tầng cloud-native (Terraform, EKS, GitOps) & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Quản lý secret, registry và observability & Nguyễn Trường Duy & Huỳnh Lê Đại Thắng \\
+Kiểm thử, thu thập bằng chứng và viết báo cáo & Cả hai & --- \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
 \section{Cấu trúc báo cáo}
 
 Báo cáo gồm tám chương chính. Chương 1 trình bày bối cảnh, mục tiêu và phạm vi đề tài. Chương 2 trình bày cơ sở lý thuyết và công nghệ nền tảng. Chương 3 phân tích yêu cầu và thiết kế tổng thể. Chương 4 mô tả thiết kế dữ liệu, API và chính sách bảo mật. Chương 5 trình bày quá trình triển khai ứng dụng DocVault. Chương 6 trình bày quy trình DevSecOps và hạ tầng triển khai. Chương 7 mô tả kiểm thử, đánh giá và bằng chứng. Chương 8 tổng kết kết quả đạt được, hạn chế và hướng phát triển.

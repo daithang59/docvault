@@ -8,6 +8,38 @@ Hệ thống quản lý tài liệu (Document Management System - DMS) là hệ 
 
 DocVault được thiết kế theo quan điểm backend là nơi thực thi chính sách cuối cùng. Frontend có thể hiển thị hoặc vô hiệu hóa thao tác để cải thiện trải nghiệm người dùng, nhưng quyết định cho phép hoặc từ chối vẫn thuộc về metadata-service, document-service, gateway và audit-service.
 
+\section{Khảo sát các hệ thống tương tự}
+
+Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với các hệ thống này giúp xác định khoảng trống mà DocVault hướng tới. Bảng~\ref{tab:related-work} so sánh DocVault với ba đại diện tiêu biểu trên các tiêu chí liên quan trực tiếp đến phạm vi đề tài.
+
+\begin{itemize}
+  \item \textbf{Microsoft SharePoint}: nền tảng quản lý tài liệu và cộng tác thương mại, mạnh về tích hợp hệ sinh thái Microsoft 365, phân quyền và compliance; tuy nhiên là dịch vụ đóng, chủ yếu vận hành trên đám mây của nhà cung cấp và khó tùy biến sâu chính sách truy cập ở mức mã nguồn.
+  \item \textbf{Alfresco}: hệ thống ECM mã nguồn mở (có bản thương mại), hỗ trợ vòng đời tài liệu, phân quyền và audit; kiến trúc nghiêng về monolith/Java truyền thống và không đặt trọng tâm vào quy trình DevSecOps đi kèm.
+  \item \textbf{Nextcloud}: giải pháp self-hosted phổ biến cho lưu trữ và chia sẻ file, dễ triển khai; mạnh về chia sẻ và đồng bộ nhưng kiểm soát theo classification, DLP và audit tamper-evident không phải trọng tâm mặc định.
+\end{itemize}
+
+\begin{table}[H]
+\centering
+\small
+\caption{So sánh DocVault với một số hệ thống quản lý tài liệu tiêu biểu}
+\label{tab:related-work}
+\begin{tabularx}{\textwidth}{p{0.26\textwidth}YYYY}
+\toprule
+\textbf{Tiêu chí} & \textbf{SharePoint} & \textbf{Alfresco} & \textbf{Nextcloud} & \textbf{DocVault} \\
+\midrule
+Mô hình triển khai & Cloud đóng & Self-hosted & Self-hosted & Self-hosted \\
+RBAC + ACL deny-overrides & Có & Có & Một phần & Có \\
+Phân loại + kiểm soát theo classification & Có & Một phần & Hạn chế & Có \\
+DLP nâng classification tự động & Một phần & Hạn chế & Hạn chế & Có \\
+Audit tamper-evident (hash-chain) & Hạn chế & Hạn chế & Hạn chế & Có \\
+Compliance boundary (metadata-only) & Hạn chế & Hạn chế & Hạn chế & Có \\
+DevSecOps pipeline đi kèm & Không & Không & Không & Có \\
+\bottomrule
+\end{tabularx}
+\end{table}
+
+Điểm khác biệt của DocVault không nằm ở việc thay thế các hệ thống trên về quy mô tính năng, mà ở cách kết hợp ba yếu tố trong cùng một đề tài: (1) kiểm soát truy cập nhiều lớp theo classification với ranh giới compliance metadata-only, (2) audit tamper-evident bằng hash-chain, và (3) đưa toàn bộ quy trình phát hành vào pipeline DevSecOps có bằng chứng. Đây là hướng tiếp cận phù hợp với mục tiêu học thuật của đề tài: minh họa cách bảo mật được đưa xuyên suốt từ thiết kế ứng dụng đến quy trình triển khai, thay vì chỉ xây dựng một DMS đầy đủ tính năng.
+
 \section{Kiến trúc microservices}
 
 Microservices là cách tổ chức hệ thống thành nhiều service nhỏ, mỗi service sở hữu một năng lực nghiệp vụ rõ ràng và có thể phát triển, kiểm thử, triển khai độc lập ở mức tương đối. Trong DocVault, kiến trúc này được dùng để tách các bounded context:
