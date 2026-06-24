@@ -307,7 +307,7 @@ void scanTarget(cfg, Map target, String tag, boolean trivyDbReady) {
             -v ${trivyCacheVolume}:/root/.cache/trivy \\
             -v ${env.WORKSPACE}:/workspace \\
             ${cfg.trivyImage} \\
-            image ${trivyDbFlags} --format spdx-json --output "/workspace/sbom-${target.name}.json" --no-progress '${repository}:${tag}'
+            image ${trivyDbFlags} --format cyclonedx --output "/workspace/sbom-${target.name}.json" --no-progress '${repository}:${tag}'
     """
 }
 

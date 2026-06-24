@@ -1,4 +1,4 @@
-@Library('docvault@audit-devsecops-pipeline') _
+@Library('docvault@fix/sbom-attestion') _
 
 def cfg = [:]
 def changeSet = [:]
@@ -99,7 +99,7 @@ pipeline {
         )
         string(
             name: 'GITOPS_BRANCH',
-            defaultValue: 'gitops-testing',
+            defaultValue: 'main',
             description: 'GitOps branch used for Helm values tag updates (create this branch before enabling updates).'
         )
         string(

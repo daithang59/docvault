@@ -200,7 +200,8 @@ void signImageDigest(cfg, String service, String imageRef) {
     ]) {
         withEnv([
             "COSIGN_IMAGE_REF=${imageRef}",
-            "COSIGN_TLOG_FLAG=${signTlogFlag}"
+            "COSIGN_TLOG_FLAG=${signTlogFlag}",
+            "COSIGN_REGISTRY_REFERRERS_MODE=oci-1-1"
         ]) {
             sh '''
                 set -eu
@@ -213,11 +214,12 @@ void signImageDigest(cfg, String service, String imageRef) {
             withEnv([
                 "COSIGN_IMAGE_REF=${imageRef}",
                 "COSIGN_TLOG_FLAG=${signTlogFlag}",
-                "SBOM_FILE=${sbomFile}"
+                "SBOM_FILE=${sbomFile}",
+                "COSIGN_REGISTRY_REFERRERS_MODE=oci-1-1"
             ]) {
                 sh '''
                     set -eu
-                    cosign attest --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY --type spdxjson --predicate "${SBOM_FILE}" "${COSIGN_IMAGE_REF}"
+                    cosign attest --yes ${COSIGN_TLOG_FLAG} --key env://COSIGN_PRIVATE_KEY --type cyclonedx --predicate "${SBOM_FILE}" "${COSIGN_IMAGE_REF}"
                 '''
             }
         } else {
@@ -234,7 +236,8 @@ void signImageDigest(cfg, String service, String imageRef) {
     withCredentials([string(credentialsId: publicKeyCredentialId, variable: 'COSIGN_PUBLIC_KEY')]) {
         withEnv([
             "COSIGN_IMAGE_REF=${imageRef}",
-            "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
+            "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}",
+            "COSIGN_REGISTRY_REFERRERS_MODE=oci-1-1"
         ]) {
             sh '''
                 set -eu
@@ -246,11 +249,12 @@ void signImageDigest(cfg, String service, String imageRef) {
             echo ">>> Verifying SBOM attestation signature for ${service}..."
             withEnv([
                 "COSIGN_IMAGE_REF=${imageRef}",
-                "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}"
+                "COSIGN_VERIFY_TLOG_FLAG=${verifyTlogFlag}",
+                "COSIGN_REGISTRY_REFERRERS_MODE=oci-1-1"
             ]) {
                 sh '''
                     set -eu
-                    cosign verify-attestation ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY --type spdxjson "${COSIGN_IMAGE_REF}"
+                    cosign verify-attestation ${COSIGN_VERIFY_TLOG_FLAG} --key env://COSIGN_PUBLIC_KEY --type cyclonedx "${COSIGN_IMAGE_REF}"
                 '''
             }
         }
