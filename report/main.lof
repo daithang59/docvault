@@ -2,18 +2,23 @@
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }
+\contentsline {figure}{\numberline {3.1}{\ignorespaces Kiến trúc tổng thể ứng dụng DocVault}}{27}{figure.caption.12}%
+\contentsline {figure}{\numberline {3.2}{\ignorespaces Luồng nghiệp vụ demo chính theo vai trò trong DocVault}}{28}{figure.caption.13}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {4.1}{\ignorespaces Vòng đời trạng thái tài liệu trong DocVault}}{32}{figure.caption.14}%
+\contentsline {figure}{\numberline {4.2}{\ignorespaces Sequence cấp quyền download và stream file}}{35}{figure.caption.16}%
+\contentsline {figure}{\numberline {4.3}{\ignorespaces Luồng tổng hợp compliance evidence trong DocVault}}{37}{figure.caption.17}%
+\addvspace {10\p@ }
+\contentsline {figure}{\numberline {5.1}{\ignorespaces Màn hình dashboard của DocVault}}{40}{figure.caption.18}%
+\contentsline {figure}{\numberline {5.2}{\ignorespaces Màn hình danh sách tài liệu}}{41}{figure.caption.19}%
+\contentsline {figure}{\numberline {5.3}{\ignorespaces Màn hình đăng nhập DocVault}}{44}{figure.caption.20}%
+\contentsline {figure}{\numberline {5.4}{\ignorespaces Màn hình phê duyệt tài liệu}}{44}{figure.caption.21}%
+\contentsline {figure}{\numberline {5.5}{\ignorespaces Màn hình audit log}}{45}{figure.caption.22}%
+\contentsline {figure}{\numberline {5.6}{\ignorespaces Màn hình security posture}}{45}{figure.caption.23}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {5.1}{\ignorespaces Màn hình dashboard của DocVault}}{35}{figure.caption.13}%
-\contentsline {figure}{\numberline {5.2}{\ignorespaces Màn hình danh sách tài liệu}}{36}{figure.caption.14}%
-\contentsline {figure}{\numberline {5.3}{\ignorespaces Màn hình đăng nhập DocVault}}{39}{figure.caption.15}%
-\contentsline {figure}{\numberline {5.4}{\ignorespaces Màn hình phê duyệt tài liệu}}{39}{figure.caption.16}%
-\contentsline {figure}{\numberline {5.5}{\ignorespaces Màn hình audit log}}{40}{figure.caption.17}%
-\contentsline {figure}{\numberline {5.6}{\ignorespaces Màn hình security posture}}{40}{figure.caption.18}%
-\addvspace {10\p@ }
-\addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng Playwright cho dashboard command center}}{49}{figure.caption.19}%
-\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng Playwright cho approvals SLA readiness}}{49}{figure.caption.20}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng Playwright cho dashboard command center}}{54}{figure.caption.24}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng Playwright cho approvals SLA readiness}}{54}{figure.caption.25}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

@@ -36,13 +36,16 @@ Audit event ghi lại hành động trong hệ thống. Mỗi event chứa actor
 
 \section{Document lifecycle}
 
-Luồng trạng thái tài liệu trong DocVault được giữ đơn giản để phù hợp với phạm vi MVP nhưng vẫn đủ cho demo doanh nghiệp:
+Luồng trạng thái tài liệu trong DocVault được giữ đủ gọn để phù hợp với phạm vi MVP nhưng vẫn bao phủ demo doanh nghiệp. Các transition chính gồm tạo draft, gửi duyệt, phê duyệt, từ chối và lưu trữ; ngoài ra hệ thống còn mô phỏng soft delete và restore cho tài liệu nháp.
 
-\begin{lstlisting}[caption={Vòng đời tài liệu trong DocVault},label={fig:document-lifecycle}]
-DRAFT --submit--> PENDING --approve--> PUBLISHED --archive--> ARCHIVED
-                       |
-                       +--reject--> DRAFT
-\end{lstlisting}
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth,height=0.86\textheight,keepaspectratio]{docvault_document_lifecycle_state.drawio.png}
+\caption{Vòng đời trạng thái tài liệu trong DocVault}
+\label{fig:document-lifecycle}
+\end{figure}
+\end{landscape}
 
 Khi Approver approve tài liệu, hệ thống set \code{publishedAt}. Khi archive, hệ thống set \code{archivedAt}. Mỗi transition được ghi vào workflow history và audit event. Điều này giúp trang chi tiết tài liệu hiển thị timeline nghiệp vụ, đồng thời compliance có thể đối chiếu với audit log.
 
@@ -88,14 +91,14 @@ Quy tắc này được enforce ở nhiều tầng: frontend permission helper �
 
 Download được thiết kế thành luồng hai bước. Ở bước đầu, frontend gọi metadata-service thông qua gateway để xin authorize. Metadata-service kiểm tra policy và nếu hợp lệ sẽ cấp grant token ngắn hạn. Ở bước sau, frontend dùng grant token để gọi document-service. Document-service xác minh grant token hoặc tái authorize trước khi cấp presigned URL hoặc stream endpoint.
 
-\begin{lstlisting}[caption={Luồng cấp quyền download trong DocVault},label={fig:download-authorization}]
-User -> Gateway -> Metadata Service: request download authorization
-Metadata Service: check role, status, classification, ACL, owner
-Metadata Service -> User: short-lived grant token
-User -> Gateway -> Document Service: presign/stream with grant
-Document Service: verify grant or re-authorize
-Document Service -> User: presigned URL OR controlled stream endpoint
-\end{lstlisting}
+\begin{landscape}
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.95\linewidth,height=0.88\textheight,keepaspectratio]{download-authorization-sequence.png}
+\caption{Sequence cấp quyền download và stream file}
+\label{fig:download-authorization}
+\end{figure}
+\end{landscape}
 
 Với tài liệu \code{PUBLIC} hoặc \code{INTERNAL}, nếu policy cho phép, hệ thống có thể trả về presigned URL. Với tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET}, hệ thống trả về \code{url: null}, \code{watermarkRequired: true} và \code{streamingEndpoint}. Cách này giúp document-service kiểm soát đường tải nội dung nhạy cảm tốt hơn.
 
@@ -108,6 +111,19 @@ DLP scan phát hiện một số pattern nhạy cảm như email, số điện t
 \section{Audit ingest boundary}
 
 Audit-service không cho phép người dùng thường append audit event trực tiếp. Các service tin cậy phải gửi header service token \code{x-docvault-service-token}. Token này được cấu hình bằng \code{AUDIT\_INGEST\_TOKEN}. Điều này ngăn người dùng có JWT hợp lệ tạo audit event giả để che giấu hoặc làm sai lệch lịch sử.
+
+\section{Luồng compliance evidence}
+
+Compliance evidence trong DocVault được xây dựng từ nhiều tín hiệu runtime: workflow event, access event, upload control, retention record và access review signal. Các tín hiệu này được audit-service ghi nhận theo dạng append-only và hash-chain, sau đó được các màn hình Security, Audit, Retention, Access Review và Evidence Center tổng hợp thành bằng chứng có thể xuất ra ngoài.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth,height=0.82\textheight,keepaspectratio]{docvault_compliance_evidence_flow.drawio.png}
+\caption{Luồng tổng hợp compliance evidence trong DocVault}
+\label{fig:compliance-evidence-flow}
+\end{figure}
+
+Điểm cần nhấn mạnh là evidence output không chứa file content, object key, presigned URL hoặc grant token. Nhờ đó Compliance Officer có thể kiểm tra tính tuân thủ và truy vết hoạt động mà không được mở rộng thành quyền truy cập nội dung tài liệu.
 
 \section{API contract tổng quan}
 
