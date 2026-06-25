@@ -23,7 +23,7 @@
 \contentsline {section}{\numberline {2.6}Audit, hash-chain và compliance evidence}{22}{section.2.6}%
 \contentsline {section}{\numberline {2.7}DevSecOps}{23}{section.2.7}%
 \contentsline {section}{\numberline {2.8}Các nhóm kiểm thử bảo mật trong pipeline}{23}{section.2.8}%
-\contentsline {section}{\numberline {2.9}GitOps và Argo CD}{24}{section.2.9}%
+\contentsline {section}{\numberline {2.9}GitOps và Argo CD}{23}{section.2.9}%
 \contentsline {section}{\numberline {2.10}Tổng hợp công nghệ và công cụ}{24}{section.2.10}%
 \contentsline {chapter}{\numberline {3}Phân tích yêu cầu và thiết kế tổng thể}{27}{chapter.3}%
 \contentsline {section}{\numberline {3.1}Tổng quan bài toán}{27}{section.3.1}%
@@ -50,7 +50,7 @@
 \contentsline {subsection}{\numberline {4.2.5}audit\_events}{40}{subsection.4.2.5}%
 \contentsline {section}{\numberline {4.3}Document lifecycle}{40}{section.4.3}%
 \contentsline {section}{\numberline {4.4}Ma trận phân quyền}{42}{section.4.4}%
-\contentsline {subsection}{\numberline {4.4.1}Quyền xem và tải theo classification}{43}{subsection.4.4.1}%
+\contentsline {subsection}{\numberline {4.4.1}Quyền xem và tải theo classification}{42}{subsection.4.4.1}%
 \contentsline {section}{\numberline {4.5}Chính sách Compliance Officer}{45}{section.4.5}%
 \contentsline {section}{\numberline {4.6}Thiết kế preview/download authorization}{45}{section.4.6}%
 \contentsline {section}{\numberline {4.7}Malware scanning và DLP}{47}{section.4.7}%

@@ -92,7 +92,7 @@ Cấu hình hiện tại sử dụng managed node group có khả năng co giãn
 
 DocVault được triển khai trên AWS EKS theo bốn cụm thành phần, liên kết GitOps repository, Argo CD, các namespace ứng dụng và giám sát, nhóm controller nền tảng, Harbor, Keycloak cùng các dịch vụ AWS (Hình~\ref{fig:eks-deployment-architecture}). Cụm điều khiển triển khai gồm GitOps repository và Argo CD: Argo CD theo dõi nhánh GitOps và đồng bộ desired state vào cụm, đóng vai trò cầu nối duy nhất giữa Git và Kubernetes. Cụm workload ứng dụng là các namespace chạy gateway, web và sáu backend service, được đóng gói bằng Helm. Cụm nền tảng gồm các controller dùng chung như ingress-nginx, cert-manager, External Secrets Operator và CloudNativePG. Cụm dịch vụ AWS bên ngoài cluster gồm S3 (file và backup), KMS (khóa mã hóa), Secrets Manager (bí mật) và IAM/IRSA (cấp quyền cho ServiceAccount).
 
-Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nhờ đó repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
+Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nên repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Theo cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
 
 \subsection{Lưu trữ tài liệu và backup}
 
@@ -220,7 +220,7 @@ Hình~\ref{fig:argocd-app-of-apps} xác nhận application gốc đang theo dõi
 
 Sau khi image được push, Jenkins lấy digest từ registry và cập nhật ba trường \code{repository}, \code{tag}, \code{digest} trong Helm values tương ứng. Tag mặc định là 12 ký tự đầu của Git commit SHA. Pipeline clone riêng nhánh GitOps, commit thay đổi với \code{[skip ci]} để tránh vòng lặp và retry push tối đa ba lần nếu có cập nhật đồng thời.
 
-Nếu thay đổi chỉ liên quan đến manifest Kubernetes, pipeline đồng bộ thư mục \code{infra/k8s} sang nhánh GitOps nhưng giữ lại image reference đang chạy. Nhờ đó thay đổi cấu hình hạ tầng không vô tình hạ phiên bản image. Argo CD sau đó phát hiện commit mới và reconcile cluster về desired state.
+Nếu thay đổi chỉ liên quan đến manifest Kubernetes, pipeline đồng bộ thư mục \code{infra/k8s} sang nhánh GitOps nhưng giữ lại image reference đang chạy, nên thay đổi cấu hình hạ tầng không vô tình hạ phiên bản image. Argo CD sau đó phát hiện commit mới và reconcile cluster về desired state.
 
 \section{Harbor và bảo mật chuỗi cung ứng phần mềm}
 
@@ -380,7 +380,7 @@ So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes 
 
 \subsection{Argo CD health gate}
 
-Khi \code{RUN\_ARGO\_HEALTH\_CHECK=true}, Jenkins dùng kubeconfig credential hoặc context hiện tại để đọc các Argo CD Application. Pipeline chờ đến khi gateway, metadata, document, workflow, audit, notification và web đồng thời đạt \code{Synced} và \code{Healthy}. Nếu quá timeout, release fail. Argo CD vì vậy không chỉ thực hiện CD mà còn cung cấp trạng thái reconcile có thể kiểm chứng \cite{argocd_docs}.
+Khi \code{RUN\_ARGO\_HEALTH\_CHECK=true}, Jenkins dùng kubeconfig credential hoặc context hiện tại để đọc các Argo CD Application. Pipeline chờ đến khi gateway, metadata, document, workflow, audit, notification và web đồng thời đạt \code{Synced} và \code{Healthy}. Nếu quá timeout, release fail. Vai trò của Argo CD ở đây vượt ra ngoài việc thực hiện CD: nó còn cung cấp trạng thái reconcile có thể kiểm chứng \cite{argocd_docs}.
 
 \subsection{Smoke test}
 

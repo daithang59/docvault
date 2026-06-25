@@ -4,7 +4,7 @@
 
 DocVault tách dữ liệu thành ba nhóm chính. Metadata tài liệu thuộc metadata-service và lưu trong PostgreSQL. Nội dung file thuộc document-service và lưu trong MinIO/S3. Audit event thuộc audit-service và lưu trong MongoDB. Việc tách này giúp mỗi service sở hữu dữ liệu của mình, tránh việc service khác truy vấn trực tiếp vào database không thuộc bounded context của nó.
 
-Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Cách thiết kế này giúp hệ thống vừa có thể truy vấn metadata nhanh, vừa có thể lưu file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
+Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Nhờ tách như vậy, hệ thống truy vấn metadata nhanh, lưu được file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
 
 \begin{landscape}
 \begin{figure}[H]
@@ -17,7 +17,7 @@ Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metad
 
 DocVault tổ chức dữ liệu xoay quanh thực thể trung tâm \code{documents}, với các thực thể vệ tinh \code{document\_versions}, \code{document\_acl}, \code{document\_workflow\_history}, \code{document\_comments} và \code{document\_share\_links} cùng tham chiếu đến \code{documents} qua \code{docId} theo quan hệ một-nhiều (Hình~\ref{fig:data-ownership-erd}). Mỗi tài liệu có thể có nhiều phiên bản, nhiều rule ACL, nhiều bản ghi lịch sử workflow và nhiều comment.
 
-Bên cạnh quan hệ thực thể, mô hình dữ liệu được phân chia theo ranh giới sở hữu tương ứng ba kho lưu trữ. Vùng PostgreSQL (thuộc metadata-service) gồm \code{documents} và các bảng vệ tinh, là nơi lưu metadata và quyền truy cập. Vùng object storage (thuộc document-service) lưu blob file; lưu ý \code{document\_versions} chỉ giữ \code{objectKey} và \code{checksum} trỏ tới file thật chứ không lưu nội dung. Vùng MongoDB (thuộc audit-service) lưu \code{audit\_events} và cố ý không dùng khóa ngoại cứng đến \code{documents}, vì audit là bounded context độc lập và phải tồn tại được kể cả khi tài liệu bị xóa. Chính cách tách dữ liệu này giải thích vì sao một thao tác như tải file phải đi qua nhiều service: metadata nằm một nơi, file nằm một nơi, và dấu vết kiểm toán nằm ở nơi thứ ba.
+Bên cạnh quan hệ thực thể, mô hình dữ liệu được phân chia theo ranh giới sở hữu tương ứng ba kho lưu trữ. Vùng PostgreSQL (thuộc metadata-service) gồm \code{documents} và các bảng vệ tinh, là nơi lưu metadata và quyền truy cập. Vùng object storage (thuộc document-service) lưu blob file; lưu ý \code{document\_versions} chỉ giữ \code{objectKey} và \code{checksum} trỏ tới file thật chứ không lưu nội dung. Vùng MongoDB (thuộc audit-service) lưu \code{audit\_events} và cố ý không dùng khóa ngoại cứng đến \code{documents}, vì audit là bounded context độc lập và phải tồn tại được kể cả khi tài liệu bị xóa. Đây cũng là lý do một thao tác như tải file phải đi qua nhiều service: metadata nằm một nơi, file nằm một nơi, và dấu vết kiểm toán nằm ở nơi thứ ba.
 
 \section{Các thực thể chính}
 
@@ -62,9 +62,7 @@ Luồng trạng thái tài liệu trong DocVault được giữ đủ gọn đ�
 
 DocVault định nghĩa vòng đời tài liệu bằng một state machine với các trạng thái \code{DRAFT}, \code{PENDING}, \code{PUBLISHED}, \code{ARCHIVED}, \code{DELETED} và các transition có ràng buộc vai trò (Hình~\ref{fig:document-lifecycle}). Tài liệu mới luôn bắt đầu ở \code{DRAFT}. Editor thực hiện \code{SUBMIT} để chuyển sang \code{PENDING}; Approver thực hiện \code{APPROVE} để sang \code{PUBLISHED} hoặc \code{REJECT} để quay về \code{DRAFT}; tài liệu \code{PUBLISHED} có thể được \code{ARCHIVE}. Ngoài vòng đời chính, hệ thống còn hỗ trợ nhánh soft delete và restore áp dụng cho bản nháp.
 
-Vòng đời được thiết kế dựa trên hai nguyên tắc. Thứ nhất, các transition là một chiều và có ràng buộc vai trò, nên không tồn tại đường đi tùy ý giữa hai trạng thái bất kỳ; workflow-service kiểm tra tính hợp lệ của transition trước khi yêu cầu metadata-service cập nhật. Thứ hai, mỗi transition đều sinh một bản ghi \code{document\_workflow\_history} và một audit event, nhờ đó trang chi tiết tài liệu dựng được timeline nghiệp vụ và compliance có thể đối chiếu chéo với audit log. Các mốc thời gian \code{publishedAt} và \code{archivedAt} được đặt tương ứng khi tài liệu đi qua \code{APPROVE} và \code{ARCHIVE}.
-
-Khi Approver approve tài liệu, hệ thống set \code{publishedAt}. Khi archive, hệ thống set \code{archivedAt}. Mỗi transition được ghi vào workflow history và audit event. Điều này giúp trang chi tiết tài liệu hiển thị timeline nghiệp vụ, đồng thời compliance có thể đối chiếu với audit log.
+Hai nguyên tắc chi phối vòng đời này. Thứ nhất, các transition là một chiều và ràng buộc theo vai trò, nên giữa hai trạng thái bất kỳ không có đường đi tùy ý; workflow-service kiểm tra transition có hợp lệ không trước khi yêu cầu metadata-service cập nhật. Thứ hai, mỗi transition sinh một bản ghi \code{document\_workflow\_history} kèm một audit event, đủ để trang chi tiết tài liệu dựng lại timeline nghiệp vụ và để compliance đối chiếu chéo với audit log. Khi tài liệu đi qua \code{APPROVE}, hệ thống đặt \code{publishedAt}; khi đi qua \code{ARCHIVE}, hệ thống đặt \code{archivedAt}.
 
 \section{Ma trận phân quyền}
 
@@ -143,7 +141,7 @@ Compliance Officer vẫn có thể đọc metadata của tài liệu \code{PUBLI
 
 \section{Chính sách Compliance Officer}
 
-Một quyết định thiết kế quan trọng của DocVault là tách rõ quyền compliance và quyền nội dung file. Compliance Officer cần xem metadata và audit để đánh giá tuân thủ, nhưng không nên có quyền tải file chỉ vì họ có quyền audit. Điều này giảm rủi ro lạm dụng vai trò compliance để truy cập tài liệu nhạy cảm.
+Một quyết định thiết kế quan trọng của DocVault là tách rõ quyền compliance khỏi quyền truy cập nội dung file. Compliance Officer cần xem metadata và audit để đánh giá tuân thủ, nhưng có quyền audit không đồng nghĩa với được tải file. Tách hai quyền này lại giảm rủi ro ai đó lạm dụng vai trò compliance để chạm tới tài liệu nhạy cảm.
 
 Trong DocVault, Compliance Officer:
 
@@ -171,7 +169,7 @@ Download được thiết kế thành luồng hai bước. Ở bước đầu, f
 \end{figure}
 \end{landscape}
 
-Với tài liệu \code{PUBLIC} hoặc \code{INTERNAL}, nếu policy cho phép, hệ thống có thể trả về presigned URL. Với tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET}, hệ thống trả về \code{url: null}, \code{watermarkRequired: true} và \code{streamingEndpoint}. Cách này giúp document-service kiểm soát đường tải nội dung nhạy cảm tốt hơn.
+Với tài liệu \code{PUBLIC} hoặc \code{INTERNAL}, nếu policy cho phép, hệ thống có thể trả về presigned URL. Với tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET}, hệ thống trả về \code{url: null}, \code{watermarkRequired: true} và \code{streamingEndpoint}, để document-service nắm được đường tải nội dung nhạy cảm và kiểm soát chặt hơn.
 
 \section{Malware scanning và DLP}
 
@@ -181,7 +179,7 @@ DLP scan phát hiện một số pattern nhạy cảm như email, số điện t
 
 \section{Audit ingest boundary}
 
-Audit-service không cho phép người dùng thường append audit event trực tiếp. Các service tin cậy phải gửi header service token \code{x-docvault-service-token}. Token này được cấu hình bằng \code{AUDIT\_INGEST\_TOKEN}. Điều này ngăn người dùng có JWT hợp lệ tạo audit event giả để che giấu hoặc làm sai lệch lịch sử.
+Audit-service không cho người dùng thường append audit event trực tiếp. Service tin cậy phải gửi kèm header service token \code{x-docvault-service-token}, cấu hình qua \code{AUDIT\_INGEST\_TOKEN}. Rào này chặn việc một người có JWT hợp lệ tạo audit event giả để che giấu hoặc làm sai lệch lịch sử.
 
 \section{Luồng compliance evidence}
 
@@ -196,9 +194,7 @@ Compliance evidence trong DocVault được xây dựng từ nhiều tín hiệu
 
 DocVault tổng hợp compliance evidence theo một luồng ba giai đoạn từ tín hiệu runtime đến bằng chứng có thể xuất ra ngoài (Hình~\ref{fig:compliance-evidence-flow}). Giai đoạn nguồn là các tín hiệu phát sinh trong vận hành: workflow event, access event, upload control (malware/DLP), retention record và access review signal. Giai đoạn lưu trữ là audit-service ghi nhận các tín hiệu này theo dạng append-only kèm hash-chain, tạo thành một dòng sự kiện có thể kiểm tra tính toàn vẹn. Giai đoạn tổng hợp là các màn hình Security, Audit, Retention, Access Review và Evidence Center đọc dòng sự kiện đó và kết tinh thành bằng chứng.
 
-Luồng được thiết kế một chiều từ nguồn đến evidence, nên bằng chứng luôn được dẫn xuất từ tín hiệu đã ghi chứ không phải dữ liệu nhập tay, do đó khó bị làm giả sau sự việc. Quan trọng hơn, một lằn ranh lọc được áp ngay trước khi xuất để bảo đảm evidence packet không bao giờ chứa file content, object key, presigned URL hay grant token. Nhờ vậy Compliance Officer kiểm tra được tính tuân thủ và truy vết hoạt động mà quyền của họ không bị mở rộng thành quyền đọc nội dung tài liệu.
-
-Điểm cần nhấn mạnh là evidence output không chứa file content, object key, presigned URL hoặc grant token. Nhờ đó Compliance Officer có thể kiểm tra tính tuân thủ và truy vết hoạt động mà không được mở rộng thành quyền truy cập nội dung tài liệu.
+Luồng được thiết kế một chiều từ nguồn đến evidence, nên bằng chứng luôn dẫn xuất từ tín hiệu đã ghi chứ không phải dữ liệu nhập tay, khó bị làm giả sau sự việc. Ngay trước khi xuất, một lằn ranh lọc bảo đảm evidence packet không bao giờ chứa file content, object key, presigned URL hay grant token. Compliance Officer nhờ đó kiểm tra được tính tuân thủ và truy vết hoạt động, còn quyền của họ không bị nới rộng thành quyền đọc nội dung tài liệu.
 
 \section{API contract tổng quan}
 

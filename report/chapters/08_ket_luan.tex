@@ -8,7 +8,7 @@ Các kiểm soát bảo mật runtime được triển khai tại backend thay v
 
 Hạ tầng triển khai được mô tả bằng Terraform và vận hành trên Amazon EKS. Các workload được đóng gói bằng Helm, dependency nền tảng được quản lý bằng Kustomize, còn trạng thái triển khai được đồng bộ theo mô hình GitOps qua Argo CD. Dữ liệu tài liệu được lưu trên Amazon S3 với SSE-KMS; quyền truy cập AWS của workload được giới hạn bằng IRSA; bí mật được quản lý trong AWS Secrets Manager và đồng bộ vào Kubernetes bằng External Secrets Operator. Hệ thống đồng thời triển khai backup cơ sở dữ liệu, Harbor, Prometheus, Grafana và Loki.
 
-Quy trình Jenkins đã tích hợp kiểm thử, SAST, SCA, quét secret, quét filesystem và container image, kiểm tra IaC, policy-as-code, build artifact, đẩy image lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST. Image được định danh bằng Git SHA và digest. Harbor đã thể hiện SBOM và trạng thái ký của artifact, trong khi Kyverno CLI đã kiểm tra manifest trước triển khai. Kết quả này cho thấy ba nhóm kiểm soát gồm bảo mật chuỗi cung ứng, policy-as-code và quản lý bí mật đã được đưa vào hiện thực, không còn chỉ là định hướng đề xuất.
+Quy trình Jenkins đã tích hợp kiểm thử, SAST, SCA, quét secret, quét filesystem và container image, kiểm tra IaC, policy-as-code, build artifact, đẩy image lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST. Image được định danh bằng Git SHA và digest. Harbor đã thể hiện SBOM và trạng thái ký của artifact, còn Kyverno CLI đã kiểm tra manifest trước triển khai. Như vậy, ba nhóm kiểm soát gồm bảo mật chuỗi cung ứng, policy-as-code và quản lý bí mật đã được hiện thực hóa, không còn dừng ở mức định hướng đề xuất.
 
 \section{Mức độ đáp ứng mục tiêu}
 
@@ -25,7 +25,7 @@ Quy trình Jenkins đã tích hợp kiểm thử, SAST, SCA, quét secret, quét
 
 \section{Hạn chế}
 
-Mặc dù các mục tiêu cốt lõi đã được đáp ứng, hệ thống vẫn còn một số giới hạn cần được ghi nhận. Notification-service hiện chủ yếu đóng vai trò lưu nhận thông báo trong môi trường phát triển, chưa tích hợp đầy đủ email, webhook hoặc push notification. Kiểm thử end-to-end ở cấp trình duyệt chưa bao phủ toàn bộ các luồng nghiệp vụ; bằng chứng hiện tại tập trung nhiều hơn vào API và runtime.
+Mặc dù các mục tiêu cốt lõi đã được đáp ứng, hệ thống vẫn còn một số giới hạn cần ghi nhận. Notification-service hiện chủ yếu đóng vai trò lưu nhận thông báo trong môi trường phát triển, chưa tích hợp đầy đủ email, webhook hoặc push notification. Kiểm thử end-to-end ở cấp trình duyệt chưa bao phủ toàn bộ luồng nghiệp vụ; bằng chứng hiện tại nghiêng nhiều về API và runtime.
 
 Ở lớp hạ tầng, môi trường EKS đang ưu tiên chi phí kiểm thử nên chưa phản ánh đầy đủ mô hình production với node private, giới hạn chặt Kubernetes API và remote Terraform state có cơ chế khóa. NetworkPolicy chưa giới hạn egress theo từng dependency; Loki chưa bật persistence; một phần cấu hình quản trị monitoring cần tiếp tục được đưa vào External Secrets. Backup đã được cấu hình, nhưng chưa có kết quả diễn tập khôi phục để lượng hóa RPO và RTO.
 
@@ -49,4 +49,4 @@ Các hướng phát triển tiếp theo tập trung vào nâng mức bảo đả
 
 \section{Kết luận chung}
 
-Kết quả của đề tài cho thấy DocVault không chỉ đáp ứng chức năng lưu trữ và quản lý tài liệu, mà còn đưa bảo mật, khả năng truy vết và bằng chứng tuân thủ vào kiến trúc ứng dụng và quy trình phát hành. Việc kết hợp microservices, EKS, GitOps, kiểm soát chuỗi cung ứng và các cổng DevSecOps tạo ra một quy trình triển khai có thể kiểm chứng từ mã nguồn đến workload. Những hạn chế còn lại chủ yếu thuộc giai đoạn gia cố production và chuẩn hóa vận hành, không làm thay đổi việc các mục tiêu kỹ thuật cốt lõi của đề tài đã được hoàn thành.
+Kết quả của đề tài cho thấy DocVault đáp ứng được chức năng lưu trữ và quản lý tài liệu, đồng thời đưa bảo mật, khả năng truy vết và bằng chứng tuân thủ vào ngay trong kiến trúc ứng dụng và quy trình phát hành. Việc gộp microservices, EKS, GitOps, kiểm soát chuỗi cung ứng và các cổng DevSecOps tạo ra một quy trình triển khai có thể kiểm chứng từ mã nguồn đến workload. Những hạn chế còn lại chủ yếu thuộc giai đoạn gia cố production và chuẩn hóa vận hành, không làm thay đổi việc các mục tiêu kỹ thuật cốt lõi của đề tài đã hoàn thành.

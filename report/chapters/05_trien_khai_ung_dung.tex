@@ -2,7 +2,7 @@
 
 \section{Cấu trúc monorepo}
 
-DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo. Cách tổ chức này giúp quản lý frontend, backend services, shared libraries, infrastructure và tài liệu trong cùng một repository. Các thư mục chính gồm:
+DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo, gom frontend, backend services, shared libraries, infrastructure và tài liệu vào cùng một repository. Các thư mục chính gồm:
 
 \begin{itemize}
   \item \code{apps/web}: ứng dụng frontend Next.js.
@@ -17,13 +17,13 @@ DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo
   \item \code{docs}: tài liệu thiết kế, hướng dẫn chạy, evidence và screenshot.
 \end{itemize}
 
-Monorepo giúp báo cáo, code, pipeline và evidence nằm chung một vòng đời. Khi một thay đổi ảnh hưởng đến API contract hoặc security policy, nhóm phát triển có thể cập nhật code, test và tài liệu trong cùng một pull request.
+Monorepo giúp báo cáo, code, pipeline và evidence nằm chung một vòng đời. Khi một thay đổi chạm tới API contract hoặc security policy, nhóm có thể cập nhật code, test và tài liệu trong cùng một pull request.
 
 \section{Frontend Next.js}
 
 Frontend được xây dựng bằng Next.js, React, TanStack Query, React Hook Form, Zod, Tailwind CSS và Radix UI. Ứng dụng sử dụng App Router và tổ chức theo các nhóm route đã đăng nhập hoặc chưa đăng nhập. Frontend gọi gateway qua biến môi trường \code{NEXT\_PUBLIC\_API\_BASE\_URL}, mặc định trỏ đến \code{http://localhost:3000/api} trong môi trường local.
 
-Frontend không chỉ là lớp hiển thị danh sách tài liệu. Ứng dụng đã bao phủ nhiều luồng vận hành quan trọng:
+Frontend làm nhiều việc hơn là hiển thị danh sách tài liệu. Ứng dụng đã bao phủ nhiều luồng vận hành quan trọng:
 
 \begin{itemize}
   \item Đăng nhập SSO qua Keycloak và quản lý phiên.
@@ -52,7 +52,7 @@ Frontend không chỉ là lớp hiển thị danh sách tài liệu. Ứng dụn
 
 \subsection{Permission-aware UI}
 
-Frontend có helper phân quyền để xác định action nào nên hiển thị, action nào nên bị disable và lý do deny là gì. Ví dụ, Compliance Officer có thể thấy lý do bị chặn download thay vì chỉ không thấy nút. Tuy nhiên, helper frontend không được xem là boundary bảo mật cuối cùng. Backend vẫn là nơi quyết định policy. Điều này tránh tình trạng người dùng tự gọi API để vượt qua UI.
+Frontend có helper phân quyền để xác định action nào nên hiển thị, action nào nên bị disable và lý do deny là gì. Chẳng hạn, Compliance Officer được thấy lý do bị chặn download thay vì chỉ thấy nút biến mất. Dù vậy, helper frontend không phải boundary bảo mật cuối cùng; backend mới là nơi quyết định policy, tránh việc người dùng tự gọi API để vượt qua UI.
 
 \section{Gateway}
 
@@ -66,7 +66,7 @@ Gateway là entry point của hệ thống. Service này xác thực JWT từ Ke
   \item \code{x-groups}
 \end{itemize}
 
-Gateway proxy các nhóm route chính như \code{/metadata}, \code{/documents}, \code{/workflow}, \code{/audit} và \code{/notify}. Nhờ đó frontend chỉ cần biết một API base URL, trong khi bên trong hệ thống vẫn tách service theo bounded context.
+Gateway proxy các nhóm route chính như \code{/metadata}, \code{/documents}, \code{/workflow}, \code{/audit} và \code{/notify}. Frontend vì thế chỉ cần biết một API base URL, trong khi bên trong hệ thống vẫn tách service theo bounded context.
 
 \section{Metadata-service}
 
@@ -100,7 +100,7 @@ private getDeniedReason(status: string, roles: string[]): string | null {
 }
 \end{lstlisting}
 
-Vì quyết định nằm ở backend chứ không ở frontend, người dùng compliance không thể vượt qua bằng cách gọi trực tiếp API. Khi quy tắc trả về lý do từ chối, service ném \code{ForbiddenException} và ghi audit event tương ứng.
+Vì quyết định nằm ở backend chứ không ở frontend, người dùng compliance không thể lách bằng cách gọi thẳng API. Khi quy tắc trả về lý do từ chối, service ném \code{ForbiddenException} và ghi audit event tương ứng.
 
 Grant token download/preview cũng do metadata-service cấp. Token có thời hạn 300 giây, được ký bằng HMAC-SHA256 và hỗ trợ xoay khóa qua \code{kid}, sau đó document-service xác minh trước khi phát file:
 
@@ -130,7 +130,7 @@ Workflow-service sở hữu logic chuyển trạng thái. Service đọc trạng
   \item \code{ARCHIVE}: \code{PUBLISHED -> ARCHIVED}
 \end{itemize}
 
-Sau mỗi transition, workflow-service phát audit event và gọi notification-service. Cách này giúp workflow vẫn là nơi điều phối nghiệp vụ, nhưng metadata-service vẫn là owner dữ liệu trạng thái.
+Sau mỗi transition, workflow-service phát audit event và gọi notification-service. Workflow vẫn là nơi điều phối nghiệp vụ, còn metadata-service vẫn là owner của dữ liệu trạng thái.
 
 \section{Audit-service}
 
