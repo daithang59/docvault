@@ -2,9 +2,9 @@
 
 \section{Bối cảnh}
 
-Trong các tổ chức hiện đại, tài liệu không chỉ là dữ liệu văn phòng thông thường mà còn là tài sản thông tin có giá trị. Một tài liệu có thể chứa hợp đồng, báo cáo tài chính, hồ sơ nhân sự, thông tin khách hàng, biên bản phê duyệt hoặc dữ liệu có yêu cầu bảo mật cao. Khi số lượng tài liệu tăng, nhu cầu quản lý vòng đời tài liệu, phân quyền truy cập, kiểm soát tải xuống và truy vết hoạt động trở thành một yêu cầu thiết yếu.
+Trong các tổ chức hiện đại, tài liệu không đơn thuần là dữ liệu văn phòng mà là một dạng tài sản thông tin có giá trị. Một tài liệu có thể chứa hợp đồng, báo cáo tài chính, hồ sơ nhân sự, thông tin khách hàng, biên bản phê duyệt hoặc dữ liệu có yêu cầu bảo mật cao. Khi số lượng tài liệu tăng, việc quản lý vòng đời tài liệu, phân quyền truy cập, kiểm soát tải xuống và truy vết hoạt động trở thành yêu cầu thiết yếu.
 
-Các hệ thống quản lý tài liệu truyền thống thường tập trung vào việc lưu trữ và tìm kiếm. Tuy nhiên, trong bối cảnh an toàn thông tin, hệ thống quản lý tài liệu cần trả lời thêm nhiều câu hỏi: ai được xem metadata, ai được tải file, tài liệu nào được xem là nhạy cảm, ai đã phê duyệt tài liệu, thao tác nào bị từ chối, file tải lên có chứa mã độc hay dữ liệu nhạy cảm không, và bằng chứng nào có thể cung cấp cho quá trình kiểm tra tuân thủ. Những yêu cầu này khiến bài toán quản lý tài liệu trở thành bài toán kết hợp giữa nghiệp vụ, bảo mật và vận hành.
+Các hệ thống quản lý tài liệu truyền thống thường tập trung vào việc lưu trữ và tìm kiếm. Nhưng đặt trong bối cảnh an toàn thông tin, một hệ thống quản lý tài liệu còn phải trả lời nhiều câu hỏi khác: ai được xem metadata, ai được tải file, tài liệu nào được xem là nhạy cảm, ai đã phê duyệt tài liệu, thao tác nào bị từ chối, file tải lên có chứa mã độc hay dữ liệu nhạy cảm không, và bằng chứng nào có thể cung cấp cho quá trình kiểm tra tuân thủ. Những câu hỏi đó biến quản lý tài liệu thành bài toán giao thoa giữa nghiệp vụ, bảo mật và vận hành.
 
 Đồng thời, quy trình phát triển phần mềm hiện đại không còn xem bảo mật là một bước kiểm tra cuối cùng. DevSecOps khuyến khích đưa các kiểm soát bảo mật vào sớm và xuyên suốt vòng đời phát triển: từ mã nguồn, thư viện phụ thuộc, cấu hình hạ tầng, Docker image cho đến ứng dụng sau khi triển khai. Theo khuyến nghị của NIST SSDF và các hướng dẫn DevSecOps của OWASP, việc tự động hóa kiểm thử và thu thập bằng chứng bảo mật giúp giảm rủi ro và tăng tính lặp lại của quy trình phát hành \cite{nist_ssdf,owasp_devsecops}.
 
@@ -69,7 +69,7 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 
 \section{Đóng góp của đề tài}
 
-Đề tài có bốn đóng góp chính. Thứ nhất, đề tài xây dựng một hệ thống quản lý tài liệu bao phủ luồng nghiệp vụ từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai, hệ thống kết hợp nhiều lớp kiểm soát truy cập gồm vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu. Thứ ba, các yêu cầu tuân thủ được đưa vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Thứ tư, đề tài triển khai một quy trình DevSecOps có khả năng truy vết từ mã nguồn, container artifact, GitOps revision đến workload trên EKS; đồng thời tích hợp kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành.
+Đề tài có bốn đóng góp chính. Trước hết, đề tài xây dựng một hệ thống quản lý tài liệu bao phủ luồng nghiệp vụ từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Cùng với đó, hệ thống kết hợp nhiều lớp kiểm soát truy cập gồm vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu. Về phía tuân thủ, các yêu cầu compliance được đưa vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Cuối cùng, đề tài triển khai một quy trình DevSecOps có khả năng truy vết từ mã nguồn, container artifact, GitOps revision đến workload trên EKS, đồng thời tích hợp kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành.
 
 \section{Phân công công việc}
 

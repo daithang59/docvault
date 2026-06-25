@@ -4,7 +4,7 @@
 
 DocVault hướng đến bài toán quản lý tài liệu trong môi trường có nhiều vai trò và nhiều mức độ nhạy cảm dữ liệu. Một tài liệu đi qua nhiều trạng thái: bản nháp, chờ duyệt, đã xuất bản và đã lưu trữ. Trong quá trình đó, mỗi vai trò chỉ được thực hiện những thao tác phù hợp. Editor có thể tạo và gửi duyệt tài liệu; Approver có thể phê duyệt hoặc từ chối; Viewer chỉ được truy cập tài liệu đã xuất bản nếu policy cho phép; Compliance Officer có thể xem audit và evidence nhưng không được truy cập nội dung file; Admin có quyền quản trị rộng hơn.
 
-Điểm cốt lõi của bài toán không chỉ là lưu file, mà là kiểm soát file theo ngữ cảnh. Cùng một file có thể được phép preview với người này nhưng bị từ chối với người khác; có thể được cấp presigned URL khi là tài liệu public nhưng phải stream qua backend khi là tài liệu confidential; có thể cho phép xem metadata nhưng không cho tải nội dung. Vì vậy, hệ thống cần mô hình policy đủ rõ và được thực thi ở backend.
+Bài toán ở đây không dừng ở việc lưu file, mà là kiểm soát file theo ngữ cảnh. Cùng một file có thể được phép preview với người này nhưng bị từ chối với người khác; có thể được cấp presigned URL khi là tài liệu public nhưng phải stream qua backend khi là tài liệu confidential; có thể cho xem metadata nhưng không cho tải nội dung. Vì vậy, hệ thống cần một mô hình policy đủ rõ và được thực thi ở backend.
 
 \section{Tác nhân hệ thống}
 
@@ -111,7 +111,7 @@ Phần lớn rủi ro tập trung vào hai loại Information Disclosure và Ele
 
 Kiến trúc DocVault gồm bốn lớp: frontend, gateway, microservices và hạ tầng dữ liệu. Frontend Next.js là giao diện người dùng. API Gateway là điểm vào duy nhất cho frontend, chịu trách nhiệm xác thực, role guard, proxy request và truyền ngữ cảnh. Các service phía sau xử lý nghiệp vụ riêng. Hạ tầng dữ liệu gồm Keycloak, PostgreSQL, MongoDB và MinIO/S3.
 
-Hình~\ref{fig:architecture-overview} mô tả cách các lớp này liên kết với nhau. Điểm quan trọng của kiến trúc là frontend chỉ giao tiếp qua gateway, còn các microservice phía sau giữ ranh giới nghiệp vụ riêng: metadata-service sở hữu policy và metadata, document-service sở hữu blob file, workflow-service điều phối trạng thái, audit-service ghi nhận sự kiện và notification-service xử lý thông báo.
+Hình~\ref{fig:architecture-overview} mô tả cách các lớp này liên kết với nhau. Trong kiến trúc đó, frontend chỉ giao tiếp qua gateway, còn các microservice phía sau giữ ranh giới nghiệp vụ riêng: metadata-service sở hữu policy và metadata, document-service sở hữu blob file, workflow-service điều phối trạng thái, audit-service ghi nhận sự kiện và notification-service xử lý thông báo.
 
 \begin{landscape}
 \begin{figure}[H]
@@ -131,7 +131,7 @@ DocVault được tổ chức thành bốn lớp xếp chồng từ client đế
   \item \textbf{Lớp hạ tầng dữ liệu}: Keycloak quản lý định danh; PostgreSQL lưu metadata; MongoDB lưu audit event; MinIO/S3 lưu file. Mỗi service chỉ truy cập kho dữ liệu thuộc bounded context của nó, tránh việc một service đọc trực tiếp database của service khác.
 \end{itemize}
 
-Cách phân lớp này được thiết kế để không tồn tại đường tắt bỏ qua kiểm soát chính sách. Với một thao tác nhạy cảm như tải file, request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Nhờ vậy lớp backend luôn giữ vai trò quyết định cuối cùng về quyền truy cập.
+Cách phân lớp này được thiết kế để không tồn tại đường tắt bỏ qua kiểm soát chính sách. Với một thao tác nhạy cảm như tải file, request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Lớp backend vì thế luôn giữ quyền quyết định cuối cùng về truy cập.
 
 \section{Luồng nghiệp vụ chính}
 

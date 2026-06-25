@@ -2,9 +2,9 @@
 
 \section{Hệ thống quản lý tài liệu bảo mật}
 
-Hệ thống quản lý tài liệu (Document Management System - DMS) là hệ thống hỗ trợ lưu trữ, tổ chức, tìm kiếm, chia sẻ và kiểm soát vòng đời tài liệu. Trong môi trường doanh nghiệp, DMS không chỉ quản lý file mà còn quản lý metadata, phiên bản, người sở hữu, trạng thái phê duyệt và lịch sử thao tác.
+Hệ thống quản lý tài liệu (Document Management System - DMS) là hệ thống hỗ trợ lưu trữ, tổ chức, tìm kiếm, chia sẻ và kiểm soát vòng đời tài liệu. Trong môi trường doanh nghiệp, một DMS quản lý cả file lẫn metadata, phiên bản, người sở hữu, trạng thái phê duyệt và lịch sử thao tác.
 
-Đối với tài liệu có tính nhạy cảm, DMS cần bổ sung các yêu cầu bảo mật. Một tài liệu không nên chỉ được bảo vệ bằng vị trí lưu trữ, mà cần được bảo vệ bằng chính sách truy cập nhất quán ở backend. Điều này đặc biệt quan trọng với các thao tác như preview, stream, presign download, export evidence hoặc truy vấn audit. Nếu hệ thống chỉ ẩn nút thao tác ở frontend nhưng backend vẫn cho phép gọi API, chính sách bảo mật không còn đáng tin cậy.
+Với tài liệu nhạy cảm, DMS cần thêm các yêu cầu bảo mật. Một tài liệu không nên chỉ được bảo vệ bằng vị trí lưu trữ, mà phải được bảo vệ bằng chính sách truy cập nhất quán ở backend, đặc biệt với các thao tác như preview, stream, presign download, export evidence hoặc truy vấn audit. Nếu hệ thống chỉ ẩn nút thao tác ở frontend trong khi backend vẫn cho gọi API, chính sách bảo mật không còn đáng tin cậy.
 
 DocVault được thiết kế theo quan điểm backend là nơi thực thi chính sách cuối cùng. Frontend có thể hiển thị hoặc vô hiệu hóa thao tác để cải thiện trải nghiệm người dùng, nhưng quyết định cho phép hoặc từ chối vẫn thuộc về metadata-service, document-service, gateway và audit-service.
 
@@ -38,7 +38,7 @@ DevSecOps pipeline đi kèm & Không & Không & Không & Có \\
 \end{tabularx}
 \end{table}
 
-Điểm khác biệt của DocVault không nằm ở việc thay thế các hệ thống trên về quy mô tính năng, mà ở cách kết hợp ba yếu tố trong cùng một đề tài: (1) kiểm soát truy cập nhiều lớp theo classification với ranh giới compliance metadata-only, (2) audit tamper-evident bằng hash-chain, và (3) đưa toàn bộ quy trình phát hành vào pipeline DevSecOps có bằng chứng. Đây là hướng tiếp cận phù hợp với mục tiêu học thuật của đề tài: minh họa cách bảo mật được đưa xuyên suốt từ thiết kế ứng dụng đến quy trình triển khai, thay vì chỉ xây dựng một DMS đầy đủ tính năng.
+Điểm khác biệt của DocVault không nằm ở việc thay thế các hệ thống trên về quy mô tính năng, mà ở cách gộp ba yếu tố trong cùng một đề tài: (1) kiểm soát truy cập nhiều lớp theo classification với ranh giới compliance metadata-only, (2) audit tamper-evident bằng hash-chain, và (3) đưa toàn bộ quy trình phát hành vào pipeline DevSecOps có bằng chứng. Hướng tiếp cận này bám sát mục tiêu học thuật của đề tài: minh họa cách bảo mật được đưa xuyên suốt từ thiết kế ứng dụng đến quy trình triển khai, thay vì chỉ dựng một DMS đầy đủ tính năng.
 
 \section{Kiến trúc microservices}
 
@@ -53,7 +53,7 @@ Microservices là cách tổ chức hệ thống thành nhiều service nhỏ, m
   \item Notification-service nhận thông báo nghiệp vụ trong môi trường demo/dev.
 \end{itemize}
 
-Cách tách này giúp giảm sự phụ thuộc giữa lưu trữ file và chính sách truy cập. File thật được lưu ở MinIO/S3, trong khi metadata và quyền truy cập nằm ở service khác. Khi người dùng muốn tải file, document-service không tự ý quyết định quyền mà phải dựa vào policy/grant token do metadata-service cấp hoặc xác minh lại.
+Cách tách này giúp giảm sự phụ thuộc giữa lưu trữ file và chính sách truy cập. File thật nằm ở MinIO/S3, còn metadata và quyền truy cập nằm ở service khác. Khi người dùng muốn tải file, document-service không tự ý quyết định quyền mà dựa vào policy/grant token do metadata-service cấp hoặc xác minh lại.
 
 \section{Xác thực và phân quyền}
 
@@ -61,7 +61,7 @@ Cách tách này giúp giảm sự phụ thuộc giữa lưu trữ file và chí
 
 Keycloak là hệ thống quản lý định danh và truy cập mã nguồn mở, hỗ trợ các chuẩn phổ biến như OAuth 2.0 và OpenID Connect \cite{keycloak_docs}. Trong DocVault, Keycloak được sử dụng để quản lý người dùng, vai trò, nhóm và phát hành token. Sau khi đăng nhập, người dùng nhận JWT chứa thông tin định danh và các claim cần thiết như user id, username, roles và groups.
 
-Gateway và các service phía sau sử dụng JWT để xác định actor của request. Gateway là entry point chính, xác thực token và truyền các header ngữ cảnh như \code{x-user-id}, \code{x-roles}, \code{x-groups} xuống các service nội bộ. Cách này giúp các service nghiệp vụ không cần phụ thuộc trực tiếp vào phiên đăng nhập frontend, nhưng vẫn đủ thông tin để thực thi chính sách.
+Gateway và các service phía sau dùng JWT để xác định actor của request. Gateway là entry point chính, xác thực token và truyền các header ngữ cảnh như \code{x-user-id}, \code{x-roles}, \code{x-groups} xuống các service nội bộ. Nhờ đó service nghiệp vụ không phụ thuộc trực tiếp vào phiên đăng nhập frontend mà vẫn đủ thông tin để thực thi chính sách.
 
 \subsection{RBAC}
 
@@ -94,21 +94,21 @@ DocVault sử dụng bốn mức phân loại tài liệu:
   \item \code{SECRET}: tài liệu rất nhạy cảm, chỉ một số vai trò/đối tượng được phép truy cập.
 \end{itemize}
 
-Mức phân loại không chỉ là metadata hiển thị mà còn ảnh hưởng đến chính sách truy cập. Ví dụ, tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET} có thể không trả về presigned URL trực tiếp, mà yêu cầu đi qua endpoint stream để document-service có thể áp dụng kiểm soát bổ sung như watermark posture và tái xác thực grant.
+Mức phân loại không dừng ở metadata hiển thị mà còn ảnh hưởng đến chính sách truy cập. Chẳng hạn, tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET} có thể không trả về presigned URL trực tiếp mà phải đi qua endpoint stream, để document-service áp thêm kiểm soát như watermark posture và tái xác thực grant.
 
 \section{Audit, hash-chain và compliance evidence}
 
-Audit log ghi lại các sự kiện quan trọng trong hệ thống: tạo tài liệu, upload file, submit, approve, reject, download authorized/denied, DLP detected, malware blocked, retention archive và các thao tác compliance. Một audit log hữu ích không chỉ cần có dữ liệu, mà còn cần có khả năng kiểm tra tính toàn vẹn.
+Audit log ghi lại các sự kiện quan trọng trong hệ thống: tạo tài liệu, upload file, submit, approve, reject, download authorized/denied, DLP detected, malware blocked, retention archive và các thao tác compliance. Một audit log hữu ích thì ngoài việc có dữ liệu còn phải cho phép kiểm tra tính toàn vẹn.
 
 DocVault sử dụng hash-chain cho audit events. Mỗi event có hash phụ thuộc vào nội dung event hiện tại và hash của event trước đó. Nếu một event cũ bị sửa trực tiếp trong storage, chuỗi hash phía sau sẽ không còn khớp và verify-chain có thể phát hiện bất thường. Cơ chế này không biến audit log thành lưu trữ bất biến tuyệt đối, nhưng tạo tính tamper-evident phù hợp với phạm vi đồ án.
 
-Bên cạnh audit query, hệ thống còn cung cấp evidence packet. Evidence packet gom metadata, version checksum, workflow history, retention evidence, trạng thái verify-chain và các audit event liên quan đến một tài liệu. Điểm quan trọng là evidence packet không chứa nội dung file, presigned URL, grant token hoặc object key nhạy cảm.
+Bên cạnh audit query, hệ thống còn cung cấp evidence packet. Evidence packet gom metadata, version checksum, workflow history, retention evidence, trạng thái verify-chain và các audit event liên quan đến một tài liệu. Đáng chú ý là evidence packet không chứa nội dung file, presigned URL, grant token hoặc object key nhạy cảm.
 
 \section{DevSecOps}
 
 DevSecOps là cách tiếp cận tích hợp bảo mật vào quy trình phát triển và vận hành. Thay vì kiểm tra bảo mật ở cuối dự án, DevSecOps đưa các kiểm soát vào nhiều điểm trong pipeline: kiểm tra mã nguồn, kiểm tra thư viện phụ thuộc, kiểm tra hạ tầng, kiểm tra Docker image, kiểm tra ứng dụng sau khi triển khai và thu thập artifact làm bằng chứng.
 
-Trong DocVault, DevSecOps được thể hiện qua Jenkins pipeline. Pipeline không chỉ chạy test mà còn chạy SAST, SCA, Trivy filesystem scan, Trivy image scan, Checkov IaC scan, Terraform validate, smoke test và DAST bằng OWASP ZAP. Những bước này phù hợp với tư tưởng ``shift-left security'' được đề cập trong các tài liệu DevSecOps \cite{owasp_devsecops,nist_ssdf}.
+Trong DocVault, DevSecOps được thể hiện qua Jenkins pipeline. Ngoài chạy test, pipeline còn chạy SAST, SCA, Trivy filesystem scan, Trivy image scan, Checkov IaC scan, Terraform validate, smoke test và DAST bằng OWASP ZAP. Những bước này bám theo tư tưởng ``shift-left security'' được đề cập trong các tài liệu DevSecOps \cite{owasp_devsecops,nist_ssdf}.
 
 \section{Các nhóm kiểm thử bảo mật trong pipeline}
 
@@ -134,7 +134,7 @@ DAST & Kiểm thử ứng dụng đang chạy. & Baseline scan web app sau deplo
 
 GitOps là mô hình trong đó Git đóng vai trò nguồn sự thật cho trạng thái triển khai. Khi pipeline build image mới, thay vì trực tiếp chỉnh cluster bằng lệnh thủ công, pipeline cập nhật Helm values hoặc manifest trong một branch GitOps. Argo CD theo dõi branch này và đồng bộ trạng thái mong muốn vào Kubernetes cluster \cite{argocd_docs}.
 
-Trong DocVault, pipeline cập nhật các file values tương ứng với từng service. Sau đó Argo CD thực hiện sync các application như gateway, metadata-service, document-service, workflow-service, audit-service, notification-service và web. Cách tiếp cận này giúp tách trách nhiệm giữa build pipeline và deployment controller, đồng thời tạo lịch sử thay đổi triển khai trong Git.
+Trong DocVault, pipeline cập nhật các file values tương ứng với từng service. Sau đó Argo CD sync các application như gateway, metadata-service, document-service, workflow-service, audit-service, notification-service và web. Tách bạch như vậy giúp build pipeline và deployment controller giữ trách nhiệm riêng, đồng thời lưu lại lịch sử thay đổi triển khai trong Git.
 
 \section{Tổng hợp công nghệ và công cụ}
 

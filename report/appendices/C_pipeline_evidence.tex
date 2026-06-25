@@ -41,11 +41,11 @@ COSIGN_PUBLIC_KEY_CREDENTIAL_ID=cosign-public-key
 \midrule
 \endhead
 Kiến trúc EKS & EKS, namespace, GitOps, registry, secret, storage, monitoring và luồng truy cập & \path{docvault-eks-architecture.png} & Đã chèn \\
-Jenkins Stage View & Build number, branch, commit, trạng thái các stage và timestamp & \path{jenkins-stage-view.png} & Chưa có \\
-Secret/quality gate & TruffleHog, unit test, lint và workspace build & \path{jenkins-quality-gates.png} & Chưa có \\
-SonarQube & Quality Gate, bug, vulnerability, hotspot, smell và coverage & \path{sonarqube-quality-gate.png} & Chưa có \\
-SCA/Trivy FS & Dependency-Check và Trivy không còn finding vượt ngưỡng & \path{sca-trivy-results.png} & Chưa có \\
-IaC/policy & Checkov, Terraform Validate và Kyverno report & \path{iac-policy-results.png} & Chưa có \\
+Jenkins Stage View & Build number, branch, commit, trạng thái các stage và timestamp & \path{jenkins-stage-view.png} & Đã có \\
+Secret/quality gate & TruffleHog, unit test, lint và workspace build & \path{jenkins-quality-gates.png} & Đã có \\
+SonarQube & Quality Gate, bug, vulnerability, hotspot, smell và coverage & \path{sonarqube-quality-gate.png} & Đã có \\
+SCA/Trivy FS & Dependency-Check và Trivy không còn finding vượt ngưỡng & \path{sca-trivy-results.png} & Đã có \\
+IaC/policy & Checkov, Terraform Validate và Kyverno report & \path{iac-policy-results.png} & Đã có \\
 Harbor registry & Project riêng và repository của các dịch vụ & \path{harbor.png} & Đã chèn \\
 SBOM/Cosign & Digest, trạng thái ký và thông tin SBOM của artifact & \path{harbor-docvault.png} & Đã chèn \\
 GitOps commit & Commit cập nhật repository, tag và digest trên \code{gitops-testing} & \path{gitops-commit.png} & Chưa có \\
@@ -53,10 +53,10 @@ Argo CD & Root app, child app và trạng thái \code{Synced}/\code{Healthy} & \
 EKS workload & Pod và các workload nền tảng ở trạng thái vận hành & \path{eks-workloads.png} & Đã chèn \\
 AWS resources & EKS, node group, VPC, S3, KMS và IAM/IRSA & Nhiều ảnh trong \path{images/infra} & Đã chèn \\
 External Secrets & Secret metadata trong AWS Secrets Manager, không hiển thị giá trị & \path{externalsecret.png} & Đã chèn \\
-Smoke test & HTTP status web root và \code{/api/health} & \path{smoke-test.png} & Chưa có \\
+Smoke test & HTTP status web root và \code{/api/health} & \path{smoke-test.png} & Đã có \\
 ZAP & Summary và artifact HTML/JSON & \path{zap-summary.png} & Chưa có \\
-Grafana & Node/pod health, CPU, memory và restart & \path{grafana-dashboard.png} & Chưa có \\
-Loki & Query log namespace \code{docvault} & \path{loki-logs.png} & Chưa có \\
-Backup & CloudNativePG ScheduledBackup và object trong S3 backup bucket & \path{database-backup.png} & Chưa có \\
+Grafana & Node/pod health, CPU, memory và restart & \path{grafana-dashboard.png} & Đã có \\
+Loki & Query log namespace \code{docvault} & \path{loki-logs.png} & Đã có \\
+Backup & CloudNativePG ScheduledBackup và object trong S3 backup bucket & \path{database-backup.png} & Đã có \\
 \bottomrule
 \end{longtable}

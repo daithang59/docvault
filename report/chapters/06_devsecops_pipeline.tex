@@ -92,7 +92,7 @@ Cấu hình hiện tại sử dụng managed node group có khả năng co giãn
 
 DocVault được triển khai trên AWS EKS theo bốn cụm thành phần, liên kết GitOps repository, Argo CD, các namespace ứng dụng và giám sát, nhóm controller nền tảng, Harbor, Keycloak cùng các dịch vụ AWS (Hình~\ref{fig:eks-deployment-architecture}). Cụm điều khiển triển khai gồm GitOps repository và Argo CD: Argo CD theo dõi nhánh GitOps và đồng bộ desired state vào cụm, đóng vai trò cầu nối duy nhất giữa Git và Kubernetes. Cụm workload ứng dụng là các namespace chạy gateway, web và sáu backend service, được đóng gói bằng Helm. Cụm nền tảng gồm các controller dùng chung như ingress-nginx, cert-manager, External Secrets Operator và CloudNativePG. Cụm dịch vụ AWS bên ngoài cluster gồm S3 (file và backup), KMS (khóa mã hóa), Secrets Manager (bí mật) và IAM/IRSA (cấp quyền cho ServiceAccount).
 
-Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nhờ đó repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
+Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nên repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Theo cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
 
 \subsection{Lưu trữ tài liệu và backup}
 
@@ -121,11 +121,12 @@ Metadata PostgreSQL được triển khai bằng CloudNativePG với volume gp3.
 \label{fig:aws-kms-keys}
 \end{figure}
 
-\evidenceplaceholder
-  {S3 bucket lưu backup cơ sở dữ liệu}
-  {fig:placeholder-s3-backup}
-  {Chụp bucket có tên bắt đầu bằng \code{docvault-cnpg-backups-testing}, thể hiện versioning và mã hóa SSE-KMS; không mở nội dung object hoặc dữ liệu backup. Tên file đề xuất: \code{report/images/infra/s3-backup.png}.}
-
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/s3bucket-backup.png}
+\caption{S3 bucket lưu backup cơ sở dữ liệu}
+\label{fig:aws-s3-backup}
+\end{figure}
 \section{Tổ chức workload trên Kubernetes}
 
 \subsection{Helm chart và Kustomize overlay}
@@ -219,7 +220,7 @@ Hình~\ref{fig:argocd-app-of-apps} xác nhận application gốc đang theo dõi
 
 Sau khi image được push, Jenkins lấy digest từ registry và cập nhật ba trường \code{repository}, \code{tag}, \code{digest} trong Helm values tương ứng. Tag mặc định là 12 ký tự đầu của Git commit SHA. Pipeline clone riêng nhánh GitOps, commit thay đổi với \code{[skip ci]} để tránh vòng lặp và retry push tối đa ba lần nếu có cập nhật đồng thời.
 
-Nếu thay đổi chỉ liên quan đến manifest Kubernetes, pipeline đồng bộ thư mục \code{infra/k8s} sang nhánh GitOps nhưng giữ lại image reference đang chạy. Nhờ đó thay đổi cấu hình hạ tầng không vô tình hạ phiên bản image. Argo CD sau đó phát hiện commit mới và reconcile cluster về desired state.
+Nếu thay đổi chỉ liên quan đến manifest Kubernetes, pipeline đồng bộ thư mục \code{infra/k8s} sang nhánh GitOps nhưng giữ lại image reference đang chạy, nên thay đổi cấu hình hạ tầng không vô tình hạ phiên bản image. Argo CD sau đó phát hiện commit mới và reconcile cluster về desired state.
 
 \section{Harbor và bảo mật chuỗi cung ứng phần mềm}
 
@@ -303,11 +304,12 @@ Luồng pipeline hiện tại gồm:
   \item \textbf{DAST -- OWASP ZAP}: quét ứng dụng đang chạy và lưu report.
   \item \textbf{Post Cleanup}: archive artifact và dọn workspace.
 \end{enumerate}
-
-\evidenceplaceholder
-  {Jenkins build và Stage View}
-  {fig:placeholder-jenkins-stage-view}
-  {Chụp build mới nhất có branch, commit SHA, build number, thời gian chạy và toàn bộ stage cần thiết. Nếu stage được skip theo change detection, ảnh phải cho thấy lý do skip trong log. Tên file đề xuất: \code{report/images/infra/jenkins-stage-view.png}.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/jenkins-stage-view-2.png}
+\caption{Jenkins build và Stage View}
+\label{fig:jenkins-stage-view}
+\end{figure}
 
 \section{Các cổng kiểm soát chất lượng và bảo mật}
 
@@ -319,10 +321,13 @@ TruffleHog quét filesystem repository trước các bước build. Các thư m�
 
 Unit test và lint chạy song song để giảm thời gian phản hồi; workspace build chạy sau đó để kiểm tra khả năng biên dịch của toàn monorepo. SonarQube phân tích source trong \code{apps}, \code{services} và \code{libs}. Tham số \code{ENFORCE\_SONAR\_QG} mặc định bật, vì vậy pipeline fail nếu Quality Gate không đạt hoặc hết thời gian chờ \cite{sonarqube_docs}.
 
-\evidenceplaceholder
-  {SonarQube Quality Gate của DocVault}
-  {fig:placeholder-sonarqube}
-  {Chụp trạng thái Quality Gate, số bug, vulnerability, security hotspot, code smell, coverage và thời điểm analysis. Tên file đề xuất: \code{report/images/infra/sonarqube-quality-gate.png}.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/sonarqube-quality-gate.png}
+\caption{SonarQube Quality Gate của DocVault}
+\label{fig:sonarqube}
+\end{figure}
+
 
 \subsection{SCA và filesystem scanning}
 
@@ -330,10 +335,8 @@ OWASP Dependency-Check phân tích dependency và tạo report HTML/JSON/log. Ch
 
 Trivy filesystem quét vulnerability, secret và misconfiguration trên snapshot sạch tạo từ Git. Các finding HIGH/CRITICAL làm fail gate. Phạm vi misconfiguration tập trung vào Dockerfile, Kubernetes và Helm; Terraform được kiểm tra riêng bằng Checkov và Terraform Validate để tránh finding trùng từ module tải về \cite{trivy_docs}.
 
-\evidenceplaceholder
-  {Báo cáo SCA và Trivy filesystem}
-  {fig:placeholder-sca-trivy}
-  {Ghép hai ảnh hoặc chụp artifact Jenkins thể hiện Dependency-Check summary và Trivy FS không còn finding vượt ngưỡng. Tên file đề xuất: \code{report/images/infra/sca-trivy-results.png}.}
+
+
 
 \subsection{IaC và policy-as-code}
 
@@ -341,11 +344,30 @@ Checkov quét Terraform, Kubernetes và Helm để phát hiện cấu hình rủ
 
 Ba lớp kiểm tra bổ sung cho nhau: Terraform Validate kiểm tra tính hợp lệ cú pháp và provider schema; Checkov kiểm tra best practice của hạ tầng; Kyverno kiểm tra policy runtime trên manifest cuối cùng. Artifact gồm Checkov report, Kyverno report và manifest đã render.
 
-\evidenceplaceholder
-  {Kết quả Checkov, Terraform Validate và Kyverno}
-  {fig:placeholder-iac-policy}
-  {Chụp log hoặc artifact cho ba bước IaC, bảo đảm thấy số policy pass/fail và kết quả validate. Tên file đề xuất: \code{report/images/infra/iac-policy-results.png}.}
-
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/iac-artifact.png}
+\caption{Log và artifact cho ba bước IaC}
+\label{fig:iac-artifact}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/terraform-log.png}
+\caption{Kết quả Terraform Validate}
+\label{fig:terraform-log}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/checkov-artifact.png}
+\caption{Kết quả Checkov}
+\label{fig:checkov-artifact}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/kyverno-artifact.png}
+\caption{Kết quả Kyverno}
+\label{fig:kyverno-artifact}
+\end{figure}
 \section{Build, quét và phát hành container image}
 
 Backend sử dụng \code{Dockerfile.backend} với build argument xác định service; frontend sử dụng Dockerfile riêng trong \code{apps/web}. Các image được build theo batch để tận dụng song song nhưng vẫn giới hạn tải trên Jenkins agent. BuildKit lấy và cập nhật cache trong Harbor, giúp giảm thời gian build lại dependency không đổi.
@@ -358,7 +380,7 @@ So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes 
 
 \subsection{Argo CD health gate}
 
-Khi \code{RUN\_ARGO\_HEALTH\_CHECK=true}, Jenkins dùng kubeconfig credential hoặc context hiện tại để đọc các Argo CD Application. Pipeline chờ đến khi gateway, metadata, document, workflow, audit, notification và web đồng thời đạt \code{Synced} và \code{Healthy}. Nếu quá timeout, release fail. Argo CD vì vậy không chỉ thực hiện CD mà còn cung cấp trạng thái reconcile có thể kiểm chứng \cite{argocd_docs}.
+Khi \code{RUN\_ARGO\_HEALTH\_CHECK=true}, Jenkins dùng kubeconfig credential hoặc context hiện tại để đọc các Argo CD Application. Pipeline chờ đến khi gateway, metadata, document, workflow, audit, notification và web đồng thời đạt \code{Synced} và \code{Healthy}. Nếu quá timeout, release fail. Vai trò của Argo CD ở đây vượt ra ngoài việc thực hiện CD: nó còn cung cấp trạng thái reconcile có thể kiểm chứng \cite{argocd_docs}.
 
 \subsection{Smoke test}
 
@@ -368,10 +390,34 @@ Smoke test gọi web root và endpoint \code{/api/health}. Web root chấp nhậ
 
 OWASP ZAP baseline scan chạy khi \code{RUN\_ZAP=true} và target có thể truy cập từ Jenkins. Pipeline tạo report HTML và JSON, archive làm bằng chứng, đồng thời fail khi report chứa finding High/Critical. Cảnh báo mức thấp hơn được giữ để review thay vì bỏ qua \cite{zap_baseline}.
 
-\evidenceplaceholder
-  {Argo CD health check, smoke test và OWASP ZAP}
-  {fig:placeholder-post-deploy}
-  {Chụp log Jenkins thể hiện application \code{Synced}/\code{Healthy}, HTTP status của smoke test và ZAP report summary. Có thể tách thành ba hình nếu nội dung khó đọc. Tên file đề xuất: \code{report/images/infra/post-deploy-validation.png}.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/argocd-healthcheck.png}
+\caption{Kết quả Argo CD health check}
+\label{fig:argocd-healthcheck}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/postdeploy.png}
+\caption{Log post deploy smoke test}
+\label{fig:postdeploy}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/DAST-ZAP.png}
+\caption{Log OWASP ZAP}
+\label{fig:owasp-zap}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/ZAP-Scanning-Report.png}
+\caption{Kết quả OWASP ZAP}
+\label{fig:ZAP-Scanning-Report}
+\end{figure}
+
 
 \section{Giám sát và tập trung log}
 
@@ -389,15 +435,26 @@ Các nhóm thông tin cần theo dõi gồm:
 
 Cấu hình hiện tại đáp ứng nhu cầu trình diễn và thu thập bằng chứng. Tuy nhiên, Loki chưa bật persistence và thông tin quản trị Grafana cần được quản lý hoàn toàn qua External Secrets trước khi vận hành dài hạn. Hệ thống cũng cần bổ sung dashboard nghiệp vụ, alert rule, chính sách retention và kênh tiếp nhận cảnh báo để đáp ứng yêu cầu production.
 
-\evidenceplaceholder
-  {Grafana dashboard giám sát EKS và workload DocVault}
-  {fig:placeholder-grafana}
-  {Chụp dashboard thể hiện node/pod health, CPU, memory, restart và namespace \code{docvault}. Tên file đề xuất: \code{report/images/infra/grafana-dashboard.png}.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/graphana-workload.png}
+\caption{Grafana dashboard giám sát workload DocVault trong namespace \code{docvault}}
+\label{fig:grafana-workload}
+\end{figure}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/grafana-cluster.png}
+\caption{Grafana dashboard giám sát EKS cluster}
+\label{fig:grafana-cluster}
+\end{figure}
 
-\evidenceplaceholder
-  {Loki tập trung log của namespace DocVault}
-  {fig:placeholder-loki}
-  {Chụp Grafana Explore với Loki datasource và query theo namespace \code{docvault}; nên hiển thị timestamp, pod, container và một request ID nhưng không chứa token hoặc dữ liệu tài liệu. Tên file đề xuất: \code{report/images/infra/loki-logs.png}.}
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/loki-log.png}
+\caption{Loki tập trung log của namespace DocVault}
+\label{fig:loki-logs}
+\end{figure}
+
 
 \section{Mapping kiểm soát, công cụ và bằng chứng}
 
