@@ -48,8 +48,9 @@ Bảng \code{document\_workflow\_history} lưu lịch sử chuyển trạng thá
 Audit event ghi lại hành động trong hệ thống. Mỗi event chứa actor, action, resource type, resource id, result, reason, metadata và hash. Audit-service áp dụng hash-chain để phát hiện sửa đổi ngoài luồng. Vì audit là bounded context riêng, audit event không dùng foreign key cứng đến documents.
 
 \section{Document lifecycle}
+\label{sec:document-lifecycle}
 
-Luồng trạng thái tài liệu trong DocVault được giữ đủ gọn để phù hợp với phạm vi MVP nhưng vẫn bao phủ demo doanh nghiệp. Các transition chính gồm tạo draft, gửi duyệt, phê duyệt, từ chối và lưu trữ; ngoài ra hệ thống còn mô phỏng soft delete và restore cho tài liệu nháp.
+Luồng trạng thái tài liệu trong DocVault được giữ đủ gọn để phù hợp với phạm vi MVP nhưng vẫn bao phủ demo doanh nghiệp. Các transition chính gồm tạo draft, gửi duyệt, phê duyệt, từ chối và lưu trữ; ngoài ra hệ thống còn mô phỏng soft delete và restore cho tài liệu nháp. Phần này đi sâu vào state machine; cách bốn vai trò tương tác với các trạng thái đó đã được trình bày ở Mục~\ref{sec:business-flow}.
 
 \begin{landscape}
 \begin{figure}[H]

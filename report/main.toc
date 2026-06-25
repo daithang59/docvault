@@ -97,37 +97,39 @@
 \contentsline {subsection}{\numberline {6.10.1}Argo CD health gate}{78}{subsection.6.10.1}%
 \contentsline {subsection}{\numberline {6.10.2}Smoke test}{79}{subsection.6.10.2}%
 \contentsline {subsection}{\numberline {6.10.3}DAST bằng OWASP ZAP}{79}{subsection.6.10.3}%
-\contentsline {section}{\numberline {6.11}Giám sát và tập trung log}{82}{section.6.11}%
-\contentsline {section}{\numberline {6.12}Mapping kiểm soát, công cụ và bằng chứng}{83}{section.6.12}%
+\contentsline {section}{\numberline {6.11}Vận hành: giám sát, log và khôi phục}{82}{section.6.11}%
+\contentsline {subsection}{\numberline {6.11.1}Giám sát và tập trung log}{82}{subsection.6.11.1}%
+\contentsline {subsection}{\numberline {6.11.2}Khôi phục dữ liệu và sẵn sàng vận hành}{83}{subsection.6.11.2}%
+\contentsline {section}{\numberline {6.12}Mapping kiểm soát, công cụ và bằng chứng}{84}{section.6.12}%
 \contentsline {section}{\numberline {6.13}Đánh giá trạng thái triển khai}{85}{section.6.13}%
-\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{86}{chapter.7}%
-\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{86}{section.7.1}%
-\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{86}{section.7.2}%
-\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{87}{section.7.3}%
-\contentsline {section}{\numberline {7.4}Security evidence}{88}{section.7.4}%
-\contentsline {section}{\numberline {7.5}Pipeline evidence}{89}{section.7.5}%
-\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{90}{section.7.6}%
-\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{90}{section.7.7}%
-\contentsline {section}{\numberline {7.8}Nhận xét chung}{91}{section.7.8}%
-\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{92}{chapter.8}%
-\contentsline {section}{\numberline {8.1}Kết quả đạt được}{92}{section.8.1}%
-\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{93}{section.8.2}%
-\contentsline {section}{\numberline {8.3}Hạn chế}{93}{section.8.3}%
-\contentsline {section}{\numberline {8.4}Hướng phát triển}{94}{section.8.4}%
-\contentsline {section}{\numberline {8.5}Kết luận chung}{94}{section.8.5}%
-\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{96}{appendix.A}%
-\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{96}{section.A.1}%
-\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{96}{section.A.2}%
-\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{96}{section.A.3}%
-\contentsline {section}{\numberline {A.4}Chạy migration}{96}{section.A.4}%
-\contentsline {section}{\numberline {A.5}Khởi động backend}{97}{section.A.5}%
-\contentsline {section}{\numberline {A.6}Khởi động frontend}{97}{section.A.6}%
-\contentsline {section}{\numberline {A.7}Tài khoản demo}{97}{section.A.7}%
-\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{98}{section.A.8}%
-\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{99}{appendix.B}%
-\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{99}{section.B.1}%
-\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{99}{section.B.2}%
-\contentsline {section}{\numberline {B.3}Compliance Officer rule}{100}{section.B.3}%
-\contentsline {section}{\numberline {B.4}Grant token}{100}{section.B.4}%
+\contentsline {chapter}{\numberline {7}Kiểm thử, đánh giá và bằng chứng}{87}{chapter.7}%
+\contentsline {section}{\numberline {7.1}Chiến lược kiểm thử}{87}{section.7.1}%
+\contentsline {section}{\numberline {7.2}Kiểm thử runtime}{87}{section.7.2}%
+\contentsline {section}{\numberline {7.3}Kiểm thử frontend và UI evidence}{88}{section.7.3}%
+\contentsline {section}{\numberline {7.4}Security evidence}{89}{section.7.4}%
+\contentsline {section}{\numberline {7.5}Pipeline evidence}{90}{section.7.5}%
+\contentsline {section}{\numberline {7.6}Đánh giá theo yêu cầu}{91}{section.7.6}%
+\contentsline {section}{\numberline {7.7}Hạn chế hiện tại}{91}{section.7.7}%
+\contentsline {section}{\numberline {7.8}Nhận xét chung}{92}{section.7.8}%
+\contentsline {chapter}{\numberline {8}Kết luận và hướng phát triển}{93}{chapter.8}%
+\contentsline {section}{\numberline {8.1}Kết quả đạt được}{93}{section.8.1}%
+\contentsline {section}{\numberline {8.2}Mức độ đáp ứng mục tiêu}{94}{section.8.2}%
+\contentsline {section}{\numberline {8.3}Hạn chế}{94}{section.8.3}%
+\contentsline {section}{\numberline {8.4}Hướng phát triển}{95}{section.8.4}%
+\contentsline {section}{\numberline {8.5}Kết luận chung}{95}{section.8.5}%
+\contentsline {chapter}{\numberline {A}Hướng dẫn chạy hệ thống}{97}{appendix.A}%
+\contentsline {section}{\numberline {A.1}Yêu cầu môi trường}{97}{section.A.1}%
+\contentsline {section}{\numberline {A.2}Cài đặt phụ thuộc}{97}{section.A.2}%
+\contentsline {section}{\numberline {A.3}Khởi động hạ tầng local}{97}{section.A.3}%
+\contentsline {section}{\numberline {A.4}Chạy migration}{97}{section.A.4}%
+\contentsline {section}{\numberline {A.5}Khởi động backend}{98}{section.A.5}%
+\contentsline {section}{\numberline {A.6}Khởi động frontend}{98}{section.A.6}%
+\contentsline {section}{\numberline {A.7}Tài khoản demo}{98}{section.A.7}%
+\contentsline {section}{\numberline {A.8}Kiểm thử nhanh}{99}{section.A.8}%
+\contentsline {chapter}{\numberline {B}Tóm tắt API contract}{100}{appendix.B}%
+\contentsline {section}{\numberline {B.1}Nguyên tắc chung}{100}{section.B.1}%
+\contentsline {section}{\numberline {B.2}Nhóm endpoint chính}{100}{section.B.2}%
+\contentsline {section}{\numberline {B.3}Compliance Officer rule}{101}{section.B.3}%
+\contentsline {section}{\numberline {B.4}Grant token}{101}{section.B.4}%
 \babel@toc {english}{}\relax 
 \babel@toc {vietnamese}{}\relax 
