@@ -19,7 +19,7 @@ spec:
           persistence:
             enabled: false
         promtail:
-          enabled: false
+          enabled: true
           config:
             logLevel: info
             serverPort: 3101
