@@ -34,7 +34,7 @@ spec:
             - entries:
                 - keys:
                     secret:
-                      name: cosign-pub-key
+                      name: cosign-public-key
                       namespace: kyverno
                     signatureAlgorithm: sha256
                   signatureAlgorithm: sha256
