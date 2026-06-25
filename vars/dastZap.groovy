@@ -6,6 +6,7 @@ def call(cfg) {
     echo '>>> Running DAST Scan against deployed web target...'
     echo '>>> Security gate policy: ZAP warnings are archived and reviewed for the MVP demo; High/Critical findings require a fix or written exception.'
     sh 'mkdir -p zap-report'
+    sh 'chmod 777 zap-report'
 
     catchError(buildResult: 'SUCCESS', stageResult: 'UNSTABLE') {
         withEnv(["ZAP_TARGET=${cfg.zapTarget.trim()}"]) {
@@ -39,10 +40,11 @@ def call(cfg) {
                 rm -f zap-report/zap_report.html zap-report/zap_report.json
 
                 docker create --name "$container_name" \
+                    -v "$WORKSPACE/zap-report:/zap/wrk:rw" \
                     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
                     -t "$ZAP_TARGET" \
-                    -r /zap/wrk/zap_report.html \
-                    -J /zap/wrk/zap_report.json \
+                    -r zap_report.html \
+                    -J zap_report.json \
                     -I >/dev/null
 
                 set +e
@@ -50,17 +52,8 @@ def call(cfg) {
                 zap_status=$?
                 set -e
 
-                copy_failed=0
-                docker cp "$container_name:/zap/wrk/zap_report.html" zap-report/zap_report.html || copy_failed=1
-                docker cp "$container_name:/zap/wrk/zap_report.json" zap-report/zap_report.json || copy_failed=1
-
-                if [ "$copy_failed" -ne 0 ]; then
-                    echo "ZAP container did not expose the expected reports under /zap/wrk."
-                    exit 1
-                fi
-
                 if [ "$zap_status" -ne 0 ]; then
-                    echo "ZAP baseline exited with status $zap_status after reports were collected."
+                    echo "ZAP baseline exited with status $zap_status."
                     exit "$zap_status"
                 fi
             '''
