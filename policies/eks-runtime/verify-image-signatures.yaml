@@ -37,3 +37,4 @@ spec:
                       name: cosign-pub-key
                       namespace: kyverno
                     signatureAlgorithm: sha256
+                  signatureAlgorithm: sha256
