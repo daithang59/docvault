@@ -24,6 +24,7 @@ def call(cfg = [:]) {
     if (dataDir) {
         sh """
         mkdir -p dependency-check-report
+        chmod 777 dependency-check-report
         mkdir -p "${dataDir}"
         if [ -s "${dataDir}/odc.mv.db" ]; then
             echo "Dependency Check cache is warm: ${dataDir}/odc.mv.db exists."
@@ -35,6 +36,7 @@ def call(cfg = [:]) {
     } else {
         sh """
         mkdir -p dependency-check-report
+        chmod 777 dependency-check-report
         docker volume create "${dataVolume}" >/dev/null
         if docker run --rm -v "${dataVolume}:/data" --entrypoint /bin/sh owasp/dependency-check:latest -c 'test -s /data/odc.mv.db'; then
             echo "Dependency Check cache is warm: Docker volume ${dataVolume} contains odc.mv.db."

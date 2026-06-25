@@ -29,6 +29,8 @@ def call(cfg) {
 
                 container_name="docvault-zap-${BUILD_NUMBER:-$$}"
                 cleanup_zap_container() {
+                    echo ">>> Printing ZAP container logs..."
+                    docker logs "$container_name" || true
                     docker rm -f "$container_name" >/dev/null 2>&1 || true
                 }
                 trap cleanup_zap_container EXIT
@@ -39,8 +41,8 @@ def call(cfg) {
                 docker create --name "$container_name" \
                     ghcr.io/zaproxy/zaproxy:stable zap-baseline.py \
                     -t "$ZAP_TARGET" \
-                    -r zap_report.html \
-                    -J zap_report.json \
+                    -r /zap/wrk/zap_report.html \
+                    -J /zap/wrk/zap_report.json \
                     -I >/dev/null
 
                 set +e

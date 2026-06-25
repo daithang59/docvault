@@ -14,6 +14,12 @@ def call() {
 \\.tfplan$
 -secret\\.json$
 \\.kubeconfig$
+(^|/)secret-scan-report(/|$)
+(^|/)dependency-check-report(/|$)
+(^|/)trivy-fs-report(/|$)
+(^|/)checkov-report(/|$)
+(^|/)zap-report(/|$)
+(^|/)report(/|$)
 '''
     )
 
