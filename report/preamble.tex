@@ -48,7 +48,7 @@
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{tikz}
-\usetikzlibrary{arrows.meta,backgrounds,fit,positioning}
+\usetikzlibrary{arrows.meta,backgrounds,fit,positioning,calc}
 \usepackage{tcolorbox}
 \usepackage{listings}
 \usepackage{csquotes}
@@ -67,8 +67,8 @@
   linkcolor=black,
   citecolor=black,
   urlcolor=blue,
-  pdftitle={Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps},
-  pdfauthor={DocVault}
+  pdftitle={\reportTitle},
+  pdfauthor={\studentA; \studentB; \studentC; \studentD}
 }
 
 \definecolor{docvaultblue}{HTML}{1F4E79}
@@ -95,6 +95,7 @@
 \lstset{style=docvaultcode}
 
 \newcolumntype{Y}{>{\raggedright\arraybackslash}X}
+\newcolumntype{L}[1]{>{\raggedright\arraybackslash}p{#1}}
 \newcommand{\code}[1]{\texttt{#1}}
 \newcommand{\codecell}[1]{\makecell[l]{#1}}
 \newcommand{\statusdone}{\textcolor{docvaultgreen}{Đã triển khai}}
