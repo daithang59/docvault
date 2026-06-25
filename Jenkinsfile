@@ -1,4 +1,4 @@
-@Library('docvault@fix/sbom-attestion') _
+@Library('docvault@fix/dependency-check') _
 
 def cfg = [:]
 def changeSet = [:]
