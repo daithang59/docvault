@@ -3,7 +3,8 @@ def call() {
 
     writeFile(
         file: '.trufflehog-exclude',
-        text: '''(^|/)\\.pnpm-store(/|$)
+        text: '''(^|/)\\.git(/|$)
+(^|/)\\.pnpm-store(/|$)
 (^|/)node_modules(/|$)
 (^|/)\\.turbo(/|$)
 (^|/)\\.next(/|$)
