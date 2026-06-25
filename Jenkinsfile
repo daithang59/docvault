@@ -164,7 +164,7 @@ pipeline {
         )
         string(
             name: 'DEPENDENCY_CHECK_DATA_DIR',
-            defaultValue: '/var/jenkins_home/caches/dependency-check',
+            defaultValue: '',
             description: 'Persistent host/cache directory for Dependency Check data. Override this if your Jenkins agent uses a different mounted cache path.'
         )
     }
