@@ -98,6 +98,8 @@ Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ tr
 
 Trong overlay \code{testing-s3}, document-service đã được chuyển từ MinIO sang Amazon S3. Terraform khởi tạo bucket tài liệu, customer-managed KMS key và IAM role dành cho ServiceAccount của document-service. Bucket được chặn truy cập công khai, bật versioning, mã hóa mặc định bằng SSE-KMS, ghi access log sang bucket riêng, áp dụng lifecycle và phát sự kiện qua EventBridge. IAM policy chỉ cấp các thao tác cần thiết trên prefix object của document-service và KMS key tương ứng. Cách tổ chức này cho phép quản lý tập trung khóa mã hóa, chính sách sử dụng khóa và dấu vết truy cập \cite{aws_s3_kms}.
 
+DocVault dùng customer-managed KMS key thay vì key mặc định của AWS để tự kiểm soát key policy và tách khóa theo từng mục đích: một khóa cho EKS, một cho tài liệu, một cho backup PostgreSQL và một cho backup MongoDB. Nhờ vậy mỗi nhóm dữ liệu có ranh giới quyền giải mã riêng và sự cố ở một khóa không lan sang phần còn lại. Mỗi khóa bật xoay vòng tự động hằng năm: AWS thay vật liệu khóa nền theo chu kỳ trong khi ARN của khóa giữ nguyên, nên ứng dụng không phải cập nhật tham chiếu và dữ liệu mã hóa trước đó vẫn giải mã được bằng phiên bản khóa cũ. Cơ chế này giảm rủi ro khi một phiên bản khóa bị lộ mà không gây gián đoạn dịch vụ. Ngoài ra mỗi khóa đặt cửa sổ chờ xóa 30 ngày để tránh việc xóa nhầm làm mất vĩnh viễn dữ liệu đã mã hóa \cite{aws_s3_kms}.
+
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{infra/s3bucket.png}

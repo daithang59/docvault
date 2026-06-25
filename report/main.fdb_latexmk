@@ -1,17 +1,17 @@
 # Fdb version 4
-["biber main"] 1782410927.20811 "main.bcf" "main.bbl" "main" 1782411430.6598 0
-  "main.bcf" 1782411421.52016 109644 7fea9c03406703fe31e24bc909af8a22 "xelatex"
+["biber main"] 1782411715.33319 "main.bcf" "main.bbl" "main" 1782411735.78136 0
+  "main.bcf" 1782411726.0739 109710 75a7d5bdc13af96a10647a2ac23d3821 "xelatex"
   "refs.bib" 1782410632.91964 5249 0d383abb872384cfe20ebed1397d16a5 ""
   (generated)
   "main.bbl"
   "main.blg"
   (rewritten before read)
-["xdvipdfmx"] 1782411421.98613 "main.xdv" "main.pdf" "main" 1782411430.67873 0
-  "main.xdv" 1782411421.52258 1505132 847c28137e620a95b5cbc8722799e647 "xelatex"
+["xdvipdfmx"] 1782411726.53727 "main.xdv" "main.pdf" "main" 1782411735.79989 0
+  "main.xdv" 1782411726.0769 1512928 628fee8e869b7bd2939e1259e93e826f "xelatex"
   (generated)
   "main.pdf"
   (rewritten before read)
-["xelatex"] 1782411418.17187 "main.tex" "main.xdv" "main" 1782411430.66029 0
+["xelatex"] 1782411722.50128 "main.tex" "main.xdv" "main" 1782411735.78204 0
   "C:/Users/THANG/AppData/Local/MiKTeX/miktex/data/le/xetex/xelatex.fmt" 1779474906.69617 27176672 4100d1fc673211dadb02824b024dd516 ""
   "C:/Users/THANG/AppData/Local/Programs/MiKTeX/fonts/tfm/adobe/zapfding/pzdr.tfm" 1136747054 1528 f853c4d1b4e0550255e02831fdc8496f ""
   "C:/Users/THANG/AppData/Local/Programs/MiKTeX/fonts/tfm/public/cm/cmmi10.tfm" 1136765053 1528 abec98dbc43e172678c11b3b9031252a ""
@@ -199,11 +199,11 @@
   "appendices/B_api_contract.tex" 1781544351.13479 3398 3bf360b77843d946649000c5cdc34120 ""
   "chapters/00_frontmatter.tex" 1782382501.91 5894 a628e2a105564493779efbb921301488 ""
   "chapters/01_tong_quan.tex" 1782380334.72862 11056 4070e16edeca81c489bc6ae4dbec9c67 ""
-  "chapters/02_co_so_ly_thuyet.tex" 1782380609.27476 16816 4151b71c412293fa980329b66a760185 ""
+  "chapters/02_co_so_ly_thuyet.tex" 1782411699.27649 16863 4cee7774da0317852e89cae42bb934f9 ""
   "chapters/03_phan_tich_thiet_ke.tex" 1782381923.46654 16539 49389dc79c33bfb496b1617d45a0c3e8 ""
   "chapters/04_du_lieu_api_bao_mat.tex" 1782380255.02979 18743 85bf4aab899819a3e78ce09aed2b6f3d ""
   "chapters/05_trien_khai_ung_dung.tex" 1782382215.65061 11399 81ffe79c9d86828a822b2551f6217dfa ""
-  "chapters/06_devsecops_pipeline.tex" 1782411402.06825 40602 f559d93c6059e645a3d913ed810f8cc5 ""
+  "chapters/06_devsecops_pipeline.tex" 1782411682.71539 41574 8f9ec51d877db896e01bdb7d28268541 ""
   "chapters/07_kiem_thu_danh_gia.tex" 1782410692.58182 10997 c1c863202a1219996b629e473e4bb450 ""
   "chapters/08_ket_luan.tex" 1782382432.01296 8256 b50cc65237cc19bdf7aae164e80c5743 ""
   "images/docvault-architecture.drawio.png" 1782312051.03558 1249087 74f72e52906d735b3b2511cf47ab009a ""
@@ -246,14 +246,14 @@
   "images/screen/document.png" 1782312051.06129 289917 2c49225ad809ec29d5e73c7b32ba4a75 ""
   "images/screen/security.png" 1782312051.06429 278647 d251b0c7d4d64aabc938ea9ae92ecbda ""
   "logo-uit.png" 1782379503.84977 30677 f4a7793e31251799b0f85e796dc50829 ""
-  "main.aux" 1782411421.47045 40898 213b3d225053a319cc796fe0fc24f4fc "xelatex"
-  "main.bbl" 1782410929.13335 27428 1a213475937d71012a271e0aa3e1ee48 "biber main"
-  "main.lof" 1782411421.52258 6493 92b7bba105ad26891e763db53a638833 "xelatex"
-  "main.lot" 1782411421.52258 2335 d9313e8019412b3b975bc7db42209831 "xelatex"
-  "main.out" 1782411421.50141 23897 280855be42f11f85a09bb0cbe4269629 "xelatex"
-  "main.run.xml" 1782411421.52258 2431 680d1fdc78ed5cadc9dd310c0650499e "xelatex"
+  "main.aux" 1782411726.01377 40959 ab8f01844d7059f8feb853761c52f0fa "xelatex"
+  "main.bbl" 1782411717.89747 27428 038833eecb45f54a786de7133e83e6da "biber main"
+  "main.lof" 1782411726.0769 6493 92b7bba105ad26891e763db53a638833 "xelatex"
+  "main.lot" 1782411726.0769 2335 d9313e8019412b3b975bc7db42209831 "xelatex"
+  "main.out" 1782411726.05234 23897 280855be42f11f85a09bb0cbe4269629 "xelatex"
+  "main.run.xml" 1782411726.0759 2431 680d1fdc78ed5cadc9dd310c0650499e "xelatex"
   "main.tex" 1782379503.8657 1526 34045e585077bdf3895db21d0e07b980 ""
-  "main.toc" 1782411421.52258 11729 0a179dbd9d932aeda14b070b90711a21 "xelatex"
+  "main.toc" 1782411726.0769 11729 0a179dbd9d932aeda14b070b90711a21 "xelatex"
   "preamble.tex" 1782379503.8657 3263 036caaa9ef3049fb8871c66d3aa0b504 ""
   "title-page.tex" 1782379503.8657 1333 940ec6c4d39eee242a854b883b72e543 ""
   (generated)

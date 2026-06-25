@@ -276,8 +276,8 @@
       \strng{authornamehash}{4f2503babdc3fd80d169c97e65a571c9}
       \strng{authorfullhash}{4f2503babdc3fd80d169c97e65a571c9}
       \strng{authorfullhashraw}{4f2503babdc3fd80d169c97e65a571c9}
-      \field{sortinit}{9}
-      \field{sortinithash}{0a5ebc79d83c96b6579069544c73c7d4}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{Backup and Recovery}}
@@ -546,8 +546,8 @@
       \strng{authornamehash}{08c92d6085c899aad02358cf78f51038}
       \strng{authorfullhash}{08c92d6085c899aad02358cf78f51038}
       \strng{authorfullhashraw}{08c92d6085c899aad02358cf78f51038}
-      \field{sortinit}{1}
-      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{sortinit}{2}
+      \field{sortinithash}{8b555b3791beccb63322c22f3320aa9a}
       \field{labelnamesource}{author}
       \field{labeltitlesource}{title}
       \field{title}{{Checkov Documentation}}
