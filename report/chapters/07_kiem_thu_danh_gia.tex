@@ -151,7 +151,7 @@ Kết quả kiểm thử và đối chiếu cấu hình cho thấy hệ thống 
   \item Harbor đã thể hiện SBOM và trạng thái ký của artifact; tuy nhiên provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký tại admission time chưa được triển khai.
   \item Kyverno đã được sử dụng như cổng policy-as-code trong CI với manifest đã render; cụm EKS chưa có bằng chứng về admission controller chặn trực tiếp tài nguyên vi phạm.
   \item NetworkPolicy vẫn mở egress, Loki chưa có persistence và cấu hình quản trị monitoring cần được chuyển hoàn toàn sang External Secrets.
-  \item Backup PostgreSQL đã được cấu hình trên S3/KMS và có lịch chạy định kỳ; quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO.
+  \item Backup PostgreSQL (CloudNativePG) và audit MongoDB (Percona PBM, có PITR qua oplog) đã được cấu hình trên S3/KMS và chạy theo lịch; quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO.
 \end{itemize}
 
 \section{Nhận xét chung}

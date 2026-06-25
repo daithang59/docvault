@@ -24,30 +24,33 @@
 \contentsline {figure}{\numberline {6.5}{\ignorespaces Kiến trúc triển khai DocVault trên AWS EKS}}{63}{figure.caption.35}%
 \contentsline {figure}{\numberline {6.6}{\ignorespaces S3 bucket lưu tài liệu đã bật versioning trong môi trường testing}}{65}{figure.caption.36}%
 \contentsline {figure}{\numberline {6.7}{\ignorespaces S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}}{65}{figure.caption.37}%
-\contentsline {figure}{\numberline {6.8}{\ignorespaces Các customer-managed KMS key dùng cho EKS, tài liệu và backup}}{65}{figure.caption.38}%
-\contentsline {figure}{\numberline {6.9}{\ignorespaces S3 bucket lưu backup cơ sở dữ liệu}}{66}{figure.caption.39}%
-\contentsline {figure}{\numberline {6.10}{\ignorespaces Danh sách workload trên cụm EKS và trạng thái vận hành tại thời điểm thu thập bằng chứng}}{67}{figure.caption.40}%
-\contentsline {figure}{\numberline {6.11}{\ignorespaces Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}}{68}{figure.caption.41}%
-\contentsline {figure}{\numberline {6.12}{\ignorespaces Các secret của DocVault được quản lý tập trung trong AWS Secrets Manager}}{69}{figure.caption.42}%
-\contentsline {figure}{\numberline {6.13}{\ignorespaces Application gốc \texttt {docvault-root} đạt trạng thái \texttt {Healthy} và \texttt {Synced}}}{70}{figure.caption.43}%
-\contentsline {figure}{\numberline {6.14}{\ignorespaces Project riêng \texttt {docvault-dev} và các repository dịch vụ trên Harbor}}{71}{figure.caption.44}%
-\contentsline {figure}{\numberline {6.15}{\ignorespaces Artifact Harbor được định danh bằng digest, có trạng thái ký và thông tin SBOM}}{72}{figure.caption.45}%
-\contentsline {figure}{\numberline {6.16}{\ignorespaces Jenkins build và Stage View}}{73}{figure.caption.46}%
-\contentsline {figure}{\numberline {6.17}{\ignorespaces SonarQube Quality Gate của DocVault}}{74}{figure.caption.47}%
-\contentsline {figure}{\numberline {6.18}{\ignorespaces Log và artifact cho ba bước IaC}}{75}{figure.caption.48}%
-\contentsline {figure}{\numberline {6.19}{\ignorespaces Kết quả Terraform Validate}}{75}{figure.caption.49}%
-\contentsline {figure}{\numberline {6.20}{\ignorespaces Kết quả Checkov}}{76}{figure.caption.50}%
-\contentsline {figure}{\numberline {6.21}{\ignorespaces Kết quả Kyverno}}{76}{figure.caption.51}%
-\contentsline {figure}{\numberline {6.22}{\ignorespaces Kết quả Argo CD health check}}{78}{figure.caption.52}%
-\contentsline {figure}{\numberline {6.23}{\ignorespaces Log post deploy smoke test}}{79}{figure.caption.53}%
-\contentsline {figure}{\numberline {6.24}{\ignorespaces Log OWASP ZAP}}{80}{figure.caption.54}%
-\contentsline {figure}{\numberline {6.25}{\ignorespaces Kết quả OWASP ZAP}}{80}{figure.caption.55}%
-\contentsline {figure}{\numberline {6.26}{\ignorespaces Grafana dashboard giám sát workload DocVault trong namespace \texttt {docvault}}}{81}{figure.caption.56}%
-\contentsline {figure}{\numberline {6.27}{\ignorespaces Grafana dashboard giám sát EKS cluster}}{82}{figure.caption.57}%
-\contentsline {figure}{\numberline {6.28}{\ignorespaces Loki tập trung log của namespace DocVault}}{82}{figure.caption.58}%
+\contentsline {figure}{\numberline {6.8}{\ignorespaces Trạng thái backup CloudNativePG metadata (cần bổ sung ảnh minh chứng)}}{66}{figure.caption.38}%
+\contentsline {figure}{\numberline {6.9}{\ignorespaces Trạng thái Percona MongoDB replica set audit (cần bổ sung ảnh minh chứng)}}{66}{figure.caption.39}%
+\contentsline {figure}{\numberline {6.10}{\ignorespaces Trạng thái backup và PITR của PBM (cần bổ sung ảnh minh chứng)}}{66}{figure.caption.40}%
+\contentsline {figure}{\numberline {6.11}{\ignorespaces Các customer-managed KMS key dùng cho EKS, tài liệu và backup}}{67}{figure.caption.41}%
+\contentsline {figure}{\numberline {6.12}{\ignorespaces S3 bucket lưu backup cơ sở dữ liệu}}{67}{figure.caption.42}%
+\contentsline {figure}{\numberline {6.13}{\ignorespaces Danh sách workload trên cụm EKS và trạng thái vận hành tại thời điểm thu thập bằng chứng}}{69}{figure.caption.43}%
+\contentsline {figure}{\numberline {6.14}{\ignorespaces Các IAM role cho document-service, External Secrets và tiến trình backup qua IRSA}}{70}{figure.caption.44}%
+\contentsline {figure}{\numberline {6.15}{\ignorespaces Các secret của DocVault được quản lý tập trung trong AWS Secrets Manager}}{70}{figure.caption.45}%
+\contentsline {figure}{\numberline {6.16}{\ignorespaces Application gốc \texttt {docvault-root} đạt trạng thái \texttt {Healthy} và \texttt {Synced}}}{71}{figure.caption.46}%
+\contentsline {figure}{\numberline {6.17}{\ignorespaces Project riêng \texttt {docvault-dev} và các repository dịch vụ trên Harbor}}{73}{figure.caption.47}%
+\contentsline {figure}{\numberline {6.18}{\ignorespaces Artifact Harbor được định danh bằng digest, có trạng thái ký và thông tin SBOM}}{73}{figure.caption.48}%
+\contentsline {figure}{\numberline {6.19}{\ignorespaces Jenkins build và Stage View}}{75}{figure.caption.49}%
+\contentsline {figure}{\numberline {6.20}{\ignorespaces SonarQube Quality Gate của DocVault}}{75}{figure.caption.50}%
+\contentsline {figure}{\numberline {6.21}{\ignorespaces Log và artifact cho ba bước IaC}}{76}{figure.caption.51}%
+\contentsline {figure}{\numberline {6.22}{\ignorespaces Kết quả Terraform Validate}}{77}{figure.caption.52}%
+\contentsline {figure}{\numberline {6.23}{\ignorespaces Kết quả Checkov}}{77}{figure.caption.53}%
+\contentsline {figure}{\numberline {6.24}{\ignorespaces Kết quả Kyverno}}{78}{figure.caption.54}%
+\contentsline {figure}{\numberline {6.25}{\ignorespaces Kết quả Argo CD health check}}{79}{figure.caption.55}%
+\contentsline {figure}{\numberline {6.26}{\ignorespaces Log post deploy smoke test}}{80}{figure.caption.56}%
+\contentsline {figure}{\numberline {6.27}{\ignorespaces Log OWASP ZAP}}{81}{figure.caption.57}%
+\contentsline {figure}{\numberline {6.28}{\ignorespaces Kết quả OWASP ZAP}}{81}{figure.caption.58}%
+\contentsline {figure}{\numberline {6.29}{\ignorespaces Grafana dashboard giám sát workload DocVault trong namespace \texttt {docvault}}}{82}{figure.caption.59}%
+\contentsline {figure}{\numberline {6.30}{\ignorespaces Grafana dashboard giám sát EKS cluster}}{83}{figure.caption.60}%
+\contentsline {figure}{\numberline {6.31}{\ignorespaces Loki tập trung log của namespace DocVault}}{83}{figure.caption.61}%
 \addvspace {10\p@ }
-\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng giao diện dashboard command center}}{87}{figure.caption.59}%
-\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}}{87}{figure.caption.60}%
+\contentsline {figure}{\numberline {7.1}{\ignorespaces Bằng chứng giao diện dashboard command center}}{88}{figure.caption.62}%
+\contentsline {figure}{\numberline {7.2}{\ignorespaces Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}}{88}{figure.caption.63}%
 \addvspace {10\p@ }
 \addvspace {10\p@ }
 \addvspace {10\p@ }

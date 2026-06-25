@@ -94,11 +94,9 @@ DocVault được triển khai trên AWS EKS theo bốn cụm thành phần, li�
 
 Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nên repository chỉ chứa tham chiếu chứ không chứa giá trị bí mật. Theo cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
 
-\subsection{Lưu trữ tài liệu và backup}
+\subsection{Lưu trữ tài liệu trên S3}
 
 Trong overlay \code{testing-s3}, document-service đã được chuyển từ MinIO sang Amazon S3. Terraform khởi tạo bucket tài liệu, customer-managed KMS key và IAM role dành cho ServiceAccount của document-service. Bucket được chặn truy cập công khai, bật versioning, mã hóa mặc định bằng SSE-KMS, ghi access log sang bucket riêng, áp dụng lifecycle và phát sự kiện qua EventBridge. IAM policy chỉ cấp các thao tác cần thiết trên prefix object của document-service và KMS key tương ứng. Cách tổ chức này cho phép quản lý tập trung khóa mã hóa, chính sách sử dụng khóa và dấu vết truy cập \cite{aws_s3_kms}.
-
-Metadata PostgreSQL được triển khai bằng CloudNativePG với volume gp3. Cấu hình backup sử dụng bucket S3 và KMS key riêng, xác thực bằng IRSA thay vì access key tĩnh. Tài nguyên \code{ScheduledBackup} được cấu hình chạy hằng ngày, nén dữ liệu và WAL, đồng thời duy trì thời hạn lưu giữ 30 ngày \cite{cnpg_backup}. Đây là nền tảng kỹ thuật cho khả năng khôi phục dữ liệu; tuy nhiên quy trình restore vẫn cần được diễn tập định kỳ để đo lường RPO và RTO thực tế.
 
 \begin{figure}[H]
 \centering
@@ -113,6 +111,22 @@ Metadata PostgreSQL được triển khai bằng CloudNativePG với volume gp3.
 \caption{S3 bucket tài liệu được Terraform quản lý và mã hóa mặc định bằng SSE-KMS}
 \label{fig:aws-s3-kms}
 \end{figure}
+
+\subsection{Sao lưu và khôi phục cơ sở dữ liệu}
+
+DocVault có hai cơ sở dữ liệu trạng thái cần bảo vệ với mức ưu tiên khác nhau. Metadata PostgreSQL giữ ánh xạ object-key, ACL và lịch sử trạng thái tài liệu. Audit MongoDB giữ nhật ký kiểm toán có chuỗi băm SHA-256, là bằng chứng tuân thủ nên việc mất hoặc sai lệch dữ liệu ở đây nghiêm trọng hơn. Vì vậy hai cơ sở dữ liệu được sao lưu vào hai bucket S3 riêng, dùng hai KMS key riêng và hai IAM role IRSA riêng. Tách biệt như vậy giúp ranh giới quyền truy cập, lifecycle và quy trình xử lý sự cố của từng cơ sở dữ liệu độc lập với nhau, đồng thời tách hẳn khỏi bucket tài liệu.
+
+Metadata PostgreSQL được triển khai bằng CloudNativePG với volume gp3. Cấu hình backup dùng plugin Barman Cloud ghi vào bucket S3 và KMS key riêng, xác thực bằng IRSA thay vì access key tĩnh. Tài nguyên \code{ScheduledBackup} chạy base backup hằng ngày kèm lưu trữ WAL liên tục và giữ 30 ngày, nhờ đó hệ thống có thể khôi phục về một thời điểm bất kỳ trong cửa sổ lưu giữ thay vì chỉ về mốc backup gần nhất \cite{cnpg_backup}.
+
+\evidenceplaceholder{Trạng thái backup CloudNativePG metadata}{fig:cnpg-backup-status}{Ảnh chụp \code{kubectl get cluster,scheduledbackup,backup -n docvault} cho thấy cluster metadata ở trạng thái healthy, base backup gần nhất \code{Completed} và WAL đang được archive lên S3.}
+
+Audit MongoDB được triển khai bằng Percona Server for MongoDB Operator dưới dạng replica set \code{rs0} ba thành viên, đặt anti-affinity theo hostname để các thành viên không nằm chung node. Sao lưu do Percona Backup for MongoDB (PBM) đảm nhận: một bản backup logical hằng ngày được nén gzip và giữ 30 bản, đẩy lên bucket MongoDB riêng với SSE-KMS \cite{percona_pbm}. Bên cạnh đó, PBM bật point-in-time recovery qua oplog với chu kỳ cắt lát 10 phút, nên ngoài các mốc backup hằng ngày hệ thống còn có thể khôi phục về gần như mọi thời điểm trong khoảng giữa hai lần backup. Đây là khả năng phục hồi chặt hơn so với chỉ chụp ảnh định kỳ, phù hợp với yêu cầu toàn vẹn của dữ liệu audit.
+
+\evidenceplaceholder{Trạng thái Percona MongoDB replica set audit}{fig:percona-psmdb-status}{Ảnh chụp \code{kubectl get psmdb -n docvault} hoặc \code{rs.status()} cho thấy cluster \code{audit-mongodb} ở trạng thái ready với một PRIMARY và hai SECONDARY.}
+
+\evidenceplaceholder{Trạng thái backup và PITR của PBM}{fig:pbm-backup-status}{Ảnh chụp \code{pbm status} hoặc \code{pbm list} cho thấy bản backup gần nhất hoàn tất, oplog/PITR đang chạy và đối tượng backup nằm trong bucket S3 với SSE-KMS.}
+
+Cả hai cơ chế hiện đã cấu hình và chạy theo lịch. Phần còn thiếu là diễn tập khôi phục thực tế: cần khôi phục backup vào môi trường cô lập, đối chiếu số bản ghi, index và chạy lại xác minh chuỗi băm audit để đo RPO và RTO thực tế. Vì vậy ở giai đoạn hiện tại, các con số như chu kỳ oplog 10 phút phản ánh năng lực đã cấu hình chứ chưa phải RPO đã được kiểm chứng bằng diễn tập.
 
 \begin{figure}[H]
 \centering
@@ -500,7 +514,7 @@ Các giới hạn cần nêu rõ gồm:
   \item Kyverno hiện kiểm tra manifest trong CI; cụm chưa bắt buộc admission policy theo bằng chứng hiện có.
   \item NetworkPolicy chưa giới hạn egress theo từng dependency.
   \item Loki chưa có persistence và cấu hình Grafana cần được đưa hoàn toàn sang secret manager.
-  \item Backup đã được cấu hình nhưng cần diễn tập restore và ghi nhận RPO/RTO.
+  \item Backup PostgreSQL và MongoDB đã được cấu hình nhưng cần diễn tập restore và ghi nhận RPO/RTO.
   \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto.
 \end{itemize}
 

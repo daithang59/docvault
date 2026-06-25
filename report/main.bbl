@@ -292,6 +292,36 @@
       \verb https://cloudnative-pg.io/documentation/current/backup/
       \endverb
     \endentry
+    \entry{percona_pbm}{online}{}{}
+      \name{author}{1}{}{%
+        {{hash=561495342e87ca0429def338cb5d53df}{%
+           family={{Percona}},
+           familyi={P\bibinitperiod}}}%
+      }
+      \strng{namehash}{561495342e87ca0429def338cb5d53df}
+      \strng{fullhash}{561495342e87ca0429def338cb5d53df}
+      \strng{fullhashraw}{561495342e87ca0429def338cb5d53df}
+      \strng{bibnamehash}{561495342e87ca0429def338cb5d53df}
+      \strng{authorbibnamehash}{561495342e87ca0429def338cb5d53df}
+      \strng{authornamehash}{561495342e87ca0429def338cb5d53df}
+      \strng{authorfullhash}{561495342e87ca0429def338cb5d53df}
+      \strng{authorfullhashraw}{561495342e87ca0429def338cb5d53df}
+      \field{sortinit}{1}
+      \field{sortinithash}{4f6aaa89bab872aa0999fec09ff8e98a}
+      \field{labelnamesource}{author}
+      \field{labeltitlesource}{title}
+      \field{title}{{Percona Backup for MongoDB Documentation}}
+      \field{urlday}{25}
+      \field{urlmonth}{6}
+      \field{urlyear}{2026}
+      \field{urldateera}{ce}
+      \verb{urlraw}
+      \verb https://docs.percona.com/percona-backup-mongodb/index.html
+      \endverb
+      \verb{url}
+      \verb https://docs.percona.com/percona-backup-mongodb/index.html
+      \endverb
+    \endentry
     \entry{kubernetes_networkpolicy}{online}{}{}
       \name{author}{1}{}{%
         {{hash=97d5f1c7ec302d71272e93170d6ec381}{%
