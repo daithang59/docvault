@@ -115,6 +115,7 @@ DocVault dùng customer-managed KMS key thay vì key mặc định của AWS đ�
 \end{figure}
 
 \subsection{Sao lưu và khôi phục cơ sở dữ liệu}
+\label{subsec:db-backup}
 
 DocVault có hai cơ sở dữ liệu trạng thái cần bảo vệ với mức ưu tiên khác nhau. Metadata PostgreSQL giữ ánh xạ object-key, ACL và lịch sử trạng thái tài liệu. Audit MongoDB giữ nhật ký kiểm toán có chuỗi băm SHA-256, là bằng chứng tuân thủ nên việc mất hoặc sai lệch dữ liệu ở đây nghiêm trọng hơn. Vì vậy hai cơ sở dữ liệu được sao lưu vào hai bucket S3 riêng, dùng hai KMS key riêng và hai IAM role IRSA riêng. Tách biệt như vậy giúp ranh giới quyền truy cập, lifecycle và quy trình xử lý sự cố của từng cơ sở dữ liệu độc lập với nhau, đồng thời tách hẳn khỏi bucket tài liệu.
 
@@ -128,7 +129,7 @@ Audit MongoDB được triển khai bằng Percona Server for MongoDB Operator d
 
 \evidenceplaceholder{Trạng thái backup và PITR của PBM}{fig:pbm-backup-status}{Ảnh chụp \code{pbm status} hoặc \code{pbm list} cho thấy bản backup gần nhất hoàn tất, oplog/PITR đang chạy và đối tượng backup nằm trong bucket S3 với SSE-KMS.}
 
-Cả hai cơ chế hiện đã cấu hình và chạy theo lịch. Phần còn thiếu là diễn tập khôi phục thực tế: cần khôi phục backup vào môi trường cô lập, đối chiếu số bản ghi, index và chạy lại xác minh chuỗi băm audit để đo RPO và RTO thực tế. Vì vậy ở giai đoạn hiện tại, các con số như chu kỳ oplog 10 phút phản ánh năng lực đã cấu hình chứ chưa phải RPO đã được kiểm chứng bằng diễn tập.
+Cả hai cơ chế hiện đã cấu hình và chạy theo lịch. Việc diễn tập khôi phục để đo RPO và RTO thực tế được bàn ở phần vận hành (Mục~\ref{subsec:db-recovery}), nơi khép lại mạch giám sát, log và khôi phục.
 
 \begin{figure}[H]
 \centering
@@ -435,7 +436,11 @@ OWASP ZAP baseline scan chạy khi \code{RUN\_ZAP=true} và target có thể tru
 \end{figure}
 
 
-\section{Giám sát và tập trung log}
+\section{Vận hành: giám sát, log và khôi phục}
+
+Phần này gom các năng lực vận hành của hệ thống sau khi triển khai: giám sát số liệu, tập trung log và khả năng khôi phục dữ liệu. Hai năng lực đầu được trình bày ngay dưới đây; năng lực khôi phục dựa trên cơ chế sao lưu cơ sở dữ liệu đã mô tả ở Mục~\ref{subsec:db-backup}.
+
+\subsection{Giám sát và tập trung log}
 
 Khả năng quan sát được triển khai qua hai Argo CD Application trong namespace \code{monitoring}. \code{kube-prometheus-stack} cung cấp Prometheus, Grafana và Alertmanager; \code{loki-stack} cung cấp Loki và Promtail. Promtail thu thập log container trong cụm, còn Grafana sử dụng cả Prometheus và Loki làm nguồn dữ liệu \cite{prometheus_docs,loki_docs}.
 
@@ -470,6 +475,13 @@ Cấu hình hiện tại đáp ứng nhu cầu trình diễn và thu thập bằ
 \caption{Loki tập trung log của namespace DocVault}
 \label{fig:loki-logs}
 \end{figure}
+
+\subsection{Khôi phục dữ liệu và sẵn sàng vận hành}
+\label{subsec:db-recovery}
+
+Giám sát và log cho biết hệ thống đang chạy ra sao; khôi phục quyết định chuyện gì xảy ra khi nó hỏng. Hai mảnh ghép này cùng tạo nên năng lực vận hành. Cơ chế sao lưu ở Mục~\ref{subsec:db-backup} đã đặt nền cho khôi phục: PostgreSQL có base backup hằng ngày kèm WAL liên tục, MongoDB có backup hằng ngày kèm PITR qua oplog, cả hai đều ghi vào S3 mã hóa KMS.
+
+Phần còn thiếu để khép vòng là diễn tập khôi phục định kỳ. Backup chỉ có giá trị khi đã chứng minh khôi phục được, nên bước tiếp theo là khôi phục vào môi trường cô lập, đối chiếu số bản ghi và index, chạy lại xác minh chuỗi băm audit, rồi ghi nhận RPO và RTO đo được. Cho tới khi có kết quả diễn tập, các tham số như chu kỳ oplog 10 phút chỉ phản ánh năng lực đã cấu hình. Tương tự, Loki chưa bật persistence nên log lịch sử chưa bền vững qua restart, và alert rule nghiệp vụ vẫn cần bổ sung trước khi vận hành dài hạn.
 
 
 \section{Mapping kiểm soát, công cụ và bằng chứng}

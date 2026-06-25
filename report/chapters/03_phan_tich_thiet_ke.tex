@@ -134,8 +134,9 @@ DocVault được tổ chức thành bốn lớp xếp chồng từ client đế
 Cách phân lớp này được thiết kế để không tồn tại đường tắt bỏ qua kiểm soát chính sách. Với một thao tác nhạy cảm như tải file, request luôn xuất phát từ frontend, đi qua gateway để xác thực, rồi mới đến metadata-service để xin phép; document-service chỉ phát file sau khi nhận được grant token hợp lệ. Lớp backend vì thế luôn giữ quyền quyết định cuối cùng về truy cập.
 
 \section{Luồng nghiệp vụ chính}
+\label{sec:business-flow}
 
-Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhập, tạo tài liệu, upload file và submit. Approver đăng nhập, kiểm tra tài liệu pending và approve. Viewer đăng nhập, xem tài liệu đã published và download nếu policy cho phép. Compliance Officer đăng nhập, xem audit/evidence nhưng bị chặn preview/download nội dung file.
+Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhập, tạo tài liệu, upload file và submit. Approver đăng nhập, kiểm tra tài liệu pending và approve. Viewer đăng nhập, xem tài liệu đã published và download nếu policy cho phép. Compliance Officer đăng nhập, xem audit/evidence nhưng bị chặn preview/download nội dung file. Bản thân chuỗi trạng thái mà tài liệu đi qua trong các luồng này được mô tả chi tiết ở Mục~\ref{sec:document-lifecycle}.
 
 \begin{figure}[H]
 \centering
