@@ -1,0 +1,21 @@
+%%{init: {"theme": "neutral", "sequence": {"mirrorActors": false}}}%%
+sequenceDiagram
+  autonumber
+  actor Editor
+  actor Approver
+  participant Gateway as API Gateway
+  participant Workflow as workflow-service
+  participant Metadata as metadata-service
+  participant Notify as notification-service
+
+  Editor->>Gateway: POST /workflow/:id/submit
+  Gateway->>Workflow: Forward JWT + actor context
+  Workflow->>Metadata: updateStatus(DRAFT → PENDING)
+  Workflow->>Notify: Notify approvers (SUBMITTED)
+
+  Approver->>Gateway: POST /workflow/:id/approve
+  Gateway->>Workflow: Forward JWT + actor context
+  Workflow->>Metadata: updateStatus(PENDING → PUBLISHED)
+  Workflow->>Notify: Notify owner (APPROVED)
+
+  Note over Workflow,Metadata: Các service gọi nhau bằng Axios HTTP nội bộ (không qua message queue). Mỗi lần đổi trạng thái đều ghi workflow history và audit event.

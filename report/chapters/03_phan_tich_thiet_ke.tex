@@ -21,9 +21,19 @@ Editor & Người tạo và quản lý tài liệu của mình; có thể tạo 
 Approver & Người kiểm tra tài liệu đang ở trạng thái chờ duyệt; có thể approve hoặc reject theo quy trình. \\
 Compliance Officer & Người kiểm tra tuân thủ; được xem audit, metadata/evidence được phép, nhưng bị chặn preview, stream, presign và download nội dung file. \\
 Admin & Người quản trị hệ thống; có quyền rộng hơn trên tài liệu, thành viên, evidence và retention. \\
+Scheduler / Cron & Tác nhân hệ thống (không phải người dùng); chạy nền theo lịch để tự động archive tài liệu đến hạn retention và dọn tài liệu trong thùng rác quá hạn lưu giữ. \\
 \bottomrule
 \end{tabularx}
 \end{table}
+
+Hình~\ref{fig:usecase-overview} tổng hợp các use case chính của từng tác nhân trong một sơ đồ thống nhất. Ngoài bốn vai trò người dùng, sơ đồ bổ sung tác nhân Scheduler/Cron đại diện cho các tác vụ nền theo lịch. Sơ đồ làm rõ ba điểm thiết kế cốt lõi của DocVault: mọi tác nhân phải đăng nhập qua Keycloak/OIDC trước khi thao tác; mọi thao tác trên tài liệu đều được kiểm tra quyền tại backend và ghi audit log; và Compliance Officer dù xem được metadata, audit, evidence vẫn luôn bị từ chối preview hoặc download nội dung file.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth,keepaspectratio]{docvault-usecase.drawio.png}
+\caption{Sơ đồ use case tổng thể của DocVault theo tác nhân}
+\label{fig:usecase-overview}
+\end{figure}
 
 \section{Yêu cầu chức năng}
 
