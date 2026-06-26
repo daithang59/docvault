@@ -11,43 +11,11 @@ Repo này không chỉ chứa application. Phần quan trọng của dự án l�
 - Triển khai theo GitOps: Jenkins chỉ cập nhật image reference/Helm values, Argo CD là bộ điều phối trạng thái chạy trên cluster.
 - Tách local development, CI/CD, Kubernetes manifests, Terraform và runtime evidence thành các lớp rõ ràng để dễ demo, kiểm tra và mở rộng.
 
-## Kiến Trúc Application
+## Kiến Trúc DocVault
 
-```mermaid
-flowchart TB
-    FE["Web app\nNext.js :3006"]
-    GW["Gateway\nNestJS :3000\n/api/*"]
+![Kiến trúc triển khai DocVault trên EKS](report/images/infra/docvault-eks-architecture.png)
 
-    META["metadata-service\n:3001\nMetadata, ACL, workflow history, retention"]
-    DOC["document-service\n:3002\nUpload, preview, stream/download, MinIO/S3"]
-    WF["workflow-service\n:3003\nSubmit, approve, reject, archive, delete"]
-    AUDIT["audit-service\n:3004\nMongoDB audit log, hash chain"]
-    NOTIFY["notification-service\n:3005\nIn-app notifications"]
-
-    KC["Keycloak\nIdentity, roles, groups"]
-    PG["PostgreSQL\nmetadata database"]
-    MONGO["MongoDB\naudit and notifications"]
-    S3["MinIO/S3\nobject storage"]
-    AV["ClamAV\nmalware scan"]
-
-    FE -->|"HTTP /api"| GW
-    GW --> META
-    GW --> DOC
-    GW --> WF
-    GW --> AUDIT
-    GW --> NOTIFY
-
-    GW -.-> KC
-    META --> PG
-    AUDIT --> MONGO
-    NOTIFY --> MONGO
-    DOC --> S3
-    DOC -.-> AV
-
-    DOC -. "register version / authorize" .-> META
-    WF -. "status update" .-> META
-    WF -. "notify" .-> NOTIFY
-```
+Sơ đồ trên mô tả cách DocVault được triển khai trên EKS: lớp ingress/web, API gateway, các microservice backend, dependency runtime, registry, GitOps, secrets, storage và observability.
 
 Các vai trò chính trong hệ thống:
 
@@ -61,31 +29,11 @@ Các vai trò chính trong hệ thống:
 
 Vòng đời tài liệu chính:
 
-```text
-DRAFT -> PENDING -> PUBLISHED -> ARCHIVED
-               \-> DRAFT       \-> DELETED/RESTORE tùy quyền
-```
+![State machine vòng đời tài liệu trong DocVault](report/images/docvault_document_lifecycle_state.drawio.png)
 
 ## Luồng DevSecOps
 
-```mermaid
-flowchart LR
-    DEV["Developer / Git push"]
-    GH["GitHub repo"]
-    J["Jenkins pipeline"]
-    Q["Quality gates\nlint, test, build"]
-    S["Security gates\nsecret, SAST, SCA, Trivy, Checkov, Kyverno"]
-    B["Docker build\nservice/web images"]
-    I["Image scan\nTrivy image"]
-    C["Cosign/SBOM\noptional signing & attestation"]
-    H["Harbor registry\nimage tag + digest"]
-    G["GitOps branch\nHelm values updated"]
-    A["Argo CD\nsync + self-heal"]
-    K["AWS EKS / Kubernetes"]
-    V["Post-deploy verification\nArgo health, smoke test, ZAP, observability"]
-
-    DEV --> GH --> J --> Q --> S --> B --> I --> C --> H --> G --> A --> K --> V
-```
+![Luồng CI/CD và GitOps của DocVault](report/images/infra/CICDPipelineFlow.png)
 
 Pipeline chính nằm ở `Jenkinsfile`; các bước tái sử dụng nằm trong `vars/*.groovy`. Cấu hình mặc định hiện hướng tới Harbor registry (`harbor.docvault.id.vn`), GitOps branch cấu hình qua `GITOPS_BRANCH`, và triển khai Kubernetes bằng Helm chart chung trong `infra/k8s/charts/docvault-service`.
 
