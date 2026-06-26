@@ -63,7 +63,7 @@ Tài liệu đã xuất bản cần có retention evidence dựa trên classific
 \toprule
 \textbf{Nhóm yêu cầu} & \textbf{Mô tả} \\
 \midrule
-Bảo mật & Backend phải enforce policy; token và grant phải được xác minh; nội dung file không được lộ qua evidence hoặc audit. \\
+Bảo mật & Backend phải thực thi policy; token và grant phải được xác minh; nội dung file không được lộ qua evidence hoặc audit. \\
 Truy vết & Các thao tác quan trọng cần tạo audit event; audit chain cần có khả năng verify. \\
 Tách biệt trách nhiệm & Mỗi service sở hữu một bounded context rõ ràng; document-service không tự quyết định policy download. \\
 Khả năng kiểm thử & Có unit test, E2E runtime, frontend test/lint/build và pipeline scan. \\
@@ -197,7 +197,7 @@ Luồng demo chính của hệ thống gồm bốn vai trò. Editor đăng nhậ
   below=0.55cm of complianceFlow,
   inner ysep=6pt
 ] (auditNote)
-  {Workflow history và audit event được ghi cho các thao tác quan trọng như upload, submit, approve, download và deny file content.};
+  {Workflow history và audit event được ghi cho các thao tác quan trọng như upload, submit, approve, download và từ chối nội dung file.};
 
 \draw[flow] (editorFlow.south) -- node[right, font=\scriptsize] {DRAFT $\rightarrow$ PENDING} (approverFlow.north);
 \draw[flow] (approverFlow.south) -- node[right, font=\scriptsize] {PENDING $\rightarrow$ PUBLISHED} (viewerFlow.north);
@@ -219,6 +219,6 @@ Thiết kế DocVault tuân theo các nguyên tắc sau:
   \item \textbf{Tách metadata và blob}: metadata nằm ở PostgreSQL, file nằm ở MinIO/S3, version metadata chỉ giữ object key và checksum.
   \item \textbf{Deny wins}: ACL deny có độ ưu tiên cao hơn allow.
   \item \textbf{Metadata-only compliance}: compliance có thể kiểm tra hệ thống mà không cần truy cập nội dung file.
-  \item \textbf{Evidence without leakage}: evidence không chứa file content, presigned URL, grant token hoặc object key nhạy cảm.
+  \item \textbf{Evidence without leakage}: evidence không chứa nội dung file, presigned URL, grant token hoặc object key nhạy cảm.
   \item \textbf{Security as pipeline gates}: các bước scan/test cần chạy tự động trong pipeline thay vì phụ thuộc thao tác thủ công.
 \end{enumerate}

@@ -1,13 +1,38 @@
-# Thu Muc `apps`
+# Thư mục `apps`
 
-Thu muc nay danh cho cac ung dung o tang presentation, vi du frontend web hoac cac app client khac.
+Thư mục này chứa các ứng dụng ở tầng presentation của DocVault.
 
-## Trang thai hien tai
+## Ứng dụng hiện có
 
-- Repo moi co `apps/web`
-- Chua co ma nguon frontend, chua scaffold Next.js hay UI
+| App | Công nghệ | Vai trò |
+| --- | --- | --- |
+| `web` | Next.js, React, TypeScript | Frontend chính cho dashboard, quản lý tài liệu, phê duyệt, audit, security, evidence, retention và quản trị thành viên. |
 
-## Cach dung
+## Chạy frontend
 
-- Neu bat dau frontend, dat source code vao `apps/web`
-- Nen giu `apps/` cho cac ung dung hoan chinh, khong dat logic dung chung tai day
+Từ repo root:
+
+```bash
+pnpm --filter web dev
+```
+
+Mặc định app chạy tại:
+
+```text
+http://localhost:3006
+```
+
+Nếu cần đổi port:
+
+```bash
+pnpm --filter web dev -- --port 3100
+```
+
+## Ghi chú cấu hình
+
+Frontend có thể gọi API theo hai cách:
+
+- Same-origin proxy qua `NEXT_PUBLIC_API_BASE_URL=/api`.
+- Gọi thẳng gateway qua `NEXT_PUBLIC_API_BASE_URL=http://localhost:3000/api`.
+
+Khi chạy local đầy đủ, gateway cần chạy ở `http://localhost:3000`.
