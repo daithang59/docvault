@@ -84,7 +84,7 @@ Metadata-service là nguồn sự thật cho tài liệu logic và policy. Servi
   \item AI guardrails metadata-only.
 \end{itemize}
 
-Metadata-service là nơi quan trọng nhất để enforce policy liên quan đến metadata và grant token. Khi document-service cần đăng ký version mới hoặc khi workflow-service cần cập nhật trạng thái, các service này gọi metadata-service thay vì ghi trực tiếp vào database.
+Metadata-service là nơi quan trọng nhất để thực thi policy liên quan đến metadata và grant token. Khi document-service cần đăng ký version mới hoặc khi workflow-service cần cập nhật trạng thái, các service này gọi metadata-service thay vì ghi trực tiếp vào database.
 
 Một ví dụ tiêu biểu cho nguyên tắc \emph{backend authoritative} là quy tắc chặn Compliance Officer tải file. Quy tắc này được đặt ngay đầu hàm kiểm tra quyền download trong \code{policy.service.ts}, trước cả các bước kiểm tra trạng thái và ACL, để bảo đảm không có nhánh nào bỏ sót:
 
@@ -199,7 +199,7 @@ Luồng demo chính được thiết kế để chứng minh cả nghiệp vụ 
   \item Editor submit tài liệu để chuyển từ Draft sang Pending.
   \item Approver đăng nhập, mở hàng đợi Approvals và approve tài liệu.
   \item Viewer đăng nhập, xem tài liệu đã Published và download nếu policy cho phép.
-  \item Compliance Officer đăng nhập, mở Audit/Security/Evidence nhưng bị deny preview/download file content.
+  \item Compliance Officer đăng nhập, mở Audit/Security/Evidence nhưng bị từ chối preview/download nội dung file.
 \end{enumerate}
 
 Luồng này thể hiện đủ các thành phần chính của hệ thống: identity, gateway, metadata, document storage, workflow, audit, notification và frontend.
