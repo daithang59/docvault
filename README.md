@@ -13,9 +13,15 @@ Repo này không chỉ chứa application. Phần quan trọng của dự án l�
 
 ## Kiến Trúc DocVault
 
+![Kiến trúc application DocVault](report/images/docvault-architecture.drawio.png)
+
+Sơ đồ trên mô tả kiến trúc application DocVault: frontend, gateway, các microservice backend, authentication, metadata database, audit database và object storage.
+
+### Kiến Trúc Triển Khai EKS
+
 ![Kiến trúc triển khai DocVault trên EKS](report/images/infra/docvault-eks-architecture.png)
 
-Sơ đồ trên mô tả cách DocVault được triển khai trên EKS: lớp ingress/web, API gateway, các microservice backend, dependency runtime, registry, GitOps, secrets, storage và observability.
+Sơ đồ EKS mô tả lớp triển khai cloud-native: ingress/web, Kubernetes workloads, Harbor registry, GitOps, secrets, storage và observability.
 
 Các vai trò chính trong hệ thống:
 
