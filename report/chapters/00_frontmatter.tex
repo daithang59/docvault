@@ -3,7 +3,7 @@
 \chapter*{Lời cảm ơn}
 \addcontentsline{toc}{chapter}{Lời cảm ơn}
 
-Trong quá trình thực hiện đồ án chuyên ngành với đề tài ``Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps'', nhóm đã có cơ hội vận dụng kiến thức về phát triển phần mềm, kiến trúc microservices, bảo mật ứng dụng và tự động hóa triển khai vào một hệ thống có tính thực tiễn cao. Bên cạnh việc xây dựng một ứng dụng quản lý tài liệu, đề tài còn đặt trọng tâm vào cách đưa các kiểm soát bảo mật vào toàn bộ vòng đời phát triển.
+Trong quá trình thực hiện đồ án chuyên ngành với đề tài ``Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps'', nhóm đã có dịp đưa kiến thức về phát triển phần mềm, kiến trúc microservices, bảo mật ứng dụng và tự động hóa triển khai vào một hệ thống tương đối hoàn chỉnh. Quá trình này có không ít khó khăn, từ giới hạn tài nguyên và chi phí cho đến các vấn đề phát sinh khi triển khai và vận hành hệ thống. Vượt qua những trở ngại đó là một phần đáng giá của trải nghiệm, giúp nhóm trưởng thành hơn trong cách xây dựng và vận hành một hệ thống thực tế.
 
 Nhóm xin gửi lời cảm ơn đến thầy ThS. Lê Anh Tuấn đã định hướng, góp ý và hỗ trợ nhóm trong quá trình xác định phạm vi, thiết kế kiến trúc và hoàn thiện sản phẩm. Những góp ý trong quá trình thực hiện giúp nhóm nhìn nhận rõ hơn mối liên hệ giữa yêu cầu nghiệp vụ, yêu cầu bảo mật và khả năng vận hành của hệ thống.
 
@@ -14,7 +14,7 @@ Nhóm cũng xin cảm ơn nhà trường và khoa đã tạo điều kiện đ�
 \chapter*{Tóm tắt}
 \addcontentsline{toc}{chapter}{Tóm tắt}
 
-DocVault là một hệ thống quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices, hướng đến bài toán quản lý vòng đời tài liệu trong môi trường có yêu cầu phân quyền, kiểm soát tải xuống, lưu vết audit và hỗ trợ compliance. Hệ thống cho phép người dùng tạo tài liệu, tải lên phiên bản file, gửi duyệt, phê duyệt, xuất bản, lưu trữ và truy vết các hoạt động liên quan. Các vai trò chính gồm Viewer, Editor, Approver, Compliance Officer và Admin. Mỗi vai trò có phạm vi truy cập khác nhau dựa trên RBAC, ACL, trạng thái tài liệu và mức phân loại bảo mật.
+DocVault là một hệ thống quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices, hướng đến bài toán quản lý vòng đời tài liệu trong môi trường có yêu cầu phân quyền, kiểm soát tải xuống, lưu vết audit và hỗ trợ compliance. Hệ thống cho phép người dùng tạo tài liệu, tải lên phiên bản file, gửi duyệt, phê duyệt, xuất bản, lưu trữ và truy vết các hoạt động liên quan. Các vai trò chính gồm Viewer, Editor, Approver, Compliance Officer và Admin. Điểm nhóm muốn nhấn mạnh là quyền truy cập không được quyết định bởi một yếu tố đơn lẻ: nó là kết quả tổng hợp của RBAC, ACL, trạng thái tài liệu và mức phân loại bảo mật, và được thực thi ở backend.
 
 Về mặt ứng dụng, DocVault được triển khai với frontend Next.js, API Gateway và các backend service NestJS gồm metadata-service, document-service, workflow-service, audit-service và notification-service. Hệ thống sử dụng Keycloak cho xác thực, PostgreSQL cho metadata, MongoDB cho audit log và MinIO/S3 cho lưu trữ file. Các kiểm soát bảo mật trọng tâm bao gồm phân quyền theo vai trò, ACL deny-overrides, kiểm soát preview/download, grant token ngắn hạn, hash-chain audit, malware scanning, DLP, retention evidence và compliance evidence packet.
 
@@ -27,7 +27,7 @@ Về mặt DevSecOps, đề tài thiết kế và triển khai pipeline Jenkins 
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-DocVault is a secure document management system designed around a microservices architecture and a DevSecOps-oriented delivery process. The system addresses document lifecycle management in an environment that requires role-based access control, controlled file access, auditability, and compliance evidence. Core workflows include document creation, file upload and versioning, review submission, approval, publication, archiving, preview/download authorization, audit inspection, and evidence export.
+DocVault is a secure document management system designed around a microservices architecture and a DevSecOps-oriented delivery process. The system addresses document lifecycle management in an environment that requires role-based access control, controlled file access, auditability, and compliance evidence. Core workflows include document creation, file upload and versioning, review submission, approval, publication, archiving, preview/download authorization, audit inspection, and evidence export. A central design point is that an access decision is never made from a single attribute: it is the combined result of role, ACL, document status, and classification, and it is always enforced at the backend rather than in the user interface.
 
 The application layer consists of a Next.js frontend, an API Gateway, and NestJS microservices, including metadata, document, workflow, audit, and notification services. Keycloak provides identity and access management, PostgreSQL stores document metadata, MongoDB stores audit events, and MinIO/S3 stores file objects. Security controls include RBAC, ACL with deny-overrides semantics, short-lived grant tokens, tamper-evident audit hash chains, malware scanning, DLP classification escalation, retention evidence, and compliance evidence packets.
 
