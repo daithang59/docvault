@@ -2,19 +2,21 @@
 
 \section{Bối cảnh}
 
-Trong các tổ chức hiện đại, tài liệu không đơn thuần là dữ liệu văn phòng mà là một dạng tài sản thông tin có giá trị. Một tài liệu có thể chứa hợp đồng, báo cáo tài chính, hồ sơ nhân sự, thông tin khách hàng, biên bản phê duyệt hoặc dữ liệu có yêu cầu bảo mật cao. Khi số lượng tài liệu tăng, việc quản lý vòng đời tài liệu, phân quyền truy cập, kiểm soát tải xuống và truy vết hoạt động trở thành yêu cầu thiết yếu.
+Tài liệu trong một tổ chức không chỉ là file để lưu và tìm lại. Nó có vòng đời: được tạo, chỉnh sửa, gửi duyệt, xuất bản rồi lưu trữ; và ở mỗi bước, việc ai được xem, ai được tải, ai được phê duyệt đều cần có ranh giới rõ ràng. Tài liệu cũng có thể là hợp đồng, báo cáo tài chính, hồ sơ nhân sự hay biên bản phê duyệt, tức là loại dữ liệu mà mọi thao tác lên nó nên để lại dấu vết để sau này còn truy lại được.
 
-Các hệ thống quản lý tài liệu truyền thống thường tập trung vào việc lưu trữ và tìm kiếm. Nhưng đặt trong bối cảnh an toàn thông tin, một hệ thống quản lý tài liệu còn phải trả lời nhiều câu hỏi khác: ai được xem metadata, ai được tải file, tài liệu nào được xem là nhạy cảm, ai đã phê duyệt tài liệu, thao tác nào bị từ chối, file tải lên có chứa mã độc hay dữ liệu nhạy cảm không, và bằng chứng nào có thể cung cấp cho quá trình kiểm tra tuân thủ. Những câu hỏi đó biến quản lý tài liệu thành bài toán giao thoa giữa nghiệp vụ, bảo mật và vận hành.
+Các hệ thống quản lý tài liệu phổ biến đã làm tốt việc lưu trữ, phân quyền cơ bản và tìm kiếm. Nhóm chọn đề tài DocVault không nhằm dựng lại một hệ thống đầy đủ tính năng như vậy, mà muốn đi sâu hơn vào những khía cạnh nhóm thấy đáng học và thường ít được đặt làm trọng tâm: quản lý vòng đời tài liệu một cách có kiểm soát, kiểm soát truy cập nhiều lớp theo mức nhạy cảm của tài liệu, ghi nhận audit log có thể truy vết và kiểm tra tính toàn vẹn, và đưa toàn bộ quy trình phát hành vào một pipeline DevSecOps có bằng chứng. Nói cách khác, mục tiêu của nhóm thiên về chiều sâu bảo mật, khả năng truy vết và quy trình, hơn là bề rộng tính năng.
 
-Đồng thời, quy trình phát triển phần mềm hiện đại không còn xem bảo mật là một bước kiểm tra cuối cùng. DevSecOps khuyến khích đưa các kiểm soát bảo mật vào sớm và xuyên suốt vòng đời phát triển: từ mã nguồn, thư viện phụ thuộc, cấu hình hạ tầng, Docker image cho đến ứng dụng sau khi triển khai. Theo khuyến nghị của NIST SSDF và các hướng dẫn DevSecOps của OWASP, việc tự động hóa kiểm thử và thu thập bằng chứng bảo mật giúp giảm rủi ro và tăng tính lặp lại của quy trình phát hành \cite{nist_ssdf,owasp_devsecops}.
+Một nguyên tắc nhóm đặt ra từ đầu là chính sách bảo mật phải được thực thi ở backend. Giao diện có thể ẩn hoặc làm mờ thao tác để gọn gàng hơn, nhưng quyết định cho phép hay từ chối phải nằm ở phía service và được kiểm thử tại đó, vì với tài liệu nhạy cảm thì một thao tác bị bỏ lọt ở backend mới là rủi ro thật, còn việc ẩn nút trên màn hình chỉ là cải thiện trải nghiệm.
 
-Từ bối cảnh trên, đề tài DocVault được xây dựng với mục tiêu triển khai một hệ thống quản lý tài liệu bảo mật, đồng thời thiết kế quy trình DevSecOps phục vụ kiểm thử, đóng gói và triển khai hệ thống.
+Mặt thứ hai của đề tài là quy trình phát hành. Nhóm chọn DevSecOps không phải vì đó là từ khóa thời thượng, mà vì nếu kiểm soát bảo mật chỉ được kiểm tra một lần ở cuối thì rất khó lặp lại và dễ bỏ sót khi code thay đổi. DevSecOps đưa các bước kiểm tra vào sớm và rải đều khắp vòng đời: mã nguồn, thư viện phụ thuộc, cấu hình hạ tầng, Docker image, rồi đến ứng dụng đang chạy sau khi triển khai. NIST SSDF và hướng dẫn DevSecOps của OWASP cũng đi theo tư tưởng này: tự động hóa kiểm thử và thu thập bằng chứng để giảm rủi ro và làm cho mỗi lần phát hành có thể kiểm chứng lại được \cite{nist_ssdf,owasp_devsecops}.
+
+DocVault vì vậy được đặt ra với hai phần gắn vào nhau: một hệ thống quản lý tài liệu thực thi chính sách bảo mật ở backend, và một quy trình DevSecOps lo việc kiểm thử, đóng gói và triển khai hệ thống đó một cách có dấu vết.
 
 \section{Vấn đề cần giải quyết}
 
-Đề tài tập trung vào hai nhóm vấn đề chính. Nhóm thứ nhất là vấn đề ứng dụng: xây dựng hệ thống quản lý tài liệu có phân quyền rõ ràng, có quy trình phê duyệt, có lưu trữ file an toàn và có audit trail đủ để phục vụ truy vết. Nhóm thứ hai là vấn đề quy trình: đưa các kiểm soát bảo mật vào pipeline để mỗi lần thay đổi mã nguồn đều có thể được kiểm tra một cách tự động.
+Đề tài tách thành hai nhóm vấn đề. Nhóm ứng dụng là xây dựng một hệ thống quản lý tài liệu có phân quyền rõ, có quy trình phê duyệt, lưu file an toàn và có audit trail đủ để truy vết. Nhóm quy trình là đưa kiểm soát bảo mật vào pipeline, sao cho mỗi lần đổi mã nguồn đều được kiểm tra tự động thay vì phụ thuộc vào việc nhớ chạy thủ công. Hai nhóm này phải làm song song, vì một hệ thống bảo mật tốt mà phát hành thủ công thì vẫn dễ trượt ở khâu triển khai.
 
-Các yêu cầu tiêu biểu có thể tóm tắt như sau:
+Cụ thể hơn, nhóm rút ra các yêu cầu sau khi phân tích những câu hỏi nêu ở phần bối cảnh:
 
 \begin{itemize}
   \item Người dùng thuộc các vai trò khác nhau phải nhìn thấy và thao tác trên tài liệu theo đúng phạm vi quyền hạn.
@@ -25,6 +27,8 @@ Các yêu cầu tiêu biểu có thể tóm tắt như sau:
   \item Các thao tác quan trọng phải được audit và có khả năng kiểm tra tính toàn vẹn.
   \item Pipeline phải có các bước kiểm thử và quét bảo mật trước, trong và sau khi build/deploy.
 \end{itemize}
+
+Trong số này, ranh giới của Compliance Officer là yêu cầu nhóm cân nhắc nhiều nhất: một người có quyền đọc toàn bộ audit log rất dễ được mặc định cho luôn quyền đọc file, nhưng đó lại chính là lỗ hổng mà vai trò compliance cần tránh.
 
 \section{Mục tiêu đề tài}
 
@@ -69,7 +73,7 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 
 \section{Đóng góp của đề tài}
 
-Đề tài có bốn đóng góp chính. Trước hết, đề tài xây dựng một hệ thống quản lý tài liệu bao phủ luồng nghiệp vụ từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Cùng với đó, hệ thống kết hợp nhiều lớp kiểm soát truy cập gồm vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu. Về phía tuân thủ, các yêu cầu compliance được đưa vào thiết kế thông qua audit hash-chain, retention evidence và evidence packet. Cuối cùng, đề tài triển khai một quy trình DevSecOps có khả năng truy vết từ mã nguồn, container artifact, GitOps revision đến workload trên EKS, đồng thời tích hợp kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành.
+Đề tài có bốn đóng góp. Thứ nhất là một hệ thống quản lý tài liệu chạy được, bao phủ luồng từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai là mô hình kiểm soát truy cập nhiều lớp, kết hợp vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu thay vì chỉ dựa vào một trong số đó. Thứ ba là cách đưa yêu cầu compliance vào ngay trong thiết kế: audit hash-chain để phát hiện sửa đổi, retention evidence và evidence packet metadata-only. Thứ tư, và cũng là phần nhóm đầu tư nhiều công nhất, là một quy trình DevSecOps truy vết được từ mã nguồn qua container artifact và GitOps revision đến workload trên EKS, với các cổng kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành gắn vào từng chặng.
 
 \section{Phân công công việc}
 

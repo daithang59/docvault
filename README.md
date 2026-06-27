@@ -1,520 +1,303 @@
-# DocVault
+# DocVault DevSecOps
 
-**DocVault** is an enterprise document management system built on a **microservices** architecture using NestJS. It supports the full document lifecycle: create → upload → review → publish → archive, with role-based access control (RBAC) and tamper-proof audit logging.
+DocVault là dự án quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices, đồng thời là một bài toán DevSecOps end-to-end: code được kiểm thử, quét bảo mật, build thành container image, ký/định danh image, cập nhật GitOps và triển khai lên Kubernetes/EKS bằng Argo CD.
 
----
+Repo này không chỉ chứa application. Phần quan trọng của dự án là quy trình DevSecOps bao quanh application: CI/CD bằng Jenkins, security gates, policy-as-code, private registry Harbor, Terraform EKS, GitOps, post-deploy smoke test, DAST và observability.
 
-## System Architecture
+## Mục Tiêu Dự Án
 
-### Layer Overview
+- Xây dựng hệ thống quản lý tài liệu có RBAC/ACL, workflow phê duyệt, audit tamper-evident, DLP, malware scan, retention và evidence center.
+- Mô hình hóa pipeline DevSecOps có thể chứng minh bằng report/artifact: secret scan, SAST, SCA, IaC scan, filesystem/image scan, policy-as-code và DAST.
+- Triển khai theo GitOps: Jenkins chỉ cập nhật image reference/Helm values, Argo CD là bộ điều phối trạng thái chạy trên cluster.
+- Tách local development, CI/CD, Kubernetes manifests, Terraform và runtime evidence thành các lớp rõ ràng để dễ demo, kiểm tra và mở rộng.
 
-```mermaid
-flowchart TB
-    subgraph CLIENT["Client"]
-        FE["Frontend Next.js\n:3010"]
-    end
+## Kiến Trúc DocVault
 
-    subgraph GATEWAY["API Gateway — :3000"]
-        GW["gateway\nJWT Auth · RBAC · Routing · Audit wrapper"]
-    end
+![Kiến trúc application DocVault](report/images/docvault-architecture.drawio.png)
 
-    subgraph SERVICES["Microservices"]
-        direction LR
-        META["metadata-service\n:3001\nMetadata · ACL · Status · History"]
-        DOC["document-service\n:3002\nUpload · Download · MinIO"]
-        WF["workflow-service\n:3003\nState machine · Submit · Approve"]
-        AUDIT["audit-service\n:3004\nHash-chain audit log"]
-        NOTIF["notification-service\n:3005\nNotifications"]
-    end
+Sơ đồ trên mô tả kiến trúc application DocVault: frontend, gateway, các microservice backend, authentication, metadata database, audit database và object storage.
 
-    subgraph INFRA["Docker Infrastructure"]
-        direction LR
-        KC["Keycloak\n:8080\nAuth & Users"]
-        PG["PostgreSQL\n:5432\nDatabase"]
-        MINIO["MinIO\n:9000\nObject Storage"]
-    end
+### Kiến Trúc Triển Khai EKS
 
-    FE -->|"Bearer JWT"| GW
+![Kiến trúc triển khai DocVault trên EKS](report/images/infra/docvault-eks-architecture.png)
 
-    GW -->|"/api/metadata"| META
-    GW -->|"/api/documents"| DOC
-    GW -->|"/api/workflow"| WF
-    GW -->|"/api/audit"| AUDIT
-    GW -->|"/api/notify"| NOTIF
+Sơ đồ EKS mô tả lớp triển khai cloud-native: ingress/web, Kubernetes workloads, Harbor registry, GitOps, secrets, storage và observability.
 
-    DOC -.->|"register version"| META
-    WF -.->|"update status"| META
-    WF -.->|"notify"| NOTIF
+Các vai trò chính trong hệ thống:
 
-    GW -.->|"audit events"| AUDIT
-    META -.->|"audit events"| AUDIT
-    DOC -.->|"audit events"| AUDIT
-    WF -.->|"audit events"| AUDIT
+| Role | Vai trò |
+| --- | --- |
+| `viewer` | Xem metadata/tài liệu được phép và tải tài liệu đã publish khi policy cho phép. |
+| `editor` | Tạo tài liệu, upload file, submit, archive tài liệu của mình. |
+| `approver` | Duyệt hoặc từ chối tài liệu đang chờ phê duyệt. |
+| `compliance_officer` | Xem audit/compliance evidence, nhưng không được preview, stream, presign hoặc download nội dung file. |
+| `admin` | Quản trị hệ thống, thành viên, retention và các thao tác nhạy cảm. |
 
-    GW -.->|"verify token"| KC
-    META -.->|"read/write"| PG
-    AUDIT -.->|"read/write"| PG
-    DOC -.->|"store files"| MINIO
+Vòng đời tài liệu chính:
+
+![State machine vòng đời tài liệu trong DocVault](report/images/docvault_document_lifecycle_state.drawio.png)
+
+## Luồng DevSecOps
+
+![Luồng CI/CD và GitOps của DocVault](report/images/infra/CICDPipelineFlow.png)
+
+Pipeline chính nằm ở `Jenkinsfile`; các bước tái sử dụng nằm trong `vars/*.groovy`. Cấu hình mặc định hiện hướng tới Harbor registry (`harbor.docvault.id.vn`), GitOps branch cấu hình qua `GITOPS_BRANCH`, và triển khai Kubernetes bằng Helm chart chung trong `infra/k8s/charts/docvault-service`.
+
+## DevSecOps Components
+
+| Thành phần | Vai trò trong dự án |
+| --- | --- |
+| Jenkins | Điều phối pipeline CI/CD, chạy quality/security gates, build/scan/push image và cập nhật GitOps. |
+| `vars/*.groovy` | Jenkins Shared Library cho từng bước: install, test, scan, build, push, GitOps, Argo health, DAST. |
+| SonarQube | SAST và Quality Gate. |
+| OWASP Dependency-Check | SCA cho dependency, dùng cache NVD để ổn định pipeline. |
+| TruffleHog / Gitleaks | Secret scanning, chặn credential bị commit. |
+| Trivy | Quét filesystem trước build và quét container image sau build. |
+| Checkov | Quét Terraform, Kubernetes và Helm/IaC. |
+| Kyverno CLI | Policy-as-code cho manifest Kubernetes đã render. |
+| Harbor | Private container registry cho image DocVault, hỗ trợ RBAC/robot account và scan image. |
+| Cosign | Ký image digest và attestation SBOM khi bật `SIGN_IMAGES`. |
+| Terraform | Tạo AWS VPC, EKS, node group, IRSA, S3/KMS và các IAM boundary. |
+| Argo CD | GitOps app-of-apps, sync wave hạ tầng -> application -> ingress/observability. |
+| Prometheus, Grafana, Loki | Metrics, dashboard và log tập trung cho môi trường Kubernetes. |
+| OWASP ZAP | DAST baseline scan sau khi có endpoint deploy thật. |
+
+## Security Gates Chính
+
+Pipeline được thiết kế để fail sớm khi có lỗi nghiêm trọng:
+
+- Secret scan fail khi phát hiện secret thật trong repository.
+- Unit test/lint/build fail khi code không đạt chất lượng tối thiểu.
+- Dependency-Check fail với CVSS cao, trừ khi có exception được ghi nhận.
+- Trivy filesystem/image scan fail với High/Critical findings theo policy hiện tại.
+- SonarQube Quality Gate có thể bắt buộc bằng `ENFORCE_SONAR_QG=true`.
+- Checkov validate Terraform/Kubernetes/Helm trước khi deploy.
+- Kyverno CLI chặn manifest thiếu resource limits, chạy root/privileged, dùng `latest`, secret literal hoặc image không đến từ Harbor/digest.
+- ZAP fail khi có High/Critical finding sau deploy.
+
+Các report thường được archive bởi Jenkins:
+
+```text
+secret-scan-report/
+dependency-check-report/
+trivy-fs-report/
+checkov-report/
+policy-report/
+policy-rendered/
+zap-report/
 ```
 
-### Document Lifecycle
+## Hạ Tầng Và GitOps
 
-```mermaid
-flowchart LR
-    DRAFT(["DRAFT"])
-    PENDING(["PENDING"])
-    PUBLISHED(["PUBLISHED"])
-    ARCHIVED(["ARCHIVED"])
+Local development dùng Docker Compose:
 
-    DRAFT -->|"Editor submit"| PENDING
-    PENDING -->|"Approver approve"| PUBLISHED
-    PENDING -->|"Approver reject"| DRAFT
-    PUBLISHED -->|"Editor archive"| ARCHIVED
+- PostgreSQL cho `metadata-service`.
+- MongoDB cho `audit-service` và `notification-service`.
+- MinIO/S3 cho file tài liệu.
+- Keycloak cho identity, role, group.
+- ClamAV cho malware scanning.
+- Mongo Express và Prisma Studio để xem dữ liệu khi cần.
+
+Môi trường Kubernetes/EKS dùng:
+
+- Terraform stack tại `infra/terraform/aws-eks`.
+- Helm chart dùng chung tại `infra/k8s/charts/docvault-service`.
+- Helm values từng service tại `infra/k8s/values`.
+- Argo CD root app tại `infra/argocd-bootstrap/docvault-root.yaml`.
+- Argo CD child apps tại `infra/argocd-apps`.
+- External Secrets Operator đọc secret từ AWS Secrets Manager.
+- Sync wave:
+  - wave 0: infra dependencies.
+  - wave 1: DocVault services/web.
+  - wave 2: ingress, monitoring, logging.
+
+## Cấu Trúc Repository
+
+```text
+docvault-devsecops/
+|-- apps/
+|   `-- web/                         # Next.js frontend
+|-- services/
+|   |-- gateway/                     # API gateway, auth, RBAC, proxy
+|   |-- metadata-service/            # Metadata, ACL, retention, policy
+|   |-- document-service/            # Upload/preview/download, MinIO/S3, DLP/malware
+|   |-- workflow-service/            # Document lifecycle workflow
+|   |-- audit-service/               # MongoDB audit log, hash chain, security summary
+|   `-- notification-service/        # Notification sink/in-app notifications
+|-- libs/
+|   |-- auth/                        # Shared auth/RBAC helpers
+|   |-- contracts/                   # OpenAPI/events contracts
+|   `-- throttler/                   # Shared throttling utilities
+|-- infra/
+|   |-- docker-compose.dev.yml       # Local dependencies
+|   |-- terraform/                   # AWS/EKS IaC
+|   |-- k8s/                         # Helm, Kustomize, ingress, CI RBAC, Harbor
+|   |-- argocd-bootstrap/            # Argo CD app-of-apps root
+|   `-- argocd-apps/                 # Argo CD child applications
+|-- policies/
+|   `-- kyverno/                     # Policy-as-code gates
+|-- vars/                            # Jenkins Shared Library steps
+|-- docs/                            # Runbooks, evidence, setup guides
+|-- Jenkinsfile                      # Main DevSecOps pipeline
+|-- Jenkinsfile.storage              # Storage/S3-KMS GitOps pipeline
+`-- package.json                     # pnpm/Turbo workspace
 ```
 
----
+## Chạy Local Nhanh
 
-## Use Case Diagram
+Yêu cầu:
 
-```mermaid
-flowchart LR
-    subgraph ACTORS["Actors"]
-        V(["Viewer"])
-        E(["Editor"])
-        A(["Approver"])
-        CO(["Compliance Officer"])
-        ADM(["Admin"])
-    end
+- Node.js 20+
+- pnpm 9.15.0
+- Docker Desktop hoặc Docker Engine + Docker Compose
 
-    subgraph USECASES["System Functions"]
-        UC1["View document list"]
-        UC2["View document details"]
-        UC3["Create new document"]
-        UC4["Upload file"]
-        UC5["Manage ACL permissions"]
-        UC6["Submit for review\nDRAFT → PENDING"]
-        UC7["Approve document\nPENDING → PUBLISHED"]
-        UC8["Reject document\nPENDING → DRAFT"]
-        UC9["Archive document\nPUBLISHED → ARCHIVED"]
-        UC10["Download published file"]
-        UC11["View audit log"]
-        UC12["Preview document\nPUBLISHED / ARCHIVED"]
-        UC13["My Documents\nView owned documents"]
-    end
-
-    V --> UC1
-    V --> UC2
-    V --> UC10
-    V --> UC12
-
-    E --> UC1
-    E --> UC2
-    E --> UC3
-    E --> UC4
-    E --> UC5
-    E --> UC6
-    E --> UC9
-    E --> UC10
-    E --> UC12
-    E --> UC13
-
-    A --> UC1
-    A --> UC2
-    A --> UC7
-    A --> UC8
-    A --> UC10
-    A --> UC12
-
-    CO --> UC1
-    CO --> UC2
-    CO --> UC11
-    CO -.->|"PUBLIC only"| UC12
-
-    ADM --> UC1
-    ADM --> UC2
-    ADM --> UC3
-    ADM --> UC4
-    ADM --> UC5
-    ADM --> UC6
-    ADM --> UC7
-    ADM --> UC8
-    ADM --> UC9
-    ADM --> UC10
-    ADM --> UC11
-    ADM --> UC12
-    ADM --> UC13
-```
-
-> **Note:** Compliance Officer **cannot download files** regardless of any ACL permissions — this rule is enforced at the `metadata-service` layer. CO **can preview only PUBLIC** published/archived documents, but sees metadata (details) for all PUBLISHED and ARCHIVED documents for audit purposes.
-
-### User Roles
-
-| Role | Main Permissions |
-|------|------------------|
-| `viewer` | View list (PUBLIC), preview, download published files |
-| `editor` | Create documents, upload files, submit for review, archive (own docs) |
-| `approver` | Approve / reject documents, preview **all** classification levels |
-| `compliance_officer` | View metadata for all PUBLISHED + ARCHIVED documents, view audit log, preview **PUBLIC only** — **cannot download files** |
-| `admin` | Full access |
-
-### Classification × Role Matrix
-
-#### Document List Visibility
-
-| Classification | viewer | editor | approver | CO | admin |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `INTERNAL` | ❌ | ✅ | ✅ | ✅ | ✅ |
-| `CONFIDENTIAL` | ❌ | ❌ | ✅ | ✅ | ✅ |
-| `SECRET` | ❌ | ❌ | ✅ | ✅ | ✅ |
-
-#### Document Preview
-
-| Classification | viewer | editor | approver | CO | admin |
-|---|:---:|:---:|:---:|:---:|:---:|
-| `PUBLIC` | ✅ | ✅ | ✅ | ✅ | ✅ |
-| `INTERNAL` | ✅ | ✅ | ✅ | ❌ | ✅ |
-| `CONFIDENTIAL` | ❌ | ✅¹ | ✅ | ❌ | ✅ |
-| `SECRET` | ❌ | ❌ | ✅ | ❌ | ✅ |
-
-> ¹ Requires explicit ACL or is the owner
-
-> Beyond the matrix above, a user always sees documents they **own** or have an **ACL entry** for — regardless of classification level.
-
----
-
-## Installation Requirements
-
-| Tool | Minimum Version |
-|------|-----------------|
-| Node.js | 18+ |
-| pnpm | 8+ |
-| Docker Desktop | 24+ |
-| Git | any |
-
----
-
-## Running the Project
-
-### Quick Start — Single Command
+Cài dependency:
 
 ```bash
 pnpm install
-pnpm --filter metadata-service db:seed
+```
+
+Chuẩn bị env local:
+
+```bash
+cp infra/.env.example infra/.env
+cp .env.example .env
+```
+
+Tạo `.env` cho từng service từ file `.env.example` tương ứng. Với frontend, tạo `apps/web/.env.local` nếu cần override:
+
+```env
+NEXT_PUBLIC_APP_NAME=DocVault
+NEXT_PUBLIC_API_BASE_URL=/api
+GATEWAY_URL=http://localhost:3000
+FRONTEND_URL=http://localhost:3006
+```
+
+Start local infrastructure:
+
+```bash
+docker compose -f infra/docker-compose.dev.yml --env-file infra/.env up -d
+```
+
+Migrate và seed metadata:
+
+```bash
+pnpm --filter metadata-service prisma:deploy
+pnpm run seed:metadata
+```
+
+Start backend đúng thứ tự:
+
+```bash
 pnpm start:sequential
 ```
 
-This script automatically starts **all services in the correct order**, polling the health endpoint before moving to the next service:
-
-```
-metadata-service (:3001) → document-service (:3002) → workflow-service (:3003)
-  → notification-service (:3005) → audit-service (:3004) → gateway (:3000)
-```
-
-Optional steps (Prisma deploy, audit log migration) are skipped by default. Enable with:
+Start frontend:
 
 ```bash
-RUN_PRISMA_DEPLOY=1 RUN_AUDIT_MIGRATION=1 pnpm start:sequential
+pnpm --filter web dev
 ```
 
-Customize health-check timeout:
+Mở web:
+
+```text
+http://localhost:3006
+```
+
+Nếu muốn chạy frontend ở port khác:
 
 ```bash
-SERVICE_HEALTH_TIMEOUT_MS=180000 pnpm start:sequential
+pnpm --filter web dev -- --port 3100
 ```
 
-> Make sure Docker infra is already running (see Step 1 below).
+## Endpoint Quan Trọng
 
----
+| Thành phần | URL |
+| --- | --- |
+| Web | `http://localhost:3006` |
+| Gateway health | `http://localhost:3000/api/health` |
+| Gateway Swagger | `http://localhost:3000/api/docs` |
+| metadata-service Swagger | `http://localhost:3001/docs` |
+| document-service Swagger | `http://localhost:3002/docs` |
+| workflow-service Swagger | `http://localhost:3003/docs` |
+| audit-service Swagger | `http://localhost:3004/docs` |
+| notification-service Swagger | `http://localhost:3005/docs` |
+| Keycloak | `http://localhost:8080` |
+| Mongo Express | `http://localhost:8081` |
+| MinIO Console | `http://localhost:9001` |
 
-### Detailed Step-by-Step
+## Tài Khoản Demo
 
-#### Step 1 — Install Dependencies
+Password mặc định cho các seeded user:
+
+```text
+Passw0rd!
+```
+
+| Username | Role |
+| --- | --- |
+| `viewer1` | `viewer` |
+| `editor1` | `editor` |
+| `approver1` | `approver` |
+| `co1` | `compliance_officer` |
+| `admin1` | `admin` |
+
+## Verification
+
+Kiểm tra workspace:
 
 ```bash
-pnpm install
+pnpm lint
+pnpm test
+pnpm build
 ```
 
-#### Step 2 — Start Infrastructure (Docker)
-
-This starts: **PostgreSQL**, **MinIO**, **Keycloak** (with seeded realm & sample users).
+Kiểm tra E2E runtime sau khi backend, frontend và infra đã chạy:
 
 ```bash
-docker compose -f infra/docker-compose.dev.yml --env-file infra/.env.example up -d
+pnpm test:e2e
 ```
 
-Wait for all containers to be **healthy** (about 30–60 seconds):
-
-```bash
-docker compose -f infra/docker-compose.dev.yml ps
-```
-
-> **Services after startup:**
-> - PostgreSQL: `localhost:5432`
-> - MinIO Console: [http://localhost:9001](http://localhost:9001) (user: `minioadmin` / `minioadminpw`)
-> - Keycloak Admin: [http://localhost:8080](http://localhost:8080) (user: `admin` / `adminpw`)
-
-#### Step 3 — Run Database Migrations
-
-```bash
-# metadata-service (PostgreSQL)
-pnpm --filter metadata-service prisma:deploy
-
-# audit-service (PostgreSQL)
-pnpm --filter audit-service prisma:deploy
-```
-
-#### Step 3b — Seed Sample Data (first-time setup)
-
-Populates the database with sample documents, ACL entries, and workflow history so the system is ready to use immediately.
-
-```bash
-pnpm --filter metadata-service db:seed
-```
-
-Sample data created:
-- **Q1 Financial Report 2026** (CONFIDENTIAL, PUBLISHED)
-- **Employee Handbook v3** (INTERNAL, PUBLISHED)
-- **Product Roadmap 2026** (CONFIDENTIAL, DRAFT)
-- **Meeting Notes — All Hands Feb** (PUBLIC, PUBLISHED)
-
-#### Step 4 — Start Backend Services
-
-Each service runs in its own terminal:
-
-```bash
-# Terminal 1 — metadata-service (port 3001)
-pnpm --filter metadata-service start:dev
-
-# Terminal 2 — document-service (port 3002)
-pnpm --filter document-service start:dev
-
-# Terminal 3 — workflow-service (port 3003)
-pnpm --filter workflow-service start:dev
-
-# Terminal 4 — audit-service (port 3004)
-pnpm --filter audit-service start:dev
-
-# Terminal 5 — notification-service (port 3005)
-pnpm --filter notification-service start:dev
-
-# Terminal 6 — gateway (port 3000) — start LAST
-pnpm --filter gateway start:dev
-```
-
-> **Important order:** Gateway must start **after** all other services are ready.
-
-#### Step 5 — Start Frontend
-
-```bash
-cd apps/web
-
-# Copy env file
-cp .env.example .env.local
-
-# Run dev server
-npx next dev -p 3010
-```
-
-Open browser: [http://localhost:3010](http://localhost:3010)
-
----
-
-## Testing the System
-
-### Run E2E Checks for the Full BE Flow
-
-```bash
-node scripts/e2e-check.mjs
-```
-
-Includes:
-- No token → 401
-- Expired token → 401
-- Viewer creates document → 403
-- Editor creates + uploads → 201, file stored in MinIO ✅
-- Viewer guessed confidential metadata/history/comments/ACL → 403
-- Confidential document presign → stream-only response, no direct URL
-- GROUP ACL metadata access with `finance-team`
-- EICAR malware upload blocked before MinIO storage
-- DLP sensitive upload escalates classification to `CONFIDENTIAL`
-- Viewer downloads draft → 403
-- Editor submits → PENDING
-- Approver approves → PUBLISHED
-- Approve again → 409 Conflict
-- Viewer downloads PUBLISHED → 200
-- Compliance Officer downloads file → 403
-- Retention evidence + admin retention run → archived record
-- Audit verify-chain + security summary → 200
-- Compliance Officer views audit → 200
-- Viewer views audit → 403
-
-### API Swagger
-
-With services running:
-
-| Service | Swagger UI |
-|---------|-----------|
-| Gateway | [http://localhost:3000/docs](http://localhost:3000/docs) |
-| metadata-service | [http://localhost:3001/docs](http://localhost:3001/docs) |
-| document-service | [http://localhost:3002/docs](http://localhost:3002/docs) |
-| workflow-service | [http://localhost:3003/docs](http://localhost:3003/docs) |
-| audit-service | [http://localhost:3004/docs](http://localhost:3004/docs) |
-| notification-service | [http://localhost:3005/docs](http://localhost:3005/docs) |
-
----
-
-## Demo Accounts (Keycloak)
-
-Password for all accounts: **`Passw0rd!`**
-
-| Username | Role | Description |
-|----------|------|-------------|
-| `viewer1` | viewer | View & download published documents |
-| `editor1` | editor | Create, upload, submit documents |
-| `approver1` | approver | Approve / reject documents |
-| `co1` | compliance_officer | View audit log (cannot download files) |
-| `admin1` | admin | Full access |
-
-### Get JWT Token from Keycloak
-
-```bash
-curl -s -X POST \
-  http://localhost:8080/realms/docvault/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "client_id=docvault-gateway&client_secret=dev-gateway-secret&grant_type=password&username=editor1&password=Passw0rd!" \
-  | jq -r '.access_token'
-```
-
----
-
-## Core Business Flows
-
-### Upload and Publish Document
-
-```
-Editor                    Gateway              Services
-  │                          │                    │
-  ├─ POST /api/metadata/documents ──────────────► │ Create metadata (DRAFT)
-  ├─ POST /api/documents/:id/upload ────────────► │ Upload to MinIO
-  ├─ POST /api/workflow/:id/submit ────────────► │ DRAFT → PENDING
-  │                                               │
-Approver                                          │
-  ├─ POST /api/workflow/:id/approve ────────────► │ PENDING → PUBLISHED
-  │                                               │
-Viewer                                            │
-  └─ POST /api/documents/:id/presign-download ──► │ Get download URL
-```
-
-### Compliance Flow
-
-```
-Compliance Officer   Gateway         metadata-service
-  │                    │                    │
-  ├─ GET /api/metadata/documents ──────────► │ View list → 200 ✅
-  ├─ GET /api/audit/query ─────────────────► │ View audit log → 200 ✅
-  └─ POST /api/documents/:id/presign-download │ Download file → 403 ❌ (always blocked)
-```
-
----
-
-## Directory Structure
-
-```
-docvault/
-├── apps/
-│   └── web/                    # Frontend Next.js 15
-├── services/
-│   ├── gateway/                # API Gateway (NestJS, port 3000)
-│   ├── metadata-service/       # Metadata & ACL management (port 3001)
-│   ├── document-service/       # Upload/Download via MinIO (port 3002)
-│   ├── workflow-service/       # Document review state machine (port 3003)
-│   ├── audit-service/          # Tamper-proof audit log (port 3004)
-│   └── notification-service/   # Notifications (port 3005)
-├── infra/
-│   ├── docker-compose.dev.yml  # Infra: Postgres, MinIO, Keycloak
-│   ├── .env.example            # Sample infra config
-│   └── keycloak/               # Realm config & seed users
-├── scripts/
-│   ├── e2e-check.mjs           # Automated E2E check script
-│   ├── start-sequential.mjs   # Sequential startup script for all services
-│   └── demo.sh                 # Demo script
-└── docs/
-    ├── TEAM_SETUP_DEPLOYMENT_GUIDE.md # Team setup, CI/CD, EKS and PR checklist
-    ├── demo-users.md           # Account & permission info
-    ├── demo-flow.md            # Step-by-step demo scenarios
-    ├── ERD.md                  # Entity Relationship Diagram
-    ├── PROJECT_STATUS.md       # Project status & known gaps
-    └── verification-report.md # Integration check report
-```
-
----
-
-## Data Model
-
-### Database `docvault_metadata` (PostgreSQL)
-
-- `documents` — metadata, tags, classification, status, publishedAt, archivedAt
-- `document_versions` — pointers to file versions stored in MinIO
-- `document_acl` — access control (USER / ROLE / GROUP)
-- `document_workflow_history` — status transition history
-
-### Database `docvault_audit` (PostgreSQL)
-
-- `audit_events` — audit events with **SHA-256 hash chain** for tamper proofing
-
-### Database `docvault_metadata` — Document Comments
-
-- `document_comments` — comments/notes on documents (authorId, content, timestamp)
-
----
-
-## Advanced Features
-
-### Bulk Actions
-
-Select multiple documents in the table and perform batch operations:
-
-- **Bulk Submit**: Select multiple DRAFT → Submit all at once
-- **Bulk Approve**: Approver selects multiple PENDING → Batch approve
-- **Bulk Archive**: Select multiple PUBLISHED → Archive simultaneously
-
-> Results displayed via toast: `"Bulk Submit: 3 succeeded, 1 failed"`.
-
-### Document Comments
-
-All users with document view permission can leave comments/notes:
-
-- Displayed on document detail page (right column)
-- Supported across all roles: viewer, editor, approver, CO, admin
-- API: `GET/POST /api/metadata/documents/:docId/comments`
-
-### Full-text Search (Server-side)
-
-Search documents by title, description, and tags:
-
-- Search processed server-side (PostgreSQL ILIKE) → efficient with large datasets
-- API: `GET /api/metadata/documents?q=keyword`
-- Frontend automatically sends query to server when typing in the search box
-
-### My Documents
-
-Editor/Admin has a dedicated `/my-documents` page showing only their owned documents:
-
-- Sidebar menu: **My Documents** (FolderOpen icon)
-- Auto-filtered by `ownerId` — easy personal document management
-- Full support: bulk actions, filters, submit/archive
-
----
-
-## Important Notes
-
-- **Compliance Officer** is always denied file downloads, even if ACL permits it (logic in `metadata-service/policy.service.ts`). CO **can only preview PUBLIC documents**, but sees metadata (details) for all PUBLISHED and ARCHIVED documents for audit purposes.
-- **Approver** is the highest non-admin permission — can preview documents at **all** classification levels.
-- **Preview** supports `PUBLISHED` and `ARCHIVED` documents. PDFs are rendered via `pdf.js` (canvas) — no download button, no right-click save.
-- **Archive** is only available to editors who own the document or admins (not approvers). ARCHIVED documents **can only be previewed**, not downloaded.
-- **Classification Visibility**: PUBLIC (all) → INTERNAL (editor+) → CONFIDENTIAL (approver+) → SECRET (approver+). CO sees all PUBLISHED (metadata only).
-- **Bulk Actions** supports batch Submit, Approve, Archive — each doc is called via sequential API.
-- **Document Comments** stored in the `document_comments` table — unlimited comments.
-- Gateway automatically logs audit for every request received.
-- Document status flow: `DRAFT` → `PENDING` → `PUBLISHED` → `ARCHIVED`.
+Các luồng E2E chính gồm:
+
+- Không có token hoặc token hết hạn bị chặn.
+- Viewer không thể tạo tài liệu.
+- Editor tạo/upload/submit tài liệu.
+- Approver approve/reject workflow.
+- ACL `GROUP`, DLP, malware block, retention và audit security summary.
+- Compliance officer xem audit/evidence nhưng không được tải file.
+
+## Tài Liệu Liên Quan
+
+| Tài liệu | Khi nào đọc |
+| --- | --- |
+| [docs/RUN_PROJECT.md](docs/RUN_PROJECT.md) | Chạy local stack từng bước. |
+| [docs/DEPLOYMENT_RUNBOOK.md](docs/DEPLOYMENT_RUNBOOK.md) | Runbook vận hành service, env và troubleshooting. |
+| [docs/DEVSECOPS_PIPELINE_SETUP_GUIDE.md](docs/DEVSECOPS_PIPELINE_SETUP_GUIDE.md) | Cấu hình Jenkins/SonarQube/GitOps pipeline. |
+| [docs/TEAM_SETUP_DEPLOYMENT_GUIDE.md](docs/TEAM_SETUP_DEPLOYMENT_GUIDE.md) | Hướng dẫn EKS, Argo CD, Jenkins, ZAP và observability cho team. |
+| [vars/README.md](vars/README.md) | Ý nghĩa từng Jenkins Shared Library step. |
+| [infra/README.md](infra/README.md) | Bản đồ hạ tầng, GitOps và Kubernetes. |
+| [infra/terraform/aws-eks/README.md](infra/terraform/aws-eks/README.md) | Terraform stack tạo AWS EKS và IAM/IRSA. |
+| [infra/argocd-apps/README.md](infra/argocd-apps/README.md) | Argo CD child applications và sync wave. |
+| [policies/kyverno/README.md](policies/kyverno/README.md) | Policy-as-code gates cho Kubernetes. |
+| [docs/DANH_SACH_TINH_NANG_WEB.md](docs/DANH_SACH_TINH_NANG_WEB.md) | Danh sách tính năng web hiện tại. |
+| [docs/API_CONTRACT.md](docs/API_CONTRACT.md) | Contract API chính qua Gateway. |
+| [docs/web-security-evidence.md](docs/web-security-evidence.md) | Evidence runtime security của web/application. |
+| [docs/security-sca-triage.md](docs/security-sca-triage.md) | SCA triage, package đã fix và exception. |
+| [docs/pipeline-hardening-summary.md](docs/pipeline-hardening-summary.md) | Tóm tắt cải tiến pipeline, DAST và observability. |
+
+## Quy Ước Bảo Mật
+
+- Không commit `.env`, secret, kubeconfig thật, `terraform.tfvars`, Terraform state hoặc plan file.
+- Secret runtime trên EKS nên đi qua AWS Secrets Manager và External Secrets Operator.
+- Không dùng image tag `latest` cho workload DocVault.
+- Image deploy nên được pin bằng digest và pull từ Harbor/private registry.
+- Compliance officer luôn bị chặn khỏi nội dung file, kể cả khi có metadata visibility.
+- Các exception security phải có lý do, mitigation và follow-up rõ ràng.
+
+## Thành Viên
+
+| Họ tên | Vai trò |
+| --- | --- |
+| Huỳnh Lê Đại Thắng | Author |
+| Nguyễn Trường Duy | Coauthor |

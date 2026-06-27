@@ -155,7 +155,7 @@ Trong DocVault, Compliance Officer:
   \item không được preview, stream, presign hoặc download nội dung file.
 \end{itemize}
 
-Quy tắc này được enforce ở nhiều tầng: frontend permission helper để hiển thị lý do deny, gateway proxy để chặn đường gọi phù hợp và service policy để đảm bảo backend là nguồn quyết định cuối cùng.
+Quy tắc này được thực thi ở nhiều tầng: frontend permission helper để hiển thị lý do từ chối, gateway proxy để chặn đường gọi phù hợp và service policy để đảm bảo backend là nguồn quyết định cuối cùng.
 
 \section{Thiết kế preview/download authorization}
 
@@ -171,6 +171,19 @@ Download được thiết kế thành luồng hai bước. Ở bước đầu, f
 \end{landscape}
 
 Với tài liệu \code{PUBLIC} hoặc \code{INTERNAL}, nếu policy cho phép, hệ thống có thể trả về presigned URL. Với tài liệu \code{CONFIDENTIAL} hoặc \code{SECRET}, hệ thống trả về \code{url: null}, \code{watermarkRequired: true} và \code{streamingEndpoint}, để document-service nắm được đường tải nội dung nhạy cảm và kiểm soát chặt hơn.
+
+\section{Luồng phê duyệt tài liệu}
+
+Workflow phê duyệt là luồng đa-service tiêu biểu của DocVault. Editor gửi tài liệu duyệt và Approver phê duyệt; trong cả hai bước, workflow-service đóng vai trò điều phối: gọi metadata-service để đổi trạng thái, rồi gọi notification-service để thông báo cho đúng người nhận. Hình~\ref{fig:workflow-approval} mô tả luồng chính từ \code{DRAFT} đến \code{PUBLISHED}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\linewidth,keepaspectratio]{docvault-workflow-approvals.drawio.png}
+\caption{Sequence luồng phê duyệt tài liệu (submit và approve)}
+\label{fig:workflow-approval}
+\end{figure}
+
+Điểm thiết kế đáng chú ý là các service giao tiếp với nhau bằng Axios HTTP nội bộ, không qua message queue, và mỗi lần đổi trạng thái đều ghi workflow history kèm audit event. Luồng từ chối (reject) đưa tài liệu \code{PENDING} quay lại \code{DRAFT} kèm lý do, theo cùng mô hình điều phối này.
 
 \section{Malware scanning và DLP}
 

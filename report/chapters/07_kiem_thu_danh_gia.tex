@@ -79,7 +79,7 @@ Frontend được kiểm tra bằng lint, build, typecheck và test component/he
 Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát bảo mật runtime. Các điểm nổi bật gồm:
 
 \begin{itemize}
-  \item Compliance Officer bị chặn preview, stream, presign và download file content.
+  \item Compliance Officer bị chặn preview, stream, presign và download nội dung file.
   \item Metadata access boundary được áp dụng cho detail, workflow history, comments và ACL list.
   \item Frontend permission helper được align với backend policy ở mức UI hint.
   \item Grant token cho download/preview có TTL 300 giây và hỗ trợ rotation bằng \code{kid}.
@@ -88,7 +88,7 @@ Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát 
   \item DLP phát hiện pattern nhạy cảm và nâng classification.
   \item Audit ingest cần service token.
   \item Audit verify-chain và security summary được expose qua gateway.
-  \item Evidence packet không chứa file content, presigned URL, grant token hoặc object key.
+  \item Evidence packet không chứa nội dung file, presigned URL, grant token hoặc object key.
 \end{itemize}
 
 \section{Pipeline evidence}
