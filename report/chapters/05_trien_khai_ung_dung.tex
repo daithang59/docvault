@@ -1,5 +1,9 @@
 \chapter{Triển khai ứng dụng DocVault}
 
+Trong phần triển khai ứng dụng, nhóm tập trung làm rõ trách nhiệm của từng service trong hệ thống DocVault. Gateway tiếp nhận request và xử lý xác thực ở lớp đầu vào. Metadata-service quản lý thông tin tài liệu, trạng thái, ACL, policy, evidence và retention. Document-service xử lý nội dung file, upload/download, checksum, malware scanning và DLP. Workflow-service xử lý các bước chuyển trạng thái như submit, approve, reject và archive. Audit-service ghi nhận các hoạt động quan trọng và hỗ trợ kiểm tra chuỗi hash audit.
+
+Cách chia service này giúp mỗi thành phần có phạm vi xử lý rõ ràng. Khi cần kiểm tra một luồng nghiệp vụ như upload version, gửi duyệt hoặc download tài liệu, nhóm có thể xác định service nào chịu trách nhiệm chính và service nào chỉ đóng vai trò hỗ trợ. Điều này cũng giúp việc debug và kiểm thử dễ hơn so với việc gom toàn bộ chức năng vào một backend duy nhất.
+
 \section{Cấu trúc monorepo}
 
 DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo, gom frontend, backend services, shared libraries, infrastructure và tài liệu vào cùng một repository. Các thư mục chính gồm:

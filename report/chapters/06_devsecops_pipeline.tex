@@ -2,7 +2,11 @@
 
 \section{Mục tiêu và phạm vi triển khai}
 
-Quy trình DevSecOps của DocVault được xây dựng nhằm tự động hóa vòng đời phát hành từ mã nguồn đến môi trường AWS EKS, đồng thời tích hợp các kiểm soát chất lượng và bảo mật tại nhiều thời điểm của quy trình. Jenkins không triển khai trực tiếp tài nguyên lên Kubernetes. Thành phần này thực hiện kiểm tra mã nguồn, xây dựng và quét container image, đẩy artifact lên Harbor, sau đó cập nhật trạng thái mong muốn trên nhánh GitOps. Argo CD chịu trách nhiệm đối chiếu trạng thái trong Git với trạng thái thực tế và đồng bộ các thay đổi xuống cụm EKS.
+Phần DevSecOps là một trong hai phần chính của đề tài DocVault. Nếu các chương trước tập trung vào cách hệ thống quản lý tài liệu được thiết kế và hiện thực, thì chương này trình bày cách hệ thống đó được kiểm thử, đóng gói, triển khai và kiểm chứng trên môi trường cloud-native. Mục tiêu của phần DevSecOps là tạo ra một quy trình phát hành có kiểm soát, có thể lặp lại và có bằng chứng cho từng giai đoạn từ mã nguồn đến workload đang chạy.
+
+Quy trình DevSecOps của DocVault được xây dựng nhằm tự động hóa vòng đời phát hành từ mã nguồn đến môi trường AWS EKS, đồng thời thu thập các bằng chứng cần thiết cho việc kiểm tra hệ thống. Jenkins thực hiện kiểm thử, quét bảo mật, build image và cập nhật trạng thái mong muốn trên nhánh GitOps. Argo CD chịu trách nhiệm đồng bộ trạng thái đó xuống cụm EKS. Cách làm này giúp mỗi lần phát hành có thể được đối chiếu lại thông qua commit, image tag, digest, trạng thái Argo CD, smoke test và các báo cáo scan.
+
+Trong thiết kế này, Jenkins không triển khai trực tiếp tài nguyên lên Kubernetes. Thành phần này thực hiện kiểm tra mã nguồn, xây dựng và quét container image, đẩy artifact lên Harbor, sau đó cập nhật trạng thái mong muốn trên nhánh GitOps. Argo CD chịu trách nhiệm đối chiếu trạng thái trong Git với trạng thái thực tế và đồng bộ các thay đổi xuống cụm EKS.
 
 Thiết kế trên hướng đến các mục tiêu sau:
 
@@ -358,7 +362,7 @@ Các policy Kyverno được chạy bằng Kyverno CLI trong Jenkins trên manif
 \caption{Chữ ký Cosign và SBOM của artifact trên Harbor}
 \label{fig:Sbom-Cosign}
 \end{figure}
-Hình~\ref{fig:harbor-repositories} xác nhận các image của web, gateway và microservice được lưu trong project riêng. Hình~\ref{fig:harbor-sbom-signature} và Hình~\ref{fig:Sbom-Cosign} cung cấp bằng chứng về digest, chữ ký và SBOM của artifact. Một số artifact trong ảnh vẫn hiển thị trạng thái \code{Not Scanned}; Lý do là vì khi pipeline thực hiện Cosign signing, nó bao gồm signature cho image mà SBOM attestion, với SBOM được tạo ra từ Trivy SBOM generator. Nhưng attestion này lại bị quét không thành công bởi Trivy scanner của Harbor, dấn đến tình trạng nó là một artifact nằm riêng. Nhưng nó vẫn được lưu với dạng \code{.att}, minh chứng cho việc ký SBOM của pipeline.
+Hình~\ref{fig:harbor-repositories} xác nhận các image của web, gateway và microservice được lưu trong project riêng. Hình~\ref{fig:harbor-sbom-signature} và Hình~\ref{fig:Sbom-Cosign} cung cấp bằng chứng về digest, chữ ký và SBOM của artifact. Một số artifact trong ảnh vẫn hiển thị trạng thái \code{Not Scanned}; lý do là khi pipeline thực hiện Cosign signing, pipeline tạo signature cho image và SBOM attestation, với SBOM được tạo ra từ Trivy SBOM generator. Attestation này bị quét không thành công bởi Trivy scanner của Harbor, dẫn đến tình trạng nó là một artifact nằm riêng. Tuy vậy, nó vẫn được lưu với dạng \code{.att}, minh chứng cho việc ký SBOM của pipeline.
 
 \section{Jenkins pipeline}
 
@@ -612,7 +616,7 @@ Các giới hạn hiện tại gồm:
   \item NetworkPolicy chưa giới hạn egress theo từng dependency.
   \item Loki chưa có persistence và cấu hình Grafana cần được đưa hoàn toàn sang secret manager.
   \item Backup PostgreSQL và MongoDB đã được cấu hình nhưng cần diễn tập restore và ghi nhận RPO/RTO.
-  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestion bằng Kyverno).
+  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestation bằng Kyverno).
 \end{itemize}
 
 Những giới hạn trên xác định ranh giới giữa môi trường đồ án có kiểm soát và hệ thống production. Các bước gia cố tiếp theo gồm remote Terraform state có locking, private node group, admission control, provenance chuẩn hóa, bắt buộc xác minh chữ ký image, NetworkPolicy theo nguyên tắc đặc quyền tối thiểu, cảnh báo vận hành và kiểm thử phục hồi định kỳ.

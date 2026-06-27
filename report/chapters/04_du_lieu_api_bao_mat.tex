@@ -1,10 +1,14 @@
 \chapter{Thiết kế dữ liệu, API và chính sách bảo mật}
 
+Thiết kế hệ thống của DocVault được xây dựng xoay quanh tài liệu và vòng đời của tài liệu. Thay vì chỉ lưu thông tin file, hệ thống cần lưu thêm metadata, version, trạng thái workflow, quyền truy cập, lịch sử thao tác và các audit event liên quan. Cách thiết kế này giúp hệ thống có thể truy vết lại quá trình xử lý tài liệu, từ lúc tạo mới đến khi phê duyệt, truy cập hoặc lưu trữ.
+
+Các bảng và collection trong hệ thống được chia theo trách nhiệm của từng service. Metadata-service quản lý thông tin chính của tài liệu, document-service quản lý file và checksum, workflow-service quản lý quá trình chuyển trạng thái, audit-service lưu lại các hoạt động quan trọng, còn các thành phần evidence và retention giúp tổng hợp thông tin phục vụ kiểm tra lại tài liệu. Cách tách này giúp hệ thống rõ ràng hơn và phù hợp với kiến trúc microservices.
+
 \section{Tổng quan thiết kế dữ liệu}
 
 DocVault tách dữ liệu thành ba nhóm chính. Metadata tài liệu thuộc metadata-service và lưu trong PostgreSQL. Nội dung file thuộc document-service và lưu trong MinIO/S3. Audit event thuộc audit-service và lưu trong MongoDB. Việc tách này giúp mỗi service sở hữu dữ liệu của mình, tránh việc service khác truy vấn trực tiếp vào database không thuộc bounded context của nó.
 
-Tài liệu nội bộ \code{docs/ERD.md} mô tả rõ nguyên tắc này: metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Nhờ tách như vậy, hệ thống truy vấn metadata nhanh, lưu được file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
+Metadata database lưu documents, document versions, ACL và workflow history; audit database lưu audit events; object storage lưu blob file. Nhờ tách như vậy, hệ thống truy vấn metadata nhanh, lưu file dung lượng lớn trong object storage, đồng thời giữ audit log độc lập với nghiệp vụ tài liệu.
 
 \begin{landscape}
 \begin{figure}[H]
