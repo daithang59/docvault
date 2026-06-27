@@ -14,13 +14,13 @@ Nhóm cũng xin cảm ơn nhà trường và khoa đã tạo điều kiện đ�
 \chapter*{Tóm tắt}
 \addcontentsline{toc}{chapter}{Tóm tắt}
 
-DocVault là hệ thống quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices và đi kèm quy trình DevSecOps. Đề tài gồm hai phần chính: phần ứng dụng dùng để quản lý tài liệu bảo mật theo vòng đời, và phần DevSecOps dùng để kiểm thử, đóng gói, triển khai và kiểm tra hệ thống sau triển khai.
+DocVault là hệ thống quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices và đi kèm quy trình DevSecOps. Đề tài vừa giải quyết bài toán nghiệp vụ tài liệu có vòng đời, quyền truy cập và bằng chứng xử lý, vừa kiểm soát cách hệ thống được phát hành từ mã nguồn đến môi trường triển khai.
 
 Ở phần ứng dụng, hệ thống tập trung vào việc quản lý tài liệu từ lúc tạo mới, upload phiên bản, gửi duyệt, phê duyệt, xuất bản, truy cập, tải xuống cho đến retention hoặc archive. Mỗi tài liệu không chỉ được lưu dưới dạng file, mà còn có metadata, version file, trạng thái workflow, quyền truy cập, lịch sử phê duyệt và audit log. Nhờ đó, khi cần kiểm tra lại, hệ thống có thể cho biết tài liệu đã đi qua những bước nào, ai đã thao tác và kết quả xử lý ra sao.
 
 Đối với các tài liệu có tính nhạy cảm, việc chỉ lưu file và phân quyền cơ bản là chưa đủ. Vì vậy, DocVault tích hợp các cơ chế như RBAC, ACL, classification, kiểm soát preview/download ở backend, Compliance Officer metadata-only, grant token ngắn hạn, malware scanning, DLP và audit hash-chain. Các cơ chế này giúp hệ thống kiểm soát quyền truy cập, bảo vệ nội dung file và ghi nhận lại các hoạt động quan trọng liên quan đến tài liệu.
 
-Ở phần DevSecOps, nhóm xây dựng pipeline Jenkins để tự động hóa các bước kiểm thử, quét bảo mật, build Docker image, đẩy artifact lên Harbor, cập nhật GitOps, đồng bộ qua Argo CD và kiểm tra sau triển khai. Các bằng chứng như kết quả scan, image digest, SBOM, trạng thái ký, GitOps revision, Argo CD health, smoke test và ZAP report được sử dụng để đối chiếu lại quá trình phát hành hệ thống từ mã nguồn đến workload trên EKS.
+Ở phần DevSecOps, nhóm xây dựng Jenkins pipeline để kiểm soát chuỗi phát hành từ code, container artifact, GitOps revision đến workload trên EKS. Các bằng chứng như kết quả scan, image digest, SBOM, trạng thái ký, Argo CD health, smoke test và ZAP report được sử dụng để đối chiếu lại từng lần triển khai.
 
 Kết quả của đề tài cho thấy DocVault đã triển khai được các luồng chính của một hệ thống quản lý tài liệu bảo mật, đồng thời xây dựng được quy trình DevSecOps có khả năng kiểm tra và truy vết quá trình triển khai. Tuy nhiên, hệ thống vẫn còn một số điểm cần hoàn thiện thêm nếu hướng đến môi trường production, chẳng hạn như NetworkPolicy chi tiết, admission policy, provenance chuẩn hóa, kiểm thử trình duyệt đầy đủ và diễn tập khôi phục dữ liệu.
 
@@ -31,13 +31,13 @@ Kết quả của đề tài cho thấy DocVault đã triển khai được các
 \chapter*{Abstract}
 \addcontentsline{toc}{chapter}{Abstract}
 
-DocVault is a secure document management system built with a microservices architecture and a DevSecOps delivery process. The project consists of two main parts: the application part, which manages secure documents through a controlled lifecycle, and the DevSecOps part, which automates testing, security scanning, packaging, deployment, and post-deployment verification.
+DocVault is a secure document management system built with a microservices architecture and a DevSecOps delivery process. The project covers both the controlled lifecycle of sensitive documents and the traceable delivery path from source code to the deployed environment.
 
 In the application part, DocVault manages documents from creation, version upload, review submission, approval, publication, access, download, retention, and archiving. A document is not treated only as a stored file, but as an object with metadata, file versions, workflow status, access permissions, approval history, and audit logs. These records help the system review how a document has been handled over time.
 
 For sensitive documents, simple file storage and basic authorization are not enough. Therefore, DocVault integrates mechanisms such as RBAC, ACL, classification, backend-based preview/download control, a metadata-only Compliance Officer boundary, short-lived grant tokens, malware scanning, DLP, and audit hash-chain. These mechanisms help control document access, protect file content, and record important activities related to documents.
 
-In the DevSecOps part, the project uses a Jenkins pipeline to automate testing, security scanning, Docker image build, Harbor artifact publishing, GitOps updates, Argo CD synchronization, and post-deployment checks. Evidence such as scan results, image digests, SBOM, signing status, GitOps revisions, Argo CD health, smoke tests, and ZAP reports is used to trace the delivery process from source code to workloads running on EKS.
+In the DevSecOps part, the project uses a Jenkins pipeline to control the delivery path from code, container artifacts, and GitOps revisions to workloads running on EKS. Evidence such as scan results, image digests, SBOM, signing status, Argo CD health, smoke tests, and ZAP reports is used to review each deployment.
 
 The result shows that DocVault has implemented the main workflows of a secure document management system and a DevSecOps process that supports controlled delivery and deployment traceability. Some \mbox{production-grade} improvements are still needed, such as fine-grained NetworkPolicy, admission policy, standardized provenance, full \mbox{browser-based} E2E testing, and data recovery drills.
 

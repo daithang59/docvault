@@ -1,8 +1,8 @@
 \chapter{Phân tích yêu cầu và thiết kế tổng thể}
 
-Các yêu cầu của DocVault được chia theo hai nhóm chính tương ứng với phạm vi đề tài. Nhóm thứ nhất là yêu cầu cho phần ứng dụng quản lý tài liệu bảo mật, tập trung vào vòng đời tài liệu, version file, workflow, phân quyền, audit log, evidence và retention. Nhóm thứ hai là yêu cầu cho phần DevSecOps, tập trung vào kiểm thử, quét bảo mật, build image, phát hành artifact, triển khai lên Kubernetes và thu thập bằng chứng vận hành.
+Các yêu cầu của DocVault được chia theo hai hướng để bám sát phạm vi đề tài. Hướng thứ nhất là quản lý tài liệu bảo mật, tập trung vào vòng đời tài liệu, version file, workflow, phân quyền, audit log, evidence và retention. Hướng thứ hai là kiểm soát quá trình phát hành, tập trung vào pipeline, security gate, container artifact, GitOps, Kubernetes và bằng chứng vận hành.
 
-Cách chia này giúp việc phân tích yêu cầu rõ ràng hơn. Những yêu cầu như tạo tài liệu, upload version, submit, approve, preview/download hay evidence thuộc về phần ứng dụng. Trong khi đó, các yêu cầu như SAST, SCA, image scan, IaC scan, GitOps, Argo CD health check, smoke test và ZAP thuộc về phần DevSecOps.
+Cách chia này giúp việc phân tích yêu cầu rõ ràng hơn. Những yêu cầu như tạo tài liệu, upload version, submit, approve, preview/download hay evidence thuộc về luồng nghiệp vụ. Trong khi đó, SAST, SCA, image scan, IaC scan, GitOps, Argo CD health check, smoke test và ZAP là các yêu cầu kiểm chứng release.
 
 \section{Tổng quan bài toán}
 

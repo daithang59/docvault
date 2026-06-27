@@ -2,9 +2,9 @@
 
 \section{Chiến lược kiểm thử}
 
-Kiểm thử DocVault được tổ chức theo nhiều lớp để kiểm tra cả phần ứng dụng và phần DevSecOps. Ở lớp mã nguồn, các service backend có unit test cho policy, controller, guard bảo mật và các helper quan trọng. Frontend có kiểm thử cho permission helper, form, component và một số behavior giao diện. Ở lớp runtime, nhóm sử dụng kiểm thử E2E qua API thật để kiểm tra các luồng nghiệp vụ và bảo mật chính. Ở lớp pipeline, Jenkins chạy các bước test, scan, build, deploy, smoke test và DAST để kiểm tra toàn bộ quá trình phát hành.
+Kiểm thử DocVault được tổ chức theo nhiều lớp để kiểm tra cả nghiệp vụ tài liệu và quy trình phát hành. Ở lớp mã nguồn, các service backend có unit test cho policy, controller, guard bảo mật và các helper quan trọng. Frontend có kiểm thử cho permission helper, form, component và một số behavior giao diện. Ở lớp runtime, nhóm sử dụng kiểm thử E2E qua API thật để kiểm tra các luồng nghiệp vụ và bảo mật chính. Ở lớp pipeline, Jenkins kiểm tra chuỗi release từ mã nguồn đến môi trường triển khai.
 
-Mục tiêu của chương này không chỉ là chứng minh hệ thống chạy được, mà còn chứng minh các luồng quan trọng đã được kiểm tra. Đối với phần ứng dụng, kiểm thử cần cho thấy tài liệu có thể đi qua các bước tạo mới, upload version, submit, approve, preview/download, retention và audit/evidence. Đối với phần DevSecOps, kiểm thử cần cho thấy hệ thống có pipeline kiểm soát từ mã nguồn đến image, GitOps revision, workload trên Kubernetes và kiểm tra sau triển khai.
+Mục tiêu của chương này không chỉ là chứng minh hệ thống chạy được, mà còn chứng minh các luồng quan trọng đã được kiểm tra. Với nghiệp vụ tài liệu, kiểm thử cần cho thấy tài liệu có thể đi qua các bước tạo mới, upload version, submit, approve, preview/download, retention và audit/evidence. Với release, kiểm thử cần cho thấy pipeline kiểm soát được đường đi từ mã nguồn đến image, GitOps revision, workload trên Kubernetes và kiểm tra sau triển khai.
 
 Chiến lược kiểm thử này phù hợp với đặc thù của hệ thống. Một unit test có thể kiểm tra một rule policy cụ thể, nhưng chưa đủ để chứng minh toàn bộ luồng từ frontend, gateway, metadata-service, document-service đến audit-service. Ngược lại, E2E runtime có thể chứng minh luồng chính hoạt động, nhưng khó bao phủ tất cả nhánh nhỏ của policy. Vì vậy, nhóm kết hợp nhiều loại kiểm thử để có cái nhìn đầy đủ hơn về hệ thống.
 
@@ -132,7 +132,7 @@ Các bằng chứng này giúp nhóm đối chiếu được quá trình phát h
 
 \section{Đánh giá theo yêu cầu}
 
-Bảng mapping yêu cầu với hiện thực và bằng chứng được dùng để kiểm tra mức độ đáp ứng của hệ thống so với mục tiêu ban đầu. Ở phần ứng dụng, các bằng chứng cho thấy hệ thống đã quản lý được vòng đời tài liệu, kiểm soát quyền truy cập, ghi audit log, xuất evidence và xử lý retention. Ở phần DevSecOps, các bằng chứng cho thấy hệ thống đã đi qua pipeline kiểm thử/quét bảo mật, build image, phát hành artifact, cập nhật GitOps, đồng bộ qua Argo CD và kiểm tra sau triển khai.
+Bảng mapping yêu cầu với hiện thực và bằng chứng được dùng để kiểm tra mức độ đáp ứng của hệ thống so với mục tiêu ban đầu. Các bằng chứng ứng dụng cho thấy hệ thống đã quản lý được vòng đời tài liệu, kiểm soát quyền truy cập, ghi audit log, xuất evidence và xử lý retention. Các bằng chứng DevSecOps cho thấy release đã đi qua pipeline, container registry, GitOps, Argo CD và các bước kiểm tra sau triển khai.
 
 Bảng~\ref{tab:req-impl-evidence} giúp người đọc đối chiếu nhanh giữa yêu cầu, hiện thực và bằng chứng.
 
@@ -173,6 +173,6 @@ Backup PostgreSQL và MongoDB đã được cấu hình trên S3/KMS và chạy 
 
 Qua các kết quả kiểm thử, DocVault đã đáp ứng được các mục tiêu cốt lõi của một hệ thống quản lý tài liệu bảo mật trong phạm vi đồ án chuyên ngành. Các luồng chính như tạo tài liệu, upload version, workflow phê duyệt, kiểm soát preview/download, audit, evidence, retention, malware scanning và DLP đều có kiểm thử hoặc bằng chứng tương ứng.
 
-Ở phần DevSecOps, hệ thống đã có pipeline để kiểm thử, quét bảo mật, build image, phát hành artifact, cập nhật GitOps, đồng bộ qua Argo CD và kiểm tra sau triển khai. Các bằng chứng từ Jenkins, Harbor, Argo CD, ZAP, Grafana/Loki và AWS giúp đối chiếu lại quá trình phát hành hệ thống.
+Ở phần DevSecOps, hệ thống đã có pipeline kiểm soát chuỗi phát hành từ source code đến workload. Các bằng chứng từ Jenkins, Harbor, Argo CD, ZAP, Grafana/Loki và AWS giúp đối chiếu lại quá trình release của hệ thống.
 
 Tuy vậy, kết quả kiểm thử hiện tại chủ yếu chứng minh hệ thống ở mức đồ án chuyên ngành và môi trường kiểm thử có kiểm soát. Nếu phát triển tiếp theo hướng production, nhóm cần bổ sung kiểm thử trình duyệt đầy đủ, kiểm thử tải lớn, admission policy trong cluster, NetworkPolicy chi tiết, log persistence và diễn tập khôi phục dữ liệu.

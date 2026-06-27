@@ -8,6 +8,8 @@ Trong phạm vi đề tài này, một hệ thống quản lý tài liệu bảo
 
 Các cơ chế phân quyền và kiểm soát truy cập vẫn rất cần thiết, nhưng chúng phục vụ mục tiêu rộng hơn là bảo đảm tài liệu được xử lý đúng theo chính sách. Frontend có thể hiển thị hoặc ẩn thao tác để hỗ trợ trải nghiệm người dùng, nhưng quyết định cuối cùng về quyền truy cập cần được thực thi ở backend để tránh việc chính sách chỉ tồn tại ở giao diện.
 
+Trong DocVault, nhóm chọn tập trung vào các điểm có thể kiểm chứng được trong phạm vi đồ án: vòng đời tài liệu, policy truy cập nội dung file, audit log, retention và evidence packet. Các chức năng rộng hơn của một DMS thương mại như cộng tác thời gian thực, chỉnh sửa văn bản trực tuyến hoặc quản trị tri thức doanh nghiệp không phải trọng tâm chính của bản triển khai này.
+
 \section{Khảo sát các hệ thống tương tự}
 
 Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với chúng giúp định vị rõ hơn hướng đi mà DocVault chọn.
@@ -55,7 +57,7 @@ Microservices chia hệ thống thành nhiều service nhỏ, mỗi service sở
   \item Notification-service nhận thông báo nghiệp vụ trong môi trường demo/dev.
 \end{itemize}
 
-Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo lưu trữ file ra khỏi nơi quyết định quyền. File thật nằm ở MinIO/S3, còn quyền truy cập nằm ở metadata-service. Khi người dùng muốn tải file, document-service không tự ý quyết định mà phải dựa vào policy hoặc grant token do metadata-service cấp và xác minh lại, nên không service nào một mình nắm trọn cả file lẫn quyền.
+Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo lưu trữ file ra khỏi nơi quyết định quyền. File thật nằm ở MinIO/S3, còn quyền truy cập nằm ở metadata-service. Khi người dùng muốn tải file, document-service không tự ý quyết định mà phải dựa vào policy hoặc grant token do metadata-service cấp và xác minh lại, nên không service nào một mình nắm trọn cả file lẫn quyền. Ban đầu nhóm tách trách nhiệm khá nhiều giữa các service, nhưng khi kiểm thử luồng download thì ranh giới này trở thành điểm cần giữ chặt nhất: object storage không được biến thành đường vòng để bỏ qua policy.
 
 \section{Xác thực và phân quyền}
 
@@ -113,7 +115,7 @@ Ngoài audit query, hệ thống còn xuất evidence packet gom metadata, versi
 
 \section{DevSecOps}
 
-Trong phạm vi đề tài, DevSecOps không chỉ là phần triển khai phụ trợ, mà là phần chính thứ hai bên cạnh ứng dụng DocVault. Nếu phần ứng dụng trả lời câu hỏi hệ thống quản lý tài liệu bảo mật được thiết kế và hiện thực như thế nào, thì phần DevSecOps trả lời câu hỏi hệ thống đó được kiểm thử, đóng gói, phát hành, triển khai và kiểm chứng ra sao. Cách tiếp cận này phù hợp với tinh thần shift-left của OWASP DevSecOps Guideline: đưa bảo mật vào sớm trong quá trình phát triển, thay vì chỉ kiểm tra ở cuối chu kỳ \cite{owasp_devsecops}.
+Trong phạm vi đề tài, DevSecOps không chỉ là phần triển khai phụ trợ, mà là cách nhóm kiểm soát đường đi của một thay đổi từ mã nguồn đến môi trường EKS. Cách tiếp cận này phù hợp với tinh thần shift-left của OWASP DevSecOps Guideline: đưa bảo mật vào sớm trong quá trình phát triển, thay vì chỉ kiểm tra ở cuối chu kỳ \cite{owasp_devsecops}.
 
 \begin{figure}[H]
 \centering
@@ -122,9 +124,9 @@ Trong phạm vi đề tài, DevSecOps không chỉ là phần triển khai phụ
 \label{fig:devsecops-overview}
 \end{figure}
 
-Với một hệ thống gồm nhiều microservice, nhiều cơ chế bảo mật và nhiều thành phần hạ tầng, việc triển khai thủ công rất khó lặp lại và khó chứng minh. DevSecOps giúp đưa các bước kiểm tra vào pipeline, từ mã nguồn, dependency, secret, filesystem, Docker image, IaC, Kubernetes manifest cho đến ứng dụng sau triển khai. Kết quả của pipeline không chỉ là một bản triển khai mới, mà còn là tập bằng chứng cho thấy hệ thống đã đi qua các cổng kiểm soát tương ứng.
+Với một hệ thống gồm nhiều microservice, nhiều cơ chế bảo mật và nhiều thành phần hạ tầng, việc triển khai thủ công rất khó lặp lại và khó chứng minh. DevSecOps giúp đưa các bước kiểm tra vào pipeline, từ mã nguồn đến manifest triển khai và ứng dụng sau khi chạy. Kết quả của pipeline không chỉ là một bản release mới, mà còn là tập bằng chứng cho thấy release đó đã đi qua các cổng kiểm soát tương ứng.
 
-Ở DocVault, Jenkins pipeline thực hiện các bước test, SAST, SCA, secret scanning, Trivy filesystem/image scan, Checkov, Terraform validate, Kyverno, build image, đẩy artifact lên Harbor, cập nhật GitOps, kiểm tra Argo CD, smoke test và DAST bằng OWASP ZAP. Các kết quả như scan report, image digest, SBOM, trạng thái ký, GitOps revision và Argo CD health là một phần quan trọng trong bằng chứng của đề tài.
+Ở DocVault, Jenkins pipeline được chia thành các gate cho chất lượng mã nguồn, dependency, secret, IaC, policy Kubernetes, container artifact và kiểm tra sau triển khai. Các kết quả như scan report, image digest, SBOM, trạng thái ký, GitOps revision và Argo CD health là một phần quan trọng trong bằng chứng của đề tài.
 
 \section{Các nhóm kiểm thử bảo mật trong pipeline}
 
@@ -161,7 +163,7 @@ DocVault tận dụng đúng điểm này. Pipeline cập nhật các file value
 
 \section{Tổng hợp công nghệ và công cụ}
 
-Để có cái nhìn tổng thể, phần này tổng hợp các công nghệ và công cụ chính được sử dụng trong đề tài, chia thành hai nhóm: nhóm xây dựng ứng dụng (Bảng~\ref{tab:tech-stack-app}) và nhóm quy trình DevSecOps cùng hạ tầng triển khai (Bảng~\ref{tab:tech-stack-devsecops}). Các phiên bản được ghi nhận theo cấu hình thực tế trong repository tại thời điểm hoàn thành báo cáo.
+Để có cái nhìn tổng thể, phần này tổng hợp các công nghệ và công cụ chính được sử dụng trong đề tài, chia thành hai nhóm: nhóm xây dựng ứng dụng (Bảng~\ref{tab:tech-stack-app}) và nhóm quy trình DevSecOps cùng hạ tầng triển khai (Bảng~\ref{tab:tech-stack-devsecops}). Các phiên bản được ghi nhận theo cấu hình thực tế trong repository tại thời điểm hoàn thành báo cáo. Khi mô tả vai trò của từng công cụ, nhóm ưu tiên đối chiếu với tài liệu chính thức của dự án hoặc nhà cung cấp, chẳng hạn Keycloak, Argo CD, Harbor, SonarQube, Trivy, OWASP ZAP và các dịch vụ AWS được dùng trong triển khai \cite{keycloak_docs,argocd_docs,harbor_docs,sonarqube_docs,trivy_docs,zap_baseline,aws_eks_irsa,aws_s3_kms}.
 
 \begin{table}[H]
 \centering
