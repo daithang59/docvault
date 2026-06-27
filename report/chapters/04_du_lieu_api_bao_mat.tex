@@ -71,35 +71,20 @@ Hai nguyên tắc chi phối vòng đời này. Thứ nhất, các transition l�
 
 \section{Ma trận phân quyền}
 
-Policy của DocVault không chỉ dựa trên role. Kết quả truy cập được xác định bởi nhiều yếu tố: role, owner, ACL, classification, status, version existence và trạng thái deleted/archived. Tuy nhiên, ở mức tổng quan, ma trận dưới đây thể hiện ý nghĩa các vai trò chính.
+Các vai trò chính của hệ thống đã được giới thiệu ở Chương 3. Trong mục này, báo cáo tập trung vào cách các vai trò đó được ánh xạ thành quyền truy cập nội dung file theo classification.
 
-\begin{table}[H]
-\centering
-\caption{Ma trận quyền tổng quan theo vai trò}
-\label{tab:role-permission-summary}
-\begin{tabularx}{\textwidth}{p{0.22\textwidth}Y}
-\toprule
-\textbf{Vai trò} & \textbf{Quyền chính} \\
-\midrule
-Viewer & Xem danh sách/metadata và preview/download tài liệu đã published trong phạm vi policy. \\
-Editor & Tạo tài liệu, upload version, chỉnh metadata, submit, archive tài liệu thuộc quyền sở hữu hoặc được cấp quyền. \\
-Approver & Xem hàng đợi duyệt, kiểm tra tài liệu pending, approve hoặc reject. \\
-Compliance Officer & Xem audit, security summary, retention, evidence và metadata được phép; luôn bị chặn nội dung file. \\
-Admin & Quản trị tài liệu, thành viên, evidence, retention và các thao tác nhạy cảm. \\
-\bottomrule
-\end{tabularx}
-\end{table}
+Policy của DocVault không chỉ dựa trên role. Kết quả truy cập được xác định bởi nhiều yếu tố như role, owner, ACL, classification, trạng thái tài liệu, version tồn tại và trạng thái deleted/archived. Vì vậy, ma trận dưới đây chỉ mô tả quyền xem trước và tải nội dung file trong trường hợp tổng quan. Khi thực thi thực tế, backend vẫn áp dụng thêm các điều kiện như ACL \code{DENY}, ownership, trạng thái workflow và grant token.
 
 \subsection{Quyền xem và tải theo classification}
 
-Bảng~\ref{tab:content-access-by-role-classification} mô tả quyền truy cập nội dung file trong luồng người dùng thông thường. Ký hiệu \textbf{X} là xem trước nội dung và \textbf{T} là tải file. Quyền tải chỉ được xét khi tài liệu ở trạng thái \code{PUBLISHED} và đã có version; quyền xem trước có thể áp dụng ở các trạng thái workflow khác nếu đã có version. ACL \code{DENY} phù hợp được ưu tiên hơn quyền role. Các ô ghi ``Owner/ACL'' yêu cầu người dùng là chủ sở hữu hoặc có ACL \code{ALLOW} đúng loại quyền.
+Ma trận dưới đây mô tả quyền truy cập nội dung file trong luồng người dùng thông thường. Ký hiệu \textbf{X} là quyền xem trước nội dung, còn \textbf{T} là quyền tải file. Quyền tải chỉ được xét khi tài liệu ở trạng thái \code{PUBLISHED} và đã có version; quyền xem trước có thể áp dụng ở các trạng thái workflow khác nếu tài liệu đã có version. Trong mọi trường hợp, ACL \code{DENY} phù hợp được ưu tiên hơn quyền role. Các ô ghi ``Owner/ACL'' yêu cầu người dùng là chủ sở hữu hoặc có ACL \code{ALLOW} đúng loại quyền.
 
 \begin{landscape}
 \begin{table}[H]
 \centering
 \small
-\caption{Quyền xem và tải nội dung theo vai trò và classification}
-\label{tab:content-access-by-role-classification}
+\caption{Quyền xem và tải nội dung file theo vai trò và classification}
+\label{tab:classification-access}
 \begin{tabularx}{\linewidth}{p{0.16\linewidth}YYYY}
 \toprule
 \textbf{Vai trò} &
