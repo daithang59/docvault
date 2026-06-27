@@ -217,6 +217,13 @@ Pipeline cũng hỗ trợ AWS IAM Roles Anywhere cho Jenkins controller được
 \label{fig:aws-secrets-manager}
 \end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/SecretStore&ExternalSecret.png}
+\caption{Trạng thái đồng bộ Secret của External Secrets Operator (ESO)}
+\label{fig:SecretStore-ExternalSecret}
+\end{figure}
+
 Hình~\ref{fig:aws-secrets-manager} thể hiện các nhóm secret dành cho ứng dụng, Keycloak, MongoDB, Harbor, Cosign và Jenkins. Ảnh chỉ hiển thị tên và metadata quản lý, không hiển thị giá trị secret.
 
 \section{Mô hình GitOps với Argo CD}
@@ -250,7 +257,19 @@ Các application DocVault bật \code{selfHeal=true} để Argo CD tự động 
 \end{figure}
 
 Hình~\ref{fig:argocd-app-of-apps} xác nhận application gốc đang theo dõi nhánh GitOps (main), đã đồng bộ revision Git và quản lý các application con của DocVault. 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/argocd-apps-1.png}
+\caption{Hình chụp dashboard ArgoCD hiển thị các ứng dụng (Ảnh 1)}
+\label{fig:argocd-apps-1}
+\end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/argocd-apps-2.png}
+\caption{Hình chụp dashboard ArgoCD hiển thị các ứng dụng (Ảnh 2)}
+\label{fig:argocd-apps-2}
+\end{figure}
 \subsection{Cập nhật trạng thái mong muốn (desired state) bằng GitOps}
 
 Sau khi image được push, Jenkins lấy digest từ registry và cập nhật ba trường \code{repository}, \code{tag}, \code{digest} trong Helm values tương ứng. Tag mặc định là 12 ký tự đầu của Git commit SHA. Pipeline clone riêng nhánh GitOps, commit thay đổi với \code{[skip ci]} để tránh vòng lặp và retry push tối đa ba lần nếu có cập nhật đồng thời.
@@ -418,7 +437,19 @@ Ba lớp kiểm tra bổ sung cho nhau: Terraform Validate kiểm tra tính hợ
 \section{Build, quét và phát hành container image}
 
 Backend sử dụng \code{Dockerfile.backend} với build argument xác định service; frontend sử dụng Dockerfile riêng trong \code{apps/web}. Các image được build theo batch để tận dụng song song nhưng vẫn giới hạn tải trên Jenkins agent. BuildKit lấy và cập nhật cache trong Harbor, giúp giảm thời gian build lại dependency không đổi.
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/harbor-cache-repo.png}
+\caption{Repo Harbor có tên docvault-cache, dùng để lưu cache của các image}
+\label{fig:harbor-cache-repo}
+\end{figure}
 
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/harbor-cache-audit.png}
+\caption{Các image dùng để cache (Có chữ C ở cột artifact), với dung lượng lớn, do nó chứa cả các phần build image}
+\label{fig:harbor-cache-audit}
+\end{figure}
 Sau build, Trivy quét từng image và fail nếu có lỗ hổng CRITICAL. Chỉ các image vượt qua gate mới được push. Pipeline đăng nhập registry bằng credential tạm trong thư mục Docker config riêng và xóa sau khi hoàn tất. Image triển khai không phụ thuộc tag mutable mà được cập nhật cả tag Git SHA lẫn registry digest.
 
 So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes kéo đúng artifact đã được quét. Nếu cùng một tag bị ghi đè, digest trong Helm values vẫn không thay đổi. Đây là kiểm soát quan trọng đối với tính toàn vẹn của chuỗi cung ứng phần mềm.
