@@ -62,7 +62,12 @@ Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo l
 Keycloak là hệ thống quản lý định danh và truy cập mã nguồn mở, hỗ trợ các chuẩn phổ biến như OAuth 2.0 và OpenID Connect \cite{keycloak_docs}. Trong DocVault, Keycloak được sử dụng để quản lý người dùng, vai trò, nhóm và phát hành token. Sau khi đăng nhập, người dùng nhận JWT chứa thông tin định danh và các claim cần thiết như user id, username, roles và groups.
 
 Gateway và các service phía sau dùng JWT để xác định actor của request. Gateway là entry point chính, xác thực token và truyền các header ngữ cảnh như \code{x-user-id}, \code{x-roles}, \code{x-groups} xuống các service nội bộ. Nhờ đó service nghiệp vụ không phụ thuộc trực tiếp vào phiên đăng nhập frontend mà vẫn đủ thông tin để thực thi chính sách.
-
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/KeyCloak-example.png}
+\caption{Ví dụ về cách hoạt dộng của Keycloak cho một Spring Boot gateway}
+\label{fig:KeyCloak-example}
+\end{figure}
 \subsection{RBAC}
 
 RBAC gán quyền cho vai trò thay vì gán trực tiếp cho từng người dùng, rồi người dùng nhận một hoặc nhiều vai trò. Trong DocVault có năm vai trò:

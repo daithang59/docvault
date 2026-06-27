@@ -93,11 +93,9 @@ Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát 
 
 \section{Pipeline evidence}
 
-Bằng chứng pipeline gồm log, báo cáo và trạng thái thực thi từ Jenkins, Harbor, Git, Argo CD và EKS. Tài liệu kiểm chứng trước đây ghi nhận build \#61 đã hoàn thành các stage chính. Tuy nhiên, pipeline hiện tại đã được mở rộng thêm TruffleHog, phát hiện phạm vi thay đổi, lint và build toàn workspace, SonarQube Quality Gate, Kyverno policy-as-code, cố định digest trên Harbor và ký artifact bằng Cosign. Vì vậy, bộ bằng chứng Jenkins cuối cùng cần được thu thập từ một build mới chạy đúng phiên bản \code{Jenkinsfile} hiện tại.
+Các bằng chứng pipeline được sử dụng để đối chiếu kết quả triển khai gồm:
 
-Các bằng chứng được sử dụng để đối chiếu kết quả triển khai gồm:
-
-\begin{itemize}
+\begin{itemize} 
   \item Screenshot Jenkins build xanh và stage view.
   \item TruffleHog secret scan, lint, unit test và workspace build.
   \item SonarQube report hoặc quality gate.
@@ -114,7 +112,7 @@ Các bằng chứng được sử dụng để đối chiếu kết quả triể
   \item AWS EKS, S3, KMS, IAM/IRSA, Secrets Manager và CloudNativePG backup.
 \end{itemize}
 
-Các ảnh EKS, IAM/IRSA, S3/KMS, Secrets Manager, Argo CD và Harbor đã được đưa vào Chương 6. Các placeholder còn lại được giữ cho bằng chứng Jenkins, SonarQube, SCA/Trivy, IaC, kiểm tra sau triển khai, Grafana, Loki và bucket backup.
+Các ảnh Jenkins, SonarQube, SCA/Trivy, IaC, kiểm tra sau triển khai, Grafana, Loki, EKS, IAM/IRSA, S3/KMS, Secrets Manager, Argo CD và Harbor đã được đưa vào Chương 6. 
 
 \section{Đánh giá theo yêu cầu}
 
@@ -149,7 +147,7 @@ Kết quả kiểm thử và đối chiếu cấu hình cho thấy hệ thống 
   \item Notification-service hiện vẫn sử dụng cơ chế lưu nhận phục vụ phát triển, chưa tích hợp đầy đủ email, webhook hoặc push notification.
   \item Kiểm thử end-to-end ở cấp trình duyệt chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phạm vi kiểm chứng hiện tập trung vào API và runtime.
   \item Thư viện xác thực và contract dùng chung cần tiếp tục được hợp nhất để giảm trùng lặp giữa các dịch vụ.
-  \item Harbor đã thể hiện SBOM và trạng thái ký của artifact; tuy nhiên provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký tại admission time chưa được triển khai.
+  \item Harbor đã có SBOM và trạng thái ký của artifact; tuy nhiên provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký bằng Kyverno chạy trong cluster chưa được triển khai.
   \item Kyverno đã được sử dụng như cổng policy-as-code trong CI với manifest đã render; cụm EKS chưa có bằng chứng về admission controller chặn trực tiếp tài nguyên vi phạm.
   \item NetworkPolicy vẫn mở egress, Loki chưa có persistence và cấu hình quản trị monitoring cần được chuyển hoàn toàn sang External Secrets.
   \item Backup PostgreSQL (CloudNativePG) và audit MongoDB (Percona PBM, có PITR qua oplog) đã được cấu hình trên S3/KMS và chạy theo lịch; quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO.

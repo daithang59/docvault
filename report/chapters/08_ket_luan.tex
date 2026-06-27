@@ -36,7 +36,6 @@ Mặc dù các mục tiêu cốt lõi đã được đáp ứng, hệ thống v�
 Các hướng phát triển tiếp theo tập trung vào nâng mức bảo đảm vận hành và khả năng kiểm chứng của hệ thống:
 
 \begin{enumerate}
-  \item \textbf{Chuẩn hóa provenance và phê duyệt GitOps}: tạo attestation theo SLSA/in-toto, liên kết commit, SBOM, kết quả quét và image digest; chuyển thay đổi GitOps quan trọng sang pull request có phê duyệt.
   \item \textbf{Enforcement tại admission và phân đoạn mạng}: triển khai Kyverno admission controller, bắt buộc xác minh chữ ký/attestation và giới hạn NetworkPolicy egress theo đúng dependency của từng workload.
   \item \textbf{Tăng cường khả năng phục hồi}: tổ chức diễn tập restore PostgreSQL và MongoDB, kiểm chứng tính toàn vẹn backup, xác định RPO/RTO và xây dựng quy trình disaster recovery.
   \item \textbf{Gia cố hạ tầng production}: sử dụng private node group, giới hạn endpoint EKS, remote Terraform state có locking, tách môi trường và bổ sung cơ chế phê duyệt thay đổi hạ tầng.
