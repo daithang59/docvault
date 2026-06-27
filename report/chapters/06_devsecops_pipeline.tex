@@ -182,7 +182,30 @@ Các dependency nền tảng được quản lý bằng Kustomize tại \code{in
 
 \subsection{Ingress, DNS và TLS}
 
-Lưu lượng public đi qua ingress-nginx. Web có URL công khai là \code{app.docvault.id.vn}, trong khi đó Keycloak là \code{auth.docvault.id.vn}. cert-manager sử dụng ClusterIssuer \code{letsencrypt-cloudflare} và DNS-01 challenge để cấp, gia hạn chứng chỉ TLS. Cloudflare quản lý DNS trỏ đến AWS Load Balancer của ingress-nginx. Harbor sử dụng host riêng \code{harbor.docvault.id.vn} và cấu hình upload không giới hạn kích thước, tắt request buffering và tăng timeout cho thao tác push/pull image.
+Lưu lượng public đi qua ingress-nginx. Các dịch vụ công khai của hệ thống gồm ứng dụng chính (\code{app.docvault.id.vn}), máy chủ xác thực Keycloak (\code{auth.docvault.id.vn}), và private registry Harbor (\code{harbor.docvault.id.vn}) được cấu hình DNS trỏ trực tiếp đến địa chỉ IP Public của AWS Network Load Balancer (NLB) thông qua bản ghi trên Cloudflare (Hình~\ref{fig:cloudflare-dns}). Để cấp phát chứng chỉ SSL/TLS bảo mật, cert-manager sử dụng ClusterIssuer \code{letsencrypt-cloudflare} và giao thức xác thực DNS-01 challenge qua API Token của Cloudflare.
+
+Để có thể cung cấp một cách truy cập công khai bằng URL cho các giao diện như Argo CD (\code{argocd.docvault.id.vn}), hệ thống giám sát Grafana (\code{monitoring.docvault.id.vn}) và private registry Harbor (\code{harbor.docvault.id.vn}), chúng được định tuyến bảo mật qua giải pháp Cloudflare Tunnel thông qua một dịch vụ \code{cloudflared} chạy độc lập bằng docker container trong namespace \code{cloudflare-tunnel} (Hình~\ref{fig:cloudflare-tunnel-routes}). Bằng cách này, các dịch vụ không cần lộ trực tiếp ra Internet mà vẫn có thể truy cập công khai thông qua Cloudflare Tunnel. Tuy nhiên, chỉ riêng Harbor thì cần phải sử dụng IP Public của AWS NLB (như đã nói ở trên) và tắt dịch vụ Proxy của Cloudflare. Lý do cần tắt dịch vụ đó đi là vì, Proxy của Cloudflare giới hạn dung lượng upload chỉ 100MB, ở bản free, và các image khi được upload lên Harbor có thể lên đến 200MB hoặc 500MB nếu dành cho phần cache image. 
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/cloudflare-dns.png}
+\caption{Cấu hình bản ghi DNS của DocVault trỏ tên miền dịch vụ về Load Balancer hoặc Tunnel trên Cloudflare}
+\label{fig:cloudflare-dns}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/cloudflare-tunnels-dashboard.png}
+\caption{Trạng thái hoạt động của Cloudflare Tunnel trên trang quản trị Cloudflare Zero Trust}
+\label{fig:cloudflare-tunnels-dashboard}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/cloudflared-tunnels-routes.png}
+\caption{Application route của Cloudflare Tunnel cho Argo CD, Grafana, Harbor trong cụm EKS}
+\label{fig:cloudflare-tunnel-routes}
+\end{figure}
 
 NetworkPolicy hiện tạo ranh giới truy cập cơ bản cho workload và ingress công khai. Tuy nhiên, egress của chart ứng dụng vẫn được mở để bảo đảm khả năng giao tiếp giữa các dịch vụ trong môi trường kiểm thử. Do đó, cấu hình hiện tại chưa đạt mô hình zero-trust đầy đủ. Giai đoạn tiếp theo cần giới hạn egress theo dịch vụ đích, DNS, cơ sở dữ liệu, S3 endpoint và identity provider \cite{kubernetes_networkpolicy}.
 
