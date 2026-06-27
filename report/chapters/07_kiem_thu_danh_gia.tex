@@ -2,33 +2,39 @@
 
 \section{Chiến lược kiểm thử}
 
-Kiểm thử DocVault được tổ chức theo nhiều lớp. Ở lớp code, các service backend có unit test cho policy, controller, security guard và các helper quan trọng. Frontend có test cho permission helper, form, component và một số behavior UI. Ở lớp runtime, script E2E kiểm tra các luồng nghiệp vụ và bảo mật qua API thật. Ở lớp pipeline, Jenkins chạy các bước test/scan/build/deploy/smoke/DAST để kiểm tra toàn bộ vòng đời phát hành.
+Kiểm thử DocVault được tổ chức theo nhiều lớp để kiểm tra cả nghiệp vụ tài liệu và quy trình phát hành. Ở lớp mã nguồn, các service backend có unit test cho policy, controller, guard bảo mật và các helper quan trọng. Frontend có kiểm thử cho permission helper, form, component và một số behavior giao diện. Ở lớp runtime, nhóm sử dụng kiểm thử E2E qua API thật để kiểm tra các luồng nghiệp vụ và bảo mật chính. Ở lớp pipeline, Jenkins kiểm tra chuỗi release từ mã nguồn đến môi trường triển khai.
 
-Chiến lược này phù hợp với đặc thù của hệ thống bảo mật. Một unit test có thể kiểm tra một rule policy cụ thể, nhưng không chứng minh được toàn bộ luồng từ frontend đến gateway, metadata-service, document-service và audit-service. Ngược lại, E2E runtime có thể chứng minh luồng chính hoạt động, nhưng khó bao phủ mọi nhánh policy nhỏ. Vì vậy, hệ thống cần kết hợp nhiều loại kiểm thử.
+Mục tiêu của chương này không chỉ là chứng minh hệ thống chạy được, mà còn chứng minh các luồng quan trọng đã được kiểm tra. Với nghiệp vụ tài liệu, kiểm thử cần cho thấy tài liệu có thể đi qua các bước tạo mới, upload version, submit, approve, preview/download, retention và audit/evidence. Với release, kiểm thử cần cho thấy pipeline kiểm soát được đường đi từ mã nguồn đến image, GitOps revision, workload trên Kubernetes và kiểm tra sau triển khai.
+
+Chiến lược kiểm thử này phù hợp với đặc thù của hệ thống. Một unit test có thể kiểm tra một rule policy cụ thể, nhưng chưa đủ để chứng minh toàn bộ luồng từ frontend, gateway, metadata-service, document-service đến audit-service. Ngược lại, E2E runtime có thể chứng minh luồng chính hoạt động, nhưng khó bao phủ tất cả nhánh nhỏ của policy. Vì vậy, nhóm kết hợp nhiều loại kiểm thử để có cái nhìn đầy đủ hơn về hệ thống.
 
 \section{Kiểm thử runtime}
 
-Theo \code{docs/verification-report.md}, lệnh E2E runtime chính là:
+Để kiểm tra các luồng runtime chính, nhóm sử dụng lệnh kiểm thử E2E:
 
 \begin{lstlisting}[language=bash,caption={Lệnh kiểm thử E2E runtime}]
 pnpm test:e2e
 \end{lstlisting}
 
-Kết quả gần nhất được ghi nhận trong tài liệu là \code{All required E2E checks passed}. Các nhóm kiểm thử runtime gồm:
+Bộ kiểm thử này gọi trực tiếp vào các API của hệ thống để kiểm tra các luồng quan trọng như xác thực, phân quyền, quản lý tài liệu, workflow, preview/download, malware scanning, DLP, retention, Compliance Officer boundary và audit verify-chain. Kết quả kiểm thử gần nhất ghi nhận toàn bộ các kiểm tra bắt buộc đều đạt.
+
+Các nhóm kiểm thử runtime gồm:
 
 \begin{itemize}
-  \item Auth boundary: request thiếu token và token hết hạn bị từ chối.
-  \item Create policy: viewer không được tạo tài liệu, editor được tạo.
-  \item Metadata policy: truy cập trái phép vào confidential document bị từ chối ở detail, history, comments và ACL.
-  \item GROUP ACL: group \code{finance-team} được normalize và kiểm tra đúng.
-  \item Confidential download posture: viewer bị deny, editor nhận stream-only response.
-  \item Malware scan: EICAR upload bị chặn.
-  \item DLP: upload có dữ liệu nhạy cảm bị phát hiện và nâng classification.
-  \item Workflow: submit, approve và duplicate approve conflict.
-  \item Retention: approval stamp retention, retention job archive due record.
-  \item Compliance Officer: được phép xem metadata, audit, retention; bị chặn preview, presign, stream và download.
-  \item Audit: query, verify-chain, security summary và audit ingest boundary.
+  \item \textbf{Authentication boundary}: request thiếu token hoặc token hết hạn phải bị từ chối.
+  \item \textbf{Create policy}: viewer không được tạo tài liệu, editor được phép tạo tài liệu.
+  \item \textbf{Metadata policy}: truy cập trái phép vào confidential document bị từ chối ở các API detail, history, comments và ACL.
+  \item \textbf{GROUP ACL}: quyền \code{READ} theo group được normalize và kiểm tra đúng.
+  \item \textbf{Confidential download posture}: viewer bị từ chối, editor nhận stream-only response hoặc controlled stream theo policy.
+  \item \textbf{Malware scanning}: file EICAR bị chặn trước khi tạo object/version.
+  \item \textbf{DLP}: file có dữ liệu nhạy cảm bị phát hiện và nâng classification.
+  \item \textbf{Workflow}: submit, approve và duplicate approve conflict được kiểm tra.
+  \item \textbf{Retention}: retention job có thể archive tài liệu đến hạn và ghi nhận workflow history/audit.
+  \item \textbf{Compliance Officer boundary}: Compliance Officer được xem metadata, audit, retention và evidence nhưng bị chặn preview, presign, stream và download nội dung file.
+  \item \textbf{Audit}: hỗ trợ query audit, verify-chain, security summary và chặn người dùng thường giả mạo audit event.
 \end{itemize}
+
+Bảng~\ref{tab:runtime-evidence} tóm tắt các nhóm kiểm thử runtime, bằng chứng tương ứng và trạng thái kết quả.
 
 \begin{longtable}{p{0.24\textwidth}p{0.44\textwidth}p{0.18\textwidth}}
 \caption{Tóm tắt bằng chứng kiểm thử runtime}
@@ -58,7 +64,9 @@ Audit ingest & Viewer cannot ingest fake audit event & PASS \\
 
 \section{Kiểm thử frontend và UI evidence}
 
-Frontend được kiểm tra bằng lint, build, typecheck và test component/helper. Ngoài ra, bộ screenshot trong \code{report/images/screen} ghi nhận các màn hình trọng yếu như Dashboard, Documents, Approvals, Audit, Security và Access Review trên môi trường triển khai. Các screenshot này vừa minh họa UI, vừa cung cấp bằng chứng trực quan rằng các màn hình chính render được và hiển thị trạng thái dữ liệu phù hợp.
+Frontend được kiểm tra bằng các bước lint, build, typecheck và test component/helper. Các bước này giúp phát hiện lỗi cú pháp, lỗi kiểu dữ liệu, lỗi build và một số lỗi ở tầng giao diện trước khi triển khai.
+
+Bên cạnh kiểm thử tự động, nhóm cũng thu thập ảnh chụp các màn hình chính của hệ thống sau khi triển khai. Các màn hình được kiểm tra gồm Dashboard, Documents, Approvals, Audit, Security, Evidence, Retention và Access Review. Những ảnh chụp này được dùng để minh họa giao diện và làm bằng chứng trực quan rằng các màn hình chính có thể render đúng, hiển thị dữ liệu phù hợp và phản ánh trạng thái hệ thống tại thời điểm kiểm thử.
 
 \begin{figure}[H]
 \centering
@@ -74,49 +82,59 @@ Frontend được kiểm tra bằng lint, build, typecheck và test component/he
 \label{fig:evidence-approvals}
 \end{figure}
 
+Tuy nhiên, phạm vi kiểm thử frontend hiện tại chủ yếu tập trung vào build, component/helper và bằng chứng giao diện. Kiểm thử end-to-end ở cấp trình duyệt đầy đủ vẫn là hướng cần bổ sung thêm nếu hệ thống được phát triển tiếp.
+
 \section{Security evidence}
 
-Tài liệu \code{docs/web-security-evidence.md} tổng hợp các kiểm soát bảo mật runtime. Các điểm nổi bật gồm:
+Các kiểm soát bảo mật runtime được nhóm đối chiếu thông qua kiểm thử API, kết quả E2E và bằng chứng giao diện. Mục tiêu của phần này là xác nhận các quyết định bảo mật quan trọng không chỉ được thể hiện trên giao diện, mà còn được thực thi ở backend.
+
+Các điểm chính đã được kiểm tra gồm:
 
 \begin{itemize}
   \item Compliance Officer bị chặn preview, stream, presign và download nội dung file.
   \item Metadata access boundary được áp dụng cho detail, workflow history, comments và ACL list.
-  \item Frontend permission helper được align với backend policy ở mức UI hint.
-  \item Grant token cho download/preview có TTL 300 giây và hỗ trợ rotation bằng \code{kid}.
-  \item MinIO bucket local bật SSE-S3 trong init script.
-  \item Malware scanning chặn EICAR trước khi ghi object.
+  \item Frontend permission helper được căn chỉnh với backend policy ở mức UI hint, nhưng backend vẫn là nơi quyết định cuối cùng.
+  \item Grant token cho download/preview có TTL ngắn hạn và hỗ trợ rotation bằng \code{kid}.
+  \item Malware scanning chặn file EICAR trước khi ghi object hoặc tạo version.
   \item DLP phát hiện pattern nhạy cảm và nâng classification.
-  \item Audit ingest cần service token.
-  \item Audit verify-chain và security summary được expose qua gateway.
-  \item Evidence packet không chứa nội dung file, presigned URL, grant token hoặc object key.
+  \item Audit ingest yêu cầu service token, người dùng thường không thể tự ghi audit event giả.
+  \item Audit verify-chain và security summary được expose qua gateway để kiểm tra trạng thái audit.
+  \item Evidence packet không chứa nội dung file, presigned URL, grant token hoặc object key nhạy cảm.
 \end{itemize}
+
+Kết quả này cho thấy các kiểm soát bảo mật chính của phần ứng dụng đã được kiểm tra ở mức runtime. Một số nội dung vẫn cần phát triển thêm nếu hướng đến production, chẳng hạn kiểm thử nhiều trường hợp biên hơn cho policy, kiểm thử trình duyệt đầy đủ và kiểm tra tải lớn với nhiều tài liệu/audit event.
 
 \section{Pipeline evidence}
 
-Bằng chứng pipeline gồm log, báo cáo và trạng thái thực thi từ Jenkins, Harbor, Git, Argo CD và EKS. Tài liệu kiểm chứng trước đây ghi nhận build \#61 đã hoàn thành các stage chính. Tuy nhiên, pipeline hiện tại đã được mở rộng thêm TruffleHog, phát hiện phạm vi thay đổi, lint và build toàn workspace, SonarQube Quality Gate, Kyverno policy-as-code, cố định digest trên Harbor và ký artifact bằng Cosign. Vì vậy, bộ bằng chứng Jenkins cuối cùng cần được thu thập từ một build mới chạy đúng phiên bản \code{Jenkinsfile} hiện tại.
+Các bằng chứng pipeline được thu thập từ quá trình chạy Jenkins và môi trường triển khai. Nhóm sử dụng log pipeline, kết quả scan, trạng thái artifact trên Harbor, GitOps commit, Argo CD health check, smoke test, ZAP report và dashboard quan sát vận hành để đối chiếu quá trình phát hành hệ thống.
 
-Các bằng chứng được sử dụng để đối chiếu kết quả triển khai gồm:
+Cụ thể, bằng chứng DevSecOps gồm:
 
 \begin{itemize}
-  \item Screenshot Jenkins build xanh và stage view.
-  \item TruffleHog secret scan, lint, unit test và workspace build.
-  \item SonarQube report hoặc quality gate.
-  \item Dependency Check report.
-  \item Trivy filesystem/image scan log.
-  \item Checkov, Terraform Validate và Kyverno report.
-  \item Harbor image tag theo Git SHA, digest, SBOM, trạng thái ký và kết quả quét lỗ hổng.
+  \item Jenkins build và Stage View cho thấy pipeline chạy qua các stage chính.
+  \item TruffleHog secret scan để kiểm tra credential bị commit trong repository.
+  \item Lint, unit test và workspace build để kiểm tra chất lượng cơ bản của mã nguồn.
+  \item SonarQube Quality Gate để phân tích mã nguồn tĩnh.
+  \item Dependency Check để quét lỗ hổng thư viện phụ thuộc.
+  \item Trivy filesystem/image scan để quét filesystem và Docker image.
+  \item Checkov, Terraform Validate và Kyverno report để kiểm tra IaC và policy Kubernetes.
+  \item Harbor image tag/digest, SBOM, trạng thái ký và kết quả quét lỗ hổng.
   \item Log ký và xác minh Cosign tương ứng với image digest.
-  \item GitOps commit cập nhật repository, tag và digest trong Helm values.
-  \item Argo CD application \code{Synced/Healthy}.
-  \item Smoke test log cho web root và \code{/api/health}.
-  \item ZAP HTML/JSON report.
-  \item Grafana/Loki screenshot cho observability.
-  \item AWS EKS, S3, KMS, IAM/IRSA, Secrets Manager và CloudNativePG backup.
+  \item GitOps commit cập nhật repository, image tag và digest trong Helm values.
+  \item Argo CD application đạt trạng thái Synced/Healthy.
+  \item Smoke test cho web root và \code{/api/health}.
+  \item OWASP ZAP report sau triển khai.
+  \item Grafana/Loki dashboard cho metric, log và quan sát workload.
+  \item Bằng chứng hạ tầng như EKS, S3/KMS, IAM/IRSA, Secrets Manager và backup cơ sở dữ liệu.
 \end{itemize}
 
-Các ảnh EKS, IAM/IRSA, S3/KMS, Secrets Manager, Argo CD và Harbor đã được đưa vào Chương 6. Các placeholder còn lại được giữ cho bằng chứng Jenkins, SonarQube, SCA/Trivy, IaC, kiểm tra sau triển khai, Grafana, Loki và bucket backup.
+Các bằng chứng này giúp nhóm đối chiếu được quá trình phát hành từ mã nguồn đến container artifact, GitOps revision và workload trên Kubernetes. Nhờ đó, phần DevSecOps không chỉ dừng ở việc có pipeline, mà còn có bằng chứng cho từng giai đoạn quan trọng của quy trình triển khai.
 
 \section{Đánh giá theo yêu cầu}
+
+Bảng mapping yêu cầu với hiện thực và bằng chứng được dùng để kiểm tra mức độ đáp ứng của hệ thống so với mục tiêu ban đầu. Các bằng chứng ứng dụng cho thấy hệ thống đã quản lý được vòng đời tài liệu, kiểm soát quyền truy cập, ghi audit log, xuất evidence và xử lý retention. Các bằng chứng DevSecOps cho thấy release đã đi qua pipeline, container registry, GitOps, Argo CD và các bước kiểm tra sau triển khai.
+
+Bảng~\ref{tab:req-impl-evidence} giúp người đọc đối chiếu nhanh giữa yêu cầu, hiện thực và bằng chứng.
 
 \begin{longtable}{p{0.28\textwidth}p{0.36\textwidth}p{0.22\textwidth}}
 \caption{Mapping yêu cầu với hiện thực và bằng chứng}
@@ -129,32 +147,32 @@ Các ảnh EKS, IAM/IRSA, S3/KMS, Secrets Manager, Argo CD và Harbor đã đư�
 \textbf{Yêu cầu} & \textbf{Hiện thực} & \textbf{Bằng chứng} \\
 \midrule
 \endhead
-Đăng nhập và phân quyền & Keycloak, JWT, gateway role guard, frontend permission helper & README, API contract, E2E auth checks \\
-Quản lý vòng đời tài liệu & Documents, versions, workflow history, workflow-service transitions & Project status, E2E workflow checks \\
-Kiểm soát download & Metadata authorization, grant token, document-service presign/stream & web-security-evidence, E2E confidential posture \\
-Compliance boundary & Compliance metadata/audit/evidence allowed, file content denied & web-security-evidence, E2E compliance checks \\
-Audit tamper-evident & audit-service hash-chain, verify-chain endpoint & verification report, audit docs \\
+Đăng nhập và phân quyền & Keycloak, JWT, gateway role guard, frontend permission helper & E2E auth checks, kiểm tra route bảo vệ \\
+Quản lý vòng đời tài liệu & Documents, versions, workflow history, workflow-service transitions & E2E workflow checks, workflow history \\
+Kiểm soát preview/download & Metadata authorization, grant token, document-service presign/stream & Runtime security checks, E2E confidential posture \\
+Compliance boundary & Compliance metadata/audit/evidence allowed, file content denied & Runtime compliance checks, E2E compliance checks \\
+Audit tamper-evident & audit-service hash-chain, verify-chain endpoint & Kết quả verify-chain, audit events \\
 Malware/DLP & Malware scanner, DLP scanner, classification escalation & E2E malware/DLP checks \\
 Retention evidence & Retention fields, retention run, audit event & E2E retention checks \\
-DevSecOps pipeline & Jenkins gates, Harbor/digest, Kyverno, GitOps, Argo CD, smoke, ZAP & Jenkinsfile, shared library, manifest hạ tầng \\
+DevSecOps pipeline & Jenkins gates, Harbor/digest, Kyverno, GitOps, Argo CD, smoke, ZAP & Pipeline log, Harbor, Argo CD, ZAP evidence \\
 \bottomrule
 \end{longtable}
 
 \section{Hạn chế hiện tại}
 \label{sec:limitations}
 
-Kết quả kiểm thử và đối chiếu cấu hình cho thấy hệ thống vẫn còn các giới hạn sau:
+Kết quả kiểm thử và đối chiếu cấu hình cho thấy hệ thống đã đáp ứng được các luồng chính, nhưng vẫn còn một số giới hạn cần tiếp tục hoàn thiện.
 
-\begin{itemize}
-  \item Notification-service hiện vẫn sử dụng cơ chế lưu nhận phục vụ phát triển, chưa tích hợp đầy đủ email, webhook hoặc push notification.
-  \item Kiểm thử end-to-end ở cấp trình duyệt chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phạm vi kiểm chứng hiện tập trung vào API và runtime.
-  \item Thư viện xác thực và contract dùng chung cần tiếp tục được hợp nhất để giảm trùng lặp giữa các dịch vụ.
-  \item Harbor đã thể hiện SBOM và trạng thái ký của artifact; tuy nhiên provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký tại admission time chưa được triển khai.
-  \item Kyverno đã được sử dụng như cổng policy-as-code trong CI với manifest đã render; cụm EKS chưa có bằng chứng về admission controller chặn trực tiếp tài nguyên vi phạm.
-  \item NetworkPolicy vẫn mở egress, Loki chưa có persistence và cấu hình quản trị monitoring cần được chuyển hoàn toàn sang External Secrets.
-  \item Backup PostgreSQL (CloudNativePG) và audit MongoDB (Percona PBM, có PITR qua oplog) đã được cấu hình trên S3/KMS và chạy theo lịch; quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO.
-\end{itemize}
+Ở phần ứng dụng, notification-service hiện vẫn chủ yếu phục vụ môi trường phát triển/demo, chưa tích hợp đầy đủ email, webhook hoặc push notification. Kiểm thử end-to-end ở cấp trình duyệt chưa phải bằng chứng chính cho toàn bộ luồng nghiệp vụ; phạm vi kiểm chứng hiện tập trung nhiều hơn vào API và runtime. Ngoài ra, một số thư viện xác thực và contract dùng chung giữa các service vẫn cần tiếp tục hợp nhất để giảm trùng lặp.
+
+Ở phần DevSecOps, Harbor đã có SBOM và trạng thái ký của artifact, nhưng provenance theo chuẩn SLSA/in-toto và chính sách bắt buộc xác minh chữ ký bằng Kyverno trong cluster chưa được triển khai đầy đủ. Kyverno hiện đã được dùng như cổng policy-as-code trong CI với manifest đã render, nhưng cụm EKS chưa có bằng chứng về admission controller chặn trực tiếp tài nguyên vi phạm. NetworkPolicy vẫn cần giới hạn egress chi tiết hơn, Loki cần bật persistence, và cấu hình monitoring nên được chuyển đầy đủ sang External Secrets.
+
+Backup PostgreSQL và MongoDB đã được cấu hình trên S3/KMS và chạy theo lịch, nhưng quy trình khôi phục vẫn cần được diễn tập và đo lường để xác minh RPO/RTO. Đây là phần quan trọng nếu hệ thống muốn tiến gần hơn đến môi trường production.
 
 \section{Nhận xét chung}
 
-DocVault đã đáp ứng các mục tiêu cốt lõi của một hệ thống quản lý tài liệu bảo mật trong phạm vi đồ án chuyên ngành. Kiến trúc, luồng nghiệp vụ, kiểm soát bảo mật backend, audit, evidence và pipeline DevSecOps đều có hiện thực tương ứng trong repository. Các kết luận trong báo cáo được đối chiếu với mã nguồn, cấu hình hạ tầng, báo cáo kiểm thử và ảnh chụp từ môi trường triển khai.
+Qua các kết quả kiểm thử, DocVault đã đáp ứng được các mục tiêu cốt lõi của một hệ thống quản lý tài liệu bảo mật trong phạm vi đồ án chuyên ngành. Các luồng chính như tạo tài liệu, upload version, workflow phê duyệt, kiểm soát preview/download, audit, evidence, retention, malware scanning và DLP đều có kiểm thử hoặc bằng chứng tương ứng.
+
+Ở phần DevSecOps, hệ thống đã có pipeline kiểm soát chuỗi phát hành từ source code đến workload. Các bằng chứng từ Jenkins, Harbor, Argo CD, ZAP, Grafana/Loki và AWS giúp đối chiếu lại quá trình release của hệ thống.
+
+Tuy vậy, kết quả kiểm thử hiện tại chủ yếu chứng minh hệ thống ở mức đồ án chuyên ngành và môi trường kiểm thử có kiểm soát. Nếu phát triển tiếp theo hướng production, nhóm cần bổ sung kiểm thử trình duyệt đầy đủ, kiểm thử tải lớn, admission policy trong cluster, NetworkPolicy chi tiết, log persistence và diễn tập khôi phục dữ liệu.

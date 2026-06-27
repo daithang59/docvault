@@ -2,21 +2,25 @@
 
 \section{Hệ thống quản lý tài liệu bảo mật}
 
-Hệ thống quản lý tài liệu (Document Management System - DMS) lo việc lưu trữ, tổ chức, tìm kiếm, chia sẻ và kiểm soát vòng đời tài liệu; trong môi trường doanh nghiệp nó quản lý cả file lẫn metadata, phiên bản, người sở hữu, trạng thái phê duyệt và lịch sử thao tác. Phần lý thuyết này không nhắc lại định nghĩa đó dài dòng, mà tập trung vào điều khiến một DMS trở nên \emph{bảo mật}.
+Trong phạm vi đề tài này, một hệ thống quản lý tài liệu bảo mật không chỉ được hiểu là nơi lưu trữ file có phân quyền. Hệ thống cần quản lý tài liệu như một đối tượng nghiệp vụ có vòng đời, trạng thái, phiên bản, quyền truy cập và lịch sử thao tác. Một tài liệu được tạo ra, thay đổi, gửi duyệt, phê duyệt, xuất bản hoặc lưu trữ đều cần để lại thông tin đủ rõ để kiểm tra lại.
 
-Khác biệt nằm ở chỗ thực thi chính sách. Một tài liệu nhạy cảm không thể chỉ được bảo vệ bằng nơi lưu trữ; nó phải được bảo vệ bằng một chính sách truy cập nhất quán ở backend, đặc biệt với các thao tác như preview, stream, presign download, export evidence hay truy vấn audit. Rủi ro cần tránh là tình huống frontend chỉ ẩn nút thao tác trong khi backend vẫn nhận lời gọi API, vì khi đó chính sách bảo mật không còn đáng tin.
+Điểm quan trọng của hệ thống là khả năng kiểm chứng. Với tài liệu nhạy cảm, câu hỏi không chỉ là file còn tồn tại hay không, mà còn là file này đã được ai tạo, đã qua những phiên bản nào, ai đã phê duyệt, ai đã truy cập và có bằng chứng nào cho quá trình xử lý đó. Vì vậy, audit log, workflow history, version checksum, retention evidence và evidence packet là các thành phần quan trọng trong thiết kế của DocVault.
 
-Vì lý do đó, DocVault đặt backend làm nơi ra quyết định cuối cùng. Frontend được phép hiển thị hoặc làm mờ thao tác để trải nghiệm tốt hơn, nhưng việc cho phép hay từ chối luôn thuộc về metadata-service, document-service, gateway và audit-service. Nguyên tắc này chi phối gần như mọi thiết kế ở các chương sau.
+Các cơ chế phân quyền và kiểm soát truy cập vẫn rất cần thiết, nhưng chúng phục vụ mục tiêu rộng hơn là bảo đảm tài liệu được xử lý đúng theo chính sách. Frontend có thể hiển thị hoặc ẩn thao tác để hỗ trợ trải nghiệm người dùng, nhưng quyết định cuối cùng về quyền truy cập cần được thực thi ở backend để tránh việc chính sách chỉ tồn tại ở giao diện.
+
+Trong DocVault, nhóm chọn tập trung vào các điểm có thể kiểm chứng được trong phạm vi đồ án: vòng đời tài liệu, policy truy cập nội dung file, audit log, retention và evidence packet. Các chức năng rộng hơn của một DMS thương mại như cộng tác thời gian thực, chỉnh sửa văn bản trực tuyến hoặc quản trị tri thức doanh nghiệp không phải trọng tâm chính của bản triển khai này.
 
 \section{Khảo sát các hệ thống tương tự}
 
-Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với chúng giúp định vị rõ hơn hướng đi mà DocVault chọn. Bảng~\ref{tab:related-work} so sánh DocVault với ba đại diện tiêu biểu trên các tiêu chí liên quan trực tiếp đến phạm vi đề tài; phần so sánh này dựa trên tài liệu và đặc điểm công khai của các sản phẩm chứ không phải kết quả kiểm thử trực tiếp của nhóm, nên chỉ mang tính định vị tương đối.
+Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với chúng giúp định vị rõ hơn hướng đi mà DocVault chọn.
 
 \begin{itemize}
   \item \textbf{Microsoft SharePoint}: nền tảng quản lý tài liệu và cộng tác thương mại, mạnh về tích hợp hệ sinh thái Microsoft 365, phân quyền và compliance; tuy nhiên là dịch vụ đóng, chủ yếu vận hành trên đám mây của nhà cung cấp và khó tùy biến sâu chính sách truy cập ở mức mã nguồn.
   \item \textbf{Alfresco}: hệ thống ECM mã nguồn mở (có bản thương mại), hỗ trợ vòng đời tài liệu, phân quyền và audit; kiến trúc nghiêng về monolith/Java truyền thống và không đặt trọng tâm vào quy trình DevSecOps đi kèm.
   \item \textbf{Nextcloud}: giải pháp self-hosted phổ biến cho lưu trữ và chia sẻ file, dễ triển khai; mạnh về chia sẻ và đồng bộ nhưng kiểm soát theo classification, DLP và audit tamper-evident không phải trọng tâm mặc định.
 \end{itemize}
+
+Phần khảo sát này nhằm định vị hướng tiếp cận của DocVault so với một số hệ thống quản lý tài liệu phổ biến. Nhóm chỉ dựa trên tài liệu công khai và đặc điểm tổng quát của các sản phẩm, chưa thực hiện benchmark hoặc triển khai thử trực tiếp từng hệ thống. Vì vậy, bảng so sánh không nhằm kết luận hệ thống nào tốt hơn, mà chỉ làm rõ phạm vi mà DocVault tập trung trong đồ án: quản lý vòng đời tài liệu bảo mật, audit/evidence và quy trình DevSecOps có bằng chứng.
 
 \begin{table}[H]
 \centering
@@ -28,17 +32,17 @@ Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ
 \textbf{Tiêu chí} & \textbf{SharePoint} & \textbf{Alfresco} & \textbf{Nextcloud} & \textbf{DocVault} \\
 \midrule
 Mô hình triển khai & Cloud đóng & Self-hosted & Self-hosted & Self-hosted \\
-RBAC + ACL deny-overrides & Có & Có & Một phần & Có \\
-Phân loại + kiểm soát theo classification & Có & Một phần & Hạn chế & Có \\
-DLP nâng classification tự động & Một phần & Hạn chế & Hạn chế & Có \\
-Audit tamper-evident (hash-chain) & Hạn chế & Hạn chế & Hạn chế & Có \\
-Compliance boundary (metadata-only) & Hạn chế & Hạn chế & Hạn chế & Có \\
-DevSecOps pipeline đi kèm & Không & Không & Không & Có \\
+RBAC + ACL deny-overrides & Có hỗ trợ & Có hỗ trợ & Một phần & Có hỗ trợ \\
+Phân loại + kiểm soát theo classification & Có hỗ trợ & Một phần & Không phải trọng tâm mặc định & Có hỗ trợ \\
+DLP nâng classification tự động & Một phần & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
+Audit tamper-evident (hash-chain) & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
+Compliance boundary (metadata-only) & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
+DevSecOps pipeline đi kèm & Không đi kèm trong phạm vi khảo sát & Không đi kèm trong phạm vi khảo sát & Không đi kèm trong phạm vi khảo sát & Có hỗ trợ \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Điểm khác biệt của DocVault không nằm ở việc thay thế các hệ thống trên về quy mô tính năng, mà ở cách gộp ba yếu tố trong cùng một đề tài: (1) kiểm soát truy cập nhiều lớp theo classification với ranh giới compliance metadata-only, (2) audit tamper-evident bằng hash-chain, và (3) đưa toàn bộ quy trình phát hành vào pipeline DevSecOps có bằng chứng. Hướng tiếp cận này bám sát mục tiêu học thuật của đề tài: minh họa cách bảo mật được đưa xuyên suốt từ thiết kế ứng dụng đến quy trình triển khai, thay vì chỉ dựng một DMS đầy đủ tính năng.
+Từ bảng so sánh, có thể thấy DocVault không được xây dựng để thay thế các hệ thống quản lý tài liệu hoàn chỉnh về độ rộng tính năng. Điểm nhấn của đề tài nằm ở việc kết hợp hai phần trong cùng một hệ thống minh họa: một ứng dụng quản lý tài liệu bảo mật có vòng đời, kiểm soát truy cập, audit/evidence; và một quy trình DevSecOps có kiểm thử, quét bảo mật, GitOps, triển khai cloud-native và bằng chứng vận hành. Cách tiếp cận này phù hợp với mục tiêu đồ án: làm rõ cách một tài liệu nhạy cảm được quản lý và kiểm chứng, đồng thời cách hệ thống đó được phát hành qua một quy trình có kiểm soát.
 
 \section{Kiến trúc microservices}
 
@@ -53,7 +57,7 @@ Microservices chia hệ thống thành nhiều service nhỏ, mỗi service sở
   \item Notification-service nhận thông báo nghiệp vụ trong môi trường demo/dev.
 \end{itemize}
 
-Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo lưu trữ file ra khỏi nơi quyết định quyền. File thật nằm ở MinIO/S3, còn quyền truy cập nằm ở metadata-service. Khi người dùng muốn tải file, document-service không tự ý quyết định mà phải dựa vào policy hoặc grant token do metadata-service cấp và xác minh lại, nên không service nào một mình nắm trọn cả file lẫn quyền.
+Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo lưu trữ file ra khỏi nơi quyết định quyền. File thật nằm ở MinIO/S3, còn quyền truy cập nằm ở metadata-service. Khi người dùng muốn tải file, document-service không tự ý quyết định mà phải dựa vào policy hoặc grant token do metadata-service cấp và xác minh lại, nên không service nào một mình nắm trọn cả file lẫn quyền. Ban đầu nhóm tách trách nhiệm khá nhiều giữa các service, nhưng khi kiểm thử luồng download thì ranh giới này trở thành điểm cần giữ chặt nhất: object storage không được biến thành đường vòng để bỏ qua policy.
 
 \section{Xác thực và phân quyền}
 
@@ -62,7 +66,12 @@ Lý do tách quan trọng nhất với một hệ thống bảo mật là kéo l
 Keycloak là hệ thống quản lý định danh và truy cập mã nguồn mở, hỗ trợ các chuẩn phổ biến như OAuth 2.0 và OpenID Connect \cite{keycloak_docs}. Trong DocVault, Keycloak được sử dụng để quản lý người dùng, vai trò, nhóm và phát hành token. Sau khi đăng nhập, người dùng nhận JWT chứa thông tin định danh và các claim cần thiết như user id, username, roles và groups.
 
 Gateway và các service phía sau dùng JWT để xác định actor của request. Gateway là entry point chính, xác thực token và truyền các header ngữ cảnh như \code{x-user-id}, \code{x-roles}, \code{x-groups} xuống các service nội bộ. Nhờ đó service nghiệp vụ không phụ thuộc trực tiếp vào phiên đăng nhập frontend mà vẫn đủ thông tin để thực thi chính sách.
-
+\begin{figure}[H]
+\centering
+\includegraphics[width=\textwidth]{infra/KeyCloak-example.png}
+\caption{Ví dụ về cách hoạt động của Keycloak cho một Spring Boot gateway}
+\label{fig:KeyCloak-example}
+\end{figure}
 \subsection{RBAC}
 
 RBAC gán quyền cho vai trò thay vì gán trực tiếp cho từng người dùng, rồi người dùng nhận một hoặc nhiều vai trò. Trong DocVault có năm vai trò:
@@ -106,9 +115,18 @@ Ngoài audit query, hệ thống còn xuất evidence packet gom metadata, versi
 
 \section{DevSecOps}
 
-DevSecOps đưa bảo mật vào trong quá trình phát triển và vận hành thay vì để dành kiểm tra ở cuối dự án. Ý tưởng là rải các kiểm soát ra nhiều điểm của pipeline: mã nguồn, thư viện phụ thuộc, hạ tầng, Docker image, ứng dụng sau triển khai, và giữ lại artifact làm bằng chứng. Cái lợi không chỉ là phát hiện sớm mà còn là tính lặp lại: mỗi lần thay đổi đều đi qua cùng một bộ kiểm tra.
+Trong phạm vi đề tài, DevSecOps không chỉ là phần triển khai phụ trợ, mà là cách nhóm kiểm soát đường đi của một thay đổi từ mã nguồn đến môi trường EKS. Cách tiếp cận này phù hợp với tinh thần shift-left của OWASP DevSecOps Guideline: đưa bảo mật vào sớm trong quá trình phát triển, thay vì chỉ kiểm tra ở cuối chu kỳ \cite{owasp_devsecops}.
 
-Ở DocVault, tinh thần đó được hiện thực bằng Jenkins pipeline. Ngoài chạy test, pipeline còn chạy SAST, SCA, Trivy filesystem scan, Trivy image scan, Checkov IaC scan, Terraform validate, smoke test và DAST bằng OWASP ZAP. Các bước này bám theo tư tưởng ``shift-left security'' trong các tài liệu DevSecOps \cite{owasp_devsecops,nist_ssdf}.
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.88\textwidth]{devsecops.png}
+\caption{Mô hình kết hợp phát triển, bảo mật và vận hành trong DevSecOps}
+\label{fig:devsecops-overview}
+\end{figure}
+
+Với một hệ thống gồm nhiều microservice, nhiều cơ chế bảo mật và nhiều thành phần hạ tầng, việc triển khai thủ công rất khó lặp lại và khó chứng minh. DevSecOps giúp đưa các bước kiểm tra vào pipeline, từ mã nguồn đến manifest triển khai và ứng dụng sau khi chạy. Kết quả của pipeline không chỉ là một bản release mới, mà còn là tập bằng chứng cho thấy release đó đã đi qua các cổng kiểm soát tương ứng.
+
+Ở DocVault, Jenkins pipeline được chia thành các gate cho chất lượng mã nguồn, dependency, secret, IaC, policy Kubernetes, container artifact và kiểm tra sau triển khai. Các kết quả như scan report, image digest, SBOM, trạng thái ký, GitOps revision và Argo CD health là một phần quan trọng trong bằng chứng của đề tài.
 
 \section{Các nhóm kiểm thử bảo mật trong pipeline}
 
@@ -132,13 +150,20 @@ DAST & Kiểm thử ứng dụng đang chạy. & Baseline scan web app sau deplo
 
 \section{GitOps và Argo CD}
 
-GitOps lấy Git làm nguồn sự thật cho trạng thái triển khai. Khi pipeline build xong image mới, thay vì chạy lệnh sửa cluster thủ công, nó cập nhật Helm values hoặc manifest trong một branch GitOps; Argo CD theo dõi branch đó và đồng bộ trạng thái mong muốn xuống Kubernetes \cite{argocd_docs}. Khác biệt thực tế là không ai \code{kubectl apply} trực tiếp lên cụm, mọi thay đổi triển khai đều đi qua một commit.
+GitOps lấy Git làm nguồn sự thật cho trạng thái triển khai. Khi pipeline build xong image mới, thay vì chạy lệnh sửa cluster thủ công, nó cập nhật Helm values hoặc manifest trong một branch GitOps; Argo CD theo dõi branch đó và đồng bộ trạng thái mong muốn xuống Kubernetes \cite{argocd_docs,cncf_gitops_argo}. Khác biệt thực tế là không ai \code{kubectl apply} trực tiếp lên cụm, mọi thay đổi triển khai đều đi qua một commit. Cơ chế reconcile liên tục cũng giúp phát hiện configuration drift khi trạng thái thật trong cluster lệch khỏi manifest trong Git \cite{cncf_gitops_argo}.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.94\textwidth]{gitops_argo.png}
+\caption{Luồng triển khai GitOps với Argo CD}
+\label{fig:gitops-argo-overview}
+\end{figure}
 
 DocVault tận dụng đúng điểm này. Pipeline cập nhật các file values theo từng service, rồi Argo CD sync các application gateway, metadata-service, document-service, workflow-service, audit-service, notification-service và web. Việc tách build pipeline khỏi deployment controller giúp mỗi bên giữ một trách nhiệm, đồng thời để lại lịch sử thay đổi triển khai ngay trong Git.
 
 \section{Tổng hợp công nghệ và công cụ}
 
-Để có cái nhìn tổng thể, phần này tổng hợp các công nghệ và công cụ chính được sử dụng trong đề tài, chia thành hai nhóm: nhóm xây dựng ứng dụng (Bảng~\ref{tab:tech-stack-app}) và nhóm quy trình DevSecOps cùng hạ tầng triển khai (Bảng~\ref{tab:tech-stack-devsecops}). Các phiên bản được ghi nhận theo cấu hình thực tế trong repository tại thời điểm hoàn thành báo cáo.
+Để có cái nhìn tổng thể, phần này tổng hợp các công nghệ và công cụ chính được sử dụng trong đề tài, chia thành hai nhóm: nhóm xây dựng ứng dụng (Bảng~\ref{tab:tech-stack-app}) và nhóm quy trình DevSecOps cùng hạ tầng triển khai (Bảng~\ref{tab:tech-stack-devsecops}). Các phiên bản được ghi nhận theo cấu hình thực tế trong repository tại thời điểm hoàn thành báo cáo. Khi mô tả vai trò của từng công cụ, nhóm ưu tiên đối chiếu với tài liệu chính thức của dự án hoặc nhà cung cấp, chẳng hạn Keycloak, Argo CD, Harbor, SonarQube, Trivy, OWASP ZAP và các dịch vụ AWS được dùng trong triển khai \cite{keycloak_docs,argocd_docs,harbor_docs,sonarqube_docs,trivy_docs,zap_baseline,aws_eks_irsa,aws_s3_kms}.
 
 \begin{table}[H]
 \centering

@@ -1,5 +1,9 @@
 \chapter{Phân tích yêu cầu và thiết kế tổng thể}
 
+Các yêu cầu của DocVault được chia theo hai hướng để bám sát phạm vi đề tài. Hướng thứ nhất là quản lý tài liệu bảo mật, tập trung vào vòng đời tài liệu, version file, workflow, phân quyền, audit log, evidence và retention. Hướng thứ hai là kiểm soát quá trình phát hành, tập trung vào pipeline, security gate, container artifact, GitOps, Kubernetes và bằng chứng vận hành.
+
+Cách chia này giúp việc phân tích yêu cầu rõ ràng hơn. Những yêu cầu như tạo tài liệu, upload version, submit, approve, preview/download hay evidence thuộc về luồng nghiệp vụ. Trong khi đó, SAST, SCA, image scan, IaC scan, GitOps, Argo CD health check, smoke test và ZAP là các yêu cầu kiểm chứng release.
+
 \section{Tổng quan bài toán}
 
 DocVault hướng đến bài toán quản lý tài liệu trong môi trường có nhiều vai trò và nhiều mức độ nhạy cảm dữ liệu. Một tài liệu đi qua nhiều trạng thái: bản nháp, chờ duyệt, đã xuất bản và đã lưu trữ. Trong quá trình đó, mỗi vai trò chỉ được thực hiện những thao tác phù hợp. Editor có thể tạo và gửi duyệt tài liệu; Approver có thể phê duyệt hoặc từ chối; Viewer chỉ được truy cập tài liệu đã xuất bản nếu policy cho phép; Compliance Officer có thể xem audit và evidence nhưng không được truy cập nội dung file; Admin có quyền quản trị rộng hơn.
@@ -16,17 +20,17 @@ Bài toán ở đây không dừng ở việc lưu file, mà là kiểm soát fi
 \toprule
 \textbf{Tác nhân} & \textbf{Vai trò trong hệ thống} \\
 \midrule
-Viewer & Người dùng đọc tài liệu đã được xuất bản trong phạm vi policy cho phép; có thể preview/download tài liệu public hoặc tài liệu được cấp quyền. \\
-Editor & Người tạo và quản lý tài liệu của mình; có thể tạo draft, chỉnh metadata, upload phiên bản, gửi duyệt và archive khi có quyền. \\
-Approver & Người kiểm tra tài liệu đang ở trạng thái chờ duyệt; có thể approve hoặc reject theo quy trình. \\
-Compliance Officer & Người kiểm tra tuân thủ; được xem audit, metadata/evidence được phép, nhưng bị chặn preview, stream, presign và download nội dung file. \\
-Admin & Người quản trị hệ thống; có quyền rộng hơn trên tài liệu, thành viên, evidence và retention. \\
-Scheduler / Cron & Tác nhân hệ thống (không phải người dùng); chạy nền theo lịch để tự động archive tài liệu đến hạn retention và dọn tài liệu trong thùng rác quá hạn lưu giữ. \\
+Viewer & Người dùng có nhu cầu đọc và theo dõi các tài liệu được phép truy cập trong hệ thống. Viewer chủ yếu thao tác với danh sách tài liệu, metadata và các tài liệu đã được xuất bản trong phạm vi policy cho phép. \\
+Editor & Người tạo và quản lý tài liệu trong phạm vi được cấp quyền. Editor có thể tạo draft, chỉnh metadata, upload phiên bản file, gửi duyệt và archive tài liệu khi thỏa điều kiện policy. \\
+Approver & Người phụ trách kiểm tra các tài liệu đang chờ duyệt. Approver có thể xem hàng đợi duyệt, kiểm tra nội dung/metadata cần thiết và đưa ra quyết định approve hoặc reject theo workflow. \\
+Compliance Officer & Người phụ trách kiểm tra tuân thủ. Vai trò này tập trung vào audit, metadata, evidence, retention và các thông tin phục vụ đối soát, không đại diện cho quyền truy cập nội dung file. \\
+Admin & Người quản trị hệ thống. Admin có quyền rộng hơn trong việc quản lý tài liệu, thành viên, evidence, retention và các thao tác nhạy cảm. \\
+Scheduler / Cron & Tác nhân hệ thống không phải người dùng. Tác nhân này chạy nền theo lịch để tự động archive tài liệu đến hạn retention và dọn tài liệu trong thùng rác quá hạn lưu giữ. \\
 \bottomrule
 \end{tabularx}
 \end{table}
 
-Hình~\ref{fig:usecase-overview} tổng hợp các use case chính của từng tác nhân trong một sơ đồ thống nhất. Ngoài bốn vai trò người dùng, sơ đồ bổ sung tác nhân Scheduler/Cron đại diện cho các tác vụ nền theo lịch. Sơ đồ làm rõ ba điểm thiết kế cốt lõi của DocVault: mọi tác nhân phải đăng nhập qua Keycloak/OIDC trước khi thao tác; mọi thao tác trên tài liệu đều được kiểm tra quyền tại backend và ghi audit log; và Compliance Officer dù xem được metadata, audit, evidence vẫn luôn bị từ chối preview hoặc download nội dung file.
+Hình~\ref{fig:usecase-overview} tổng hợp các use case chính của từng tác nhân trong một sơ đồ thống nhất. Ngoài các vai trò người dùng, sơ đồ bổ sung tác nhân Scheduler/Cron đại diện cho các tác vụ nền theo lịch. Sơ đồ làm rõ hai điểm thiết kế cốt lõi của DocVault: mọi tác nhân phải đăng nhập qua Keycloak/OIDC trước khi thao tác, và mọi thao tác quan trọng trên tài liệu đều được kiểm tra quyền tại backend cũng như ghi audit log.
 
 \begin{figure}[H]
 \centering
@@ -85,7 +89,7 @@ Khả năng mở rộng & Kiến trúc cho phép bổ sung message queue, kênh 
 
 \section{Mô hình threat cơ bản}
 
-Để định hướng thiết kế bảo mật, hệ thống xem xét các nhóm rủi ro sau. Mỗi nhóm được phân loại theo khung STRIDE \cite{microsoft_stride} để làm rõ bản chất mối đe dọa và liên kết với biện pháp giảm thiểu tương ứng trong DocVault.
+Mô hình threat trong đề tài được sử dụng như một công cụ hỗ trợ thiết kế bảo mật cho phần ứng dụng, không nhằm mô phỏng tấn công chuyên sâu. Mục tiêu của phần này là xác định các điểm trong hệ thống cần kiểm soát, chẳng hạn truy cập metadata, tải nội dung file, thay đổi trạng thái tài liệu, ghi audit event và xuất evidence. Các rủi ro được ánh xạ theo STRIDE để nhóm có cơ sở liên kết từng rủi ro với biện pháp giảm thiểu tương ứng trong DocVault.
 
 \begin{table}[H]
 \centering
@@ -115,7 +119,7 @@ Sửa audit log cũ & Tampering & Hash-chain phát hiện khi audit event bị t
 \end{tabularx}
 \end{table}
 
-Phần lớn rủi ro tập trung vào hai loại Information Disclosure và Elevation of Privilege, phản ánh đúng đặc thù của một hệ thống quản lý tài liệu nhạy cảm: mối đe dọa chính là lộ dữ liệu và vượt quyền truy cập. Hai loại Tampering và Spoofing liên quan đến tính toàn vẹn của file và audit trail. Các nhóm Repudiation và Denial of Service không phải trọng tâm trong phạm vi đồ án; tính chống chối bỏ được hỗ trợ một phần qua audit hash-chain, còn chống từ chối dịch vụ được xử lý ở mức cơ bản bằng rate limiting.
+Nhìn chung, các rủi ro trong mô hình threat đều quay về mục tiêu của phần ứng dụng: bảo đảm tài liệu được truy cập, xử lý và ghi nhận đúng theo chính sách. Information Disclosure và Elevation of Privilege liên quan đến việc lộ hoặc vượt quyền truy cập tài liệu. Tampering và Spoofing liên quan đến tính đúng đắn của file, metadata và audit log. Trong phạm vi đồ án, mô hình threat đóng vai trò định hướng cho các kiểm soát như backend policy, grant token, audit ingest boundary và hash-chain.
 
 \section{Kiến trúc tổng thể}
 

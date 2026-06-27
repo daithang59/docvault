@@ -2,55 +2,65 @@
 
 \section{Bối cảnh}
 
-Tài liệu trong một tổ chức không chỉ là file để lưu và tìm lại. Nó có vòng đời: được tạo, chỉnh sửa, gửi duyệt, xuất bản rồi lưu trữ; và ở mỗi bước, việc ai được xem, ai được tải, ai được phê duyệt đều cần có ranh giới rõ ràng. Tài liệu cũng có thể là hợp đồng, báo cáo tài chính, hồ sơ nhân sự hay biên bản phê duyệt, tức là loại dữ liệu mà mọi thao tác lên nó nên để lại dấu vết để sau này còn truy lại được.
+Trong thực tế, nhiều tổ chức làm việc với số lượng lớn tài liệu nội bộ như hợp đồng, biểu mẫu phê duyệt, tài liệu kỹ thuật, hồ sơ nhân sự, tài liệu kiểm toán hoặc các file phục vụ quá trình vận hành. Các tài liệu này thường không chỉ được lưu một lần rồi để đó, mà sẽ đi qua nhiều bước xử lý khác nhau như tạo mới, cập nhật phiên bản, gửi duyệt, phê duyệt, xuất bản, truy cập, tải xuống hoặc lưu trữ. Nếu hệ thống chỉ lưu file mà không quản lý trạng thái và lịch sử xử lý, việc kiểm tra lại tài liệu sau này sẽ gặp nhiều khó khăn.
 
-Các hệ thống quản lý tài liệu phổ biến đã làm tốt việc lưu trữ, phân quyền cơ bản và tìm kiếm. Nhóm chọn đề tài DocVault không nhằm dựng lại một hệ thống đầy đủ tính năng như vậy, mà muốn đi sâu hơn vào những khía cạnh nhóm thấy đáng học và thường ít được đặt làm trọng tâm: quản lý vòng đời tài liệu một cách có kiểm soát, kiểm soát truy cập nhiều lớp theo mức nhạy cảm của tài liệu, ghi nhận audit log có thể truy vết và kiểm tra tính toàn vẹn, và đưa toàn bộ quy trình phát hành vào một pipeline DevSecOps có bằng chứng. Nói cách khác, mục tiêu của nhóm thiên về chiều sâu bảo mật, khả năng truy vết và quy trình, hơn là bề rộng tính năng.
+Một vấn đề thường gặp là khi cần xem lại một tài liệu, người quản trị hoặc người phụ trách không chỉ muốn biết file đang nằm ở đâu, mà còn muốn biết tài liệu đó đã được ai tạo, ai cập nhật, đã qua phiên bản nào, ai phê duyệt, ai từng truy cập và hiện tại đang ở trạng thái nào. Với tài liệu nhạy cảm, các thông tin này càng quan trọng vì nó liên quan đến trách nhiệm xử lý, kiểm soát truy cập và khả năng chứng minh tài liệu đã được quản lý đúng quy trình.
 
-Một nguyên tắc nhóm đặt ra từ đầu là chính sách bảo mật phải được thực thi ở backend. Giao diện có thể ẩn hoặc làm mờ thao tác để gọn gàng hơn, nhưng quyết định cho phép hay từ chối phải nằm ở phía service và được kiểm thử tại đó, vì với tài liệu nhạy cảm thì một thao tác bị bỏ lọt ở backend mới là rủi ro thật, còn việc ẩn nút trên màn hình chỉ là cải thiện trải nghiệm.
+Từ nhu cầu đó, nhóm xây dựng DocVault như một hệ thống quản lý tài liệu bảo mật. Phần ứng dụng không dừng ở upload và download file, mà quản lý tài liệu như một đối tượng có metadata, version, trạng thái, quyền truy cập, lịch sử phê duyệt và audit log. Khi thử các luồng như upload version, gửi duyệt và tải file, nhóm nhận thấy nếu chỉ kiểm soát thao tác ở giao diện thì rất khó tin cậy; vì vậy các quyết định quan trọng phải được đưa xuống backend và để lại dấu vết kiểm tra.
 
-Mặt thứ hai của đề tài là quy trình phát hành. Nhóm chọn DevSecOps không phải vì đó là từ khóa thời thượng, mà vì nếu kiểm soát bảo mật chỉ được kiểm tra một lần ở cuối thì rất khó lặp lại và dễ bỏ sót khi code thay đổi. DevSecOps đưa các bước kiểm tra vào sớm và rải đều khắp vòng đời: mã nguồn, thư viện phụ thuộc, cấu hình hạ tầng, Docker image, rồi đến ứng dụng đang chạy sau khi triển khai. NIST SSDF và hướng dẫn DevSecOps của OWASP cũng đi theo tư tưởng này: tự động hóa kiểm thử và thu thập bằng chứng để giảm rủi ro và làm cho mỗi lần phát hành có thể kiểm chứng lại được \cite{nist_ssdf,owasp_devsecops}.
+Bên cạnh đó, đề tài xây dựng thêm quy trình DevSecOps cho DocVault. Một hệ thống microservices có nhiều service, nhiều database, object storage, Kubernetes manifest và secret runtime sẽ rất dễ lệch cấu hình nếu triển khai hoàn toàn thủ công. Nhóm cần một chuỗi phát hành từ mã nguồn đến workload trên EKS có thể chạy lại, có log, có artifact và có trạng thái triển khai để đối chiếu. Đây là lý do DevSecOps được xem là phần chính thứ hai của đề tài, không chỉ là bước phụ để đưa ứng dụng lên server.
 
-DocVault vì vậy được đặt ra với hai phần gắn vào nhau: một hệ thống quản lý tài liệu thực thi chính sách bảo mật ở backend, và một quy trình DevSecOps lo việc kiểm thử, đóng gói và triển khai hệ thống đó một cách có dấu vết.
+Vì vậy, báo cáo không xem DocVault chỉ là một ứng dụng quản lý file, cũng không xem đây chỉ là một pipeline DevSecOps. Đề tài kết hợp cả hai hướng: xây dựng luồng nghiệp vụ tài liệu có kiểm soát và chứng minh cách hệ thống đó được phát hành qua một quy trình có thể truy vết.
 
 \section{Vấn đề cần giải quyết}
 
-Đề tài tách thành hai nhóm vấn đề. Nhóm ứng dụng là xây dựng một hệ thống quản lý tài liệu có phân quyền rõ, có quy trình phê duyệt, lưu file an toàn và có audit trail đủ để truy vết. Nhóm quy trình là đưa kiểm soát bảo mật vào pipeline, sao cho mỗi lần đổi mã nguồn đều được kiểm tra tự động thay vì phụ thuộc vào việc nhớ chạy thủ công. Hai nhóm này phải làm song song, vì một hệ thống bảo mật tốt mà phát hành thủ công thì vẫn dễ trượt ở khâu triển khai.
+Đề tài đặt ra hai câu hỏi chính. Thứ nhất, làm sao xây dựng một hệ thống quản lý tài liệu nhạy cảm mà vẫn kiểm tra lại được quá trình xử lý sau này. Thứ hai, làm sao phát hành hệ thống đó theo một quy trình đủ rõ để biết mã nguồn nào tạo ra image nào, image nào được triển khai và workload sau triển khai có đạt trạng thái mong muốn hay không.
 
-Cụ thể hơn, nhóm rút ra các yêu cầu sau khi phân tích những câu hỏi nêu ở phần bối cảnh:
+Đối với phần ứng dụng, vấn đề chính là làm sao quản lý được toàn bộ vòng đời của một tài liệu. Một tài liệu có thể được tạo mới, upload phiên bản, cập nhật metadata, gửi duyệt, phê duyệt, từ chối, xuất bản, truy cập, tải xuống, lưu trữ hoặc đưa vào retention. Nếu chỉ lưu file và trạng thái hiện tại, hệ thống sẽ khó trả lời các câu hỏi như tài liệu này đã được xử lý qua những bước nào, ai đã thao tác, thao tác đó có hợp lệ không và có bằng chứng nào để kiểm tra lại.
+
+Vì vậy, hệ thống cần quản lý đồng thời nhiều thông tin liên quan đến tài liệu, bao gồm metadata, version file, checksum, trạng thái workflow, quyền truy cập, mức phân loại bảo mật, lịch sử phê duyệt và audit log. Các thông tin này cần được liên kết với nhau để tạo thành một bức tranh đầy đủ về quá trình xử lý tài liệu. Khi cần kiểm tra lại, hệ thống phải có khả năng tổng hợp các dữ liệu này thành evidence để phục vụ việc đối chiếu.
+
+Đối với phần DevSecOps, vấn đề đặt ra là làm sao đưa một hệ thống nhiều service vào một quy trình triển khai có thể lặp lại và kiểm soát được. Nếu build image, cập nhật manifest, triển khai Kubernetes và kiểm tra trạng thái đều làm thủ công, quá trình phát hành sẽ dễ sai sót và khó truy vết. Do đó, hệ thống cần pipeline kiểm thử, đóng gói, phát hành artifact, cập nhật GitOps và kiểm tra lại môi trường sau triển khai.
+
+Cụ thể, đề tài tập trung vào các yêu cầu sau:
 
 \begin{itemize}
-  \item Người dùng thuộc các vai trò khác nhau phải nhìn thấy và thao tác trên tài liệu theo đúng phạm vi quyền hạn.
-  \item Tài liệu hỗ trợ bốn mức phân loại: public, internal, confidential và secret.
-  \item Luồng nghiệp vụ phải hỗ trợ tạo bản nháp, tải file, gửi duyệt, phê duyệt, từ chối và lưu trữ.
-  \item File nhạy cảm không nên được cấp URL tải trực tiếp nếu cần đi qua đường stream có kiểm soát.
-  \item Compliance Officer được xem metadata, audit và bằng chứng tuân thủ, nhưng không được truy cập nội dung file.
-  \item Các thao tác quan trọng phải được audit và có khả năng kiểm tra tính toàn vẹn.
-  \item Pipeline phải có các bước kiểm thử và quét bảo mật trước, trong và sau khi build/deploy.
+  \item Quản lý vòng đời tài liệu với các trạng thái như \code{DRAFT}, \code{PENDING}, \code{PUBLISHED} và \code{ARCHIVED}.
+  \item Quản lý metadata, version file, checksum, workflow history và trạng thái hiện tại của tài liệu.
+  \item Kiểm soát quyền truy cập dựa trên RBAC, ACL, classification, trạng thái tài liệu và quyền sở hữu.
+  \item Ghi nhận audit log cho các thao tác quan trọng như tạo tài liệu, upload version, submit, approve, reject, preview, download, retention và compliance.
+  \item Cung cấp evidence packet để tổng hợp metadata, version checksum, workflow history, retention evidence và audit event liên quan đến tài liệu.
+  \item Kiểm soát preview/download thông qua backend policy và grant token ngắn hạn.
+  \item Đảm bảo Compliance Officer chỉ xem metadata, audit và evidence phục vụ kiểm tra, không truy cập trực tiếp nội dung file.
+  \item Xây dựng pipeline DevSecOps để kiểm soát chuỗi phát hành từ mã nguồn, container artifact, GitOps revision đến workload đang chạy, đồng thời thu thập bằng chứng vận hành.
 \end{itemize}
-
-Trong số này, ranh giới của Compliance Officer là yêu cầu nhóm cân nhắc nhiều nhất: một người có quyền đọc toàn bộ audit log rất dễ được mặc định cho luôn quyền đọc file, nhưng đó lại chính là lỗ hổng mà vai trò compliance cần tránh.
 
 \section{Mục tiêu đề tài}
 
-Mục tiêu tổng quát của đề tài là xây dựng và trình bày một hệ thống quản lý tài liệu bảo mật tên DocVault theo hướng microservices, có tích hợp các kiểm soát bảo mật ở cả runtime và quy trình DevSecOps.
+Mục tiêu tổng quát của đề tài là xây dựng và triển khai DocVault như một hệ thống hoàn chỉnh trong phạm vi đồ án: có ứng dụng quản lý tài liệu bảo mật, có hạ tầng triển khai và có quy trình phát hành đủ bằng chứng để kiểm tra lại.
+
+Ở lớp ứng dụng, nhóm hướng đến việc quản lý tài liệu theo vòng đời rõ ràng, kiểm soát truy cập ở backend và tạo được audit/evidence khi cần đối soát. Ở lớp triển khai, nhóm xây dựng pipeline và hạ tầng cloud-native để mỗi lần phát hành có thể lần ngược từ commit, image digest, GitOps revision đến trạng thái workload trên Kubernetes.
 
 Các mục tiêu cụ thể gồm:
 
 \begin{enumerate}
-  \item Thiết kế kiến trúc tổng thể cho hệ thống quản lý tài liệu bảo mật, gồm frontend, API Gateway, các microservice nghiệp vụ và các thành phần hạ tầng.
-  \item Xây dựng các chức năng chính của hệ thống: đăng nhập, quản lý tài liệu, version file, workflow phê duyệt, phân quyền, preview/download, audit, security dashboard, evidence và retention.
-  \item Thiết kế mô hình phân quyền dựa trên RBAC, ACL, trạng thái tài liệu, phân loại bảo mật và quy tắc deny-overrides.
-  \item Xây dựng cơ chế audit hash-chain và các bằng chứng phục vụ compliance.
-  \item Tích hợp các kiểm soát bảo mật như malware scanning, DLP, grant token ngắn hạn và kiểm soát truy cập nội dung file.
-  \item Xây dựng pipeline DevSecOps với Jenkins, SonarQube, Dependency Check, Trivy, Checkov, Terraform validation, Docker build/scan, GitOps, Argo CD, smoke test và OWASP ZAP.
-  \item Kiểm thử và đánh giá hệ thống dựa trên các kịch bản runtime, security evidence và pipeline evidence.
+  \item Thiết kế kiến trúc tổng thể cho hệ thống DocVault, gồm frontend, API Gateway, các backend service, các thành phần lưu trữ dữ liệu và hạ tầng triển khai.
+  \item Xây dựng các chức năng quản lý vòng đời tài liệu như tạo tài liệu, cập nhật metadata, upload version file, gửi duyệt, phê duyệt, từ chối, xuất bản, lưu trữ và retention.
+  \item Thiết kế mô hình dữ liệu cho documents, document versions, ACL, workflow history, audit events và các thông tin evidence liên quan.
+  \item Xây dựng cơ chế kiểm soát truy cập dựa trên RBAC, ACL, trạng thái tài liệu, classification, quyền sở hữu và quy tắc deny-overrides.
+  \item Ghi nhận audit log cho các thao tác quan trọng trong vòng đời tài liệu và áp dụng hash-chain để hỗ trợ kiểm tra tính toàn vẹn của audit event.
+  \item Xây dựng evidence packet để tổng hợp metadata, checksum phiên bản, workflow history, retention evidence và audit event, giúp kiểm tra lại quá trình quản lý tài liệu.
+  \item Tích hợp các cơ chế bảo mật như grant token ngắn hạn cho preview/download, Compliance Officer metadata-only boundary, malware scanning và DLP.
+  \item Xây dựng hạ tầng triển khai cloud-native trên AWS EKS với Terraform, Helm/Kustomize, S3/KMS, IRSA, External Secrets, Harbor và các thành phần quan sát vận hành.
+  \item Xây dựng pipeline DevSecOps với Jenkins, các cổng kiểm tra chất lượng/bảo mật và luồng GitOps triển khai lên Kubernetes.
+  \item Thu thập bằng chứng cho các luồng ứng dụng và chuỗi phát hành, bao gồm kiểm thử E2E, audit/evidence, retention, scan report, image digest, SBOM, signing status, GitOps revision, Argo CD health, smoke test và ZAP report.
 \end{enumerate}
 
 \section{Phạm vi thực hiện}
 
-Phạm vi đề tài gồm hai hợp phần có quan hệ chặt chẽ. Hợp phần ứng dụng bao gồm giao diện web, các dịch vụ backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Hợp phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, quy trình CI/CD trên Jenkins, kho ảnh Harbor, GitOps với Argo CD, các cổng kiểm soát bảo mật và cơ chế giám sát sau triển khai.
+Phạm vi đề tài gồm hai phần có quan hệ chặt chẽ. Phần ứng dụng bao gồm giao diện web, các dịch vụ backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, quy trình CI/CD trên Jenkins, kho ảnh Harbor, GitOps với Argo CD, các cổng kiểm soát bảo mật và cơ chế giám sát sau triển khai.
 
-Tại thời điểm hoàn thành báo cáo, pipeline đã tích hợp SAST, SCA, quét secret, Trivy, Checkov, Terraform Validate, Kyverno CLI, build và quét container image, đẩy artifact lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST bằng OWASP ZAP. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Các nội dung còn lại tập trung vào gia cố vận hành ở quy mô production, thay vì bổ sung các thành phần nền tảng của quy trình.
+Tại thời điểm hoàn thành báo cáo, pipeline đã có các cổng kiểm soát chính cho mã nguồn, dependency, secret, IaC, Kubernetes manifest, container image và kiểm tra sau triển khai. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Trong quá trình triển khai, nhóm ưu tiên phương án phù hợp với phạm vi đồ án và chi phí thử nghiệm, nên một số cấu hình production hardening được giữ lại làm hướng phát triển thay vì cố hoàn thiện tất cả trong bản hiện tại.
 
 \begin{table}[H]
 \centering
@@ -73,7 +83,7 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 
 \section{Đóng góp của đề tài}
 
-Đề tài có bốn đóng góp. Thứ nhất là một hệ thống quản lý tài liệu chạy được, bao phủ luồng từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai là mô hình kiểm soát truy cập nhiều lớp, kết hợp vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu thay vì chỉ dựa vào một trong số đó. Thứ ba là cách đưa yêu cầu compliance vào ngay trong thiết kế: audit hash-chain để phát hiện sửa đổi, retention evidence và evidence packet metadata-only. Thứ tư, và cũng là phần nhóm đầu tư nhiều công nhất, là một quy trình DevSecOps truy vết được từ mã nguồn qua container artifact và GitOps revision đến workload trên EKS, với các cổng kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành gắn vào từng chặng.
+Đề tài có bốn đóng góp. Thứ nhất là một hệ thống quản lý tài liệu chạy được, bao phủ luồng từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai là mô hình kiểm soát truy cập nhiều lớp, kết hợp vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu thay vì chỉ dựa vào một trong số đó. Thứ ba là cách đưa yêu cầu compliance vào ngay trong thiết kế: audit hash-chain để phát hiện sửa đổi, retention evidence và evidence packet metadata-only. Thứ tư là quy trình DevSecOps được nhóm đầu tư triển khai khá đầy đủ, có khả năng truy vết từ mã nguồn qua container artifact và GitOps revision đến workload trên EKS, với các cổng kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành gắn vào từng chặng.
 
 \section{Phân công công việc}
 
