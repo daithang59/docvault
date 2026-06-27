@@ -1,11 +1,8 @@
+% ==================== PAGE 1: Outer TITLE PAGE ====================
 \begin{titlepage}
 \pagestyle{empty}
 
 \begin{tikzpicture}[remember picture,overlay]
-  \draw[line width=3pt]
-    ($(current page.north west) + (3.0cm,-2.0cm)$)
-    rectangle
-    ($(current page.south east) + (-2.0cm,2.0cm)$);
   \draw[line width=1pt]
     ($(current page.north west) + (2.9cm,-1.9cm)$)
     rectangle
@@ -13,50 +10,81 @@
 \end{tikzpicture}
 
 \centering
-\vspace*{-0.8cm}
+\fontsize{13}{16}\selectfont
+\vspace*{-4ex}
 
-{\bfseries\large\MakeUppercase{\reportUniversity}\par}
-\vspace{0.2cm}
-{\bfseries\large\MakeUppercase{\reportFaculty}\par}
+{\bfseries \MakeUppercase{\reportUniversity}\par}
+{\bfseries \MakeUppercase{\reportFaculty}\par}
+\vspace*{18ex}
 
-\vspace{0.8cm}
-\IfFileExists{logo-uit.png}{%
-  \includegraphics[width=0.18\textwidth]{logo-uit.png}\par
-  \vspace{0.8cm}
-}{%
-  \vspace{1.8cm}
-}
 
-{\bfseries\Large\MakeUppercase{\reportCourse}\par}
+{\bfseries \MakeUppercase{\studentA}\ -- \roleA\par}
+{\bfseries \MakeUppercase{\studentB}\ -- \roleB\par}
+\vspace*{9ex}
 
-\vfill
-
-\begin{minipage}{0.86\textwidth}
+{\bfseries \MakeUppercase{\reportCourse}\par}
+\vspace*{4ex}
+\begin{minipage}{0.8\textwidth}
   \centering
-  {\bfseries\Large \reportTitle\par}
+  
+  {\bfseries \MakeUppercase{\reportTitle}\par}
+  \vspace*{2ex}
+  {\bfseries \textcolor{red}{\reportEnglishTitle}\par}
 \end{minipage}
+\vspace*{12ex}
 
+{\bfseries Giảng viên hướng dẫn\par}
+\vspace*{1.5ex} 
+{\bfseries \reportSupervisor\par} 
 \vfill
-
-\begin{minipage}{0.94\textwidth}
-  \centering
-  \begin{tabular}{L{5cm}L{8cm}}
-    \textbf{Môn học} & \reportSubject \\
-    \textbf{Giảng viên hướng dẫn:} &  ThS. Lê Anh Tuấn \\
-  \end{tabular}
-\end{minipage}
-
-\vspace{0.9cm}
-
-\begin{minipage}{0.94\textwidth}
-  \begin{tabular}{L{5cm}L{8cm}}
-    \textbf{Thành viên} & \textbf{MSSV} \\
-    \studentA & \roleA \\
-    \studentB & \roleB \\
-  \end{tabular}
-\end{minipage}
-
-\vfill
-
 {\bfseries \reportDate\par}
+\vspace{0ex}
+\end{titlepage}
+\clearpage
+% ==================== PAGE 2: INNER TITLE PAGE ====================
+\begin{titlepage}
+\pagestyle{empty}
+
+\begin{tikzpicture}[remember picture,overlay]
+  \draw[line width=1pt]
+    ($(current page.north west) + (2.9cm,-1.9cm)$)
+    rectangle
+    ($(current page.south east) + (-1.9cm,1.9cm)$);
+\end{tikzpicture}
+
+\centering
+\fontsize{13}{16}\selectfont
+\vspace*{-4ex}
+
+{\bfseries \MakeUppercase{\reportUniversity}\par}
+{\bfseries \MakeUppercase{\reportFaculty}\par}
+\vspace*{5ex}
+
+\begin{figure}[h]
+    \centering
+    \includegraphics[width=0.18\textwidth]{logo-uit.png}
+\end{figure}
+\vspace*{5ex}
+
+{\bfseries \MakeUppercase{\studentA}\ -- \roleA\par}
+{\bfseries \MakeUppercase{\studentB}\ -- \roleB\par}
+\vspace*{9ex}
+
+{\bfseries \MakeUppercase{\reportCourse}\par}
+\vspace*{4ex}
+\begin{minipage}{0.8\textwidth}
+  \centering
+  
+  {\bfseries \MakeUppercase{\reportTitle}\par}
+  \vspace*{2ex}
+  {\bfseries \textcolor{red}{\reportEnglishTitle}\par}
+\end{minipage}
+\vspace*{12ex}
+
+{\bfseries Giảng viên hướng dẫn\par}
+\vspace*{1.5ex} 
+{\bfseries \reportSupervisor\par} 
+\vfill
+{\bfseries \reportDate\par}
+\vspace{0ex}
 \end{titlepage}

@@ -12,7 +12,7 @@ Từ bối cảnh trên, đề tài DocVault được xây dựng với mục ti
 
 \section{Vấn đề cần giải quyết}
 
-Đề tài tập trung vào hai nhóm vấn đề chính. Nhóm thứ nhất là vấn đề ứng dụng: xây dựng hệ thống quản lý tài liệu có phân quyền rõ ràng, có quy trình phê duyệt, có lưu trữ file an toàn và có audit trail đủ để phục vụ truy vết. Nhóm thứ hai là vấn đề quy trình: đưa các kiểm soát bảo mật vào pipeline để mỗi lần thay đổi mã nguồn đều có thể được kiểm tra bằng các bước tự động.
+Đề tài tập trung vào hai nhóm vấn đề chính. Nhóm thứ nhất là vấn đề ứng dụng: xây dựng hệ thống quản lý tài liệu có phân quyền rõ ràng, có quy trình phê duyệt, có lưu trữ file an toàn và có audit trail đủ để phục vụ truy vết. Nhóm thứ hai là vấn đề quy trình: đưa các kiểm soát bảo mật vào pipeline để mỗi lần thay đổi mã nguồn đều có thể được kiểm tra một cách tự động.
 
 Các yêu cầu tiêu biểu có thể tóm tắt như sau:
 
@@ -46,7 +46,7 @@ Các mục tiêu cụ thể gồm:
 
 Phạm vi đề tài gồm hai hợp phần có quan hệ chặt chẽ. Hợp phần ứng dụng bao gồm giao diện web, các dịch vụ backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Hợp phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, quy trình CI/CD trên Jenkins, kho ảnh Harbor, GitOps với Argo CD, các cổng kiểm soát bảo mật và cơ chế giám sát sau triển khai.
 
-Tại thời điểm hoàn thành báo cáo, pipeline đã tích hợp SAST, SCA, quét secret, Trivy, Checkov, Terraform Validate, Kyverno CLI, build và quét container image, đẩy artifact lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST bằng OWASP ZAP. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Các nội dung còn lại tập trung vào gia cố vận hành ở quy mô production, thay vì bổ sung các thành phần nền tảng của quy trình.
+Tại thời điểm hoàn thành báo cáo, pipeline đã tích hợp SAST, SCA, quét secret, Trivy, Checkov, Terraform Validate, Kyverno CLI, build và quét container image, đẩy artifact lên Harbor, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test và DAST bằng OWASP ZAP. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Các nội dung còn lại tập trung vào vận hành ở quy mô production, thay vì bổ sung các thành phần nền tảng của quy trình.
 
 \begin{table}[H]
 \centering
