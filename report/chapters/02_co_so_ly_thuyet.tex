@@ -15,29 +15,30 @@ Trong DocVault, nhóm chọn tập trung vào các điểm có thể kiểm ch�
 Trên thị trường đã có nhiều hệ thống quản lý tài liệu, từ giải pháp thương mại đến mã nguồn mở. Việc đối chiếu với chúng giúp định vị rõ hơn hướng đi mà DocVault chọn.
 
 \begin{itemize}
-  \item \textbf{Microsoft SharePoint}: nền tảng quản lý tài liệu và cộng tác thương mại, mạnh về tích hợp hệ sinh thái Microsoft 365, phân quyền và compliance; tuy nhiên là dịch vụ đóng, chủ yếu vận hành trên đám mây của nhà cung cấp và khó tùy biến sâu chính sách truy cập ở mức mã nguồn.
-  \item \textbf{Alfresco}: hệ thống ECM mã nguồn mở (có bản thương mại), hỗ trợ vòng đời tài liệu, phân quyền và audit; kiến trúc nghiêng về monolith/Java truyền thống và không đặt trọng tâm vào quy trình DevSecOps đi kèm.
-  \item \textbf{Nextcloud}: giải pháp self-hosted phổ biến cho lưu trữ và chia sẻ file, dễ triển khai; mạnh về chia sẻ và đồng bộ nhưng kiểm soát theo classification, DLP và audit tamper-evident không phải trọng tâm mặc định.
+  \item \textbf{Microsoft SharePoint}: nền tảng quản lý tài liệu và cộng tác thương mại, mạnh về tích hợp hệ sinh thái Microsoft 365, phân quyền và compliance \cite{microsoft_sharepoint_intro}; tuy nhiên là dịch vụ đóng, chủ yếu vận hành trên đám mây của nhà cung cấp và khó tùy biến sâu chính sách truy cập ở mức mã nguồn.
+  \item \textbf{Alfresco}: hệ thống ECM mã nguồn mở (có bản thương mại), hỗ trợ vòng đời tài liệu, phân quyền và audit \cite{alfresco_security_authz,alfresco_audit}; kiến trúc nghiêng về monolith/Java truyền thống và không đặt trọng tâm vào quy trình DevSecOps đi kèm.
+  \item \textbf{Nextcloud}: giải pháp self-hosted phổ biến cho lưu trữ và chia sẻ file, dễ triển khai; mạnh về chia sẻ và đồng bộ \cite{nextcloud_files}; nhưng kiểm soát theo classification, DLP và audit tamper-evident không phải trọng tâm mặc định.
+  \item \textbf{Dropbox Business}: nền tảng lưu trữ, đồng bộ và cộng tác tài liệu trên cloud, có team folders, nhóm/vai trò quản trị, kiểm soát chia sẻ, SSO, compliance tracking và key management ở các gói doanh nghiệp \cite{dropbox_business,dropbox_security}; tuy nhiên đây là dịch vụ SaaS đóng, không phù hợp nếu mục tiêu là tự triển khai và kiểm chứng toàn bộ backend, audit chain và pipeline phát hành.
+  \item \textbf{Box và Box Shield}: nền tảng quản lý nội dung cloud có lớp bảo vệ dữ liệu như gán nhãn classification, chính sách phân loại tự động và các quy tắc phát hiện bất thường hoặc nội dung độc hại \cite{box_security_classification,box_auto_classification,box_anomalous_download,box_malicious_content}; điểm khác biệt so với DocVault là Box Shield là năng lực bảo vệ trong một sản phẩm thương mại SaaS, không phải một hệ thống minh họa tự triển khai cùng DevSecOps pipeline trong phạm vi đồ án.
 \end{itemize}
 
 Phần khảo sát này nhằm định vị hướng tiếp cận của DocVault so với một số hệ thống quản lý tài liệu phổ biến. Nhóm chỉ dựa trên tài liệu công khai và đặc điểm tổng quát của các sản phẩm, chưa thực hiện benchmark hoặc triển khai thử trực tiếp từng hệ thống. Vì vậy, bảng so sánh không nhằm kết luận hệ thống nào tốt hơn, mà chỉ làm rõ phạm vi mà DocVault tập trung trong đồ án: quản lý vòng đời tài liệu bảo mật, audit/evidence và quy trình DevSecOps có bằng chứng.
 
-\begin{table}[H]
+\begin{table}[htbp]
 \centering
-\small
+\footnotesize
 \caption{So sánh DocVault với một số hệ thống quản lý tài liệu tiêu biểu}
 \label{tab:related-work}
-\begin{tabularx}{\textwidth}{p{0.26\textwidth}YYYY}
+\begin{tabularx}{\textwidth}{p{0.18\textwidth}p{0.20\textwidth}YY}
 \toprule
-\textbf{Tiêu chí} & \textbf{SharePoint} & \textbf{Alfresco} & \textbf{Nextcloud} & \textbf{DocVault} \\
+\textbf{Hệ thống} & \textbf{Mô hình triển khai} & \textbf{Điểm mạnh liên quan} & \textbf{Giới hạn so với trọng tâm DocVault} \\
 \midrule
-Mô hình triển khai & Cloud đóng & Self-hosted & Self-hosted & Self-hosted \\
-RBAC + ACL deny-overrides & Có hỗ trợ & Có hỗ trợ & Một phần & Có hỗ trợ \\
-Phân loại + kiểm soát theo classification & Có hỗ trợ & Một phần & Không phải trọng tâm mặc định & Có hỗ trợ \\
-DLP nâng classification tự động & Một phần & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
-Audit tamper-evident (hash-chain) & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
-Compliance boundary (metadata-only) & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Không phải trọng tâm mặc định & Có hỗ trợ \\
-DevSecOps pipeline đi kèm & Không đi kèm trong phạm vi khảo sát & Không đi kèm trong phạm vi khảo sát & Không đi kèm trong phạm vi khảo sát & Có hỗ trợ \\
+SharePoint & Cloud đóng trong hệ sinh thái Microsoft 365 & Quản lý tài liệu, cộng tác, phân quyền và compliance cho tổ chức. & Dịch vụ đóng; không tập trung vào tự triển khai mã nguồn, audit hash-chain và pipeline DevSecOps minh họa trong phạm vi khảo sát. \\
+Alfresco & Self-hosted hoặc bản thương mại & ECM/DMS có vòng đời tài liệu, metadata, phân quyền và audit. & Kiến trúc và hệ sinh thái nghiêng về ECM truyền thống; DevSecOps pipeline đi kèm không phải trọng tâm mặc định. \\
+Nextcloud & Self-hosted & Lưu trữ, đồng bộ và chia sẻ file, phù hợp nhu cầu cloud file server nội bộ. & Classification, DLP tự động và audit tamper-evident không phải trọng tâm mặc định của phần lõi trong phạm vi khảo sát. \\
+Dropbox Business & SaaS cloud & Đồng bộ, chia sẻ, cộng tác tài liệu, quản trị team và một số kiểm soát bảo mật/compliance ở gói doanh nghiệp. & Không self-hosted; không cho phép kiểm chứng toàn bộ backend, audit chain và pipeline triển khai ở mức đồ án. \\
+Box + Box Shield & SaaS cloud & Quản lý nội dung doanh nghiệp, classification, chính sách phân loại tự động và phát hiện rủi ro/bất thường. & Là năng lực bảo vệ trong sản phẩm thương mại đóng; DevSecOps pipeline tự xây dựng và evidence packet theo thiết kế riêng không phải trọng tâm khảo sát. \\
+DocVault & Self-hosted/cloud-native demo & RBAC, ACL deny-overrides, classification policy, DLP nâng classification, audit hash-chain, compliance boundary và evidence packet. & Phạm vi hẹp hơn các DMS thương mại; không tập trung vào cộng tác văn phòng thời gian thực hoặc bộ quản trị tri thức doanh nghiệp đầy đủ. \\
 \bottomrule
 \end{tabularx}
 \end{table}
