@@ -33,6 +33,21 @@ Ranh giới quan trọng nhất trong thiết kế là Jenkins không trực ti�
 
 \section{Kiến trúc hạ tầng trên AWS EKS}
 
+Trước khi đi vào từng nhóm tài nguyên, Hình~\ref{fig:aws-eks-iac-deployment-flow} mô tả luồng triển khai hạ tầng AWS EKS ở mức tổng thể. Thay đổi hạ tầng bắt đầu từ pull request trên các file IaC như Terraform, Kubernetes manifest hoặc GitOps values, được review trước khi Jenkins kích hoạt workflow kiểm tra. Jenkins chuẩn bị môi trường Terraform trên CI runner có kiểm soát, chạy \code{fmt}, \code{init}, \code{validate}, \code{plan} và Checkov scan; nếu một gate thất bại thì quá trình bị chặn và yêu cầu sửa lại trước khi apply.
+
+\begin{figure}[H]
+\centering
+\includegraphics[
+  width=0.96\textwidth,
+  height=0.78\textheight,
+  keepaspectratio
+]{aws-eks-iac-deployment-flow.drawio.png}
+\caption{Luồng triển khai hạ tầng AWS EKS bằng IaC}
+\label{fig:aws-eks-iac-deployment-flow}
+\end{figure}
+
+Sau khi kết quả \code{terraform plan} vượt qua kiểm tra và được phê duyệt, pipeline mới thực hiện \code{terraform apply} để tạo hoặc cập nhật nền tảng AWS gồm VPC, EKS, IAM/OIDC/IRSA, Secrets Manager, S3/KMS và EBS CSI. Trên nền tảng đó, lớp Kubernetes tiếp tục cài các controller vận hành như Argo CD, External Secrets Operator, cert-manager, ingress-nginx, Kyverno và monitoring/Loki. Runtime của DocVault sau cùng chạy trong namespace riêng với web, gateway, các backend service, Keycloak và cơ sở dữ liệu. Nguyên tắc chính của luồng này là không thay đổi hạ tầng trực tiếp trên AWS Console; mọi thay đổi đều đi qua mã nguồn, pipeline, kiểm tra bảo mật và lịch sử Git.
+
 \subsection{Hạ tầng dưới dạng mã với Terraform}
 
 Mã nguồn Terraform được đặt tại \code{infra/terraform/aws-eks} và được phân tách thành các module cục bộ theo từng nhóm trách nhiệm. Module \code{network} khởi tạo VPC, public subnet và private subnet trên hai Availability Zone. Module \code{eks-cluster} khởi tạo EKS control plane, managed node group, security group và các add-on nền tảng gồm CoreDNS, kube-proxy, VPC CNI và AWS EBS CSI Driver. Việc mô tả hạ tầng bằng mã giúp chuẩn hóa cấu hình, hỗ trợ kiểm tra thay đổi và tái tạo môi trường \cite{terraform_docs}.

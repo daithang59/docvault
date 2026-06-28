@@ -66,7 +66,7 @@ Audit ingest & Viewer cannot ingest fake audit event & PASS \\
 
 Frontend được kiểm tra bằng các bước lint, build, typecheck và test component/helper. Các bước này giúp phát hiện lỗi cú pháp, lỗi kiểu dữ liệu, lỗi build và một số lỗi ở tầng giao diện trước khi triển khai.
 
-Bên cạnh kiểm thử tự động, nhóm cũng thu thập ảnh chụp các màn hình chính của hệ thống sau khi triển khai. Các màn hình được kiểm tra gồm Dashboard, Documents, Approvals, Audit, Security, Evidence, Retention và Access Review. Những ảnh chụp này được dùng để minh họa giao diện và làm bằng chứng trực quan rằng các màn hình chính có thể render đúng, hiển thị dữ liệu phù hợp và phản ánh trạng thái hệ thống tại thời điểm kiểm thử.
+Bên cạnh kiểm thử tự động, nhóm cũng thu thập ảnh chụp các màn hình chính của hệ thống sau khi triển khai. Các màn hình được kiểm tra gồm đăng nhập, xác thực Keycloak, Dashboard, Documents, My Documents, New Document, Document Detail, Preview, Approvals, Audit, Security, Evidence Center, Retention và Access Review. Những ảnh chụp này được dùng để minh họa giao diện và làm bằng chứng trực quan rằng các màn hình chính có thể render đúng, hiển thị dữ liệu phù hợp và phản ánh trạng thái hệ thống tại thời điểm kiểm thử.
 
 \begin{figure}[H]
 \centering
@@ -80,6 +80,71 @@ Bên cạnh kiểm thử tự động, nhóm cũng thu thập ảnh chụp các 
 \includegraphics[width=0.92\textwidth]{screen/approvals.png}
 \caption{Bằng chứng giao diện hàng đợi phê duyệt và trạng thái SLA}
 \label{fig:evidence-approvals}
+\end{figure}
+
+Nhóm ảnh bổ sung dưới đây làm rõ hơn đường đi của người dùng từ đăng nhập, tạo tài liệu, xem chi tiết, preview nội dung đến đối soát evidence và retention.
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/loginpage.png}
+\caption{Bằng chứng trang đăng nhập ứng dụng DocVault}
+\label{fig:evidence-login-page}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/authpage.png}
+\caption{Bằng chứng trang xác thực Keycloak}
+\label{fig:evidence-keycloak-auth-page}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/keycloakconsole.png}
+\caption{Bằng chứng quản trị user trong realm Keycloak}
+\label{fig:evidence-keycloak-console}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/mydocument.png}
+\caption{Bằng chứng danh sách tài liệu của người dùng}
+\label{fig:evidence-my-documents}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/newdocument.png}
+\caption{Bằng chứng tạo tài liệu mới và upload file}
+\label{fig:evidence-new-document}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/documentdetail.png}
+\caption{Bằng chứng chi tiết tài liệu và metadata}
+\label{fig:evidence-document-detail}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/preview-document.png}
+\caption{Bằng chứng preview tài liệu qua luồng kiểm soát}
+\label{fig:evidence-preview-document}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/evidencecenter.png}
+\caption{Bằng chứng giao diện Evidence Center}
+\label{fig:evidence-center}
+\end{figure}
+
+\begin{figure}[H]
+\centering
+\includegraphics[width=0.92\textwidth]{screen/retention.png}
+\caption{Bằng chứng giao diện Retention và trạng thái lưu giữ}
+\label{fig:evidence-retention}
 \end{figure}
 
 Tuy nhiên, phạm vi kiểm thử frontend hiện tại chủ yếu tập trung vào build, component/helper và bằng chứng giao diện. Kiểm thử end-to-end ở cấp trình duyệt đầy đủ vẫn là hướng cần bổ sung thêm nếu hệ thống được phát triển tiếp.
