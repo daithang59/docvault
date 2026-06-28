@@ -173,7 +173,7 @@
       "firstName": "CO",
       "lastName": "One",
       "email": "co1@docvault.local",
-      "requiredActions": ["CONFIGURE_TOTP"],
+      "requiredActions": [],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["co", "compliance_officer"]
     },
@@ -184,7 +184,7 @@
       "firstName": "Admin",
       "lastName": "One",
       "email": "admin1@docvault.local",
-      "requiredActions": ["CONFIGURE_TOTP"],
+      "requiredActions": [],
       "credentials": [{ "type": "password", "value": "Passw0rd!", "temporary": false }],
       "realmRoles": ["admin"]
     },
