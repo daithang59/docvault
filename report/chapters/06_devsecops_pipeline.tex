@@ -489,7 +489,7 @@ Backend sử dụng \code{Dockerfile.backend} với build argument xác định 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{infra/harbor-cache-audit.png}
-\caption{Các image dùng để cache (Có chữ C ở cột artifact) có dung lượng lớn do nó chứa cả các phần build image}
+\caption{Các image cache được đánh dấu bằng chữ C ở cột artifact, có dung lượng lớn do chứa cả các lớp build trung gian.}
 \label{fig:harbor-cache-audit}
 \end{figure}
 Sau build, Trivy quét từng image và fail nếu có lỗ hổng CRITICAL. Chỉ các image vượt qua gate mới được push. Pipeline đăng nhập registry bằng credential tạm trong thư mục Docker config riêng và xóa sau khi hoàn tất. Image triển khai không phụ thuộc tag mutable mà được cập nhật cả tag Git SHA lẫn registry digest.
