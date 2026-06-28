@@ -203,7 +203,7 @@ Các dependency nền tảng được quản lý bằng Kustomize tại \code{in
 
 Lưu lượng public đi qua ingress-nginx. Các dịch vụ công khai của hệ thống gồm ứng dụng chính (\code{app.docvault.id.vn}), máy chủ xác thực Keycloak (\code{auth.docvault.id.vn}), và private registry Harbor (\code{harbor.docvault.id.vn}) được cấu hình DNS trỏ trực tiếp đến địa chỉ IP Public của AWS Network Load Balancer (NLB) thông qua bản ghi trên Cloudflare (Hình~\ref{fig:cloudflare-dns}). Để cấp phát chứng chỉ SSL/TLS bảo mật, cert-manager sử dụng ClusterIssuer \code{letsencrypt-cloudflare} và giao thức xác thực DNS-01 challenge qua API Token của Cloudflare.
 
-Để có thể cung cấp một cách truy cập công khai bằng URL cho các giao diện như Argo CD (\code{argocd.docvault.id.vn}), hệ thống giám sát Grafana (\code{monitoring.docvault.id.vn}) và private registry Harbor (\code{harbor.docvault.id.vn}), chúng được định tuyến bảo mật qua giải pháp Cloudflare Tunnel thông qua một dịch vụ \code{cloudflared} chạy độc lập bằng docker container trong namespace \code{cloudflare-tunnel} (Hình~\ref{fig:cloudflare-tunnel-routes}). Bằng cách này, các dịch vụ không cần lộ trực tiếp ra Internet mà vẫn có thể truy cập công khai thông qua Cloudflare Tunnel. Tuy nhiên, chỉ riêng Harbor thì cần phải sử dụng IP Public của AWS NLB (như đã nói ở trên) và tắt dịch vụ Proxy của Cloudflare. Lý do cần tắt dịch vụ đó đi là vì, Proxy của Cloudflare giới hạn dung lượng upload chỉ 100MB, ở bản free, và các image khi được upload lên Harbor có thể lên đến 200MB hoặc 500MB nếu dành cho phần cache image. 
+Để có thể cung cấp một cách truy cập công khai bằng URL cho các giao diện như Argo CD (\code{argocd.docvault.id.vn}), hệ thống giám sát Grafana (\code{monitoring.docvault.id.vn}) và private registry Harbor (\code{harbor.docvault.id.vn}), chúng được định tuyến bảo mật qua giải pháp Cloudflare Tunnel thông qua một dịch vụ \code{cloudflared} chạy độc lập bằng docker container trong namespace \code{cloudflare-tunnel} (Hình~\ref{fig:cloudflare-tunnel-routes}). Bằng cách này, các dịch vụ không cần lộ trực tiếp ra Internet mà vẫn có thể truy cập công khai thông qua Cloudflare Tunnel. Tuy nhiên, chỉ riêng Harbor thì cần phải sử dụng IP Public của AWS NLB (như đã nói ở trên) và tắt dịch vụ Proxy của Cloudflare. Lý do cần tắt dịch vụ đó đi là vì Proxy của Cloudflare giới hạn dung lượng upload chỉ 100MB (ở bản free) và các image khi được upload lên Harbor có thể lên đến 200MB hoặc 500MB nếu dành cho phần cache image. 
 
 \begin{figure}[H]
 \centering
@@ -489,7 +489,7 @@ Backend sử dụng \code{Dockerfile.backend} với build argument xác định 
 \begin{figure}[H]
 \centering
 \includegraphics[width=\textwidth]{infra/harbor-cache-audit.png}
-\caption{Các image dùng để cache (Có chữ C ở cột artifact), với dung lượng lớn, do nó chứa cả các phần build image}
+\caption{Các image dùng để cache (Có chữ C ở cột artifact) có dung lượng lớn do nó chứa cả các phần build image}
 \label{fig:harbor-cache-audit}
 \end{figure}
 Sau build, Trivy quét từng image và fail nếu có lỗ hổng CRITICAL. Chỉ các image vượt qua gate mới được push. Pipeline đăng nhập registry bằng credential tạm trong thư mục Docker config riêng và xóa sau khi hoàn tất. Image triển khai không phụ thuộc tag mutable mà được cập nhật cả tag Git SHA lẫn registry digest.
