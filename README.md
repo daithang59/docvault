@@ -43,6 +43,12 @@ Vòng đời tài liệu chính:
 
 Pipeline chính nằm ở `Jenkinsfile`; các bước tái sử dụng nằm trong `vars/*.groovy`. Cấu hình mặc định hiện hướng tới Harbor registry (`harbor.docvault.id.vn`), GitOps branch cấu hình qua `GITOPS_BRANCH`, và triển khai Kubernetes bằng Helm chart chung trong `infra/k8s/charts/docvault-service`.
 
+### Luồng Triển Khai IaC Lên AWS/EKS
+
+![Luồng triển khai IaC lên AWS EKS](report/images/aws-eks-iac-deployment-flow.drawio.png)
+
+Sơ đồ trên mô tả luồng thay đổi hạ tầng bằng Infrastructure as Code: developer tạo PR, Jenkins chạy Terraform và Checkov, các bước validation/plan phải pass trước khi approval và `terraform apply` tạo AWS foundation, Kubernetes platform layer và runtime DocVault.
+
 ## DevSecOps Components
 
 | Thành phần | Vai trò trong dự án |
