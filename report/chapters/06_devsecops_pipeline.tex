@@ -1,3 +1,4 @@
+\clearpage
 \section{Hạ tầng triển khai trên AWS và EKS}
 
 \subsection{Mục tiêu và phạm vi triển khai}
@@ -57,13 +58,15 @@ Cấu hình hỗ trợ hai phương án mạng. Phương án tối ưu chi phí 
 Các biện pháp gia cố bảo mật chính được thể hiện trong Terraform gồm:
 
 \begin{itemize}
-  \item Bật đầy đủ năm nhóm log EKS control plane: API, audit, authenticator, controller manager và scheduler.
+  \item Bật đầy đủ năm nhóm log EKS control plane: API, audit, authenticator, controller manager và scheduler \cite{kubernetes_auditing}.
   \item Bắt buộc IMDSv2 trên EC2 node.
   \item Mã hóa volume gốc của node bằng EBS gp3.
   \item Bật OIDC provider để cấp quyền AWS theo IRSA cho từng Kubernetes ServiceAccount \cite{aws_eks_irsa}.
   \item Tạo StorageClass gp3 và cài EBS CSI Driver để hỗ trợ PersistentVolume.
   \item Tách module lưu trữ tài liệu, backup cơ sở dữ liệu, External Secrets và quyền Jenkins.
 \end{itemize}
+
+Các cấu hình này bám theo các nhóm khuyến nghị thường gặp trong Kubernetes Security Checklist như kiểm soát truy cập API, network security, pod security, secrets, image và admission controller \cite{kubernetes_security_checklist}.
 
 Cấu hình hiện tại sử dụng managed node group có khả năng co giãn từ một đến ba node, trong đó số lượng mong muốn của môi trường kiểm thử là hai node. Loại máy, dung lượng đĩa, phiên bản Kubernetes và số lượng node đều được khai báo dưới dạng biến, cho phép điều chỉnh mà không thay đổi logic của module.
 
@@ -197,6 +200,8 @@ Các service DocVault sử dụng Helm chart dùng chung tại \path{infra/k8s/c
   \item Tạo NetworkPolicy cho từng release.
 \end{itemize}
 
+Các kiểm soát như chạy non-root, tắt privilege escalation, dùng seccomp mặc định, loại bỏ Linux capability và áp dụng NetworkPolicy được đối chiếu với Kubernetes Pod Security Standards và Security Checklist \cite{kubernetes_pod_security_standards,kubernetes_security_checklist}.
+
 Các dependency nền tảng được quản lý bằng Kustomize tại \code{infra/k8s/infra-deps}. Overlay hiện dùng cho EKS triển khai namespace, External Secrets, CloudNativePG, MongoDB và Keycloak; các tài nguyên MinIO được loại khỏi desired state sau khi document-service chuyển sang S3. Cách tách Helm cho application và Kustomize cho dependency giúp giảm lặp cấu hình nhưng vẫn giữ được khả năng tùy biến theo môi trường.
 
 \subsubsection{Ingress, DNS và TLS}
@@ -268,6 +273,7 @@ Pipeline cũng hỗ trợ AWS IAM Roles Anywhere cho Jenkins controller được
 
 Hình~\ref{fig:aws-secrets-manager} thể hiện các nhóm secret dành cho ứng dụng, Keycloak, MongoDB, Harbor, Cosign và Jenkins. Ảnh chỉ hiển thị tên và metadata quản lý, không hiển thị giá trị secret.
 
+\clearpage
 \section{Quy trình DevSecOps với GitOps và CI/CD}
 
 \subsection{Mô hình GitOps với Argo CD}
@@ -421,6 +427,7 @@ Luồng pipeline hiện tại gồm:
 \label{fig:jenkins-stage-view}
 \end{figure}
 
+\clearpage
 \section{Kiểm soát bảo mật trong pipeline}
 
 \subsection{Các cổng kiểm soát chất lượng và bảo mật}
@@ -498,7 +505,7 @@ Backend sử dụng \code{Dockerfile.backend} với build argument xác định 
 \end{figure}
 Sau build, Trivy quét từng image và fail nếu có lỗ hổng CRITICAL. Chỉ các image vượt qua gate mới được push. Pipeline đăng nhập registry bằng credential tạm trong thư mục Docker config riêng và xóa sau khi hoàn tất. Image triển khai không phụ thuộc tag mutable mà được cập nhật cả tag Git SHA lẫn registry digest.
 
-So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes kéo đúng artifact đã được quét. Nếu cùng một tag bị ghi đè, digest trong Helm values vẫn không thay đổi. Đây là kiểm soát quan trọng đối với tính toàn vẹn của chuỗi cung ứng phần mềm.
+So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes kéo đúng artifact đã được quét. Nếu cùng một tag bị ghi đè, digest trong Helm values vẫn không thay đổi. Đây là kiểm soát quan trọng đối với tính toàn vẹn của chuỗi cung ứng phần mềm và là bước nền trước khi chuẩn hóa provenance/attestation theo SLSA \cite{slsa_framework}.
 
 \subsection{Kiểm tra sau triển khai}
 
@@ -543,6 +550,7 @@ OWASP ZAP baseline scan chạy khi \code{RUN\_ZAP=true} và target có thể tru
 \end{figure}
 
 
+\clearpage
 \section{Vận hành, giám sát và khôi phục}
 
 Phần này gom các năng lực vận hành của hệ thống sau khi triển khai: giám sát số liệu, tập trung log và khả năng khôi phục dữ liệu. Hai năng lực đầu được trình bày ngay dưới đây; năng lực khôi phục dựa trên cơ chế sao lưu cơ sở dữ liệu đã mô tả ở Mục~\ref{subsec:db-backup}.
@@ -591,6 +599,7 @@ Giám sát và log cho biết hệ thống đang chạy ra sao; khôi phục quy
 Phần còn thiếu để khép vòng là diễn tập khôi phục định kỳ. Backup chỉ có giá trị khi đã chứng minh khôi phục được, nên bước tiếp theo là khôi phục vào môi trường cô lập, đối chiếu số bản ghi và index, chạy lại xác minh chuỗi băm audit, rồi ghi nhận RPO và RTO đo được. Cho tới khi có kết quả diễn tập, các tham số như chu kỳ oplog 10 phút chỉ phản ánh năng lực đã cấu hình. Tương tự, Loki chưa bật persistence nên log lịch sử chưa bền vững qua restart, và alert rule nghiệp vụ vẫn cần bổ sung trước khi vận hành dài hạn.
 
 
+\clearpage
 \section{Đánh giá trạng thái triển khai}
 
 \subsection{Mapping kiểm soát, công cụ và bằng chứng}
@@ -637,7 +646,7 @@ Các giới hạn hiện tại gồm:
   \item NetworkPolicy chưa giới hạn egress theo từng dependency.
   \item Loki chưa có persistence và cấu hình Grafana cần được đưa hoàn toàn sang secret manager.
   \item Backup PostgreSQL và MongoDB đã được cấu hình nhưng cần diễn tập restore và ghi nhận RPO/RTO.
-  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestation bằng Kyverno).
+  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestation bằng Kyverno) \cite{slsa_framework}.
 \end{itemize}
 
 Những giới hạn trên xác định ranh giới giữa môi trường đồ án có kiểm soát và hệ thống production. Các bước gia cố tiếp theo gồm remote Terraform state có locking, private node group, admission control, provenance chuẩn hóa, bắt buộc xác minh chữ ký image, NetworkPolicy theo nguyên tắc đặc quyền tối thiểu, cảnh báo vận hành và kiểm thử phục hồi định kỳ.

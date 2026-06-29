@@ -1,16 +1,16 @@
-\chapter{Tổng quan đề tài}
+\chapter{Giới thiệu đề tài}
 
-\section{Bối cảnh}
+\section{Lý do chọn đề tài}
 
-Trong thực tế, nhiều tổ chức làm việc với số lượng lớn tài liệu nội bộ như hợp đồng, biểu mẫu phê duyệt, tài liệu kỹ thuật, hồ sơ nhân sự, tài liệu kiểm toán hoặc các file phục vụ quá trình vận hành. Các tài liệu này thường không chỉ được lưu một lần rồi để đó, mà sẽ đi qua nhiều bước xử lý khác nhau như tạo mới, cập nhật phiên bản, gửi duyệt, phê duyệt, xuất bản, truy cập, tải xuống hoặc lưu trữ. Nếu hệ thống chỉ lưu file mà không quản lý trạng thái và lịch sử xử lý, việc kiểm tra lại tài liệu sau này sẽ gặp nhiều khó khăn.
+Trong quá trình làm việc của nhiều tổ chức, tài liệu nội bộ thường không chỉ được tạo ra rồi lưu trữ cố định. Một tài liệu có thể được cập nhật nhiều lần, gửi cho người khác duyệt, được phê duyệt, xuất bản, tải xuống, lưu trữ hoặc được kiểm tra lại sau một khoảng thời gian. Với các loại tài liệu như hợp đồng, biểu mẫu phê duyệt, tài liệu kỹ thuật, hồ sơ nhân sự hoặc tài liệu kiểm toán, việc chỉ lưu file trong một thư mục chung và phân quyền cơ bản thường chưa đủ để theo dõi toàn bộ quá trình xử lý.
 
-Một vấn đề thường gặp là khi cần xem lại một tài liệu, người quản trị hoặc người phụ trách không chỉ muốn biết file đang nằm ở đâu, mà còn muốn biết tài liệu đó đã được ai tạo, ai cập nhật, đã qua phiên bản nào, ai phê duyệt, ai từng truy cập và hiện tại đang ở trạng thái nào. Với tài liệu nhạy cảm, các thông tin này càng quan trọng vì nó liên quan đến trách nhiệm xử lý, kiểm soát truy cập và khả năng chứng minh tài liệu đã được quản lý đúng quy trình.
+Vấn đề này rõ hơn khi tài liệu có tính nhạy cảm. Khi cần kiểm tra lại một tài liệu, người quản trị không chỉ cần biết file đang được lưu ở đâu, mà còn cần biết ai đã tạo, ai đã cập nhật, tài liệu đã qua những phiên bản nào, ai đã phê duyệt, ai từng truy cập và hiện tại tài liệu đang ở trạng thái nào. Nếu hệ thống không lưu lại các thông tin này một cách có cấu trúc, việc truy vết sau này sẽ phụ thuộc nhiều vào thao tác thủ công hoặc dữ liệu rời rạc, khó đối chiếu.
 
-Từ nhu cầu đó, nhóm xây dựng DocVault như một hệ thống quản lý tài liệu bảo mật. Phần ứng dụng không dừng ở upload và download file, mà quản lý tài liệu như một đối tượng có metadata, version, trạng thái, quyền truy cập, lịch sử phê duyệt và audit log. Khi thử các luồng như upload version, gửi duyệt và tải file, nhóm nhận thấy nếu chỉ kiểm soát thao tác ở giao diện thì rất khó tin cậy; vì vậy các quyết định quan trọng phải được đưa xuống backend và để lại dấu vết kiểm tra.
+Từ đó, nhóm chọn xây dựng DocVault theo hướng xem tài liệu như một đối tượng nghiệp vụ có vòng đời riêng, thay vì chỉ xem tài liệu như một file lưu trữ. Mỗi tài liệu trong hệ thống cần đi kèm metadata, version, trạng thái workflow, quyền truy cập, lịch sử phê duyệt và audit log. Khi thử các luồng như upload phiên bản mới, gửi duyệt, phê duyệt hoặc tải file, nhóm nhận thấy các quyết định quan trọng không nên chỉ nằm ở giao diện, vì người dùng vẫn có thể gọi trực tiếp API nếu backend không kiểm soát chặt.
 
-Bên cạnh đó, đề tài xây dựng thêm quy trình DevSecOps cho DocVault. Một hệ thống microservices có nhiều service, nhiều database, object storage, Kubernetes manifest và secret runtime sẽ rất dễ lệch cấu hình nếu triển khai hoàn toàn thủ công. Nhóm cần một chuỗi phát hành từ mã nguồn đến workload trên EKS có thể chạy lại, có log, có artifact và có trạng thái triển khai để đối chiếu. Đây là lý do DevSecOps được xem là phần chính thứ hai của đề tài, không chỉ là bước phụ để đưa ứng dụng lên server.
+Bên cạnh phần ứng dụng, nhóm cũng muốn quá trình triển khai hệ thống có thể kiểm tra lại được. Một hệ thống microservices thường gồm nhiều service, nhiều database, object storage, Kubernetes manifest, secret runtime và các thành phần hạ tầng liên quan. Nếu việc build image, scan, cập nhật manifest và triển khai lên Kubernetes được làm thủ công, quá trình phát hành dễ bị lệch cấu hình và khó xác định nguyên nhân khi có lỗi.
 
-Vì vậy, báo cáo không xem DocVault chỉ là một ứng dụng quản lý file, cũng không xem đây chỉ là một pipeline DevSecOps. Đề tài kết hợp cả hai hướng: xây dựng luồng nghiệp vụ tài liệu có kiểm soát và chứng minh cách hệ thống đó được phát hành qua một quy trình có thể truy vết.
+Vì vậy, đề tài ``Phát triển hệ thống quản lý tài liệu bảo mật dựa trên kiến trúc Microservices và quy trình DevSecOps'' được thực hiện theo hai hướng song song. Hướng thứ nhất là xây dựng ứng dụng DocVault để quản lý tài liệu có kiểm soát. Hướng thứ hai là xây dựng quy trình DevSecOps để việc phát hành hệ thống từ mã nguồn đến workload trên Kubernetes có log, artifact và bằng chứng đối chiếu.
 
 \section{Vấn đề cần giải quyết}
 
@@ -41,9 +41,9 @@ Cụ thể, đề tài tập trung vào các yêu cầu sau:
 
 \section{Mục tiêu đề tài}
 
-Mục tiêu tổng quát của đề tài là xây dựng và triển khai DocVault như một hệ thống hoàn chỉnh trong phạm vi đồ án: có ứng dụng quản lý tài liệu bảo mật, có hạ tầng triển khai và có quy trình phát hành đủ bằng chứng để kiểm tra lại.
+Mục tiêu tổng quát của đề tài là xây dựng và triển khai DocVault như một hệ thống hoàn chỉnh trong phạm vi đồ án. Hệ thống cần có phần ứng dụng quản lý tài liệu bảo mật, có hạ tầng triển khai và có quy trình phát hành đủ rõ để kiểm tra lại khi cần.
 
-Ở lớp ứng dụng, nhóm hướng đến việc quản lý tài liệu theo vòng đời rõ ràng, kiểm soát truy cập ở backend và tạo được audit/evidence khi cần đối soát. Ở lớp triển khai, nhóm xây dựng pipeline và hạ tầng cloud-native để mỗi lần phát hành có thể lần ngược từ commit, image digest, GitOps revision đến trạng thái workload trên Kubernetes.
+Ở lớp ứng dụng, nhóm tập trung vào việc quản lý tài liệu theo vòng đời, kiểm soát truy cập ở backend và tạo audit/evidence cho các thao tác quan trọng. Ở lớp triển khai, nhóm xây dựng pipeline và hạ tầng cloud-native để mỗi lần phát hành có thể lần ngược từ commit, image digest, GitOps revision đến trạng thái workload trên Kubernetes.
 
 Các mục tiêu cụ thể gồm:
 
@@ -61,11 +61,21 @@ Các mục tiêu cụ thể gồm:
   \item Thu thập bằng chứng cho các luồng ứng dụng và chuỗi phát hành, bao gồm kiểm thử E2E, audit/evidence, retention, scan report, image digest, SBOM, signing status, GitOps revision, Argo CD health, smoke test và ZAP report.
 \end{enumerate}
 
-\section{Phạm vi thực hiện}
+\section{Đối tượng và phạm vi thực hiện}
 
-Phạm vi đề tài gồm hai phần có quan hệ chặt chẽ. Phần ứng dụng bao gồm giao diện web, các dịch vụ backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, quy trình CI/CD trên Jenkins, kho ảnh Harbor, GitOps với Argo CD, các cổng kiểm soát bảo mật và cơ chế giám sát sau triển khai.
+\subsection{Đối tượng thực hiện}
 
-Tại thời điểm hoàn thành báo cáo, pipeline đã có các cổng kiểm soát chính cho mã nguồn, dependency, secret, IaC, Kubernetes manifest, container image và kiểm tra sau triển khai. Hạ tầng triển khai đã sử dụng Amazon S3 với SSE-KMS, IAM Role for Service Account (IRSA), AWS Secrets Manager kết hợp External Secrets Operator, backup cơ sở dữ liệu, Prometheus, Grafana và Loki. Harbor đã lưu thông tin SBOM và trạng thái ký của artifact. Trong quá trình triển khai, nhóm ưu tiên phương án phù hợp với phạm vi đồ án và chi phí thử nghiệm, nên một số cấu hình production hardening được giữ lại làm hướng phát triển thay vì cố hoàn thiện tất cả trong bản hiện tại.
+Đối tượng thực hiện của đề tài là hệ thống DocVault, một hệ thống quản lý tài liệu bảo mật được xây dựng theo kiến trúc microservices và triển khai kèm quy trình DevSecOps. Hệ thống hướng đến nhóm tài liệu nội bộ cần quản lý vòng đời, phân quyền truy cập, phê duyệt, audit và bằng chứng xử lý.
+
+Ở phần ứng dụng, các đối tượng chính gồm tài liệu, phiên bản tài liệu, metadata, workflow history, ACL, audit event, retention evidence và evidence packet. Hệ thống có các vai trò chính như Editor, Approver, Viewer, Compliance Officer và Admin. Mỗi vai trò tham gia vào một phần khác nhau của luồng xử lý, từ tạo tài liệu, duyệt tài liệu, truy cập nội dung đến kiểm tra audit/evidence.
+
+Ở phần triển khai, đối tượng thực hiện gồm frontend, API Gateway, các backend service, database, object storage, Kubernetes workload, registry, GitOps repository, pipeline CI/CD và các công cụ kiểm soát bảo mật trong chuỗi phát hành.
+
+\subsection{Phạm vi thực hiện}
+
+Phạm vi đề tài gồm hai phần chính: phần ứng dụng DocVault và phần DevSecOps triển khai hệ thống. Phần ứng dụng bao gồm giao diện web, các service backend, luồng nghiệp vụ tài liệu, kiểm soát truy cập, audit, DLP, quét mã độc, retention và evidence center. Phần DevSecOps bao gồm hạ tầng AWS EKS được quản lý bằng Terraform, pipeline Jenkins, Harbor registry, GitOps với Argo CD, các bước scan bảo mật và cơ chế quan sát sau triển khai.
+
+Trong phạm vi đồ án, nhóm tập trung chứng minh các luồng chính như tạo tài liệu, upload version, gửi duyệt, phê duyệt, xuất bản, preview/download có kiểm soát, ghi audit log, kiểm tra ranh giới quyền của Compliance Officer, xử lý DLP/malware scanning, retention và xuất evidence packet. Ở phần DevSecOps, nhóm tập trung vào các bước kiểm thử, scan, build image, push artifact, cập nhật GitOps, kiểm tra trạng thái Argo CD, smoke test, DAST và thu thập bằng chứng triển khai.
 
 \begin{table}[H]
 \centering
@@ -85,6 +95,14 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 \bottomrule
 \end{tabularx}
 \end{table}
+
+\section{Phương pháp thực hiện}
+
+Đề tài được thực hiện theo hướng kết hợp giữa khảo sát, thiết kế, hiện thực và kiểm chứng bằng bằng chứng triển khai. Trước hết, nhóm khảo sát một số hệ thống quản lý tài liệu và các công cụ DevSecOps liên quan để xác định phạm vi phù hợp cho DocVault. Từ đó, nhóm phân tích yêu cầu, xác định các luồng nghiệp vụ chính và thiết kế hệ thống theo kiến trúc microservices.
+
+Sau giai đoạn thiết kế, nhóm hiện thực các thành phần chính của DocVault, bao gồm frontend, API Gateway, các service backend, database, object storage và các cơ chế bảo mật như RBAC, ACL, grant token, DLP, malware scanning và audit hash-chain. Song song với phần ứng dụng, nhóm xây dựng hạ tầng triển khai trên AWS EKS và pipeline DevSecOps để kiểm soát quá trình phát hành từ mã nguồn đến workload đang chạy.
+
+Cuối cùng, nhóm kiểm thử hệ thống thông qua các luồng runtime, API, boundary bảo mật và pipeline. Các bằng chứng như log kiểm thử, scan report, image digest, SBOM, trạng thái ký, GitOps revision, Argo CD health, smoke test, ZAP report và ảnh chụp giao diện được dùng để đối chiếu với mục tiêu ban đầu và đánh giá mức độ hoàn thành của đề tài.
 
 \section{Đóng góp của đề tài}
 
@@ -121,10 +139,10 @@ Kiểm thử, thu thập bằng chứng và viết báo cáo & Cả hai & --- \\
 Báo cáo được tổ chức thành sáu chương chính:
 
 \begin{description}
-  \item[Chương 1. Tổng quan đề tài:] Trình bày bối cảnh, vấn đề cần giải quyết, mục tiêu, phạm vi, đóng góp của đề tài và phân công công việc.
-  \item[Chương 2. Cơ sở lý thuyết:] Trình bày các khái niệm, mô hình bảo mật và các công nghệ được sử dụng trong hệ thống.
-  \item[Chương 3. Phân tích yêu cầu và thiết kế hệ thống:] Phân tích tác nhân, yêu cầu chức năng, yêu cầu phi chức năng, kiến trúc tổng thể, thiết kế dữ liệu, API và chính sách bảo mật.
-  \item[Chương 4. Hiện thực và triển khai hệ thống:] Trình bày quá trình hiện thực DocVault, các thành phần ứng dụng, hạ tầng triển khai và quy trình DevSecOps.
-  \item[Chương 5. Kiểm thử và đánh giá hệ thống:] Trình bày chiến lược kiểm thử, kết quả kiểm thử, bằng chứng triển khai và đánh giá mức độ đáp ứng yêu cầu.
-  \item[Chương 6. Kết luận và hướng phát triển:] Tổng kết kết quả đạt được, nêu các hạn chế còn tồn tại và định hướng phát triển trong tương lai.
+  \item[Chương 1. Giới thiệu đề tài:] Trình bày lý do chọn đề tài, vấn đề cần giải quyết, mục tiêu, đối tượng và phạm vi thực hiện, phương pháp thực hiện, đóng góp của đề tài và phân công công việc.
+  \item[Chương 2. Cơ sở lý thuyết:] Trình bày các khái niệm, mô hình bảo mật, hệ thống tương tự và các công nghệ được sử dụng trong DocVault.
+  \item[Chương 3. Phân tích yêu cầu và thiết kế hệ thống:] Phân tích tác nhân, yêu cầu chức năng, yêu cầu phi chức năng, mô hình threat, kiến trúc tổng thể, thiết kế dữ liệu, API và các chính sách bảo mật.
+  \item[Chương 4. Hiện thực và triển khai hệ thống:] Trình bày quá trình hiện thực ứng dụng DocVault, các thành phần microservices, hạ tầng triển khai trên AWS EKS, GitOps, CI/CD và các kiểm soát bảo mật trong pipeline.
+  \item[Chương 5. Kiểm thử và đánh giá hệ thống:] Trình bày chiến lược kiểm thử, bằng chứng giao diện, kiểm thử runtime, kiểm thử bảo mật, bằng chứng pipeline và đánh giá mức độ đáp ứng yêu cầu.
+  \item[Chương 6. Kết luận và hướng phát triển:] Tổng kết kết quả đạt được, nêu các hạn chế còn tồn tại và đề xuất hướng phát triển tiếp theo.
 \end{description}
