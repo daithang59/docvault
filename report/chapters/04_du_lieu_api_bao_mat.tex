@@ -1,5 +1,3 @@
-\chapter{Thiết kế dữ liệu, API và chính sách bảo mật}
-
 Thiết kế hệ thống của DocVault được xây dựng xoay quanh tài liệu và vòng đời của tài liệu. Thay vì chỉ lưu thông tin file, hệ thống cần lưu thêm metadata, version, trạng thái workflow, quyền truy cập, lịch sử thao tác và các audit event liên quan. Cách thiết kế này giúp hệ thống có thể truy vết lại quá trình xử lý tài liệu, từ lúc tạo mới đến khi phê duyệt, truy cập hoặc lưu trữ.
 
 Các bảng và collection trong hệ thống được chia theo trách nhiệm của từng service. Metadata-service quản lý thông tin chính của tài liệu, document-service quản lý file và checksum, workflow-service quản lý quá trình chuyển trạng thái, audit-service lưu lại các hoạt động quan trọng, còn các thành phần evidence và retention giúp tổng hợp thông tin phục vụ kiểm tra lại tài liệu. Cách tách này giúp hệ thống rõ ràng hơn và phù hợp với kiến trúc microservices.
@@ -71,7 +69,7 @@ Hai nguyên tắc chi phối vòng đời này. Thứ nhất, các transition l�
 
 \section{Ma trận phân quyền}
 
-Các vai trò chính của hệ thống đã được giới thiệu ở Chương 3. Trong mục này, báo cáo tập trung vào cách các vai trò đó được ánh xạ thành quyền truy cập nội dung file theo classification.
+Các vai trò chính của hệ thống đã được giới thiệu ở Mục~\ref{sec:actors}. Trong mục này, báo cáo tập trung vào cách các vai trò đó được ánh xạ thành quyền truy cập nội dung file theo classification.
 
 Policy của DocVault không chỉ dựa trên role. Kết quả truy cập được xác định bởi nhiều yếu tố như role, owner, ACL, classification, trạng thái tài liệu, version tồn tại và trạng thái deleted/archived. Vì vậy, ma trận dưới đây chỉ mô tả quyền xem trước và tải nội dung file trong trường hợp tổng quan. Khi thực thi thực tế, backend vẫn áp dụng thêm các điều kiện như ACL \code{DENY}, ownership, trạng thái workflow và grant token.
 
@@ -230,3 +228,5 @@ Retention & \codecell{\code{/metadata/retention/}\\\code{documents}\\\code{/meta
 \bottomrule
 \end{longtable}
 \endgroup
+
+Các thiết kế về dữ liệu, policy, workflow, audit và API trong chương này tạo thành nền tảng cho phần hiện thực. Chương tiếp theo trình bày cách các thiết kế đó được triển khai trong mã nguồn, service runtime, hạ tầng Kubernetes và quy trình DevSecOps.

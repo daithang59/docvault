@@ -92,17 +92,26 @@
   \renewcommand{\bibname}{Tài liệu tham khảo}%
 }
 
+\newif\ifdocvaultappendix
+\let\docvaultoriginalappendix\appendix
+\renewcommand{\appendix}{%
+  \docvaultoriginalappendix
+  \docvaultappendixtrue
+}
+
 \titleformat{\chapter}[display]
-  {\normalfont\bfseries\filcenter}
+  {\normalfont\bfseries\ifdocvaultappendix\filcenter\else\filright\fi\LARGE}
   {\MakeUppercase{\chaptertitlename}\ \thechapter}
   {0.6em}
-  {\Large\MakeUppercase}
+  {\MakeUppercase}
 \titleformat{name=\chapter,numberless}[display]
-  {\normalfont\bfseries\filcenter}
+  {\normalfont\bfseries\filcenter\LARGE}
   {}
   {0pt}
-  {\Large\MakeUppercase}
+  {\MakeUppercase}
 \titlespacing*{\chapter}{0pt}{-10pt}{24pt}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{1}
 
 \lstdefinestyle{docvaultcode}{
   basicstyle=\ttfamily\small,
