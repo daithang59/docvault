@@ -626,7 +626,7 @@ Cloud security & IRSA, Secrets Manager, KMS & IAM role, ExternalSecret, encrypte
 
 \subsection{Nhận xét trạng thái triển khai}
 
-Kết quả đối chiếu mã nguồn, cấu hình hạ tầng và ảnh chụp thực nghiệm cho thấy DocVault đã triển khai các thành phần cốt lõi của quy trình DevSecOps: IaC cho EKS, các cổng kiểm soát trong CI, private registry, image digest, SBOM, ký artifact bằng Cosign, GitOps, kiểm tra sau triển khai, quản lý bí mật, thu thập metric/log và backup cơ sở dữ liệu.
+Kết quả đối chiếu mã nguồn, cấu hình hạ tầng và bằng chứng triển khai cho thấy DocVault đã triển khai các thành phần cốt lõi của quy trình DevSecOps: IaC cho EKS, các cổng kiểm soát trong CI, private registry, image digest, SBOM, ký artifact bằng Cosign, GitOps, kiểm tra sau triển khai, quản lý bí mật, thu thập metric/log và backup cơ sở dữ liệu.
 
 Các giới hạn hiện tại gồm:
 
@@ -642,4 +642,4 @@ Các giới hạn hiện tại gồm:
 
 Những giới hạn trên xác định ranh giới giữa môi trường đồ án có kiểm soát và hệ thống production. Các bước gia cố tiếp theo gồm remote Terraform state có locking, private node group, admission control, provenance chuẩn hóa, bắt buộc xác minh chữ ký image, NetworkPolicy theo nguyên tắc đặc quyền tối thiểu, cảnh báo vận hành và kiểm thử phục hồi định kỳ.
 
-Sau khi hệ thống đã được hiện thực và triển khai, bước tiếp theo là kiểm tra mức độ đáp ứng của các luồng nghiệp vụ, kiểm soát bảo mật và chuỗi phát hành. Nội dung này được trình bày trong chương kiểm thử, thực nghiệm và đánh giá.
+Sau khi hệ thống đã được hiện thực và triển khai, bước tiếp theo là kiểm tra mức độ đáp ứng của các luồng nghiệp vụ, kiểm soát bảo mật và chuỗi phát hành. Nội dung này được trình bày trong chương kiểm thử và đánh giá hệ thống.
