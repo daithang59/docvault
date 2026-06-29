@@ -1,4 +1,4 @@
-\chapter{Kiểm thử, thực nghiệm và đánh giá}
+\chapter{Kiểm thử và đánh giá hệ thống}
 
 Chương này trình bày chiến lược kiểm thử và đánh giá hệ thống DocVault sau khi hiện thực và triển khai. Các nội dung đánh giá bao gồm kiểm thử runtime, kiểm thử giao diện, kiểm thử bảo mật, kiểm tra pipeline DevSecOps, đối chiếu với yêu cầu ban đầu và phân tích các hạn chế hiện tại của hệ thống.
 
@@ -170,6 +170,30 @@ Các điểm chính đã được kiểm tra gồm:
 \end{itemize}
 
 Kết quả này cho thấy các kiểm soát bảo mật chính của phần ứng dụng đã được kiểm tra ở mức runtime. Một số nội dung vẫn cần phát triển thêm nếu hướng đến production, chẳng hạn kiểm thử nhiều trường hợp biên hơn cho policy, kiểm thử trình duyệt đầy đủ và kiểm tra tải lớn với nhiều tài liệu/audit event.
+
+Bên cạnh các kiểm thử trực tiếp trên chức năng tài liệu, nhóm cũng kiểm tra việc ghi nhận audit event cho một số hoạt động bảo mật và vận hành. Mục tiêu của phần này là xác nhận rằng các thao tác quan trọng trong hệ thống đều để lại dấu vết đủ rõ để phục vụ truy vết và kiểm tra sau này.
+
+\begin{longtable}{p{0.25\textwidth}p{0.37\textwidth}p{0.24\textwidth}}
+\caption{Kiểm chứng audit event cho hoạt động bảo mật và vận hành}
+\label{tab:security-operations-audit-evidence} \\
+\toprule
+\textbf{Nhóm hoạt động} & \textbf{Nội dung kiểm chứng} & \textbf{Ý nghĩa} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Nhóm hoạt động} & \textbf{Nội dung kiểm chứng} & \textbf{Ý nghĩa} \\
+\midrule
+\endhead
+Truy cập nội dung & Ghi nhận các lần preview/download thành công hoặc bị từ chối. & Kiểm tra hệ thống có lưu lại actor, thời điểm, kết quả xử lý và lý do từ chối khi có. \\
+Kiểm soát nội dung & Ghi nhận các trường hợp liên quan đến DLP, malware scanning hoặc guardrail bảo mật. & Cho thấy hệ thống có lưu lại các tình huống có rủi ro về nội dung hoặc file. \\
+Retention và thao tác nhạy cảm & Ghi nhận việc chạy retention job hoặc thực hiện thao tác cần xác nhận bổ sung. & Cung cấp dấu vết cho các thao tác có ảnh hưởng đến dữ liệu hoặc trạng thái tài liệu. \\
+Quản trị người dùng & Ghi nhận thay đổi thành viên, vai trò hoặc quyền truy cập. & Hỗ trợ kiểm tra lại các thay đổi có thể ảnh hưởng đến quyền trong hệ thống. \\
+Comment và share link & Ghi nhận thao tác bình luận, chia sẻ, thu hồi hoặc sử dụng liên kết chia sẻ. & Theo dõi các hoạt động cộng tác và chia sẻ liên quan đến tài liệu. \\
+Khuyến nghị bảo mật & Ghi nhận quá trình tạo hoặc cập nhật trạng thái xử lý khuyến nghị. & Hỗ trợ quản trị viên theo dõi quá trình kiểm tra một hành vi đáng chú ý. \\
+\bottomrule
+\end{longtable}
+
+Kết quả kiểm thử cho thấy audit log trong DocVault không chỉ phục vụ việc xem lại lịch sử của từng tài liệu, mà còn ghi nhận được các hoạt động bảo mật và vận hành ở phạm vi hệ thống. Các dữ liệu này là cơ sở để quản trị viên kiểm tra lại hành vi người dùng, đánh giá các khuyến nghị bảo mật và đưa ra hướng xử lý phù hợp.
 
 \section{Bằng chứng quy trình pipeline}
 

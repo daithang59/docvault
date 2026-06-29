@@ -20,6 +20,10 @@ Vì vậy, báo cáo không xem DocVault chỉ là một ứng dụng quản lý
 
 Vì vậy, hệ thống cần quản lý đồng thời nhiều thông tin liên quan đến tài liệu, bao gồm metadata, version file, checksum, trạng thái workflow, quyền truy cập, mức phân loại bảo mật, lịch sử phê duyệt và audit log. Các thông tin này cần được liên kết với nhau để tạo thành một bức tranh đầy đủ về quá trình xử lý tài liệu. Khi cần kiểm tra lại, hệ thống phải có khả năng tổng hợp các dữ liệu này thành evidence để phục vụ việc đối chiếu.
 
+Ngoài các thao tác gắn trực tiếp với vòng đời tài liệu, hệ thống còn cần lưu lại một số hoạt động khác trong quá trình vận hành. Ví dụ, khi người dùng xem audit log, bị từ chối quyền xem hoặc tải tài liệu, chạy retention job, thực hiện thao tác nhạy cảm, thay đổi thành viên trong tổ chức, sử dụng share link hoặc cập nhật trạng thái xử lý một khuyến nghị bảo mật, các sự kiện này cũng cần được ghi nhận lại.
+
+Việc ghi nhận các hoạt động này giúp audit log không chỉ phản ánh lịch sử của từng tài liệu, mà còn cho thấy cách người dùng và các thành phần trong hệ thống tương tác với nhau. Khi có một hành vi cần kiểm tra lại, quản trị viên có thể dựa vào các sự kiện đã ghi nhận để xem hành động đó diễn ra khi nào, do ai thực hiện, kết quả xử lý ra sao và có cần tiếp tục điều tra hay không.
+
 Đối với phần DevSecOps, vấn đề đặt ra là làm sao đưa một hệ thống nhiều service vào một quy trình triển khai có thể lặp lại và kiểm soát được. Nếu build image, cập nhật manifest, triển khai Kubernetes và kiểm tra trạng thái đều làm thủ công, quá trình phát hành sẽ dễ sai sót và khó truy vết. Do đó, hệ thống cần pipeline kiểm thử, đóng gói, phát hành artifact, cập nhật GitOps và kiểm tra lại môi trường sau triển khai.
 
 Cụ thể, đề tài tập trung vào các yêu cầu sau:
@@ -49,6 +53,7 @@ Các mục tiêu cụ thể gồm:
   \item Thiết kế mô hình dữ liệu cho documents, document versions, ACL, workflow history, audit events và các thông tin evidence liên quan.
   \item Xây dựng cơ chế kiểm soát truy cập dựa trên RBAC, ACL, trạng thái tài liệu, classification, quyền sở hữu và quy tắc deny-overrides.
   \item Ghi nhận audit log cho các thao tác quan trọng trong vòng đời tài liệu và áp dụng hash-chain để hỗ trợ kiểm tra tính toàn vẹn của audit event.
+  \item Bổ sung cơ chế ghi nhận audit ở mức hệ thống cho các hoạt động bảo mật và vận hành ngoài các thao tác trực tiếp trên tài liệu, chẳng hạn như truy cập thành công hoặc bị từ chối, xem audit log, chạy retention job, thực hiện thao tác nhạy cảm, quản trị thành viên, thao tác comment/share link và xử lý khuyến nghị bảo mật. Các dữ liệu này được sử dụng để phục vụ truy vết, kiểm tra hành vi người dùng và hỗ trợ quản trị viên đánh giá các hoạt động có dấu hiệu bất thường.
   \item Xây dựng evidence packet để tổng hợp metadata, checksum phiên bản, workflow history, retention evidence và audit event, giúp kiểm tra lại quá trình quản lý tài liệu.
   \item Tích hợp các cơ chế bảo mật như grant token ngắn hạn cho preview/download, Compliance Officer metadata-only boundary, malware scanning và DLP.
   \item Xây dựng hạ tầng triển khai cloud-native trên AWS EKS với Terraform, Helm/Kustomize, S3/KMS, IRSA, External Secrets, Harbor và các thành phần quan sát vận hành.
@@ -83,7 +88,7 @@ Gia cố vận hành production & Remote Terraform state, private node, admissio
 
 \section{Đóng góp của đề tài}
 
-Đề tài có bốn đóng góp. Thứ nhất là một hệ thống quản lý tài liệu chạy được, bao phủ luồng từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai là mô hình kiểm soát truy cập nhiều lớp, kết hợp vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu thay vì chỉ dựa vào một trong số đó. Thứ ba là cách đưa yêu cầu compliance vào ngay trong thiết kế: audit hash-chain để phát hiện sửa đổi, retention evidence và evidence packet metadata-only. Thứ tư là quy trình DevSecOps được nhóm đầu tư triển khai khá đầy đủ, có khả năng truy vết từ mã nguồn qua container artifact và GitOps revision đến workload trên EKS, với các cổng kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành gắn vào từng chặng.
+Đề tài có bốn đóng góp. Thứ nhất là một hệ thống quản lý tài liệu chạy được, bao phủ luồng từ khởi tạo, tải lên, phê duyệt đến lưu trữ. Thứ hai là mô hình kiểm soát truy cập nhiều lớp, kết hợp vai trò, ACL, mức phân loại, trạng thái và quyền sở hữu thay vì chỉ dựa vào một trong số đó. Thứ ba là cách đưa yêu cầu compliance vào ngay trong thiết kế: audit hash-chain để phát hiện sửa đổi, retention evidence, evidence packet metadata-only và ghi nhận các hoạt động bảo mật/vận hành phục vụ kiểm tra hành vi người dùng. Thứ tư là quy trình DevSecOps được nhóm đầu tư triển khai khá đầy đủ, có khả năng truy vết từ mã nguồn qua container artifact và GitOps revision đến workload trên EKS, với các cổng kiểm soát chất lượng, bảo mật chuỗi cung ứng, quản lý bí mật và giám sát vận hành gắn vào từng chặng.
 
 \section{Phân công công việc}
 
@@ -120,6 +125,6 @@ Báo cáo được tổ chức thành sáu chương chính:
   \item[Chương 2. Cơ sở lý thuyết:] Trình bày các khái niệm, mô hình bảo mật và các công nghệ được sử dụng trong hệ thống.
   \item[Chương 3. Phân tích yêu cầu và thiết kế hệ thống:] Phân tích tác nhân, yêu cầu chức năng, yêu cầu phi chức năng, kiến trúc tổng thể, thiết kế dữ liệu, API và chính sách bảo mật.
   \item[Chương 4. Hiện thực và triển khai hệ thống:] Trình bày quá trình hiện thực DocVault, các thành phần ứng dụng, hạ tầng triển khai và quy trình DevSecOps.
-  \item[Chương 5. Kiểm thử, thực nghiệm và đánh giá:] Trình bày chiến lược kiểm thử, kết quả thực nghiệm, bằng chứng triển khai và đánh giá mức độ đáp ứng yêu cầu.
+  \item[Chương 5. Kiểm thử và đánh giá hệ thống:] Trình bày chiến lược kiểm thử, kết quả thực nghiệm, bằng chứng triển khai và đánh giá mức độ đáp ứng yêu cầu.
   \item[Chương 6. Kết luận và hướng phát triển:] Tổng kết kết quả đạt được, nêu các hạn chế còn tồn tại và định hướng phát triển trong tương lai.
 \end{description}
