@@ -1,4 +1,6 @@
-\chapter{Kiểm thử, đánh giá và bằng chứng}
+\chapter{Kiểm thử và đánh giá hệ thống}
+
+Chương này trình bày chiến lược kiểm thử và đánh giá hệ thống DocVault sau khi hiện thực và triển khai. Các nội dung đánh giá bao gồm kiểm thử runtime, kiểm thử giao diện, kiểm thử bảo mật, kiểm tra pipeline DevSecOps, đối chiếu với yêu cầu ban đầu và phân tích các hạn chế hiện tại của hệ thống.
 
 \section{Chiến lược kiểm thử}
 
@@ -62,7 +64,7 @@ Audit ingest & Viewer cannot ingest fake audit event & PASS \\
 \bottomrule
 \end{longtable}
 
-\section{Kiểm thử frontend và UI evidence}
+\section{Kiểm thử giao diện và bằng chứng UI}
 
 Frontend được kiểm tra bằng các bước lint, build, typecheck và test component/helper. Các bước này giúp phát hiện lỗi cú pháp, lỗi kiểu dữ liệu, lỗi build và một số lỗi ở tầng giao diện trước khi triển khai.
 
@@ -149,7 +151,7 @@ Nhóm ảnh bổ sung dưới đây làm rõ hơn đường đi của người d
 
 Tuy nhiên, phạm vi kiểm thử frontend hiện tại chủ yếu tập trung vào build, component/helper và bằng chứng giao diện. Kiểm thử end-to-end ở cấp trình duyệt đầy đủ vẫn là hướng cần bổ sung thêm nếu hệ thống được phát triển tiếp.
 
-\section{Security evidence}
+\section{Bằng chứng kiểm thử bảo mật}
 
 Các kiểm soát bảo mật runtime được nhóm đối chiếu thông qua kiểm thử API, kết quả E2E và bằng chứng giao diện. Mục tiêu của phần này là xác nhận các quyết định bảo mật quan trọng không chỉ được thể hiện trên giao diện, mà còn được thực thi ở backend.
 
@@ -169,7 +171,31 @@ Các điểm chính đã được kiểm tra gồm:
 
 Kết quả này cho thấy các kiểm soát bảo mật chính của phần ứng dụng đã được kiểm tra ở mức runtime. Một số nội dung vẫn cần phát triển thêm nếu hướng đến production, chẳng hạn kiểm thử nhiều trường hợp biên hơn cho policy, kiểm thử trình duyệt đầy đủ và kiểm tra tải lớn với nhiều tài liệu/audit event.
 
-\section{Pipeline evidence}
+Bên cạnh các kiểm thử trực tiếp trên chức năng tài liệu, nhóm cũng kiểm tra việc ghi nhận audit event cho một số hoạt động bảo mật và vận hành. Mục tiêu của phần này là xác nhận rằng các thao tác quan trọng trong hệ thống đều để lại dấu vết đủ rõ để phục vụ truy vết và kiểm tra sau này.
+
+\begin{longtable}{p{0.25\textwidth}p{0.37\textwidth}p{0.24\textwidth}}
+\caption{Kiểm chứng audit event cho hoạt động bảo mật và vận hành}
+\label{tab:security-operations-audit-evidence} \\
+\toprule
+\textbf{Nhóm hoạt động} & \textbf{Nội dung kiểm chứng} & \textbf{Ý nghĩa} \\
+\midrule
+\endfirsthead
+\toprule
+\textbf{Nhóm hoạt động} & \textbf{Nội dung kiểm chứng} & \textbf{Ý nghĩa} \\
+\midrule
+\endhead
+Truy cập nội dung & Ghi nhận các lần preview/download thành công hoặc bị từ chối. & Kiểm tra hệ thống có lưu lại actor, thời điểm, kết quả xử lý và lý do từ chối khi có. \\
+Kiểm soát nội dung & Ghi nhận các trường hợp liên quan đến DLP, malware scanning hoặc guardrail bảo mật. & Cho thấy hệ thống có lưu lại các tình huống có rủi ro về nội dung hoặc file. \\
+Retention và thao tác nhạy cảm & Ghi nhận việc chạy retention job hoặc thực hiện thao tác cần xác nhận bổ sung. & Cung cấp dấu vết cho các thao tác có ảnh hưởng đến dữ liệu hoặc trạng thái tài liệu. \\
+Quản trị người dùng & Ghi nhận thay đổi thành viên, vai trò hoặc quyền truy cập. & Hỗ trợ kiểm tra lại các thay đổi có thể ảnh hưởng đến quyền trong hệ thống. \\
+Comment và share link & Ghi nhận thao tác bình luận, chia sẻ, thu hồi hoặc sử dụng liên kết chia sẻ. & Theo dõi các hoạt động cộng tác và chia sẻ liên quan đến tài liệu. \\
+Khuyến nghị bảo mật & Ghi nhận quá trình tạo hoặc cập nhật trạng thái xử lý khuyến nghị. & Hỗ trợ quản trị viên theo dõi quá trình kiểm tra một hành vi đáng chú ý. \\
+\bottomrule
+\end{longtable}
+
+Kết quả kiểm thử cho thấy audit log trong DocVault không chỉ phục vụ việc xem lại lịch sử của từng tài liệu, mà còn ghi nhận được các hoạt động bảo mật và vận hành ở phạm vi hệ thống. Các dữ liệu này là cơ sở để quản trị viên kiểm tra lại hành vi người dùng, đánh giá các khuyến nghị bảo mật và đưa ra hướng xử lý phù hợp.
+
+\section{Bằng chứng quy trình pipeline}
 
 Các bằng chứng pipeline được thu thập từ quá trình chạy Jenkins và môi trường triển khai. Nhóm sử dụng log pipeline, kết quả scan, trạng thái artifact trên Harbor, GitOps commit, Argo CD health check, smoke test, ZAP report và dashboard quan sát vận hành để đối chiếu quá trình phát hành hệ thống.
 
@@ -241,3 +267,5 @@ Qua các kết quả kiểm thử, DocVault đã đáp ứng được các mục
 Ở phần DevSecOps, hệ thống đã có pipeline kiểm soát chuỗi phát hành từ source code đến workload. Các bằng chứng từ Jenkins, Harbor, Argo CD, ZAP, Grafana/Loki và AWS giúp đối chiếu lại quá trình release của hệ thống.
 
 Tuy vậy, kết quả kiểm thử hiện tại chủ yếu chứng minh hệ thống ở mức đồ án chuyên ngành và môi trường kiểm thử có kiểm soát. Nếu phát triển tiếp theo hướng production, nhóm cần bổ sung kiểm thử trình duyệt đầy đủ, kiểm thử tải lớn, admission policy trong cluster, NetworkPolicy chi tiết, log persistence và diễn tập khôi phục dữ liệu.
+
+Các kết quả kiểm thử và đánh giá trên là cơ sở để tổng kết mức độ hoàn thành đề tài, nêu các hạn chế còn tồn tại và đề xuất hướng phát triển tiếp theo.

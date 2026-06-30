@@ -6,6 +6,8 @@ Sau quá trình thực hiện, nhóm đã xây dựng được DocVault theo đ�
 
 Với nghiệp vụ tài liệu, DocVault đã xử lý được các bước từ tạo draft, cập nhật metadata, upload version, gửi duyệt, approve/reject, xuất bản, preview/download đến retention và archive. Mỗi tài liệu đi kèm metadata, checksum phiên bản, trạng thái workflow, lịch sử phê duyệt và audit event. Khi cần kiểm tra lại, hệ thống có thể tổng hợp các dữ liệu này thành evidence thay vì chỉ trả về một file rời rạc.
 
+Bên cạnh truy vết vòng đời tài liệu, hệ thống còn ghi nhận các hoạt động bảo mật và vận hành quan trọng, từ đó hỗ trợ quản trị viên kiểm tra hành vi người dùng và xử lý các khuyến nghị bảo mật khi cần.
+
 Về bảo mật ứng dụng, nhóm đã hiện thực các lớp kiểm soát chính gồm RBAC, ACL, classification, ranh giới metadata-only cho Compliance Officer, grant token ngắn hạn, malware scanning, DLP và audit hash-chain. Trong quá trình kiểm thử, nhóm đặc biệt chú ý các điểm dễ bị bỏ sót như viewer cố truy cập tài liệu confidential, Compliance Officer bị chặn nội dung file, file EICAR bị từ chối trước khi tạo version và audit event giả bị chặn ở backend.
 
 Với DevSecOps, nhóm đã hoàn thiện được chuỗi phát hành từ mã nguồn đến workload trên EKS. Jenkins giữ vai trò điều phối kiểm thử và các security gate, Harbor lưu artifact cùng digest/SBOM/trạng thái ký, GitOps ghi nhận desired state, còn Argo CD cung cấp trạng thái đồng bộ và health sau triển khai. Smoke test, ZAP report và dashboard vận hành giúp đối chiếu thêm rằng bản phát hành không chỉ được build thành công mà còn chạy được ở môi trường triển khai.

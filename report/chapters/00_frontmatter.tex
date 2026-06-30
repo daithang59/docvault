@@ -1,4 +1,5 @@
 \input{title-page}
+\pagenumbering{roman}
 
 \chapter*{Lời cảm ơn}
 \addcontentsline{toc}{chapter}{Lời cảm ơn}
@@ -20,6 +21,8 @@ DocVault là hệ thống quản lý tài liệu bảo mật được xây dựn
 
 Đối với các tài liệu có tính nhạy cảm, việc chỉ lưu file và phân quyền cơ bản là chưa đủ. Vì vậy, DocVault tích hợp các cơ chế như RBAC, ACL, classification, kiểm soát preview/download ở backend, Compliance Officer metadata-only, grant token ngắn hạn, malware scanning, DLP và audit hash-chain. Các cơ chế này giúp hệ thống kiểm soát quyền truy cập, bảo vệ nội dung file và ghi nhận lại các hoạt động quan trọng liên quan đến tài liệu.
 
+Bên cạnh truy vết vòng đời tài liệu, hệ thống còn ghi nhận một số hoạt động bảo mật và vận hành để hỗ trợ quản trị viên kiểm tra hành vi bất thường và xử lý khuyến nghị bảo mật.
+
 Ở phần DevSecOps, nhóm xây dựng Jenkins pipeline để kiểm soát chuỗi phát hành từ code, container artifact, GitOps revision đến workload trên EKS. Các bằng chứng như kết quả scan, image digest, SBOM, trạng thái ký, Argo CD health, smoke test và ZAP report được sử dụng để đối chiếu lại từng lần triển khai.
 
 Kết quả của đề tài cho thấy DocVault đã triển khai được các luồng chính của một hệ thống quản lý tài liệu bảo mật, đồng thời xây dựng được quy trình DevSecOps có khả năng kiểm tra và truy vết quá trình triển khai. Tuy nhiên, hệ thống vẫn còn một số điểm cần hoàn thiện thêm nếu hướng đến môi trường production, chẳng hạn như NetworkPolicy chi tiết, admission policy, provenance chuẩn hóa, kiểm thử trình duyệt đầy đủ và diễn tập khôi phục dữ liệu.
@@ -36,6 +39,8 @@ DocVault is a secure document management system built with a microservices archi
 In the application part, DocVault manages documents from creation, version upload, review submission, approval, publication, access, download, retention, and archiving. A document is not treated only as a stored file, but as an object with metadata, file versions, workflow status, access permissions, approval history, and audit logs. These records help the system review how a document has been handled over time.
 
 For sensitive documents, simple file storage and basic authorization are not enough. Therefore, DocVault integrates mechanisms such as RBAC, ACL, classification, backend-based preview/download control, a metadata-only Compliance Officer boundary, short-lived grant tokens, malware scanning, DLP, and audit hash-chain. These mechanisms help control document access, protect file content, and record important activities related to documents.
+
+Beyond document lifecycle traceability, the system also records selected security and operational activities to help administrators review unusual behavior and handle security recommendations.
 
 In the DevSecOps part, the project uses a Jenkins pipeline to control the delivery path from code, container artifacts, and GitOps revisions to workloads running on EKS. Evidence such as scan results, image digests, SBOM, signing status, Argo CD health, smoke tests, and ZAP reports is used to review each deployment.
 

@@ -1,10 +1,10 @@
-\chapter{Triển khai ứng dụng DocVault}
+\chapter{Hiện thực và triển khai hệ thống}
 
-Trong phần triển khai ứng dụng, nhóm tập trung làm rõ trách nhiệm của từng service trong hệ thống DocVault. Gateway tiếp nhận request và xử lý xác thực ở lớp đầu vào. Metadata-service quản lý thông tin tài liệu, trạng thái, ACL, policy, evidence và retention. Document-service xử lý nội dung file, upload/download, checksum, malware scanning và DLP. Workflow-service xử lý các bước chuyển trạng thái như submit, approve, reject và archive. Audit-service ghi nhận các hoạt động quan trọng và hỗ trợ kiểm tra chuỗi hash audit.
+Chương này trình bày quá trình hiện thực và triển khai hệ thống DocVault. Nội dung chương được tổ chức thành các nhóm chính gồm hiện thực ứng dụng, hạ tầng triển khai trên AWS EKS, quy trình GitOps và CI/CD, các kiểm soát bảo mật trong pipeline, vận hành hệ thống và đánh giá trạng thái triển khai.
 
-Cách chia service này giúp mỗi thành phần có phạm vi xử lý rõ ràng. Khi cần kiểm tra một luồng nghiệp vụ như upload version, gửi duyệt hoặc download tài liệu, nhóm có thể xác định service nào chịu trách nhiệm chính và service nào chỉ đóng vai trò hỗ trợ. Điều này cũng giúp việc debug và kiểm thử dễ hơn so với việc gom toàn bộ chức năng vào một backend duy nhất.
+\section{Hiện thực ứng dụng DocVault}
 
-\section{Cấu trúc monorepo}
+\subsection{Cấu trúc monorepo}
 
 DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo, gom frontend, backend services, shared libraries, infrastructure và tài liệu vào cùng một repository. Các thư mục chính gồm:
 
@@ -23,7 +23,7 @@ DocVault được tổ chức dưới dạng monorepo sử dụng pnpm và Turbo
 
 Monorepo giúp báo cáo, code, pipeline và evidence nằm chung một vòng đời. Khi một thay đổi chạm tới API contract hoặc security policy, nhóm có thể cập nhật code, test và tài liệu trong cùng một pull request.
 
-\section{Frontend Next.js}
+\subsection{Frontend Next.js}
 
 Frontend được xây dựng bằng Next.js, React, TanStack Query, React Hook Form, Zod, Tailwind CSS và Radix UI. Ứng dụng sử dụng App Router và tổ chức theo các nhóm route đã đăng nhập hoặc chưa đăng nhập. Frontend gọi gateway qua biến môi trường \code{NEXT\_PUBLIC\_API\_BASE\_URL}, mặc định trỏ đến \code{http://localhost:3000/api} trong môi trường local.
 
@@ -54,11 +54,11 @@ Frontend làm nhiều việc hơn là hiển thị danh sách tài liệu. Ứng
 \label{fig:web-documents}
 \end{figure}
 
-\subsection{Permission-aware UI}
+\subsubsection{Permission-aware UI}
 
 Frontend có helper phân quyền để xác định action nào nên hiển thị, action nào nên bị disable và lý do deny là gì. Chẳng hạn, Compliance Officer được thấy lý do bị chặn download thay vì chỉ thấy nút biến mất. Dù vậy, helper frontend không phải boundary bảo mật cuối cùng; backend mới là nơi quyết định policy, tránh việc người dùng tự gọi API để vượt qua UI.
 
-\section{Gateway}
+\subsection{Gateway}
 
 Gateway là entry point của hệ thống. Service này xác thực JWT từ Keycloak, kiểm tra role ở mức route, expose health endpoint, proxy request xuống service phía sau và truyền các header ngữ cảnh. Các header quan trọng gồm:
 
@@ -72,7 +72,7 @@ Gateway là entry point của hệ thống. Service này xác thực JWT từ Ke
 
 Gateway proxy các nhóm route chính như \code{/metadata}, \code{/documents}, \code{/workflow}, \code{/audit} và \code{/notify}. Frontend vì thế chỉ cần biết một API base URL, trong khi bên trong hệ thống vẫn tách service theo bounded context.
 
-\section{Metadata-service}
+\subsection{Metadata-service}
 
 Metadata-service là nguồn sự thật cho tài liệu logic và policy. Service này sở hữu các dữ liệu và nghiệp vụ:
 
@@ -117,13 +117,13 @@ const signature = createHmac('sha256', signing.secret)
 return `${encoded}.${signature}`;
 \end{lstlisting}
 
-\section{Document-service}
+\subsection{Document-service}
 
 Document-service xử lý phần blob file. Service này nhận upload multipart, tính checksum SHA-256, scan malware/DLP, sinh object key và upload file lên MinIO/S3. Sau khi upload thành công, service gọi metadata-service để đăng ký version mới.
 
 Đối với download, document-service không cấp file một cách độc lập. Service xác minh grant token hoặc tái authorize thông qua metadata-service trước khi trả presigned URL hoặc stream endpoint. Với tài liệu nhạy cảm, service trả về stream endpoint để áp dụng posture kiểm soát tốt hơn.
 
-\section{Workflow-service}
+\subsection{Workflow-service}
 
 Workflow-service sở hữu logic chuyển trạng thái. Service đọc trạng thái hiện tại từ metadata-service, kiểm tra transition hợp lệ rồi yêu cầu metadata-service cập nhật trạng thái. Các transition chính:
 
@@ -136,18 +136,18 @@ Workflow-service sở hữu logic chuyển trạng thái. Service đọc trạng
 
 Sau mỗi transition, workflow-service phát audit event và gọi notification-service. Workflow vẫn là nơi điều phối nghiệp vụ, còn metadata-service vẫn là owner của dữ liệu trạng thái.
 
-\section{Audit-service}
+\subsection{Audit-service}
 
 Audit-service ghi và truy vấn audit log. Service hỗ trợ append audit event từ các service tin cậy, query theo actor/action/resource/result/time, verify hash-chain và security summary. Endpoint audit query chỉ dành cho Compliance Officer hoặc Admin.
 
 Hash-chain giúp phát hiện sửa đổi audit event ngoài luồng. Nếu một event cũ bị chỉnh trực tiếp trong database, verify-chain trả về trạng thái không hợp lệ. Trong phạm vi đồ án, đây là cơ chế tamper-evident phù hợp để chứng minh ý tưởng kiểm soát audit.
 
-\section{Notification-service}
+\subsection{Notification-service}
 \label{sec:notification-service}
 
 Notification-service hiện là notification sink cho môi trường dev/demo. Service nhận payload từ workflow hoặc các sự kiện liên quan và lưu/log để frontend hiển thị notification center. Đây chưa phải hệ thống email, SMS hoặc push notification hoàn chỉnh, nhưng đủ để mô phỏng luồng thông báo trong sản phẩm. Trạng thái chưa hoàn thiện này được ghi nhận lại trong phần hạn chế ở Mục~\ref{sec:limitations}.
 
-\section{Hạ tầng local}
+\subsection{Hạ tầng local}
 
 Môi trường local sử dụng Docker Compose để chạy các dependency:
 
@@ -162,7 +162,7 @@ Môi trường local sử dụng Docker Compose để chạy các dependency:
 
 Các service backend chạy trên các port \code{3000} đến \code{3005}; frontend chạy trên port \code{3006} (script \code{pnpm --filter web dev}) để tránh xung đột với gateway và các service backend.
 
-\section{Các màn hình minh họa}
+\subsection{Các màn hình minh họa}
 
 Các hình dưới đây thể hiện một số giao diện chính đã triển khai trong frontend.
 
@@ -194,7 +194,7 @@ Các hình dưới đây thể hiện một số giao diện chính đã triển
 \label{fig:web-security}
 \end{figure}
 
-\section{Luồng demo ứng dụng}
+\subsection{Luồng demo ứng dụng}
 
 Luồng demo chính được thiết kế để chứng minh cả nghiệp vụ và bảo mật:
 

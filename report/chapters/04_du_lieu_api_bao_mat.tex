@@ -1,5 +1,3 @@
-\chapter{Thiết kế dữ liệu, API và chính sách bảo mật}
-
 Thiết kế hệ thống của DocVault được xây dựng xoay quanh tài liệu và vòng đời của tài liệu. Thay vì chỉ lưu thông tin file, hệ thống cần lưu thêm metadata, version, trạng thái workflow, quyền truy cập, lịch sử thao tác và các audit event liên quan. Cách thiết kế này giúp hệ thống có thể truy vết lại quá trình xử lý tài liệu, từ lúc tạo mới đến khi phê duyệt, truy cập hoặc lưu trữ.
 
 Các bảng và collection trong hệ thống được chia theo trách nhiệm của từng service. Metadata-service quản lý thông tin chính của tài liệu, document-service quản lý file và checksum, workflow-service quản lý quá trình chuyển trạng thái, audit-service lưu lại các hoạt động quan trọng, còn các thành phần evidence và retention giúp tổng hợp thông tin phục vụ kiểm tra lại tài liệu. Cách tách này giúp hệ thống rõ ràng hơn và phù hợp với kiến trúc microservices.
@@ -71,7 +69,7 @@ Hai nguyên tắc chi phối vòng đời này. Thứ nhất, các transition l�
 
 \section{Ma trận phân quyền}
 
-Các vai trò chính của hệ thống đã được giới thiệu ở Chương 3. Trong mục này, báo cáo tập trung vào cách các vai trò đó được ánh xạ thành quyền truy cập nội dung file theo classification.
+Các vai trò chính của hệ thống đã được giới thiệu ở Mục~\ref{sec:actors}. Trong mục này, báo cáo tập trung vào cách các vai trò đó được ánh xạ thành quyền truy cập nội dung file theo classification.
 
 Policy của DocVault không chỉ dựa trên role. Kết quả truy cập được xác định bởi nhiều yếu tố như role, owner, ACL, classification, trạng thái tài liệu, version tồn tại và trạng thái deleted/archived. Vì vậy, ma trận dưới đây chỉ mô tả quyền xem trước và tải nội dung file trong trường hợp tổng quan. Khi thực thi thực tế, backend vẫn áp dụng thêm các điều kiện như ACL \code{DENY}, ownership, trạng thái workflow và grant token.
 
@@ -184,6 +182,16 @@ DLP scan phát hiện một số pattern nhạy cảm như email, số điện t
 
 Audit-service không cho người dùng thường append audit event trực tiếp. Service tin cậy phải gửi kèm header service token \code{x-docvault-service-token}, cấu hình qua \code{AUDIT\_INGEST\_TOKEN}. Rào này chặn việc một người có JWT hợp lệ tạo audit event giả để che giấu hoặc làm sai lệch lịch sử.
 
+\section{Ghi nhận hoạt động hệ thống và khuyến nghị bảo mật}
+
+Trong DocVault, audit log không chỉ dùng để lưu lại các thao tác trên tài liệu như tạo mới, cập nhật metadata, upload version, gửi duyệt, phê duyệt, xem trước hoặc tải xuống. Một phần khác cũng quan trọng là ghi nhận các hoạt động diễn ra trong quá trình vận hành hệ thống, đặc biệt là các hoạt động liên quan đến quyền truy cập, bảo mật và quản trị.
+
+Các sự kiện được ghi nhận có thể chia thành một số nhóm chính. Nhóm thứ nhất là các quyết định truy cập, bao gồm trường hợp người dùng được phép xem/tải tài liệu và trường hợp bị từ chối quyền. Nhóm thứ hai là các sự kiện liên quan đến kiểm soát nội dung, chẳng hạn như phát hiện DLP, malware scanning hoặc các guardrail bảo mật. Nhóm thứ ba là các thao tác vận hành có ảnh hưởng đến dữ liệu hoặc trạng thái hệ thống, ví dụ chạy retention job, thực hiện thao tác nhạy cảm hoặc cập nhật trạng thái xử lý khuyến nghị bảo mật. Ngoài ra, hệ thống cũng ghi nhận các thay đổi về thành viên, vai trò, comment và share link.
+
+Cách tổ chức này giúp audit log có vai trò rộng hơn so với một lịch sử thao tác đơn thuần. Khi một hành vi cần được kiểm tra lại, quản trị viên có thể xem các sự kiện liên quan để biết bối cảnh của hành động đó. Chẳng hạn, một lần truy cập bị từ chối không chỉ cho biết người dùng không có quyền, mà còn cho biết thời điểm truy cập, đối tượng bị truy cập và lý do xử lý của hệ thống.
+
+Từ các audit event đã ghi nhận, hệ thống có thể tạo hoặc cập nhật các khuyến nghị bảo mật. Các khuyến nghị này không nhằm tự động kết luận người dùng vi phạm, mà đóng vai trò như một gợi ý để quản trị viên xem xét. Trong quá trình xử lý, quản trị viên có thể chuyển trạng thái khuyến nghị qua các bước như đang mở, đang điều tra, đã xem xét hoặc đã xử lý. Nhờ đó, hệ thống vừa lưu được bằng chứng kỹ thuật, vừa hỗ trợ quá trình kiểm tra và phản hồi sau khi phát hiện hành vi đáng chú ý.
+
 \section{Luồng compliance evidence}
 
 Compliance evidence trong DocVault được xây dựng từ nhiều tín hiệu runtime: workflow event, access event, upload control, retention record và access review signal. Các tín hiệu này được audit-service ghi nhận theo dạng append-only và hash-chain, sau đó được các màn hình Security, Audit, Retention, Access Review và Evidence Center tổng hợp thành bằng chứng có thể xuất ra ngoài.
@@ -230,3 +238,5 @@ Retention & \codecell{\code{/metadata/retention/}\\\code{documents}\\\code{/meta
 \bottomrule
 \end{longtable}
 \endgroup
+
+Các thiết kế về dữ liệu, policy, workflow, audit và API trong chương này tạo thành nền tảng cho phần hiện thực. Chương tiếp theo trình bày cách các thiết kế đó được triển khai trong mã nguồn, service runtime, hạ tầng Kubernetes và quy trình DevSecOps.

@@ -47,6 +47,7 @@
 \usepackage{float}
 \usepackage{caption}
 \usepackage{subcaption}
+\usepackage{titlesec}
 \usepackage{enumitem}
 \usepackage{xcolor}
 \usepackage{tikz}
@@ -83,6 +84,34 @@
 \setlist[enumerate]{topsep=4pt,itemsep=2pt,parsep=0pt}
 
 \captionsetup{font=small,labelfont=bf}
+
+\addto\captionsvietnamese{%
+  \renewcommand{\contentsname}{Mục lục}%
+  \renewcommand{\listfigurename}{Danh sách hình}%
+  \renewcommand{\listtablename}{Danh sách bảng}%
+  \renewcommand{\bibname}{Tài liệu tham khảo}%
+}
+
+\newif\ifdocvaultappendix
+\let\docvaultoriginalappendix\appendix
+\renewcommand{\appendix}{%
+  \docvaultoriginalappendix
+  \docvaultappendixtrue
+}
+
+\titleformat{\chapter}[display]
+  {\normalfont\bfseries\ifdocvaultappendix\filcenter\else\filright\fi\LARGE}
+  {\MakeUppercase{\chaptertitlename}\ \thechapter}
+  {0.6em}
+  {\MakeUppercase}
+\titleformat{name=\chapter,numberless}[display]
+  {\normalfont\bfseries\filcenter\LARGE}
+  {}
+  {0pt}
+  {\MakeUppercase}
+\titlespacing*{\chapter}{0pt}{-10pt}{24pt}
+\setcounter{secnumdepth}{3}
+\setcounter{tocdepth}{1}
 
 \lstdefinestyle{docvaultcode}{
   basicstyle=\ttfamily\small,

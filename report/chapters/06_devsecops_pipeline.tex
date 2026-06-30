@@ -1,8 +1,9 @@
-\chapter{Quy trình DevSecOps và hạ tầng triển khai}
+\clearpage
+\section{Hạ tầng triển khai trên AWS và EKS}
 
-\section{Mục tiêu và phạm vi triển khai}
+\subsection{Mục tiêu và phạm vi triển khai}
 
-Phần DevSecOps là một trong hai phần chính của đề tài DocVault. Nếu các chương trước tập trung vào cách hệ thống quản lý tài liệu được thiết kế và hiện thực, thì chương này trình bày đường đi của một thay đổi từ repository đến môi trường cloud-native. Mục tiêu là tạo ra quy trình phát hành có kiểm soát, có thể lặp lại và có bằng chứng cho từng giai đoạn từ mã nguồn đến workload đang chạy.
+Phần DevSecOps là một trong hai phần chính của đề tài DocVault. Nếu các mục trước tập trung vào cách hệ thống quản lý tài liệu được hiện thực, thì phần này trình bày đường đi của một thay đổi từ repository đến môi trường cloud-native. Mục tiêu là tạo ra quy trình phát hành có kiểm soát, có thể lặp lại và có bằng chứng cho từng giai đoạn từ mã nguồn đến workload đang chạy.
 
 Quy trình DevSecOps của DocVault được xây dựng để tự động hóa release lên AWS EKS và thu thập bằng chứng cần thiết cho việc kiểm tra lại. Jenkins chịu trách nhiệm chạy các gate CI, tạo container artifact và cập nhật trạng thái mong muốn trên nhánh GitOps. Argo CD tiếp tục reconcile trạng thái đó xuống cụm EKS. Cách làm này giúp mỗi lần phát hành có thể được đối chiếu lại thông qua commit, image tag/digest, trạng thái Argo CD, smoke test và các báo cáo scan.
 
@@ -31,7 +32,7 @@ DocVault tổ chức quy trình phát hành thành ba phân đoạn nối tiếp
 
 Ranh giới quan trọng nhất trong thiết kế là Jenkins không trực tiếp \code{kubectl apply} lên cụm; nó chỉ ghi trạng thái mong muốn vào Git, còn Argo CD mới là thành phần thực thi thay đổi trên cluster. Trong phiên bản hiện tại, Jenkins tạo pull request để cập nhật nhánh GitOps (nhánh main) bằng commit có \code{[skip ci]} sau khi toàn bộ điều kiện phát hành được thỏa mãn. 
 
-\section{Kiến trúc hạ tầng trên AWS EKS}
+\subsection{Kiến trúc hạ tầng trên AWS EKS}
 
 Trước khi đi vào từng nhóm tài nguyên, Hình~\ref{fig:aws-eks-iac-deployment-flow} mô tả luồng triển khai hạ tầng AWS EKS ở mức tổng thể. Thay đổi hạ tầng bắt đầu từ pull request trên các file IaC như Terraform, Kubernetes manifest hoặc GitOps values, được review trước khi Jenkins kích hoạt workflow kiểm tra. Jenkins chuẩn bị môi trường Terraform trên CI runner có kiểm soát, chạy \code{fmt}, \code{init}, \code{validate}, \code{plan} và Checkov scan; nếu một gate thất bại thì quá trình bị chặn và yêu cầu sửa lại trước khi apply.
 
@@ -48,7 +49,7 @@ Trước khi đi vào từng nhóm tài nguyên, Hình~\ref{fig:aws-eks-iac-depl
 
 Sau khi kết quả \code{terraform plan} vượt qua kiểm tra và được phê duyệt, pipeline mới thực hiện \code{terraform apply} để tạo hoặc cập nhật nền tảng AWS gồm VPC, EKS, IAM/OIDC/IRSA, Secrets Manager, S3/KMS và EBS CSI. Trên nền tảng đó, lớp Kubernetes tiếp tục cài các controller vận hành như Argo CD, External Secrets Operator, cert-manager, ingress-nginx, Kyverno và monitoring/Loki. Runtime của DocVault sau cùng chạy trong namespace riêng với web, gateway, các backend service, Keycloak và cơ sở dữ liệu. Nguyên tắc chính của luồng này là không thay đổi hạ tầng trực tiếp trên AWS Console; mọi thay đổi đều đi qua mã nguồn, pipeline, kiểm tra bảo mật và lịch sử Git.
 
-\subsection{Hạ tầng dưới dạng mã với Terraform}
+\subsubsection{Hạ tầng dưới dạng mã với Terraform}
 
 Mã nguồn Terraform được đặt tại \code{infra/terraform/aws-eks} và được phân tách thành các module cục bộ theo từng nhóm trách nhiệm. Module \code{network} khởi tạo VPC, public subnet và private subnet trên hai Availability Zone. Module \code{eks-cluster} khởi tạo EKS control plane, managed node group, security group và các add-on nền tảng gồm CoreDNS, kube-proxy, VPC CNI và AWS EBS CSI Driver. Việc mô tả hạ tầng bằng mã giúp chuẩn hóa cấu hình, hỗ trợ kiểm tra thay đổi và tái tạo môi trường \cite{terraform_docs}.
 
@@ -57,13 +58,15 @@ Cấu hình hỗ trợ hai phương án mạng. Phương án tối ưu chi phí 
 Các biện pháp gia cố bảo mật chính được thể hiện trong Terraform gồm:
 
 \begin{itemize}
-  \item Bật đầy đủ năm nhóm log EKS control plane: API, audit, authenticator, controller manager và scheduler.
+  \item Bật đầy đủ năm nhóm log EKS control plane: API, audit, authenticator, controller manager và scheduler \cite{kubernetes_auditing}.
   \item Bắt buộc IMDSv2 trên EC2 node.
   \item Mã hóa volume gốc của node bằng EBS gp3.
   \item Bật OIDC provider để cấp quyền AWS theo IRSA cho từng Kubernetes ServiceAccount \cite{aws_eks_irsa}.
   \item Tạo StorageClass gp3 và cài EBS CSI Driver để hỗ trợ PersistentVolume.
   \item Tách module lưu trữ tài liệu, backup cơ sở dữ liệu, External Secrets và quyền Jenkins.
 \end{itemize}
+
+Các cấu hình này bám theo các nhóm khuyến nghị thường gặp trong Kubernetes Security Checklist như kiểm soát truy cập API, network security, pod security, secrets, image và admission controller \cite{kubernetes_security_checklist}.
 
 Cấu hình hiện tại sử dụng managed node group có khả năng co giãn từ một đến ba node, trong đó số lượng mong muốn của môi trường kiểm thử là hai node. Loại máy, dung lượng đĩa, phiên bản Kubernetes và số lượng node đều được khai báo dưới dạng biến, cho phép điều chỉnh mà không thay đổi logic của module.
 
@@ -113,7 +116,7 @@ DocVault được triển khai trên AWS EKS theo bốn cụm thành phần, li�
 
 Thiết kế hạ tầng dựa trên nguyên tắc không để workload lộ trực tiếp ra Internet và không lưu khóa bí mật trong cụm. Lưu lượng truy cập từ người dùng đi từ Cloudflare đến AWS Load Balancer rồi vào ingress-nginx trước khi tới web/gateway. Các khóa bí mật đi từ AWS Secrets Manager qua External Secrets Operator để tạo Kubernetes Secret tại runtime, nên repository chỉ chứa tham chiếu chứ không chứa các giá trị khóa bí mật. Theo cùng nguyên tắc đó, file tài liệu được lưu trên S3 và mã hóa bằng KMS thay vì nằm trong cụm.
 
-\subsection{Lưu trữ tài liệu trên S3}
+\subsubsection{Lưu trữ tài liệu trên S3}
 
 Terraform khởi tạo bucket tài liệu, customer-managed KMS key và IAM role dành cho ServiceAccount của document-service. Bucket được chặn truy cập công khai, bật versioning, mã hóa mặc định bằng SSE-KMS, ghi access log sang bucket riêng, áp dụng lifecycle và phát sự kiện qua EventBridge. IAM policy chỉ cấp các thao tác cần thiết trên prefix object của document-service và KMS key tương ứng. Cách tổ chức này cho phép quản lý tập trung khóa mã hóa, chính sách sử dụng khóa và dấu vết truy cập \cite{aws_s3_kms}.
 
@@ -133,7 +136,7 @@ DocVault dùng customer-managed KMS key thay vì key mặc định của AWS đ�
 \label{fig:aws-s3-kms}
 \end{figure}
 
-\subsection{Sao lưu và khôi phục cơ sở dữ liệu}
+\subsubsection{Sao lưu và khôi phục cơ sở dữ liệu}
 \label{subsec:db-backup}
 
 DocVault có hai cơ sở dữ liệu trạng thái cần bảo vệ với mức ưu tiên khác nhau. Metadata PostgreSQL giữ ánh xạ object-key, ACL và lịch sử trạng thái tài liệu. Audit MongoDB giữ nhật ký kiểm toán có chuỗi băm SHA-256, là bằng chứng tuân thủ nên việc mất hoặc sai lệch dữ liệu ở đây nghiêm trọng hơn. Vì vậy hai cơ sở dữ liệu được sao lưu vào hai bucket S3 riêng, dùng hai KMS key riêng và hai IAM role IRSA riêng. Tách biệt như vậy giúp ranh giới quyền truy cập, lifecycle và quy trình xử lý sự cố của từng cơ sở dữ liệu độc lập với nhau, đồng thời tách hẳn khỏi bucket tài liệu.
@@ -144,7 +147,7 @@ Metadata PostgreSQL được triển khai bằng CloudNativePG với volume gp3.
 \centering
 \includegraphics[width=\textwidth]{infra/CloudNativePG-metadata.png}
 \caption{Trạng thái backup CloudNativePG metadata với base backup hằng ngày và WAL đang được archive lên S3}
-\label{fig:}
+\label{fig:cnpg-metadata-backup}
 \end{figure}
 
 
@@ -181,9 +184,9 @@ Cả hai cơ chế hiện đã cấu hình và chạy theo lịch. Việc diễn
 \caption{S3 bucket lưu backup cơ sở dữ liệu}
 \label{fig:aws-s3-backup}
 \end{figure}
-\section{Tổ chức workload trên Kubernetes}
+\subsection{Tổ chức workload trên Kubernetes}
 
-\subsection{Helm chart và Kustomize overlay}
+\subsubsection{Helm chart và Kustomize overlay}
 
 Các service DocVault sử dụng Helm chart dùng chung tại \path{infra/k8s/charts/docvault-service}. Mỗi workload có một file values riêng cho image, port, biến môi trường, resource request/limit, migration và seed job. Việc dùng một chart chung giúp các service áp dụng đồng nhất những kiểm soát sau:
 
@@ -197,13 +200,15 @@ Các service DocVault sử dụng Helm chart dùng chung tại \path{infra/k8s/c
   \item Tạo NetworkPolicy cho từng release.
 \end{itemize}
 
+Các kiểm soát như chạy non-root, tắt privilege escalation, dùng seccomp mặc định, loại bỏ Linux capability và áp dụng NetworkPolicy được đối chiếu với Kubernetes Pod Security Standards và Security Checklist \cite{kubernetes_pod_security_standards,kubernetes_security_checklist}.
+
 Các dependency nền tảng được quản lý bằng Kustomize tại \code{infra/k8s/infra-deps}. Overlay hiện dùng cho EKS triển khai namespace, External Secrets, CloudNativePG, MongoDB và Keycloak; các tài nguyên MinIO được loại khỏi desired state sau khi document-service chuyển sang S3. Cách tách Helm cho application và Kustomize cho dependency giúp giảm lặp cấu hình nhưng vẫn giữ được khả năng tùy biến theo môi trường.
 
-\subsection{Ingress, DNS và TLS}
+\subsubsection{Ingress, DNS và TLS}
 
-Lưu lượng public đi qua ingress-nginx. Các dịch vụ công khai của hệ thống gồm ứng dụng chính (\code{app.docvault.id.vn}), máy chủ xác thực Keycloak (\code{auth.docvault.id.vn}), và private registry Harbor (\code{harbor.docvault.id.vn}) được cấu hình DNS trỏ trực tiếp đến địa chỉ IP Public của AWS Network Load Balancer (NLB) thông qua bản ghi trên Cloudflare (Hình~\ref{fig:cloudflare-dns}). Để cấp phát chứng chỉ SSL/TLS bảo mật, cert-manager sử dụng ClusterIssuer \code{letsencrypt-cloudflare} và giao thức xác thực DNS-01 challenge qua API Token của Cloudflare.
+Lưu lượng public đi qua ingress-nginx. Các dịch vụ công khai của hệ thống gồm ứng dụng chính (\path{app.docvault.id.vn}), máy chủ xác thực Keycloak (\path{auth.docvault.id.vn}), và private registry Harbor (\path{harbor.docvault.id.vn}) được cấu hình DNS trỏ trực tiếp đến địa chỉ IP Public của AWS Network Load Balancer (NLB) thông qua bản ghi trên Cloudflare (Hình~\ref{fig:cloudflare-dns}). Để cấp phát chứng chỉ SSL/TLS bảo mật, cert-manager sử dụng ClusterIssuer \code{letsencrypt-cloudflare} và giao thức xác thực DNS-01 challenge qua API Token của Cloudflare.
 
-Để có thể cung cấp một cách truy cập công khai bằng URL cho các giao diện như Argo CD (\code{argocd.docvault.id.vn}), hệ thống giám sát Grafana (\code{monitoring.docvault.id.vn}) và private registry Harbor (\code{harbor.docvault.id.vn}), chúng được định tuyến bảo mật qua giải pháp Cloudflare Tunnel thông qua một dịch vụ \code{cloudflared} chạy độc lập bằng docker container trong namespace \code{cloudflare-tunnel} (Hình~\ref{fig:cloudflare-tunnel-routes}). Bằng cách này, các dịch vụ không cần lộ trực tiếp ra Internet mà vẫn có thể truy cập công khai thông qua Cloudflare Tunnel. Tuy nhiên, chỉ riêng Harbor thì cần phải sử dụng IP Public của AWS NLB (như đã nói ở trên) và tắt dịch vụ Proxy của Cloudflare. Lý do cần tắt dịch vụ đó đi là vì Proxy của Cloudflare giới hạn dung lượng upload chỉ 100MB (ở bản free) và các image khi được upload lên Harbor có thể lên đến 200MB hoặc 500MB nếu dành cho phần cache image. 
+Để có thể cung cấp một cách truy cập công khai bằng URL cho các giao diện như Argo CD (\path{argocd.docvault.id.vn}), hệ thống giám sát Grafana (\path{monitoring.docvault.id.vn}) và private registry Harbor (\path{harbor.docvault.id.vn}), chúng được định tuyến bảo mật qua giải pháp Cloudflare Tunnel thông qua một dịch vụ \code{cloudflared} chạy độc lập bằng docker container trong namespace \code{cloudflare-tunnel} (Hình~\ref{fig:cloudflare-tunnel-routes}). Bằng cách này, các dịch vụ không cần lộ trực tiếp ra Internet mà vẫn có thể truy cập công khai thông qua Cloudflare Tunnel. Tuy nhiên, chỉ riêng Harbor thì cần phải sử dụng IP Public của AWS NLB (như đã nói ở trên) và tắt dịch vụ Proxy của Cloudflare. Lý do cần tắt dịch vụ đó đi là vì Proxy của Cloudflare giới hạn dung lượng upload chỉ 100MB (ở bản free) và các image khi được upload lên Harbor có thể lên đến 200MB hoặc 500MB nếu dành cho phần cache image.
 
 \begin{figure}[H]
 \centering
@@ -237,7 +242,7 @@ NetworkPolicy hiện tạo ranh giới truy cập cơ bản cho workload và ing
 
 Hình~\ref{fig:eks-workloads} ghi nhận 58 pod được quản lý trên cụm và các workload tiêu biểu của Argo CD, monitoring và cơ sở dữ liệu đang ở trạng thái \code{Running}.
 
-\section{Quản lý secret và quyền truy cập AWS}
+\subsection{Quản lý secret và quyền truy cập AWS}
 
 DocVault sử dụng External Secrets Operator làm cầu nối giữa Kubernetes và AWS Secrets Manager. \code{SecretStore} \code{aws-secrets-manager} đọc secret từ khu vực triển khai của cluster là \code{ap-southeast-1}. ServiceAccount của operator nhận IAM role thông qua IRSA và chỉ có quyền đọc các secret thuộc prefix của môi trường DocVault. Kubernetes Secret tại runtime được tạo từ tài nguyên \code{ExternalSecret}; vì vậy repository chỉ lưu tham chiếu và cấu trúc ánh xạ, không lưu giá trị bí mật \cite{external_secrets_aws,aws_eks_irsa}.
 
@@ -268,9 +273,12 @@ Pipeline cũng hỗ trợ AWS IAM Roles Anywhere cho Jenkins controller được
 
 Hình~\ref{fig:aws-secrets-manager} thể hiện các nhóm secret dành cho ứng dụng, Keycloak, MongoDB, Harbor, Cosign và Jenkins. Ảnh chỉ hiển thị tên và metadata quản lý, không hiển thị giá trị secret.
 
-\section{Mô hình GitOps với Argo CD}
+\clearpage
+\section{Quy trình DevSecOps với GitOps và CI/CD}
 
-\subsection{App-of-apps và thứ tự đồng bộ}
+\subsection{Mô hình GitOps với Argo CD}
+
+\subsubsection{App-of-apps và thứ tự đồng bộ}
 
 Argo CD triển khai theo mô hình App-of-apps, khởi tạo các application con bằng application gốc là \code{docvault-root}. Application này theo dõi thư mục \code{infra/argocd-apps} trên repo GitOps và tạo các application con. Mô hình App-of-apps cho phép quản lý thống nhất hạ tầng phụ trợ, dịch vụ ứng dụng, ingress và observability \cite{argocd_docs}.
 
@@ -312,13 +320,13 @@ Hình~\ref{fig:argocd-app-of-apps} xác nhận application gốc đang theo dõi
 \caption{Hình chụp dashboard ArgoCD hiển thị các ứng dụng (Ảnh 2)}
 \label{fig:argocd-apps-2}
 \end{figure}
-\subsection{Cập nhật trạng thái mong muốn (desired state) bằng GitOps}
+\subsubsection{Cập nhật trạng thái mong muốn (desired state) bằng GitOps}
 
 Sau khi image được push, Jenkins lấy digest từ registry và cập nhật ba trường \code{repository}, \code{tag}, \code{digest} trong Helm values tương ứng. Tag mặc định là 12 ký tự đầu của Git commit SHA. Pipeline clone riêng nhánh GitOps, commit thay đổi với \code{[skip ci]} để tránh vòng lặp và retry push tối đa ba lần nếu có cập nhật đồng thời.
 
 Nếu thay đổi chỉ liên quan đến manifest Kubernetes, pipeline đồng bộ thư mục \code{infra/k8s} sang nhánh GitOps nhưng giữ lại image reference đang chạy, nên thay đổi cấu hình hạ tầng không vô tình hạ phiên bản image. Argo CD sau đó phát hiện commit mới và reconcile cluster về desired state.
 
-\section{Harbor và bảo mật chuỗi cung ứng phần mềm}
+\subsection{Harbor và bảo mật chuỗi cung ứng phần mềm}
 
 Harbor được triển khai trên EKS với vai trò private container registry của DocVault. Registry sử dụng PersistentVolume gp3, TLS, robot account dành cho Jenkins và image pull secret dành cho workload. Trivy scanner tích hợp hỗ trợ quản lý kết quả quét lỗ hổng của artifact lưu trong registry \cite{harbor_docs}.
 
@@ -379,9 +387,9 @@ Các policy Kyverno được chạy bằng Kyverno CLI trong Jenkins trên manif
 \end{figure}
 Hình~\ref{fig:harbor-repositories} xác nhận các image của web, gateway và microservice được lưu trong project riêng. Hình~\ref{fig:harbor-sbom-signature} và Hình~\ref{fig:Sbom-Cosign} cung cấp bằng chứng về digest, chữ ký và SBOM của artifact. Một số artifact trong ảnh vẫn hiển thị trạng thái \code{Not Scanned}; lý do là khi pipeline thực hiện Cosign signing, pipeline tạo signature cho image và SBOM attestation, với SBOM được tạo ra từ Trivy SBOM generator. Attestation này bị quét không thành công bởi Trivy scanner của Harbor, dẫn đến tình trạng nó là một artifact nằm riêng. Tuy vậy, nó vẫn được lưu với dạng \code{.att}, minh chứng cho việc ký SBOM của pipeline.
 
-\section{Jenkins pipeline}
+\subsection{Jenkins pipeline}
 
-\subsection{Phân tách CI và CD}
+\subsubsection{Phân tách CI và CD}
 
 Pipeline chính nằm trong \code{Jenkinsfile}, còn logic tái sử dụng được tổ chức thành Jenkins Shared Library trong thư mục \code{vars}. Pipeline phân biệt hai chế độ:
 
@@ -392,7 +400,7 @@ Pipeline chính nằm trong \code{Jenkinsfile}, còn logic tái sử dụng đư
 
 Cách phân tách này ngăn việc branch phát triển tạo ra các artifact. Trước khi chạy các stage, pipeline xác định file thay đổi để chỉ chạy phần liên quan. Thay đổi ở service chỉ build service bị ảnh hưởng; thay đổi ở shared library, lockfile hoặc Dockerfile có thể kích hoạt nhiều image. Khi không xác định được diff range tin cậy, pipeline build toàn bộ để ưu tiên tính đúng đắn.
 
-\subsection{Các stage chính}
+\subsubsection{Các stage chính}
 
 Luồng pipeline hiện tại gồm:
 
@@ -419,13 +427,16 @@ Luồng pipeline hiện tại gồm:
 \label{fig:jenkins-stage-view}
 \end{figure}
 
-\section{Các cổng kiểm soát chất lượng và bảo mật}
+\clearpage
+\section{Kiểm soát bảo mật trong pipeline}
 
-\subsection{Secret scanning}
+\subsection{Các cổng kiểm soát chất lượng và bảo mật}
+
+\subsubsection{Secret scanning}
 
 TruffleHog quét filesystem repository trước các bước build. Các thư mục dependency, cache, Terraform working directory và file state/plan được loại trừ để giảm nhiễu. Nếu phát hiện secret, stage fail và report được archive. Cơ chế này giảm nguy cơ credential bị đóng gói vào image hoặc lưu trong lịch sử phát hành.
 
-\subsection{Kiểm thử và chất lượng mã nguồn}
+\subsubsection{Kiểm thử và chất lượng mã nguồn}
 
 Unit test và lint chạy song song để giảm thời gian phản hồi; workspace build chạy sau đó để kiểm tra khả năng biên dịch của toàn monorepo. SonarQube phân tích source trong \code{apps}, \code{services} và \code{libs}. Tham số \code{ENFORCE\_SONAR\_QG} mặc định bật, vì vậy pipeline fail nếu Quality Gate không đạt hoặc hết thời gian chờ \cite{sonarqube_docs}.
 
@@ -437,7 +448,7 @@ Unit test và lint chạy song song để giảm thời gian phản hồi; works
 \end{figure}
 
 
-\subsection{SCA và filesystem scanning}
+\subsubsection{SCA và filesystem scanning}
 
 OWASP Dependency-Check phân tích dependency và tạo report HTML/JSON/log. Chính sách kỹ thuật đặt ngưỡng fail ở CVSS từ 7 trở lên. 
 
@@ -446,7 +457,7 @@ Trivy filesystem quét vulnerability, secret và misconfiguration trên snapshot
 
 
 
-\subsection{IaC và policy-as-code}
+\subsubsection{IaC và policy-as-code}
 
 Checkov quét Terraform, Kubernetes và Helm để phát hiện cấu hình rủi ro \cite{checkov_docs}. Terraform Validate chạy \code{fmt -check}, \code{init -backend=false} và \code{validate}. Kyverno CLI render toàn bộ Helm values thực tế, sau đó áp dụng policy lên manifest Kubernetes trước khi image được phát hành \cite{kyverno_cli}.
 
@@ -476,7 +487,7 @@ Ba lớp kiểm tra bổ sung cho nhau: Terraform Validate kiểm tra tính hợ
 \caption{Kết quả Kyverno}
 \label{fig:kyverno-artifact}
 \end{figure}
-\section{Build, quét và phát hành container image}
+\subsection{Build, quét và phát hành container image}
 
 Backend sử dụng \code{Dockerfile.backend} với build argument xác định service; frontend sử dụng Dockerfile riêng trong \code{apps/web}. Các image được build theo batch để tận dụng song song nhưng vẫn giới hạn tải trên Jenkins agent. BuildKit lấy và cập nhật cache trong Harbor, giúp giảm thời gian build lại dependency không đổi.
 \begin{figure}[H]
@@ -494,19 +505,19 @@ Backend sử dụng \code{Dockerfile.backend} với build argument xác định 
 \end{figure}
 Sau build, Trivy quét từng image và fail nếu có lỗ hổng CRITICAL. Chỉ các image vượt qua gate mới được push. Pipeline đăng nhập registry bằng credential tạm trong thư mục Docker config riêng và xóa sau khi hoàn tất. Image triển khai không phụ thuộc tag mutable mà được cập nhật cả tag Git SHA lẫn registry digest.
 
-So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes kéo đúng artifact đã được quét. Nếu cùng một tag bị ghi đè, digest trong Helm values vẫn không thay đổi. Đây là kiểm soát quan trọng đối với tính toàn vẹn của chuỗi cung ứng phần mềm.
+So với triển khai chỉ dựa trên tag, digest pin bảo đảm Kubernetes kéo đúng artifact đã được quét. Nếu cùng một tag bị ghi đè, digest trong Helm values vẫn không thay đổi. Đây là kiểm soát quan trọng đối với tính toàn vẹn của chuỗi cung ứng phần mềm và là bước nền trước khi chuẩn hóa provenance/attestation theo SLSA \cite{slsa_framework}.
 
-\section{Kiểm tra sau triển khai}
+\subsection{Kiểm tra sau triển khai}
 
-\subsection{Argo CD health gate}
+\subsubsection{Argo CD health gate}
 
 Khi \code{RUN\_ARGO\_HEALTH\_CHECK=true}, Jenkins dùng kubeconfig credential hoặc context hiện tại để đọc các Argo CD Application. Pipeline chờ đến khi gateway, metadata, document, workflow, audit, notification và web đồng thời đạt \code{Synced} và \code{Healthy}. Nếu quá timeout, release fail. Vai trò của Argo CD ở đây vượt ra ngoài việc thực hiện CD: nó còn cung cấp trạng thái reconcile có thể kiểm chứng \cite{argocd_docs}.
 
-\subsection{Smoke test}
+\subsubsection{Smoke test}
 
 Smoke test gọi web root và endpoint \code{/api/health}. Web root chấp nhận HTTP 2xx hoặc 3xx, còn health endpoint yêu cầu 2xx. Mỗi request được retry để hấp thụ độ trễ rollout ngắn. Bước này không thay thế E2E nghiệp vụ, nhưng phát hiện nhanh lỗi ingress, service routing, container startup hoặc cấu hình runtime.
 
-\subsection{DAST bằng OWASP ZAP}
+\subsubsection{DAST bằng OWASP ZAP}
 
 OWASP ZAP baseline scan chạy khi \code{RUN\_ZAP=true} và target có thể truy cập từ Jenkins. Pipeline tạo report HTML và JSON, archive làm bằng chứng, đồng thời fail khi report chứa finding High/Critical. Cảnh báo mức thấp hơn được giữ để review thay vì bỏ qua \cite{zap_baseline}.
 
@@ -539,7 +550,8 @@ OWASP ZAP baseline scan chạy khi \code{RUN\_ZAP=true} và target có thể tru
 \end{figure}
 
 
-\section{Vận hành: giám sát, log và khôi phục}
+\clearpage
+\section{Vận hành, giám sát và khôi phục}
 
 Phần này gom các năng lực vận hành của hệ thống sau khi triển khai: giám sát số liệu, tập trung log và khả năng khôi phục dữ liệu. Hai năng lực đầu được trình bày ngay dưới đây; năng lực khôi phục dựa trên cơ chế sao lưu cơ sở dữ liệu đã mô tả ở Mục~\ref{subsec:db-backup}.
 
@@ -587,7 +599,10 @@ Giám sát và log cho biết hệ thống đang chạy ra sao; khôi phục quy
 Phần còn thiếu để khép vòng là diễn tập khôi phục định kỳ. Backup chỉ có giá trị khi đã chứng minh khôi phục được, nên bước tiếp theo là khôi phục vào môi trường cô lập, đối chiếu số bản ghi và index, chạy lại xác minh chuỗi băm audit, rồi ghi nhận RPO và RTO đo được. Cho tới khi có kết quả diễn tập, các tham số như chu kỳ oplog 10 phút chỉ phản ánh năng lực đã cấu hình. Tương tự, Loki chưa bật persistence nên log lịch sử chưa bền vững qua restart, và alert rule nghiệp vụ vẫn cần bổ sung trước khi vận hành dài hạn.
 
 
-\section{Mapping kiểm soát, công cụ và bằng chứng}
+\clearpage
+\section{Đánh giá trạng thái triển khai}
+
+\subsection{Mapping kiểm soát, công cụ và bằng chứng}
 
 \begin{longtable}{p{0.18\textwidth}p{0.18\textwidth}p{0.31\textwidth}p{0.21\textwidth}}
 \caption{Mapping kiểm soát DevSecOps với công cụ và bằng chứng}
@@ -618,9 +633,9 @@ Cloud security & IRSA, Secrets Manager, KMS & IAM role, ExternalSecret, encrypte
 \bottomrule
 \end{longtable}
 
-\section{Đánh giá trạng thái triển khai}
+\subsection{Nhận xét trạng thái triển khai}
 
-Kết quả đối chiếu mã nguồn, cấu hình hạ tầng và ảnh chụp thực nghiệm cho thấy DocVault đã triển khai các thành phần cốt lõi của quy trình DevSecOps: IaC cho EKS, các cổng kiểm soát trong CI, private registry, image digest, SBOM, ký artifact bằng Cosign, GitOps, kiểm tra sau triển khai, quản lý bí mật, thu thập metric/log và backup cơ sở dữ liệu.
+Kết quả đối chiếu mã nguồn, cấu hình hạ tầng và bằng chứng triển khai cho thấy DocVault đã triển khai các thành phần cốt lõi của quy trình DevSecOps: IaC cho EKS, các cổng kiểm soát trong CI, private registry, image digest, SBOM, ký artifact bằng Cosign, GitOps, kiểm tra sau triển khai, quản lý bí mật, thu thập metric/log và backup cơ sở dữ liệu.
 
 Các giới hạn hiện tại gồm:
 
@@ -631,7 +646,9 @@ Các giới hạn hiện tại gồm:
   \item NetworkPolicy chưa giới hạn egress theo từng dependency.
   \item Loki chưa có persistence và cấu hình Grafana cần được đưa hoàn toàn sang secret manager.
   \item Backup PostgreSQL và MongoDB đã được cấu hình nhưng cần diễn tập restore và ghi nhận RPO/RTO.
-  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestation bằng Kyverno).
+  \item Harbor đã lưu SBOM cho artifact, nhưng provenance chưa được chuẩn hóa theo SLSA/in-toto (chưa xác thực SBOM attestation bằng Kyverno) \cite{slsa_framework}.
 \end{itemize}
 
 Những giới hạn trên xác định ranh giới giữa môi trường đồ án có kiểm soát và hệ thống production. Các bước gia cố tiếp theo gồm remote Terraform state có locking, private node group, admission control, provenance chuẩn hóa, bắt buộc xác minh chữ ký image, NetworkPolicy theo nguyên tắc đặc quyền tối thiểu, cảnh báo vận hành và kiểm thử phục hồi định kỳ.
+
+Sau khi hệ thống đã được hiện thực và triển khai, bước tiếp theo là kiểm tra mức độ đáp ứng của các luồng nghiệp vụ, kiểm soát bảo mật và chuỗi phát hành. Nội dung này được trình bày trong chương kiểm thử và đánh giá hệ thống.
